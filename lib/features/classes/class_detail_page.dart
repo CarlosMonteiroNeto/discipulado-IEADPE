@@ -178,7 +178,11 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
   }
 
   Widget _content(BuildContext context) {
-    if (_editing && _classGroup != null) {
+    // Editing is status-gated (S08): completed and archived classes expose no
+    // ClassForm, even if a stale tap set the flag before a reload.
+    if (_editing &&
+        _classGroup != null &&
+        _classGroup!.status == ClassStatus.active) {
       final ClassGroup classGroup = _classGroup!;
       return SingleChildScrollView(
         child: ClassForm(
@@ -327,7 +331,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
               '${formatBrazilianDate(session.date)} · '
               '${sessionStatusLabel(session.status)}',
             ),
-            trailing: active || session.status != SessionStatus.canceled
+            trailing: active && session.status != SessionStatus.canceled
                 ? AppButton(
                     key: ClassDetailPage.openSessionKey(session.id),
                     label: 'Abrir',
@@ -342,13 +346,14 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           spacing: AppSpacing.x2,
           runSpacing: AppSpacing.x2,
           children: <Widget>[
-            AppButton(
-              key: ClassDetailPage.editKey,
-              label: 'Editar',
-              icon: Icons.edit_outlined,
-              variant: AppButtonVariant.secondary,
-              onPressed: () => setState(() => _editing = true),
-            ),
+            if (classGroup.status == ClassStatus.active)
+              AppButton(
+                key: ClassDetailPage.editKey,
+                label: 'Editar',
+                icon: Icons.edit_outlined,
+                variant: AppButtonVariant.secondary,
+                onPressed: () => setState(() => _editing = true),
+              ),
             if (classGroup.status == ClassStatus.active)
               AppButton(
                 key: ClassDetailPage.completeKey,

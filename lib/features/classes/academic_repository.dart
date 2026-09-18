@@ -239,11 +239,20 @@ class AttendanceRosterEntry {
 }
 
 /// Session plus its complete roster, as returned by `getSessionAttendance`.
+///
+/// [classStatus] is the owning class lifecycle status when the backend supplies
+/// it; the attendance editor needs it to enforce the S08 read-only rule for a
+/// session inside a completed or archived class.
 class AttendanceView {
-  const AttendanceView({required this.session, required this.entries});
+  const AttendanceView({
+    required this.session,
+    required this.entries,
+    this.classStatus,
+  });
 
   final Session session;
   final List<AttendanceRosterEntry> entries;
+  final ClassStatus? classStatus;
 
   factory AttendanceView.fromJson(JsonMap json) {
     final JsonMap session = json['session'] is Map
@@ -253,8 +262,12 @@ class AttendanceView {
     if (rawRoster is! List) {
       throw const DataFormatException('Missing attendance roster.');
     }
+    final String? rawClassStatus = optionalString(json, 'classStatus');
     return AttendanceView(
       session: Session.fromJson(session),
+      classStatus: rawClassStatus == null
+          ? null
+          : ClassStatus.fromWire(rawClassStatus),
       entries: rawRoster
           .map((Object? item) {
             if (item is! Map) {
@@ -485,19 +498,31 @@ class AcademicRepository {
     return AcademicMutationResult.fromJson(response);
   }
 
+  /// Reads every session of a class by following the opaque cursor, so a class
+  /// with more than one page of sessions is fully reachable (S09).
   Future<List<Session>> listSessions({
     required String congregationId,
     required String classId,
   }) async {
-    final PageResult page = await gateway.query(
-      QueryRequest(
-        resource: QueryResource.sessions,
-        congregationId: congregationId,
-        equalityFilters: <String, Object?>{'classId': classId},
-        limit: maxPageSize,
-      ),
-    );
-    return page.items.map(Session.fromJson).toList(growable: false);
+    final List<Session> sessions = <Session>[];
+    String? cursor;
+    while (true) {
+      final PageResult page = await gateway.query(
+        QueryRequest(
+          resource: QueryResource.sessions,
+          congregationId: congregationId,
+          equalityFilters: <String, Object?>{'classId': classId},
+          limit: maxPageSize,
+          cursor: cursor,
+        ),
+      );
+      sessions.addAll(page.items.map(Session.fromJson));
+      cursor = page.nextCursor;
+      if (cursor == null) {
+        break;
+      }
+    }
+    return sessions;
   }
 
   /// Reads the session plus its roster. The roster preserves the historical

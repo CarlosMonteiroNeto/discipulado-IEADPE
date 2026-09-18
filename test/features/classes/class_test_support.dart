@@ -184,7 +184,12 @@ JsonMap rosterEntryJson({
 JsonMap attendanceViewJson({
   required JsonMap session,
   required List<JsonMap> roster,
-}) => <String, Object?>{'session': session, 'roster': roster};
+  String? classStatus,
+}) => <String, Object?>{
+  'session': session,
+  'roster': roster,
+  'classStatus': ?classStatus,
+};
 
 JsonMap congregationJson({
   required String id,

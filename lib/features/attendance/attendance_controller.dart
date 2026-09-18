@@ -10,12 +10,17 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../domain/attendance.dart';
+import '../../domain/class_group.dart';
 import '../../domain/ports.dart';
 import '../../domain/session.dart';
 import '../../domain/validation.dart';
 import '../../ui/async_content.dart';
 import '../auth/auth_controller.dart';
 import '../classes/academic_repository.dart';
+
+/// The last mutating command that failed, so [AttendanceController.retry]
+/// re-issues exactly that operation with its retained request identity.
+enum AttendanceOperation { save, finalize, cancel }
 
 class AttendanceController extends ChangeNotifier implements SessionScoped {
   AttendanceController({
@@ -35,6 +40,8 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   AsyncViewState<List<AttendanceRosterEntry>> _state =
       const AsyncViewState<List<AttendanceRosterEntry>>.loading();
   Session? _session;
+  ClassStatus? _classStatus;
+  AttendanceOperation? _lastFailedOperation;
   List<AttendanceRosterEntry> _roster = const <AttendanceRosterEntry>[];
   final Map<String, AttendanceStatus> _marks = <String, AttendanceStatus>{};
   Map<String, AttendanceStatus>? _serverMarks;
@@ -87,6 +94,27 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
 
   Map<String, AttendanceStatus>? get serverMarks => _serverMarks;
 
+  /// The last failed mutating command, so [retry] re-issues exactly it.
+  AttendanceOperation? get lastFailedOperation => _lastFailedOperation;
+
+  /// The revision the next mutation will carry; updated from the confirmed
+  /// result so a following cancel does not ship a stale revision.
+  int? get expectedRevision => _expectedRevision;
+
+  /// True when the editor must not accept changes: the session is canceled or
+  /// the owning class is completed/archived (S08).
+  bool get isReadOnly {
+    final Session? session = _session;
+    if (session == null) {
+      return false;
+    }
+    if (session.status == SessionStatus.canceled) {
+      return true;
+    }
+    return _classStatus == ClassStatus.completed ||
+        _classStatus == ClassStatus.archived;
+  }
+
   /// The retained request identity, reused by [retry] after a timeout.
   String? get requestId => _requestId;
 
@@ -125,6 +153,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
 
   void _applyView(AttendanceView view) {
     _session = view.session;
+    _classStatus = view.classStatus;
     _roster = view.entries;
     _marks
       ..clear()
@@ -140,6 +169,9 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   }
 
   void mark(String enrollmentId, AttendanceStatus status) {
+    if (isReadOnly) {
+      return;
+    }
     _marks[enrollmentId] = status;
     _dirty = true;
     _validationMessage = null;
@@ -147,8 +179,11 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   }
 
   /// Explicit "Marcar todos presentes"; the change stays unsaved until
-  /// `Salvar chamada` (S08).
+  /// `Salvar chamada` (S08). A read-only session never accepts it.
   void markAllPresent() {
+    if (isReadOnly) {
+      return;
+    }
     for (final AttendanceRosterEntry entry in _roster) {
       _marks[entry.enrollmentId] = AttendanceStatus.present;
     }
@@ -174,11 +209,24 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
 
   Future<bool> save({required bool finalize}) => _submit(finalize: finalize);
 
-  /// Explicitly retries a timed-out command with the same request identity.
-  Future<bool> retry({required bool finalize}) => _submit(finalize: finalize);
+  /// Re-issues exactly the command that failed, with its retained requestId
+  /// and finalize flag, so a timed-out finalize is never downgraded to a save
+  /// and a failed cancel is never re-sent as saveAttendance.
+  Future<bool> retry({bool? finalize}) {
+    switch (_lastFailedOperation) {
+      case AttendanceOperation.finalize:
+        return _submit(finalize: true);
+      case AttendanceOperation.save:
+        return _submit(finalize: false);
+      case AttendanceOperation.cancel:
+        return cancelSession();
+      case null:
+        return _submit(finalize: finalize ?? false);
+    }
+  }
 
   Future<bool> _submit({required bool finalize}) async {
-    if (_submitting) {
+    if (_submitting || isReadOnly) {
       return false;
     }
     if (finalize) {
@@ -216,13 +264,20 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
       _conflictMessage = null;
       _serverMarks = null;
       _localBeforeReload = null;
+      _lastFailedOperation = null;
       notifyListeners();
+      // Reload the authoritative session/roster so the header reflects the
+      // finalized or corrected status and dependent progress can refresh (S08).
+      await _refreshAuthoritative();
       return true;
     } on AppFailure catch (failure) {
       if (_disposed || generation != _generation) {
         return false;
       }
       _submitting = false;
+      _lastFailedOperation = finalize
+          ? AttendanceOperation.finalize
+          : AttendanceOperation.save;
       if (failure.code == AppFailureCode.conflict) {
         _conflictMessage = failure.message;
         _localBeforeReload = Map<String, AttendanceStatus>.of(_marks);
@@ -232,6 +287,28 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
       // The request identity is retained for an explicit same-command retry.
       notifyListeners();
       return false;
+    }
+  }
+
+  /// Re-reads the authoritative session and roster after a confirmed mutation
+  /// instead of only advancing the local revision.
+  Future<void> _refreshAuthoritative() async {
+    final int generation = ++_generation;
+    try {
+      final AttendanceView view = await repository.getSessionAttendance(
+        congregationId: congregationId,
+        classId: classId,
+        sessionId: sessionId,
+      );
+      if (_disposed || generation != _generation) {
+        return;
+      }
+      _applyView(view);
+      _dirty = false;
+      _state = AsyncViewState<List<AttendanceRosterEntry>>.data(_roster);
+      notifyListeners();
+    } on AppFailure {
+      // The confirmed local state stands; the next load reconciles.
     }
   }
 
@@ -277,23 +354,30 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
 
   Future<bool> cancelSession() async {
     final Session? session = _session;
-    if (session == null || _submitting) {
+    if (session == null || _submitting || isReadOnly) {
       return false;
     }
     _submitting = true;
     _errorMessage = null;
+    // The same revision source as the save path, so a cancel after a
+    // successful save does not ship the stale cached session revision.
+    final int expectedRevision = _expectedRevision ?? session.revision;
+    final String requestId = _requestId ??= repository.newRequestId();
     notifyListeners();
     try {
       await repository.cancelSession(
         congregationId: congregationId,
         classId: classId,
         sessionId: sessionId,
-        expectedRevision: session.revision,
+        expectedRevision: expectedRevision,
+        requestId: requestId,
       );
       if (_disposed) {
         return false;
       }
       _submitting = false;
+      _requestId = null;
+      _lastFailedOperation = null;
       notifyListeners();
       await load();
       return true;
@@ -302,6 +386,9 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
         return false;
       }
       _submitting = false;
+      // The request identity is retained so an explicit retry re-issues the
+      // cancel command rather than a plain attendance save.
+      _lastFailedOperation = AttendanceOperation.cancel;
       _errorMessage = failure.message;
       notifyListeners();
       return false;
@@ -319,6 +406,8 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   void clearSessionData() {
     _generation++;
     _session = null;
+    _classStatus = null;
+    _lastFailedOperation = null;
     _roster = const <AttendanceRosterEntry>[];
     _marks.clear();
     _serverMarks = null;

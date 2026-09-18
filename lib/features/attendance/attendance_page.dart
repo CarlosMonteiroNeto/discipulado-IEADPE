@@ -94,7 +94,7 @@ class _AttendancePageState extends State<AttendancePage> {
               key: AttendancePage.retryKey,
               label: 'Tentar novamente',
               variant: AppButtonVariant.secondary,
-              onPressed: () => controller.retry(finalize: false),
+              onPressed: () => controller.retry(),
             ),
           ),
         ],
@@ -108,7 +108,7 @@ class _AttendancePageState extends State<AttendancePage> {
                 AttendanceRow(
                   entry: roster[index],
                   status: controller.statusOf(roster[index].enrollmentId),
-                  enabled: !controller.isSubmitting,
+                  enabled: !controller.isReadOnly && !controller.isSubmitting,
                   autofocusFirstChoice: index == 0,
                   onChanged: (AttendanceStatus status) =>
                       controller.mark(roster[index].enrollmentId, status),
@@ -134,10 +134,13 @@ class _AttendancePageState extends State<AttendancePage> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           Text(
-            '${formatBrazilianDate(session.date)} · '
-            '${_sessionStatusLabel(session.status)}',
+            formatBrazilianDate(session.date),
             style: Theme.of(context).textTheme.bodyMedium
                 ?.copyWith(color: tokens.onSurfaceVariant),
+          ),
+          Text(
+            _sessionStatusLabel(session.status),
+            style: Theme.of(context).textTheme.labelLarge,
           ),
         ],
       ),
@@ -214,6 +217,7 @@ class _AttendancePageState extends State<AttendancePage> {
   Widget _actions(BuildContext context, List<AttendanceRosterEntry> roster) {
     final AttendanceController controller = widget.controller;
     final bool busy = controller.isSubmitting;
+    final bool readOnly = controller.isReadOnly;
     return Wrap(
       alignment: WrapAlignment.end,
       spacing: AppSpacing.x2,
@@ -223,24 +227,28 @@ class _AttendancePageState extends State<AttendancePage> {
           key: AttendancePage.markAllKey,
           label: 'Marcar todos presentes',
           variant: AppButtonVariant.secondary,
-          onPressed: busy || roster.isEmpty ? null : controller.markAllPresent,
+          onPressed: busy || readOnly || roster.isEmpty
+              ? null
+              : controller.markAllPresent,
         ),
         AppButton(
           key: AttendancePage.cancelKey,
           label: 'Cancelar chamada',
           variant: AppButtonVariant.text,
-          onPressed: busy ? null : _cancelSession,
+          onPressed: busy || readOnly ? null : _cancelSession,
         ),
         AppButton(
           key: AttendancePage.saveKey,
           label: 'Salvar chamada',
           isSubmitting: busy,
-          onPressed: () => controller.save(finalize: false),
+          onPressed: readOnly ? null : () => controller.save(finalize: false),
         ),
         AppButton(
           key: AttendancePage.finalizeKey,
           label: 'Salvar e finalizar',
-          onPressed: busy ? null : () => controller.save(finalize: true),
+          onPressed: busy || readOnly
+              ? null
+              : () => controller.save(finalize: true),
         ),
       ],
     );

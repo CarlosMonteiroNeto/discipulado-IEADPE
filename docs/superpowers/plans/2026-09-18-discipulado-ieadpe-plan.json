@@ -819,6 +819,42 @@
         "The correction is confined to the task-10-owned student form file: no other feature is restyled, no S05 validation rule, port contract or existing acceptance behavior is weakened, and no test committed by another completed task is modified. Any strengthened assertion lives in a newly authored test file or in the task-10-owned test file this correction is allowed to extend; no existing assertion is deleted or relaxed.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the submitted-payload assertion failing against the pre-fix raw-text behavior. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 24,
+      "title": "Correct the task 11 class-edit gating, attendance read-only, retry fidelity and stale-revision findings",
+      "summary": "Remediate the task 11 SEND_BACK findings within the classes/attendance feature: gate class editing on active status, apply a real read-only state to canceled sessions and to sessions in completed/archived classes across the attendance editor and the session list, make error retry re-issue exactly the command that failed with its retained requestId and finalize flag, refresh authoritative session status and progress after a successful save/finalize, and send the controller's expected revision on cancellation. Also close the in-scope polish and pagination minors.",
+      "corrects": 11,
+      "spec_refs": [
+        "S04",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/classes/class_detail_page.dart",
+        "lib/features/classes/classes_page.dart",
+        "lib/features/classes/enrollment_editor.dart",
+        "lib/features/classes/academic_repository.dart",
+        "lib/features/attendance/attendance_controller.dart",
+        "lib/features/attendance/attendance_page.dart"
+      ],
+      "depends_on": [
+        11
+      ],
+      "acceptance": [
+        "Class editing is status-gated as S08 requires: class_detail_page.dart renders the Editar affordance only when the loaded class status is active. Completed and archived classes expose no edit control and cannot open ClassForm, while archival for completed classes remains available and read-only detail remains visible. A newly authored widget test loads a completed class and an archived class, asserts no edit affordance is present and ClassForm is not pushed, and a companion assertion proves an active class still opens the form.",
+        "The attendance editor and the class session list honor session and class status as the read-only gate required by S08: attendance_controller exposes an explicit read-only state that is true when the session is canceled or the owning class is completed or archived; attendance_page disables row marking, the Presente/Ausente/Justificado/Não marcado controls, Marcar todos presentes, Salvar chamada and Salvar e finalizar for that state while still rendering the frozen roster and existing marks for reading; and class_detail_page.dart renders Abrir only for sessions that may still be edited, never for a canceled session or a session in a completed/archived class. Newly authored tests assert a canceled session and a session in a completed class expose no editable/Salvar/Finalizar affordance (and no editable Abrir link) and that an active open session remains fully editable.",
+        "Retry re-issues exactly the command that failed instead of a generic one: the controller records the last failed operation with its finalize flag (save, save-and-finalize or cancel) and Tentar novamente re-submits exactly that operation with the retained requestId. A timed-out finalize is never downgraded to a plain save under the same receipt, and a failed cancelSession is never re-issued as saveAttendance. A newly authored test asserts a timed-out finalize retries with finalize true and the same requestId, and that a failed cancel retries as cancelSession with its retained requestId; the retained request identity and the visible save-versus-finalize distinction are preserved.",
+        "Successful mutations refresh authoritative state: after a successful save or save-and-finalize the controller reloads the authoritative session/roster (or updates the cached session status and revision from the confirmed result) so the header reflects the finalized or corrected status and dependent progress counts refresh, instead of only advancing expectedRevision/requestId/dirty. A newly authored test asserts the displayed status label changes after finalization and that progress is re-read after a successful change.",
+        "cancelSession sends the controller's expected revision: the cancel payload uses the same `_expectedRevision ?? session.revision` source as the save path, so canceling after a successful save/finalize does not ship the stale cached session revision and provoke an avoidable conflict. A newly authored test performs a successful save and then cancels, asserting the cancel payload carries the updated revision.",
+        "The in-scope polish and pagination minors are closed without touching unowned shared presentation: enrollment_editor.dart's close-dialog error uses the app_theme token instead of Theme.of(context).colorScheme.error; classes_page.dart filter-control widths come from the app_theme/AppSizes constants instead of hardcoded 220/280 literals; and listSessions no longer silently truncates at maxPageSize, following nextCursor (or rendering explicit pagination) so a class with more than 100 sessions is fully reachable per S09. Where consolidating the duplicated dropdown/Chip/CircularProgressIndicator styling would require a new shared lib/ui primitive owned by task 8, that consolidation is recorded as an explicit follow-up for a presentation corrective rather than performed here, and existing lib/ui primitives are reused instead of adding new inline styling.",
+        "The correction stays inside the task 11 classes/attendance feature and the listed repository/controller files: no S11 port contract, backend guard, validation or atomicity behavior is weakened, and completed/archived and canceled records remain readable. The frozen historical-name rendering evidence is strengthened to assert the rendered name comes from the authoritative attendance record rather than a fixture round-trip. New or strengthened tests live in newly authored test files or in the task-11-owned test files this correction is allowed to extend; tests committed by other completed tasks are never modified and no existing assertion is deleted or relaxed.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the newly authored or strengthened tests failing against the pre-fix behavior (unconditional Editar, editable canceled session, downgraded finalize retry, stale status after finalize, stale cancel revision). If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

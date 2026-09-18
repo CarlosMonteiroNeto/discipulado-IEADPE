@@ -375,7 +375,7 @@ class _CloseEnrollmentDialogState extends State<_CloseEnrollmentDialog> {
             const SizedBox(height: AppSpacing.x2),
             Text(
               _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+              style: TextStyle(color: AppTheme.tokensOf(context).error),
             ),
           ],
         ],

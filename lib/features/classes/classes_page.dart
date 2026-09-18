@@ -33,6 +33,11 @@ class ClassesPage extends StatefulWidget {
   static const Key nextPageKey = Key('classes-next-page');
   static const Key previousPageKey = Key('classes-previous-page');
 
+  /// Filter control widths derive from the shared [AppSizes] content scale
+  /// instead of page-local literals (S10).
+  static const double filterControlWidth = AppSizes.maxContentWidth / 5;
+  static const double searchControlWidth = AppSizes.maxContentWidth / 4;
+
   @override
   State<ClassesPage> createState() => _ClassesPageState();
 }
@@ -88,6 +93,11 @@ class _ClassesPageState extends State<ClassesPage> {
     );
   }
 
+  // Follow-up (presentation corrective owned by task 8): the filter dropdowns,
+  // archived chip and loading state are assembled from the existing lib/ui
+  // primitives. Consolidating them into a dedicated shared filter/loading
+  // control requires a new lib/ui primitive and is intentionally not performed
+  // in this corrective; no new inline styling system is introduced here.
   Widget _filters(BuildContext context) {
     final ClassQuery query = widget.controller.query;
     final bool scoped = query.congregationId != null;
@@ -105,7 +115,7 @@ class _ClassesPageState extends State<ClassesPage> {
       children: <Widget>[
         if (widget.controller.isSupervisor)
           SizedBox(
-            width: 220,
+            width: ClassesPage.filterControlWidth,
             child: DropdownButtonFormField<String?>(
               key: ClassesPage.congregationFilterKey,
               initialValue: query.congregationId,
@@ -130,7 +140,7 @@ class _ClassesPageState extends State<ClassesPage> {
             ),
           ),
         SizedBox(
-          width: 280,
+          width: ClassesPage.searchControlWidth,
           child: AppTextField(
             key: ClassesPage.searchFieldKey,
             label: 'Buscar por nome',
@@ -139,7 +149,7 @@ class _ClassesPageState extends State<ClassesPage> {
           ),
         ),
         SizedBox(
-          width: 220,
+          width: ClassesPage.filterControlWidth,
           child: DropdownButtonFormField<ClassStatus?>(
             key: ClassesPage.statusFilterKey,
             initialValue: query.status,
