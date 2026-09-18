@@ -706,6 +706,30 @@
         "The fixes stay inside the shared presentation unit, do not weaken any existing acceptance behavior or public primitive contract, and do not introduce scattered restyling in feature code. Task 8's test files may be extended with stronger assertions but no assertion is deleted or relaxed; tests committed by other completed tasks are never modified.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the added or extended tests. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 20,
+      "title": "Correct the task 19 elevated-button fill/ring mapping regression",
+      "summary": "Remediate the task 19 SEND_BACK Important finding: elevatedButtonTheme declares its fill as tokens.primary with primary/error ring targets, but Material 3 ElevatedButton is surface-filled (ColorScheme.surfaceContainerLow falls back to surface in this custom scheme), so its focus ring and pressed/hovered overlay resolve to the same color as its own background and become invisible. Make the style's declared fill match the background Material 3 actually renders and cover the elevated family in the drawn-focus-side and overlay contrast tests.",
+      "corrects": 19,
+      "spec_refs": [
+        "S03",
+        "S10",
+        "S13"
+      ],
+      "touches": [
+        "lib/ui/app_theme.dart"
+      ],
+      "depends_on": [
+        19
+      ],
+      "acceptance": [
+        "elevatedButtonTheme no longer computes its focus ring and control overlay against a fill other than the background Material 3 actually renders. Either it declares `fill: tokens.surface` with no `ringFills` (treating elevated like the other surface-filled families), or its ButtonStyle sets an explicit backgroundColor/foregroundColor (or explicit overlay colors) so the rendered fill equals the color the ring and overlay are measured against, accounting for ColorScheme.surfaceContainerLow falling back to surface in this custom scheme. No style may declare primary/error ring targets while its actual background is a surface color, and the public shared button primitive is not weakened.",
+        "The drawn-focus-side token test is non-vacuous for the elevated family: it resolves elevatedButtonTheme's actual background (resolving the surfaceContainerLow fallback rather than assuming a declared fill) and asserts the focused side reaches >=3:1 against it in both light and dark modes. The test fails against the pre-fix mapping, where in light mode the ring is white and in dark mode #101418 over an equal background. The filled, outlined and text family assertions already present are preserved and none is relaxed.",
+        "The control-overlay token test resolves the elevated background and asserts the pressed/focused/hovered overlay is measurably distinct from the fill it is composited over in both light and dark modes, so a 20%-alpha surface-colored overlay is not composited over a surface background. The filled primary and error/danger overlay assertions added by task 19 remain.",
+        "The correction is confined to the shared presentation unit: no feature code is restyled, no public primitive contract is weakened, and no existing assertion is deleted or relaxed. Tests committed by unrelated completed tasks are not modified; the stronger assertions live in the same theme-token test files owned by the task 8/19 presentation unit or in a newly authored test file.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the added elevated focused-side and overlay assertions failing under the pre-fix mapping. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

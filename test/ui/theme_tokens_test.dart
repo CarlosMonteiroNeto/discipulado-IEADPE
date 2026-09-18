@@ -119,6 +119,43 @@ void main() {
     }
   });
 
+  test('the elevated focus side clears the background Material 3 renders', () {
+    for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
+      final background = _elevatedBackground(theme);
+      final side = theme.elevatedButtonTheme.style!.side!.resolve(
+        const <WidgetState>{WidgetState.focused},
+      );
+      expect(side, isNotNull);
+      expect(
+        appContrastRatio(side!.color, background),
+        greaterThanOrEqualTo(3.0),
+        reason: 'elevated focus ring vs its rendered background $background',
+      );
+    }
+  });
+
+  test('the elevated overlay is distinct from its rendered background', () {
+    for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
+      final background = _elevatedBackground(theme);
+      final overlay = theme.elevatedButtonTheme.style!.overlayColor!;
+      for (final state in <WidgetState>[
+        WidgetState.pressed,
+        WidgetState.focused,
+        WidgetState.hovered,
+      ]) {
+        final color = overlay.resolve(<WidgetState>{state});
+        expect(color, isNotNull, reason: 'no overlay for $state');
+        final blended = Color.alphaBlend(color!, background);
+        expect(blended, isNot(equals(background)));
+        expect(
+          appContrastRatio(blended, background),
+          greaterThanOrEqualTo(1.1),
+          reason: 'elevated overlay for $state must be perceptible',
+        );
+      }
+    }
+  });
+
   test('the dialog shape uses the shared dialog radius token', () {
     for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
       final shape = theme.dialogTheme.shape as RoundedRectangleBorder;
@@ -149,4 +186,16 @@ void main() {
       const BorderRadius.all(Radius.circular(AppRadii.control)),
     );
   });
+}
+
+/// Resolves the background Material 3 actually paints for an ElevatedButton:
+/// an explicitly declared ButtonStyle background when set, otherwise
+/// [ColorScheme.surfaceContainerLow], which falls back to surface here.
+Color _elevatedBackground(ThemeData theme) {
+  final Color? declared = theme.elevatedButtonTheme.style?.backgroundColor
+      ?.resolve(const <WidgetState>{});
+  if (declared != null && declared.a > 0) {
+    return declared;
+  }
+  return theme.colorScheme.surfaceContainerLow;
 }

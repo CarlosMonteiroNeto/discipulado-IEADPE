@@ -277,12 +277,12 @@ abstract final class AppTheme {
           ringFills: <Color>[tokens.primary, tokens.error],
         ),
       ),
+      // Material 3 ElevatedButton is surface-filled: its background is
+      // ColorScheme.surfaceContainerLow, which falls back to surface in this
+      // custom scheme. Declaring primary here would measure the ring and
+      // overlay against a fill the button never renders.
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: _buttonStyle(
-          tokens,
-          fill: tokens.primary,
-          ringFills: <Color>[tokens.primary, tokens.error],
-        ),
+        style: _buttonStyle(tokens, fill: tokens.surface),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: _buttonStyle(
