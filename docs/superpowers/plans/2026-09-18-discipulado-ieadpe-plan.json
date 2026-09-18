@@ -171,7 +171,8 @@
         "Edit preserves ID and creation metadata and cannot change congregation; stale revision cannot overwrite another edit. Archive is blocked by active enrollment and retains history; restore uses the existing ID.",
         "listClassStudents validates class scope, resolves active enrollment membership and applies prefix ordering/search before page limits; no page is filtered after an unrelated student page was fetched. Cursors bind scope, filter and ordering.",
         "Query results never include another congregation's students, and unknown/out-of-scope IDs produce a safe not-found/forbidden failure without personal data.",
-        "New tests under functions/test/students/ cover homonyms, rename identity, active-enrollment archive denial, rollback, idempotent creation, forged congregation IDs, and class-filter pagination where matching students lie beyond the first unfiltered page."
+        "New tests under functions/test/students/ cover homonyms, rename identity, active-enrollment archive denial, rollback, idempotent creation, forged congregation IDs, and class-filter pagination where matching students lie beyond the first unfiltered page.",
+        "The student flow maintains `congregations/{id}/internal/references.unarchivedStudents` inside the same transaction that creates, archives or restores a student (increment on unarchived create/restore, decrement on archive), so the congregation archive guard is driven by real student operations; its tests exercise that dependency through the real create/archive operation instead of seeding the internal reference document directly."
       ]
     },
     {
@@ -203,7 +204,8 @@
         "Enrollment accepts only unarchived same-congregation students and active classes. Per-student active enrollment uniqueness and the cap of 100 total enrollment records including closed records are transactionally enforced; closing an enrollment does not free historical capacity.",
         "Close records completed or withdrawn plus an explicit valid end date without deleting history. Once present in a frozen roster, startDate cannot change; closing remains allowed when endDate is at least the latest noncanceled frozen session date containing the enrollment. Student, class and teacher IDs from other congregations are denied.",
         "Class completion is blocked by active enrollments or open sessions. Dates cannot change after any enrollment/session exists; completed classes are immutable except archival. Active empty classes alone may be archived directly.",
-        "New tests under functions/test/enrollments/ and functions/test/classes/ prove anonymous/cross-scope denial, concurrent enrollment exclusivity, capacity at 100 versus 101 including closed records, teacher eligibility, stale revision, request replay and class lifecycle constraints using synthetic session/roster fixtures."
+        "New tests under functions/test/enrollments/ and functions/test/classes/ prove anonymous/cross-scope denial, concurrent enrollment exclusivity, capacity at 100 versus 101 including closed records, teacher eligibility, stale revision, request replay and class lifecycle constraints using synthetic session/roster fixtures.",
+        "The class flow maintains `congregations/{id}/internal/references.activeClasses` inside the same transaction that creates, completes, archives or reactivates a class, and its tests prove the congregation archive guard through the real class lifecycle rather than a directly seeded reference document."
       ]
     },
     {
@@ -588,6 +590,37 @@
         "Only the task-14-authored gate test is edited. functions/test/security/rules.security.test.ts and every test committed by task 2 stay byte-identical to their committed revision, and no rule, guard or production check added by task 14 is weakened.",
         "When the emulator environment is available, the executed run reports both security suites including the committed anonymous and cross-scope denial cases, so a run that still omits the matrix cannot be recorded as green; an environment-blocked execution is stated as incomplete, never as passed.",
         "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes with the corrected gate assertions. If the Node gate or emulator environment cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
+    },
+    {
+      "id": 16,
+      "title": "Correct the task 3 archived-target, archived-congregation and archive-counter findings",
+      "summary": "Remediate the task 3 SEND_BACK findings: reject an archived replacement target, forbid contact mutations and congregation renames inside archived congregations, and give the archive dependency counters real transactional writers instead of only direct-seed readers.",
+      "corrects": 3,
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S06",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/contacts/service.ts",
+        "functions/src/congregations/service.ts",
+        "functions/tools/provision-access.ts"
+      ],
+      "depends_on": [
+        3
+      ],
+      "acceptance": [
+        "replaceRoleHolder rejects an archived replacement target: after locating the target and the previous holder, it fails with a stable conflict/forbidden error when the target document has archived === true (and defensively when the previous holder is archived) before any role-slot release, role-code write, directory projection write or receipt commit. A newly authored regression test under functions/test/contacts/ archives a target contact, attempts replaceRoleHolder against it, and asserts the failure, that every related document is unchanged, that the archived contact still has roleCode null and that its role slot is still free.",
+        "Supervisor contact mutations are scoped to active congregations: saveContact (create and rename) and setContactArchived (archive and restore) reject with forbidden when the target scope is a congregation whose authoritative record is inactive/archived, regardless of the caller's access role; the existing staff cross-scope denial is unchanged. The guard resolves the target congregation from the datastore when the cached context does not carry it, so a supervisor is checked too; archived congregations stay read-only and mutable only through setCongregationArchived restoration by supervision. Newly authored tests seed an inactive congregation and assert that supervisor create, rename, archive and restore each fail without any write.",
+        "saveCongregation's non-create branch rejects a rename of an inactive/archived congregation with a stable error and performs no write, no revision bump and no index change, leaving setCongregationArchived as the only permitted mutation on an archived congregation. A newly authored test renames an archived congregation and asserts the failure with an unchanged document revision and uniqueness index.",
+        "Archive dependency counters have real transactional writers instead of only direct-seed readers: functions/tools/provision-access.ts adjusts congregations/{id}/internal/references.activeUsers inside the same datastore transaction as the users/{uid} profile write (increment when an active profile is created on a congregation, decrement or move on deactivation or rebinding), and the contact create/archive/restore path keeps unarchivedContacts consistent inside its own command transaction. Newly authored operation-driven tests provision and deactivate real user profiles and exercise contact archive/restore, then call setCongregationArchived and assert the outcome tracks the real operations; no test seeds the internal references document directly.",
+        "The unarchivedStudents and activeClasses counters are owned by the not-yet-implemented student and class flows. Tasks 4 and 5 acceptance now require each owning flow to adjust its counter inside the transaction that creates/archives the record and to prove the congregation archive guard through the real operation instead of a seeded reference. This corrective records that cross-task obligation and does not present task 3's student/class archive blockers as verified while those writers do not exist.",
+        "All verification added by this task lives in newly authored test files; tests committed by tasks 2 and 3 are never modified, and no guard, validation or atomicity check added by earlier tasks is weakened.",
+        "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
     }
   ]

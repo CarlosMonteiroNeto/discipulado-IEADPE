@@ -185,6 +185,11 @@ export async function saveCongregation(
       if (current === null) {
         throw notFoundError("Congregation not found.");
       }
+      if (current.active !== true) {
+        throw conflictError(
+          "Archived congregations are read-only except restoration.",
+        );
+      }
       if (
         existingIndex !== null &&
         existingIndex.congregationId !== input.id

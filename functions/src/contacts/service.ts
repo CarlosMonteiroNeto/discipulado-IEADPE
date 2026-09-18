@@ -144,6 +144,33 @@ function assertScopeMutation(
   }
 }
 
+/**
+ * Archived congregations are read-only except for restoration through
+ * setCongregationArchived (S06). authorizeContext enforces the active flag only
+ * for congregationStaff, so this guard resolves the authoritative congregation
+ * record (the cached context when it carries the same ID, otherwise the
+ * datastore) and applies to every access role.
+ */
+async function assertActiveCongregation(
+  tx: Transaction,
+  context: AuthorizedContext,
+  scope: ContactScope,
+  congregationId: string | null,
+): Promise<void> {
+  if (scope !== ContactScope.congregation || congregationId === null) return;
+  const cached = context.congregation;
+  const congregation =
+    cached !== null && cached.id === congregationId
+      ? cached
+      : await tx.read(paths.congregation(congregationId));
+  if (congregation === null) {
+    throw notFoundError("Congregation not found.");
+  }
+  if (congregation.active !== true) {
+    throw forbiddenError("Congregation is inactive.");
+  }
+}
+
 function requireRevision(value: unknown): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value < 1) {
     throw validationError("expectedRevision must be a positive integer.", {
@@ -210,6 +237,7 @@ async function executeSaveContact(
   congregationId: string | null,
 ): Promise<ContactMutationResult> {
   assertScopeMutation(context, scope, congregationId);
+  await assertActiveCongregation(tx, context, scope, congregationId);
   validateDisplayName(input.name);
   const roleCode = parseRoleCode(input.roleCode, scope);
   const phoneE164 = normalizeBrazilianPhone(input.phone ?? null);
@@ -384,6 +412,7 @@ export async function setContactArchived(
       },
       async (tx, context) => {
         assertScopeMutation(context, scope, congregationId);
+        await assertActiveCongregation(tx, context, scope, congregationId);
         const located = await locateStoredContact(
           tx,
           scope,
@@ -484,6 +513,7 @@ export async function replaceRoleHolder(
       },
       async (tx, context) => {
         assertScopeMutation(context, scope, congregationId);
+        await assertActiveCongregation(tx, context, scope, congregationId);
         const previous = await locateStoredContact(
           tx,
           scope,
@@ -496,6 +526,14 @@ export async function replaceRoleHolder(
           congregationId,
           input.id,
         );
+        if (
+          previous.document.archived === true ||
+          target.document.archived === true
+        ) {
+          throw conflictError(
+            "Archived contacts cannot hold or receive an administrative role.",
+          );
+        }
         if (previous.document.roleCode !== roleCode) {
           throw validationError("The previous holder does not hold this role.", {
             previousContactId: "The previous holder does not hold this role.",
