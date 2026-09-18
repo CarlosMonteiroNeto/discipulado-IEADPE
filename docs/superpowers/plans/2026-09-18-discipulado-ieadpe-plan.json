@@ -796,6 +796,29 @@
         "The correction stays inside the task 9 feature plus the minimal query-codec extension, does not weaken the S11 port contracts or any guard, validation or atomicity behavior, and keeps birth dates out of the directory UI. New or strengthened tests live in newly authored test files or in task-9-owned test files (the task under correction); tests committed by other completed tasks are never modified and no existing assertion for another task is deleted or relaxed.",
         "Verification is dispatched under the Flutter gate (flutter test/flutter analyze) with RED evidence from the newly authored or strengthened tests failing against the pre-fix behavior. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 23,
+      "title": "Normalize the student form UF before submission",
+      "summary": "Remediate the task 10 SEND_BACK Important finding: student_form_page.dart's `_validateStateCode` accepts any case but `_address()` sends the raw text, so a lowercase UF such as 'pe' passes client validation and is rejected by the backend's uppercase-only BRAZILIAN_STATE_CODES comparison as a generic validation error. Normalize the UF to uppercase in the outgoing payload (preserving null for an empty field), keeping the case-insensitive validator, and cover it with a test.",
+      "corrects": 10,
+      "spec_refs": [
+        "S05",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/students/student_form_page.dart"
+      ],
+      "depends_on": [
+        10
+      ],
+      "acceptance": [
+        "The state code in the student payload is normalized before submission in both create and edit paths: `_address()` derives the value from `_optionalTextOrNull(_stateCode.text)?.toUpperCase()` (or an equivalent normalization applied at the point the payload is built) so a lowercase or mixed-case entry such as 'pe' is sent as 'PE'. An empty field stays null, no field-group behavior changes, and the case-insensitive `_validateStateCode` validator is retained, so the client accepts exactly the values the backend accepts instead of a superset rejected server-side.",
+        "A newly authored test under test/features/students/ captures the payload submitted through the fake repository/gateway and asserts a lowercase 'pe' is submitted as 'PE', that an empty UF is submitted as null (not an empty string), and that an unknown code still fails local validation with 'UF inválida.'. The test exercises the real form submit path rather than asserting the helper in isolation.",
+        "The correction is confined to the task-10-owned student form file: no other feature is restyled, no S05 validation rule, port contract or existing acceptance behavior is weakened, and no test committed by another completed task is modified. Any strengthened assertion lives in a newly authored test file or in the task-10-owned test file this correction is allowed to extend; no existing assertion is deleted or relaxed.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the submitted-payload assertion failing against the pre-fix raw-text behavior. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

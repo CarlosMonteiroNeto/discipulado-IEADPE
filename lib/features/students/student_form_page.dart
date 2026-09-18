@@ -202,7 +202,10 @@ class _StudentFormPageState extends State<StudentFormPage> {
     final String? district = _optionalTextOrNull(_district.text);
     final String? city = _optionalTextOrNull(_city.text);
     final String? postalCode = _optionalTextOrNull(_postalCode.text);
-    final String? stateCode = _optionalTextOrNull(_stateCode.text);
+    // The backend compares against uppercase UF codes only; normalize here so a
+    // case-insensitive client value is not rejected server-side (S05).
+    final String? stateCode = _optionalTextOrNull(_stateCode.text)
+        ?.toUpperCase();
     if (street == null &&
         district == null &&
         city == null &&
