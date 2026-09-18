@@ -168,6 +168,29 @@ describe("listPendingSessions", () => {
     expect(error.code).toBe("conflict");
   });
 
+  it("rejects a cursor minted before the Recife date rollover", async () => {
+    const dayOne = fixedClock(new Date("2026-09-18T12:00:00.000Z"));
+    const dayTwo = fixedClock(new Date("2026-09-19T12:00:00.000Z"));
+
+    const first = await listPendingSessions(seedDatastore(), seedReader(), dayOne, {
+      uid: "sup1",
+      congregationId: null,
+      limit: 1,
+    });
+    const cursor = first.nextCursor as string;
+    expect(cursor).toEqual(expect.any(String));
+
+    const error = await expectAppError(() =>
+      listPendingSessions(seedDatastore(), seedReader(), dayTwo, {
+        uid: "sup1",
+        congregationId: null,
+        limit: 1,
+        cursor,
+      }),
+    );
+    expect(error.code).toBe("conflict");
+  });
+
   it("scopes a staff caller to its own congregation and denies a cross-scope request", async () => {
     const scoped = await listPendingSessions(seedDatastore(), seedReader(), clock, {
       uid: "staff1",

@@ -209,4 +209,132 @@ void main() {
     expect(controller.pendingVisible, isFalse);
     expect(controller.counts.data, isNull);
   });
+
+  test('OverviewQuery round-trips congregacao and pendentes route state', () {
+    const OverviewQuery query = OverviewQuery(
+      congregationId: 'c2',
+      pending: true,
+    );
+
+    expect(query.toQueryParameters(), <String, String>{
+      'congregacao': 'c2',
+      'pendentes': 'true',
+    });
+
+    final OverviewQuery parsed = OverviewQuery.fromQueryParameters(
+      query.toQueryParameters(),
+    );
+    expect(parsed.congregationId, 'c2');
+    expect(parsed.pending, isTrue);
+
+    final OverviewQuery empty = OverviewQuery.fromQueryParameters(
+      <String, String>{},
+    );
+    expect(empty.congregationId, isNull);
+    expect(empty.pending, isFalse);
+    expect(empty.toQueryParameters(), isEmpty);
+  });
+
+  test(
+    'the exposed pendentes route state drives the pending section',
+    () async {
+      final FakeOverviewGateway gateway = FakeOverviewGateway()
+        ..onInvoke = (String operation, JsonMap payload) async {
+          if (operation == 'getOverview') {
+            return overviewJson();
+          }
+          return <String, Object?>{
+            'items': <JsonMap>[
+              pendingSessionJson(
+                id: 'x6',
+                congregationId: (payload['congregationId'] as String?) ?? 'c2',
+              ),
+            ],
+            'nextCursor': null,
+          };
+        };
+      final OverviewController controller = OverviewController(
+        repository: OverviewRepository(gateway: gateway),
+        profile: supervisorProfile(),
+        initialQuery: OverviewQuery.fromQueryParameters(<String, String>{
+          'congregacao': 'c2',
+          'pendentes': 'true',
+        }),
+      );
+      addTearDown(controller.dispose);
+
+      expect(controller.congregationId, 'c2');
+      expect(controller.pendingVisible, isTrue);
+      expect(controller.query.pending, isTrue);
+      expect(controller.toQueryParameters(), <String, String>{
+        'congregacao': 'c2',
+        'pendentes': 'true',
+      });
+
+      await controller.refresh();
+      expect(
+        controller.pending.data?.map((PendingSessionEntry e) => e.id),
+        <String>['x6'],
+      );
+
+      await controller.setPendingVisible(false);
+      expect(controller.pendingVisible, isFalse);
+      expect(controller.toQueryParameters().containsKey('pendentes'), isFalse);
+
+      await controller.togglePending();
+      expect(controller.pendingVisible, isTrue);
+      expect(controller.toQueryParameters()['pendentes'], 'true');
+    },
+  );
+
+  test('a failed forward page leaves no phantom previous-page entry', () async {
+    bool failForward = true;
+    final FakeOverviewGateway gateway = FakeOverviewGateway()
+      ..onInvoke = (String operation, JsonMap payload) async {
+        if (operation == 'getOverview') {
+          return overviewJson();
+        }
+        if (payload['cursor'] == null) {
+          return <String, Object?>{
+            'items': <JsonMap>[pendingSessionJson(id: 'x6')],
+            'nextCursor': 'cursor-2',
+          };
+        }
+        if (failForward) {
+          throw const AppFailure(
+            code: AppFailureCode.unavailable,
+            message: 'Não foi possível carregar as chamadas pendentes.',
+          );
+        }
+        return <String, Object?>{
+          'items': <JsonMap>[pendingSessionJson(id: 'x5', date: '2026-09-18')],
+          'nextCursor': null,
+        };
+      };
+    final OverviewController controller = OverviewController(
+      repository: OverviewRepository(gateway: gateway),
+      profile: supervisorProfile(),
+    );
+    addTearDown(controller.dispose);
+
+    await controller.refresh();
+    await controller.togglePending();
+    expect(controller.hasNextPage, isTrue);
+
+    await controller.nextPendingPage();
+
+    expect(controller.hasPreviousPage, isFalse);
+    expect(controller.pending.phase, AsyncPhase.error);
+    // The forward cursor is retained so the failed page can be retried.
+    expect(controller.hasNextPage, isTrue);
+
+    failForward = false;
+    await controller.nextPendingPage();
+
+    expect(controller.hasPreviousPage, isTrue);
+    expect(
+      controller.pending.data?.map((PendingSessionEntry e) => e.id),
+      <String>['x5'],
+    );
+  });
 }

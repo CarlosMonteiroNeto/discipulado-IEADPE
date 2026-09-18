@@ -217,10 +217,12 @@ export async function listPendingSessions(
   const congregationId = context.congregationId;
   const throughDate = recifeToday(clock.now());
 
+  // `throughDate` is part of the cursor identity: a cursor minted before the
+  // Recife date rollover must not page against the next day's window.
   const identity: NormalizedQuery = {
     resource: "sessions",
     congregationId,
-    filters: { status: SessionStatus.open },
+    filters: { status: SessionStatus.open, throughDate },
     limit,
   };
 
@@ -270,7 +272,7 @@ export async function listPendingSessions(
       ? encodeCursor({
           resource: "sessions",
           congregationId,
-          filters: { status: SessionStatus.open },
+          filters: { status: SessionStatus.open, throughDate },
           orderField: "date",
           orderValue: String(last.date ?? ""),
           id: String(last.id ?? ""),

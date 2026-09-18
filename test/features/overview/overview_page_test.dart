@@ -1,3 +1,4 @@
+import 'package:discipulado_ieadpe/domain/class_group.dart';
 import 'package:discipulado_ieadpe/domain/common.dart';
 import 'package:discipulado_ieadpe/domain/ports.dart';
 import 'package:discipulado_ieadpe/features/overview/overview_controller.dart';
@@ -46,9 +47,11 @@ Future<void> _tabUntilFocused(WidgetTester tester, Key key) async {
 OverviewController _controller(
   FakeOverviewGateway gateway, {
   bool supervisor = false,
+  OverviewQuery? initialQuery,
 }) => OverviewController(
   repository: OverviewRepository(gateway: gateway),
   profile: supervisor ? supervisorProfile() : staffProfile(),
+  initialQuery: initialQuery,
 );
 
 void main() {
@@ -89,7 +92,7 @@ void main() {
     );
   });
 
-  testWidgets('links carry the current scope to students and classes', (
+  testWidgets('links carry the current scope and the active class filter', (
     WidgetTester tester,
   ) async {
     final FakeOverviewGateway gateway = FakeOverviewGateway()
@@ -100,14 +103,14 @@ void main() {
     );
     addTearDown(controller.dispose);
     String? studentsScope;
-    String? classesScope;
+    ClassesLinkTarget? classesTarget;
 
     await pumpApp(
       tester,
       OverviewPage(
         controller: controller,
         onOpenStudents: (String? scope) => studentsScope = scope,
-        onOpenClasses: (String? scope) => classesScope = scope,
+        onOpenClasses: (ClassesLinkTarget target) => classesTarget = target,
       ),
     );
     await controller.setCongregation('c2');
@@ -119,7 +122,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(studentsScope, 'c2');
-    expect(classesScope, 'c2');
+    expect(classesTarget?.congregationId, 'c2');
+    expect(classesTarget?.status, ClassStatus.active);
   });
 
   testWidgets(
@@ -211,6 +215,9 @@ void main() {
       expect(controller.pendingVisible, isTrue);
       expect(find.text('Chamadas pendentes'), findsWidgets);
       expect(find.text('Turma Central'), findsOneWidget);
+      // The row renders the shared pt-BR date, never the raw ISO value.
+      expect(find.textContaining('17/09/2026'), findsOneWidget);
+      expect(find.textContaining('2026-09-17'), findsNothing);
 
       await tester.tap(find.byKey(const Key('overview-pending-open-x1')));
       await tester.pumpAndSettle();
@@ -247,5 +254,56 @@ void main() {
     await pumpApp(tester, OverviewPage(controller: supervisor));
     expect(find.byKey(OverviewPage.congregationFilterKey), findsOneWidget);
     expect(find.text('Todas'), findsWidgets);
+  });
+
+  testWidgets('the pendentes route state drives the pending section', (
+    WidgetTester tester,
+  ) async {
+    final FakeOverviewGateway gateway = FakeOverviewGateway()
+      ..onInvoke = (String operation, JsonMap payload) async {
+        if (operation == 'getOverview') {
+          return overviewJson();
+        }
+        return <String, Object?>{
+          'items': <JsonMap>[pendingSessionJson(id: 'x1')],
+          'nextCursor': null,
+        };
+      };
+    final OverviewController controller = _controller(
+      gateway,
+      initialQuery: OverviewQuery.fromQueryParameters(<String, String>{
+        'pendentes': 'true',
+      }),
+    );
+    addTearDown(controller.dispose);
+
+    await pumpApp(tester, OverviewPage(controller: controller));
+
+    expect(controller.pendingVisible, isTrue);
+    expect(find.text('Chamadas pendentes'), findsWidgets);
+    expect(find.text('Turma Central'), findsOneWidget);
+  });
+
+  testWidgets('page entry and Atualizar invalidate the counts', (
+    WidgetTester tester,
+  ) async {
+    int overviewCalls = 0;
+    final FakeOverviewGateway gateway = FakeOverviewGateway()
+      ..onInvoke = (String operation, JsonMap payload) async {
+        if (operation == 'getOverview') {
+          overviewCalls += 1;
+          return overviewJson();
+        }
+        return <String, Object?>{'items': <JsonMap>[], 'nextCursor': null};
+      };
+    final OverviewController controller = _controller(gateway);
+    addTearDown(controller.dispose);
+
+    await pumpApp(tester, OverviewPage(controller: controller));
+    expect(overviewCalls, 1);
+
+    await tester.tap(find.byKey(OverviewPage.refreshKey));
+    await tester.pumpAndSettle();
+    expect(overviewCalls, 2);
   });
 }

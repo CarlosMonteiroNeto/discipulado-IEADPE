@@ -883,6 +883,39 @@
         "The correction stays inside the listed classes/attendance files; no S11 port contract, backend guard, validation or atomicity behavior is weakened, and completed/archived and canceled records remain readable. Tests committed by other completed tasks are never modified and no existing assertion is deleted or relaxed; new or strengthened tests live in newly authored test files or in task-11/task-24-owned test files this correction may extend. The two parked minors from the task 24 review (the direct attendance-row `enabled: false` assertion and the dependent progress-count assertion) remain parked and are not required by this task.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the completed-class and archived-class read-only assertions failing against the pre-fix controller before the authoritative sourcing is added. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 26,
+      "title": "Correct the task 12 handler-test, route-state and active-filter findings",
+      "summary": "Remediate the task 12 SEND_BACK findings within the overview feature: make the callable handler tests exercise the real auth boundary (unauthenticated rejection and authenticated-UID override) instead of tautological type checks, give the controller an explicit `pendentes`/scope route-state surface with query-parameter round-tripping so task 13 can wire deep links and back/forward without editing task 12 files, carry the active class filter on the `Turmas ativas` link, and close the parked minors (pt-BR date rendering, cursor-stack ordering on failure, and a throughDate-bound cursor identity).",
+      "corrects": 12,
+      "spec_refs": [
+        "S04",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/overview/handlers.ts",
+        "functions/src/overview/service.ts",
+        "lib/features/overview/overview_controller.dart",
+        "lib/features/overview/overview_page.dart"
+      ],
+      "depends_on": [
+        12
+      ],
+      "acceptance": [
+        "The callable wrapper auth boundary is proven, not asserted by type: newly authored tests under functions/test/overview/ invoke the built callable path for `getOverviewCallable` and `listPendingSessionsCallable` (including the `requireUid` guard) with a request lacking `request.auth.uid` and assert an `AppError` with code `unauthenticated` and no service/read invocation; a second case sets `data.uid` to a different user while `request.auth.uid` is the real caller and asserts the service receives the authenticated UID (for example through a spy reader/datastore), never the payload value. If the current wrapper trusts a caller-supplied `uid`, functions/src/overview/handlers.ts is corrected so the authenticated identity overrides the payload. The prior `typeof x === 'function'`/not-same-object cases no longer stand as the coverage for acceptance 2/5; the new assertions fail against a wrapper that ignores auth or trusts `data.uid`.",
+        "The overview exposes an explicit route-state surface instead of a private local flip: lib/features/overview/overview_controller.dart makes an `OverviewQuery` value or an equivalent `setPendingVisible(bool)`/`initialPendingVisible` pair the single source of truth for `pendingVisible`, and provides `toQueryParameters`/`fromQueryParameters` covering the `congregacao` and `pendentes` keys, so task 13 (owner of lib/app/router.dart) can initialize the controller from the route and write back URL state without editing this task's files. `togglePending()` updates that same state (and the emitted query parameters), the existing scope selection is preserved, and a newly authored test proves `pendentes=true` round-trips to `pendingVisible == true` and back and that the exposed state — not a hidden boolean — drives the pending section.",
+        "The active-classes link carries the active filter: the `Turmas ativas` affordance passes `ClassStatus.active` (or an equally explicit navigation-contract value consumed by task 13) in addition to `congregationId`, so the target `/turmas` route shows the active class set the count represents rather than every class under the default `status == null`. A newly authored page test asserts that activating the classes count forwards both the scope and the active status filter, and the students and open-sessions links keep carrying their existing scope/filter; no zero count is fabricated on endpoint failure.",
+        "The parked minors from the task 12 review are closed inside the same files: the pending session row renders its date through the shared pt-BR `formatBrazilianDate` helper instead of raw `toIso8601String()`; lib/features/overview/overview_controller.dart updates its cursor stack only after the forward pending load resolves successfully, so a failed page fetch leaves no phantom previous-page entry; and functions/src/overview/service.ts includes the derived `throughDate` in cursor identity, so a cursor minted before the Recife date rollover is rejected the next day instead of paging page 2 against a new 'through today' window. Newly authored or strengthened tests cover each minor and fail against the pre-fix behavior.",
+        "Invalidation is testable and its remaining composition is recorded rather than silently claimed: page entry and the `Atualizar` affordance invoke the controller's invalidate entry point (proven by a test that observes the refresh/invalidity), and the controller exposes a stable public invalidation surface usable by composition. The outstanding call site — invoking invalidation from the relevant successful mutation flows — belongs to task 13 (lib/app/ composition), so this corrective records it as an explicit cross-task obligation for task 13 instead of reporting task 12 acceptance 4 as fully verified for mutation-driven invalidation.",
+        "Verification is split by ecosystem and neither gate is weakened: the functions/src/overview handler/cursor changes and the new functions/test/overview/ tests are dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands) with Node-format RED evidence, and the Dart controller/page changes and their tests are dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with Flutter RED evidence. A green Flutter suite never stands in for the backend suite (or vice versa); if either required gate cannot run, report an environment blocker under S13/S14 rather than weakening the acceptance.",
+        "The correction stays inside the listed task-12 files: no S11 port contract, backend guard, validation or atomicity behavior is weakened, no existing acceptance behavior is deleted, and no test committed by another completed task is modified. New or strengthened tests live in newly authored test files or in the task-12-owned test files this correction may extend; no existing assertion is deleted or relaxed."
+      ]
     }
   ]
 }

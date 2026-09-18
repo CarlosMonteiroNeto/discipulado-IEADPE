@@ -4,6 +4,15 @@
 /// Staff scope is fixed to the assigned congregation; a supervisor may select
 /// one congregation or `null` (Todas). Older requests are discarded by
 /// generation so a stale result never replaces a newer scope (S09, S12).
+///
+/// The URL-addressable state is held in a single [OverviewQuery] value, so
+/// task 13's router can initialize the controller from `congregacao`/
+/// `pendentes` and write the state back without editing this file.
+///
+/// Cross-task obligation for task 13: the relevant successful mutation flows
+/// (student/class/session/attendance) must call [invalidate] so the counts do
+/// not go stale. That composition lives in `lib/app/`; it is recorded here
+/// instead of being claimed as already wired.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -16,13 +25,62 @@ import '../auth/auth_controller.dart';
 import '../congregations/congregation_repository.dart';
 import 'overview_repository.dart';
 
+/// The URL-addressable overview state shared with task 13's router: the
+/// selected scope (`congregacao`) and the pending section flag (`pendentes`).
+class OverviewQuery {
+  const OverviewQuery({this.congregationId, this.pending = false});
+
+  final String? congregationId;
+  final bool pending;
+
+  OverviewQuery copyWith({
+    String? congregationId,
+    bool clearCongregation = false,
+    bool? pending,
+  }) => OverviewQuery(
+    congregationId: clearCongregation
+        ? null
+        : (congregationId ?? this.congregationId),
+    pending: pending ?? this.pending,
+  );
+
+  Map<String, String> toQueryParameters() => <String, String>{
+    if (congregationId != null && congregationId!.isNotEmpty)
+      'congregacao': congregationId!,
+    if (pending) 'pendentes': 'true',
+  };
+
+  factory OverviewQuery.fromQueryParameters(Map<String, String> parameters) =>
+      OverviewQuery(
+        congregationId: _nonEmpty(parameters['congregacao']),
+        pending: _isTrue(parameters['pendentes']),
+      );
+}
+
+String? _nonEmpty(String? value) {
+  final String? trimmed = value?.trim();
+  return (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+}
+
+bool _isTrue(String? value) {
+  final String? normalized = value?.trim().toLowerCase();
+  return normalized == 'true' || normalized == '1';
+}
+
 class OverviewController extends ChangeNotifier implements SessionScoped {
   OverviewController({
     required this.repository,
     required this.profile,
     this.catalog,
+    OverviewQuery? initialQuery,
   }) {
-    _congregationId = profile.congregationId;
+    final OverviewQuery requested = initialQuery ?? const OverviewQuery();
+    _query = OverviewQuery(
+      congregationId: isSupervisor
+          ? requested.congregationId
+          : profile.congregationId,
+      pending: requested.pending,
+    );
   }
 
   final OverviewRepository repository;
@@ -31,8 +89,7 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
   /// Authorized congregation catalog used by a supervisor's scope selector.
   final CongregationRepository? catalog;
 
-  String? _congregationId;
-  bool _pendingVisible = false;
+  late OverviewQuery _query;
   AsyncViewState<OverviewCounts> _counts =
       const AsyncViewState<OverviewCounts>.loading();
   AsyncViewState<List<PendingSessionEntry>> _pending =
@@ -45,9 +102,15 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
   int _pendingGeneration = 0;
   bool _disposed = false;
 
-  String? get congregationId => _congregationId;
+  /// The single source of truth for scope and the `pendentes` flag.
+  OverviewQuery get query => _query;
 
-  bool get pendingVisible => _pendingVisible;
+  String? get congregationId => _query.congregationId;
+
+  bool get pendingVisible => _query.pending;
+
+  /// The current route state, ready for task 13 to write back to the URL.
+  Map<String, String> toQueryParameters() => _query.toQueryParameters();
 
   AsyncViewState<OverviewCounts> get counts => _counts;
 
@@ -61,12 +124,17 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
 
   bool get hasNextPage => _nextCursor != null;
 
-  /// Page entry and `Atualizar` both call this: it reloads the catalog, the
-  /// authoritative counts and, when open, the first pending page.
-  Future<void> refresh() async {
+  /// Page entry and `Atualizar` both invalidate the counts (S09).
+  Future<void> refresh() => invalidate();
+
+  /// Stable public invalidation surface: reloads the catalog, the authoritative
+  /// counts and, when open, the first pending page. Composed by task 13 after
+  /// successful mutations.
+  Future<void> invalidate() async {
+    _resetPendingPagination();
     await _loadCatalog();
     await _loadCounts();
-    if (_pendingVisible) {
+    if (_query.pending) {
       await _loadPending(cursor: null);
     }
   }
@@ -89,53 +157,60 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
   /// Changes the supervisor's selected congregation (`null` means Todas). A
   /// staff member's scope is immutable and this is a no-op for them.
   Future<void> setCongregation(String? congregationId) async {
-    if (!isSupervisor || _congregationId == congregationId) {
+    if (!isSupervisor || _query.congregationId == congregationId) {
       return;
     }
-    _congregationId = congregationId;
+    _query = _query.copyWith(
+      congregationId: congregationId,
+      clearCongregation: congregationId == null,
+    );
     _resetPendingPagination();
     await _loadCounts();
-    if (_pendingVisible) {
+    if (_query.pending) {
       await _loadPending(cursor: null);
     }
   }
 
-  /// Reveals or hides the `Chamadas pendentes` section on the same route
-  /// (`pendentes=true`, S09) and lazily loads its first page.
-  Future<void> togglePending() async {
-    _pendingVisible = !_pendingVisible;
+  /// Explicitly shows or hides the `Chamadas pendentes` section on the same
+  /// route (`pendentes=true`, S09) and lazily loads its first page.
+  Future<void> setPendingVisible(bool visible) async {
+    if (_query.pending == visible) {
+      return;
+    }
+    _query = _query.copyWith(pending: visible);
     if (!_disposed) {
       notifyListeners();
     }
-    if (_pendingVisible) {
+    if (visible) {
       await _loadPending(cursor: null);
     }
   }
+
+  Future<void> togglePending() => setPendingVisible(!_query.pending);
 
   Future<void> refreshPending() => _loadPending(cursor: null);
 
-  Future<void> nextPendingPage() {
+  /// Advances only after the forward page actually loads, so a failed fetch
+  /// leaves no phantom previous-page entry.
+  Future<void> nextPendingPage() async {
     final String? cursor = _nextCursor;
     if (cursor == null) {
-      return Future<void>.value();
+      return;
     }
-    _cursorStack.add(_pendingCursor);
-    return _loadPending(cursor: cursor);
+    final String? previousCursor = _pendingCursor;
+    if (await _loadPending(cursor: cursor)) {
+      _cursorStack.add(previousCursor);
+    }
   }
 
-  Future<void> previousPendingPage() {
+  /// Retreats only after the previous page actually loads, keeping the stack
+  /// entry available for a retry when the fetch fails.
+  Future<void> previousPendingPage() async {
     if (_cursorStack.isEmpty) {
-      return Future<void>.value();
+      return;
     }
-    return _loadPending(cursor: _cursorStack.removeLast());
-  }
-
-  /// Invalidates the counts after a relevant successful mutation (S09).
-  Future<void> invalidate() async {
-    _resetPendingPagination();
-    await _loadCounts();
-    if (_pendingVisible) {
-      await _loadPending(cursor: null);
+    if (await _loadPending(cursor: _cursorStack.last)) {
+      _cursorStack.removeLast();
     }
   }
 
@@ -144,7 +219,7 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
     _emitCounts(const AsyncViewState<OverviewCounts>.loading());
     try {
       final OverviewCounts counts = await repository.getOverview(
-        congregationId: _congregationId,
+        congregationId: _query.congregationId,
       );
       if (_disposed || generation != _countsGeneration) {
         return;
@@ -162,16 +237,16 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
     }
   }
 
-  Future<void> _loadPending({required String? cursor}) async {
+  Future<bool> _loadPending({required String? cursor}) async {
     final int generation = ++_pendingGeneration;
     _emitPending(const AsyncViewState<List<PendingSessionEntry>>.loading());
     try {
       final PendingSessionPage page = await repository.listPendingSessions(
-        congregationId: _congregationId,
+        congregationId: _query.congregationId,
         cursor: cursor,
       );
       if (_disposed || generation != _pendingGeneration) {
-        return;
+        return false;
       }
       _pendingCursor = cursor;
       _nextCursor = page.nextCursor;
@@ -180,15 +255,17 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
             ? const AsyncViewState<List<PendingSessionEntry>>.emptyData()
             : AsyncViewState<List<PendingSessionEntry>>.data(page.items),
       );
+      return true;
     } catch (error) {
       if (_disposed || generation != _pendingGeneration) {
-        return;
+        return false;
       }
       _emitPending(
         AsyncViewState<List<PendingSessionEntry>>.fromFailure(
           _failureOf(error, 'Não foi possível carregar as chamadas pendentes.'),
         ),
       );
+      return false;
     }
   }
 
@@ -223,8 +300,7 @@ class OverviewController extends ChangeNotifier implements SessionScoped {
   void clearSessionData() {
     _countsGeneration++;
     _pendingGeneration++;
-    _congregationId = profile.congregationId;
-    _pendingVisible = false;
+    _query = OverviewQuery(congregationId: profile.congregationId);
     _counts = const AsyncViewState<OverviewCounts>.loading();
     _pending = const AsyncViewState<List<PendingSessionEntry>>.loading();
     _congregations = const <Congregation>[];

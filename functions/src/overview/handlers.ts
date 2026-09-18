@@ -38,10 +38,21 @@ function payloadOf(data: unknown): Record<string, unknown> {
   return data as Record<string, unknown>;
 }
 
+/**
+ * Drops any caller-supplied `uid` so the service only ever sees the
+ * authenticated identity from `request.auth.uid` (S04). A forged payload UID
+ * can never expand or change the caller's scope.
+ */
+function payloadWithoutUid(data: unknown): Record<string, unknown> {
+  const payload = payloadOf(data);
+  delete payload.uid;
+  return payload;
+}
+
 export function getOverviewCallable(deps: OverviewHandlerDependencies) {
   return defineCallable(async (data, request) =>
     getOverview(deps.datastore, deps.reader, deps.clock, {
-      ...payloadOf(data),
+      ...payloadWithoutUid(data),
       uid: requireUid(request),
     } as unknown as GetOverviewInput),
   );
@@ -50,7 +61,7 @@ export function getOverviewCallable(deps: OverviewHandlerDependencies) {
 export function listPendingSessionsCallable(deps: OverviewHandlerDependencies) {
   return defineCallable(async (data, request) =>
     listPendingSessions(deps.datastore, deps.reader, deps.clock, {
-      ...payloadOf(data),
+      ...payloadWithoutUid(data),
       uid: requireUid(request),
     } as unknown as ListPendingSessionsInput),
   );

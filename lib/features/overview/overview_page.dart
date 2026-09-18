@@ -7,11 +7,22 @@ library;
 
 import 'package:flutter/material.dart';
 
+import '../../domain/class_group.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
 import '../../ui/form_fields.dart';
+import '../classes/academic_repository.dart';
 import 'overview_controller.dart';
 import 'overview_repository.dart';
+
+/// Navigation contract for the `Turmas ativas` link: the target `/turmas`
+/// route must carry both the scope and the explicit status filter (S09).
+class ClassesLinkTarget {
+  const ClassesLinkTarget({required this.congregationId, this.status});
+
+  final String? congregationId;
+  final ClassStatus? status;
+}
 
 class OverviewPage extends StatefulWidget {
   const OverviewPage({
@@ -26,7 +37,9 @@ class OverviewPage extends StatefulWidget {
 
   /// Links carry the current scope, so the target list keeps the same filter.
   final ValueChanged<String?>? onOpenStudents;
-  final ValueChanged<String?>? onOpenClasses;
+
+  /// The classes link also carries the active status filter (S09).
+  final ValueChanged<ClassesLinkTarget>? onOpenClasses;
 
   /// Opens the exact class/session of a pending attendance call (S09).
   final ValueChanged<PendingSessionEntry>? onOpenSession;
@@ -51,7 +64,7 @@ class _OverviewPageState extends State<OverviewPage> {
   @override
   void initState() {
     super.initState();
-    widget.controller.refresh();
+    widget.controller.invalidate();
   }
 
   @override
@@ -72,7 +85,7 @@ class _OverviewPageState extends State<OverviewPage> {
                   const SizedBox(height: AppSpacing.x4),
                   AsyncContent<OverviewCounts>(
                     state: widget.controller.counts,
-                    onRetry: widget.controller.refresh,
+                    onRetry: widget.controller.invalidate,
                     dataBuilder: _counts,
                   ),
                   if (widget.controller.pendingVisible) ...<Widget>[
@@ -131,7 +144,7 @@ class _OverviewPageState extends State<OverviewPage> {
           key: OverviewPage.refreshKey,
           label: 'Atualizar',
           variant: AppButtonVariant.secondary,
-          onPressed: widget.controller.refresh,
+          onPressed: widget.controller.invalidate,
         ),
       ],
     );
@@ -157,8 +170,12 @@ class _OverviewPageState extends State<OverviewPage> {
           value: counts.classes,
           linkKey: OverviewPage.openClassesKey,
           linkLabel: 'Ver turmas',
-          onOpen: () =>
-              widget.onOpenClasses?.call(widget.controller.congregationId),
+          onOpen: () => widget.onOpenClasses?.call(
+            ClassesLinkTarget(
+              congregationId: widget.controller.congregationId,
+              status: ClassStatus.active,
+            ),
+          ),
         ),
         _CountCard(
           key: OverviewPage.countsOpenSessionsKey,
@@ -240,7 +257,7 @@ class _OverviewPageState extends State<OverviewPage> {
                         ),
                         const SizedBox(height: AppSpacing.x1),
                         Text(
-                          '${entry.date.toIso8601String()} · ${entry.congregationId}',
+                          '${formatBrazilianDate(entry.date)} · ${entry.congregationId}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],
