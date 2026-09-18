@@ -32,9 +32,9 @@ void main() {
                   status: 'present',
                 ),
               ],
-              classStatus: 'completed',
             )
           : const <String, Object?>{};
+      stubOwningClass(gateway, status: 'completed');
       final AttendanceController controller = attendanceController(gateway);
       addTearDown(controller.dispose);
 

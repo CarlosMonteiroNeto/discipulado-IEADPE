@@ -26,7 +26,6 @@ void main() {
                   status: 'present',
                 ),
               ],
-              classStatus: 'active',
             );
           }
           if (operation == 'saveAttendance') {
@@ -37,6 +36,7 @@ void main() {
           }
           throw StateError('Unexpected operation: $operation');
         };
+      stubOwningClass(gateway, status: 'active');
       final AttendanceController controller = attendanceController(
         gateway,
         nowUtc: () => DateTime.utc(2026, 1, 10, 12),
@@ -89,7 +89,6 @@ void main() {
                   status: 'present',
                 ),
               ],
-              classStatus: 'active',
             );
           }
           if (operation == 'cancelSession') {
@@ -100,6 +99,7 @@ void main() {
           }
           throw StateError('Unexpected operation: $operation');
         };
+      stubOwningClass(gateway, status: 'active');
       final AttendanceController controller = attendanceController(gateway);
       addTearDown(controller.dispose);
 

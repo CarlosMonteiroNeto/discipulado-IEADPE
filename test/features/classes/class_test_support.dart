@@ -181,15 +181,13 @@ JsonMap rosterEntryJson({
   'status': status,
 };
 
+/// The authoritative `getSessionAttendance` response shape: session + roster
+/// only. The owning class lifecycle status is never a wire field here; it is
+/// resolved through the repository class read (S08).
 JsonMap attendanceViewJson({
   required JsonMap session,
   required List<JsonMap> roster,
-  String? classStatus,
-}) => <String, Object?>{
-  'session': session,
-  'roster': roster,
-  'classStatus': ?classStatus,
-};
+}) => <String, Object?>{'session': session, 'roster': roster};
 
 JsonMap congregationJson({
   required String id,

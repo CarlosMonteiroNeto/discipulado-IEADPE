@@ -240,19 +240,14 @@ class AttendanceRosterEntry {
 
 /// Session plus its complete roster, as returned by `getSessionAttendance`.
 ///
-/// [classStatus] is the owning class lifecycle status when the backend supplies
-/// it; the attendance editor needs it to enforce the S08 read-only rule for a
-/// session inside a completed or archived class.
+/// The authoritative response carries only `{ session, roster }`; the owning
+/// class lifecycle status is never a wire field here and is resolved through
+/// [AcademicRepository.getClass] when the attendance editor needs it (S08).
 class AttendanceView {
-  const AttendanceView({
-    required this.session,
-    required this.entries,
-    this.classStatus,
-  });
+  const AttendanceView({required this.session, required this.entries});
 
   final Session session;
   final List<AttendanceRosterEntry> entries;
-  final ClassStatus? classStatus;
 
   factory AttendanceView.fromJson(JsonMap json) {
     final JsonMap session = json['session'] is Map
@@ -262,12 +257,8 @@ class AttendanceView {
     if (rawRoster is! List) {
       throw const DataFormatException('Missing attendance roster.');
     }
-    final String? rawClassStatus = optionalString(json, 'classStatus');
     return AttendanceView(
       session: Session.fromJson(session),
-      classStatus: rawClassStatus == null
-          ? null
-          : ClassStatus.fromWire(rawClassStatus),
       entries: rawRoster
           .map((Object? item) {
             if (item is! Map) {

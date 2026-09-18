@@ -11,7 +11,6 @@ import 'attendance_test_support.dart';
 
 JsonMap attendanceView({
   required String sessionStatus,
-  String? classStatus,
   String entryStatus = 'present',
 }) => attendanceViewJson(
   session: sessionJson(
@@ -28,14 +27,13 @@ JsonMap attendanceView({
       status: entryStatus,
     ),
   ],
-  classStatus: classStatus,
 );
 
 void main() {
   test('a canceled session is read-only and refuses mutations', () async {
     final FakeAcademicGateway gateway = FakeAcademicGateway()
-      ..onInvoke = (_, _) =>
-          attendanceView(sessionStatus: 'canceled', classStatus: 'active');
+      ..onInvoke = (_, _) => attendanceView(sessionStatus: 'canceled');
+    stubOwningClass(gateway, status: 'active');
     final AttendanceController controller = attendanceController(gateway);
     addTearDown(controller.dispose);
 
@@ -57,10 +55,8 @@ void main() {
   for (final String classStatus in <String>['completed', 'archived']) {
     test('a session in a $classStatus class is read-only', () async {
       final FakeAcademicGateway gateway = FakeAcademicGateway()
-        ..onInvoke = (_, _) => attendanceView(
-          sessionStatus: 'finalized',
-          classStatus: classStatus,
-        );
+        ..onInvoke = (_, _) => attendanceView(sessionStatus: 'finalized');
+      stubOwningClass(gateway, status: classStatus);
       final AttendanceController controller = attendanceController(gateway);
       addTearDown(controller.dispose);
 
@@ -76,8 +72,8 @@ void main() {
     WidgetTester tester,
   ) async {
     final FakeAcademicGateway gateway = FakeAcademicGateway()
-      ..onInvoke = (_, _) =>
-          attendanceView(sessionStatus: 'canceled', classStatus: 'active');
+      ..onInvoke = (_, _) => attendanceView(sessionStatus: 'canceled');
+    stubOwningClass(gateway, status: 'active');
     final AttendanceController controller = attendanceController(gateway);
     addTearDown(controller.dispose);
 
@@ -112,8 +108,8 @@ void main() {
     WidgetTester tester,
   ) async {
     final FakeAcademicGateway gateway = FakeAcademicGateway()
-      ..onInvoke = (_, _) =>
-          attendanceView(sessionStatus: 'finalized', classStatus: 'completed');
+      ..onInvoke = (_, _) => attendanceView(sessionStatus: 'finalized');
+    stubOwningClass(gateway, status: 'completed');
     final AttendanceController controller = attendanceController(gateway);
     addTearDown(controller.dispose);
 
@@ -135,11 +131,9 @@ void main() {
     WidgetTester tester,
   ) async {
     final FakeAcademicGateway gateway = FakeAcademicGateway()
-      ..onInvoke = (_, _) => attendanceView(
-        sessionStatus: 'open',
-        classStatus: 'active',
-        entryStatus: 'unmarked',
-      );
+      ..onInvoke = (_, _) =>
+          attendanceView(sessionStatus: 'open', entryStatus: 'unmarked');
+    stubOwningClass(gateway, status: 'active');
     final AttendanceController controller = attendanceController(gateway);
     addTearDown(controller.dispose);
 

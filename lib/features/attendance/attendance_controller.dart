@@ -41,6 +41,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
       const AsyncViewState<List<AttendanceRosterEntry>>.loading();
   Session? _session;
   ClassStatus? _classStatus;
+  bool _classStatusUnknown = false;
   AttendanceOperation? _lastFailedOperation;
   List<AttendanceRosterEntry> _roster = const <AttendanceRosterEntry>[];
   final Map<String, AttendanceStatus> _marks = <String, AttendanceStatus>{};
@@ -102,8 +103,12 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   int? get expectedRevision => _expectedRevision;
 
   /// True when the editor must not accept changes: the session is canceled or
-  /// the owning class is completed/archived (S08).
+  /// the owning class is completed/archived (S08). An unresolved class read
+  /// fails safe toward read-only rather than editable.
   bool get isReadOnly {
+    if (_classStatusUnknown) {
+      return true;
+    }
     final Session? session = _session;
     if (session == null) {
       return false;
@@ -134,6 +139,10 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
         return;
       }
       _applyView(view);
+      await _resolveClassStatus();
+      if (_disposed || generation != _generation) {
+        return;
+      }
       _dirty = false;
       _requestId = null;
       _localBeforeReload = null;
@@ -151,9 +160,34 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
     }
   }
 
+  /// Resolves the owning class lifecycle status through the authoritative
+  /// class read. `_classStatus` is never sourced from the attendance response,
+  /// which carries only `{ session, roster }`. A missing or failed read fails
+  /// safe toward read-only rather than editable (S08).
+  Future<void> _resolveClassStatus() async {
+    try {
+      final ClassGroup? classGroup = await repository.getClass(
+        id: classId,
+        congregationId: congregationId,
+      );
+      if (_disposed) {
+        return;
+      }
+      _classStatus = classGroup?.status;
+      _classStatusUnknown = classGroup == null;
+    } catch (_) {
+      // Any failure resolving the owner fails safe toward read-only instead of
+      // exposing an editable editor.
+      if (_disposed) {
+        return;
+      }
+      _classStatus = null;
+      _classStatusUnknown = true;
+    }
+  }
+
   void _applyView(AttendanceView view) {
     _session = view.session;
-    _classStatus = view.classStatus;
     _roster = view.entries;
     _marks
       ..clear()
@@ -304,6 +338,10 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
         return;
       }
       _applyView(view);
+      await _resolveClassStatus();
+      if (_disposed || generation != _generation) {
+        return;
+      }
       _dirty = false;
       _state = AsyncViewState<List<AttendanceRosterEntry>>.data(_roster);
       notifyListeners();
@@ -330,6 +368,12 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
       _session = view.session;
       _roster = view.entries;
       _expectedRevision = view.session.revision;
+      // Refresh the owning class status too, so a class moved to
+      // completed/archived cannot leave a stale editable state after reload.
+      await _resolveClassStatus();
+      if (_disposed || generation != _generation) {
+        return;
+      }
       _serverMarks = <String, AttendanceStatus>{
         for (final AttendanceRosterEntry entry in view.entries)
           entry.enrollmentId: entry.status,
@@ -407,6 +451,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
     _generation++;
     _session = null;
     _classStatus = null;
+    _classStatusUnknown = false;
     _lastFailedOperation = null;
     _roster = const <AttendanceRosterEntry>[];
     _marks.clear();

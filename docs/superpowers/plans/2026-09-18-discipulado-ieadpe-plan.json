@@ -855,6 +855,34 @@
         "The correction stays inside the task 11 classes/attendance feature and the listed repository/controller files: no S11 port contract, backend guard, validation or atomicity behavior is weakened, and completed/archived and canceled records remain readable. The frozen historical-name rendering evidence is strengthened to assert the rendered name comes from the authoritative attendance record rather than a fixture round-trip. New or strengthened tests live in newly authored test files or in the task-11-owned test files this correction is allowed to extend; tests committed by other completed tasks are never modified and no existing assertion is deleted or relaxed.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the newly authored or strengthened tests failing against the pre-fix behavior (unconditional Editar, editable canceled session, downgraded finalize retry, stale status after finalize, stale cancel revision). If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 25,
+      "title": "Source the attendance read-only class status authoritatively",
+      "summary": "Remediate the task 24 Critical finding: the S08 read-only gate for sessions in a completed or archived class reads AttendanceView.classStatus, a top-level wire field the authoritative getSessionAttendance backend never returns, so _classStatus is always null in production and only canceled sessions are gated while the tests pass on a fabricated fake value. Resolve the owning class status through the existing academic repository class read, drive the tests through a real class document via the fake gateway, and refresh the status on conflict reload (the folded minor).",
+      "corrects": 24,
+      "spec_refs": [
+        "S04",
+        "S08",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/attendance/attendance_controller.dart",
+        "lib/features/classes/academic_repository.dart"
+      ],
+      "depends_on": [
+        24
+      ],
+      "acceptance": [
+        "The read-only gate for completed/archived classes is sourced from an authoritative class read instead of a fabricated wire field. In AttendanceController.load() and _refreshAuthoritative(), the controller resolves the owning class through the existing repository read (repository.getClass(id: classId, congregationId: congregationId) or the equivalent already in lib/features/classes/academic_repository.dart) and sets `_classStatus` from that authoritative class record; `_classStatus` is never populated solely from AttendanceView.classStatus, which the authoritative getSessionAttendance (`{ session, roster }`) never returns in production. Consequently a session whose owning class is completed or archived reports an explicit read-only state in production, and a missing/unresolvable class read fails safe toward read-only rather than editable. The correction uses the listed Dart touches only; extending the backend callable is out of scope.",
+        "The fabricated `classStatus` response field no longer lets the tests pass for the wrong reason: AttendanceView.classStatus is removed, or its use as the sole status source is eliminated, and the attendance test support drives completed/archived ownership through FakeAcademicGateway.onGet returning a real class document on the repository class read rather than injecting a top-level `classStatus` key into the attendance response. Newly authored or strengthened tests under test/features/attendance/ load a session in a completed class and a session in an archived class through the production path and assert the controller's read-only state and the disabled marking controls; those assertions fail against the pre-fix controller (which gated only canceled sessions), while an active-class session remains fully editable.",
+        "reloadAfterConflict (and any equivalent conflict/correction reload that swaps `_session`) re-reads or otherwise refreshes the owning class status alongside the session, so a conflict reload cannot leave a stale read-only state: a session whose class moved to completed/archived is correctly read-only after reload, and one still in an active class remains editable.",
+        "attendance_page continues to render the frozen roster and existing marks for reading while exposing no editable affordance for the completed/archived case, and the read-only behavior is exercised through the authoritative class-status path rather than the removed field. The visible save-versus-finalize distinction and the retry-fidelity, cancel-revision and post-success refresh behaviors delivered by task 24 are preserved and none is weakened.",
+        "The correction stays inside the listed classes/attendance files; no S11 port contract, backend guard, validation or atomicity behavior is weakened, and completed/archived and canceled records remain readable. Tests committed by other completed tasks are never modified and no existing assertion is deleted or relaxed; new or strengthened tests live in newly authored test files or in task-11/task-24-owned test files this correction may extend. The two parked minors from the task 24 review (the direct attendance-row `enabled: false` assertion and the dependent progress-count assertion) remain parked and are not required by this task.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the completed-class and archived-class read-only assertions failing against the pre-fix controller before the authoritative sourcing is added. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }
