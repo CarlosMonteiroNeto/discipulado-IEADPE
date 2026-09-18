@@ -4,6 +4,10 @@ rules_version = '2';
 // Every client write is denied: all mutations go through callable functions
 // using the Admin SDK (S04, S11). Reads are limited to the scoped projections
 // and private congregational records described by S04.
+//
+// The nested matches below are explicit on purpose: a recursive wildcard would
+// also match the parent congregation document and every internal subcollection
+// (role slots, roster, uniqueness/reservation records), which S04 forbids.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -53,17 +57,48 @@ service cloud.firestore {
     }
 
     // Active congregation names are readable by authenticated staff; archived
-    // congregations are supervisor-protected.
+    // congregations are supervisor-protected. Only this rule (plus the
+    // supervisor grant) governs the parent document, because the child matches
+    // below are explicit and do not match it.
     match /congregations/{congregationId} {
       allow read: if activeProfile() && (isSupervisor() || resource.data.active == true);
       allow write: if false;
 
-      // Private congregational resources (contacts, students, classes,
-      // enrollments, sessions, attendance, roster, internal uniqueness docs).
-      match /{document=**} {
+      // Deliberately client-readable private congregational resources (S04).
+      match /contacts/{contactId} {
         allow read: if mayReadCongregation(congregationId);
         allow write: if false;
       }
+
+      match /students/{studentId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if false;
+      }
+
+      match /classes/{classId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if false;
+      }
+
+      match /enrollments/{enrollmentId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if false;
+      }
+
+      match /sessions/{sessionId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if false;
+
+        // Attendance is a scoped private record (S04).
+        match /attendance/{attendanceId} {
+          allow read: if mayReadCongregation(congregationId);
+          allow write: if false;
+        }
+      }
+
+      // Internal collections (roleSlots, roster, uniqueness/reservation
+      // records) are intentionally not enumerated: the final catch-all denies
+      // every direct client read and write to them.
     }
 
     // Minimal authenticated directory projection.

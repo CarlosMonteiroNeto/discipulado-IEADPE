@@ -11,7 +11,7 @@
     "build": "tsc",
     "test": "vitest run",
     "test:unit": "vitest run --exclude \"test/security/**\"",
-    "test:emulator": "vitest run test/security",
+    "test:emulator": "node -e \"if(!process.env.FIRESTORE_EMULATOR_HOST){console.error('test:emulator requires FIRESTORE_EMULATOR_HOST for the local Firestore emulator'); process.exit(1)} if(!process.env.FIREBASE_AUTH_EMULATOR_HOST){console.error('test:emulator requires FIREBASE_AUTH_EMULATOR_HOST for the local Auth emulator'); process.exit(1)} process.exit(0)\" && vitest run test/security",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

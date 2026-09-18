@@ -530,6 +530,41 @@
         "No push, deployment, message send, legacy import or Android packaging occurs; completed work is a locally runnable and verified Flutter web implementation ready for a separate release decision.",
         "The composed shell, router, and not-found page consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
       ]
+    },
+    {
+      "id": 14,
+      "title": "Correct the task 2 rules scoping and emulator-security findings",
+      "summary": "Remediate the task 2 SEND_BACK findings within the existing backend foundation: replace the recursive nested wildcard in firestore.rules with explicit gated subcollection matches so archived congregations and internal uniqueness/roster records stay protected, make the emulator security entry point fail fast and non-skippable, bind the command digest to the requested scope, reject malformed stored profiles, and assert index scope/order.",
+      "corrects": 2,
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S09",
+        "S11",
+        "S13"
+      ],
+      "touches": [
+        "firestore.rules",
+        "functions/package.json",
+        "functions/vitest.config.ts",
+        "functions/src/core/commands.ts",
+        "functions/src/core/context.ts"
+      ],
+      "depends_on": [
+        2
+      ],
+      "acceptance": [
+        "firestore.rules contains no recursive `{document=**}` wildcard under `/congregations/{congregationId}`. Each deliberately client-readable nested path (contacts, students, classes, enrollments, sessions, and any other path intentionally exposed by S04) is matched explicitly and gated by the congregation read predicate. Internal collections (role holder slots, roster, uniqueness/reservation records, receipts) are not enumerated and remain denied to direct client reads.",
+        "Because the explicit matches no longer match the parent `/congregations/{id}` document, only the active-congregation rule and the supervisor rule govern its read: congregationStaff is denied reading their own inactive/archived congregation while a supervisor is allowed. Rules stay deny-by-default for all writes and unspecified reads.",
+        "New emulator tests under functions/test/security/ prove a congregationStaff caller is denied reading their own inactive/archived congregation, a supervisor is allowed, and a direct client read of an internal uniqueness/roster document is denied; the existing anonymous and cross-scope denial matrix still passes.",
+        "The backend emulator-test entry point fails fast when required emulator environment variables (including FIRESTORE_EMULATOR_HOST) are absent: `npm run test:emulator` exits non-zero instead of silently skipping. A newly authored emulator test asserts real execution (via a sentinel the rules run must produce), so a run that skips the security suite can never report green; tests committed by earlier tasks are not modified.",
+        "The command wrapper payload digest binds operation, payload and requestedCongregationId, so replaying a requestId with a different requested scope is not served the prior scope's cached result; a unit test covers the scope-mismatch replay.",
+        "The altered-payload replay failure is either aligned with the S11 validation semantics or documented as a deliberate deviation with its chosen error code asserted, leaving no unrecorded mismatch between S11 wording and the implemented error.",
+        "Stored access profiles with malformed fields (non-integer/NaN revision, missing or invalid updatedAt, or other absent required fields) are rejected explicitly by authorize-context rather than coerced to NaN or a fabricated empty timestamp; a unit test covers the malformed profile.",
+        "Newly authored tests assert queryScope and order in addition to field-path sequences, and assert the exact expected S09 index definitions rather than a `length >= 8` count, hardening the S09 index guarantee.",
+        "Verification for this task is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands). Backend compilation and tests pass and the Node gate is not weakened; if the gate cannot run, report an environment blocker under S13/S14.",
+        "All verification added by this task lives in newly authored test files. Tests committed by earlier tasks are never modified: a modified committed test is pipeline tampering, so every additional assertion is proven from a new file."
+      ]
     }
   ]
 }

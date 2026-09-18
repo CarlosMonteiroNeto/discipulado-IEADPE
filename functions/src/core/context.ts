@@ -7,7 +7,7 @@
  * this module only reads the stored profile.
  */
 import { Datastore, JsonMap, paths } from "./datastore";
-import { forbiddenError, notFoundError } from "./errors";
+import { forbiddenError, notFoundError, validationError } from "./errors";
 import { AccessProfileRecord, AccessRole, parseAccessRole } from "./models";
 
 export interface AuthorizedContext {
@@ -36,8 +36,47 @@ export async function authorizeContext(
   if (stored === null) {
     throw forbiddenError("Access profile not found.");
   }
+
+  // Malformed stored profiles are rejected explicitly rather than coerced to
+  // NaN or a fabricated empty timestamp (S04).
+  if (typeof stored.active !== "boolean") {
+    throw validationError("Invalid stored profile: active must be a boolean.", {
+      active: "Invalid stored profile.",
+    });
+  }
   if (stored.active !== true) {
     throw forbiddenError("Access profile is inactive.");
+  }
+
+  const revision = stored.revision;
+  if (typeof revision !== "number" || !Number.isInteger(revision) || revision < 1) {
+    throw validationError(
+      "Invalid stored profile: revision must be a positive integer.",
+      { revision: "Invalid stored profile." },
+    );
+  }
+
+  const updatedAt = stored.updatedAt;
+  if (
+    typeof updatedAt !== "string" ||
+    updatedAt.length === 0 ||
+    Number.isNaN(Date.parse(updatedAt))
+  ) {
+    throw validationError(
+      "Invalid stored profile: updatedAt must be an ISO timestamp.",
+      { updatedAt: "Invalid stored profile." },
+    );
+  }
+
+  if (
+    stored.congregationId !== null &&
+    stored.congregationId !== undefined &&
+    typeof stored.congregationId !== "string"
+  ) {
+    throw validationError(
+      "Invalid stored profile: congregationId must be a string or null.",
+      { congregationId: "Invalid stored profile." },
+    );
   }
 
   const accessRole: AccessRole = parseAccessRole(stored.accessRole);
@@ -82,8 +121,8 @@ export async function authorizeContext(
     accessRole,
     congregationId: boundCongregationId,
     active: true,
-    revision: Number(stored.revision),
-    updatedAt: String(stored.updatedAt ?? ""),
+    revision,
+    updatedAt,
   };
 
   return {

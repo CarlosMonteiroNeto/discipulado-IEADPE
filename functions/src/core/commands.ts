@@ -6,6 +6,12 @@
  * already exists, then transactionally persists a seven-day receipt together
  * with the result. An identical replay returns the original result; reusing a
  * requestId with another payload is a `conflict`.
+ *
+ * Deliberate deviation from S11 wording: the spec says an altered-payload
+ * replay "fails validation", while this wrapper maps it to the transport
+ * `aborted` (AppError `conflict`) code because the request is well-formed but
+ * conflicts with its stored receipt. The commands-scope test asserts the
+ * chosen code, so the deviation stays recorded.
  */
 import { createHash } from "node:crypto";
 import { Clock } from "./clock";
@@ -38,10 +44,19 @@ export function canonicalize(value: unknown): string {
   return `{${entries.join(",")}}`;
 }
 
-/** Canonical payload digest binding an operation to its exact payload. */
-export function payloadDigest(operation: string, payload: JsonMap): string {
+/**
+ * Canonical digest binding an operation to its exact payload and requested
+ * scope, so the same requestId cannot be replayed against another scope and
+ * be served the prior scope's cached result.
+ */
+export function payloadDigest(
+  operation: string,
+  payload: JsonMap,
+  requestedCongregationId?: string | null,
+): string {
+  const scope = requestedCongregationId ?? "";
   return createHash("sha256")
-    .update(`${operation}\u0000${canonicalize(payload)}`)
+    .update(`${operation}\u0000${canonicalize(payload)}\u0000${scope}`)
     .digest("hex");
 }
 
@@ -75,7 +90,11 @@ export async function runCommand<TResult>(
     });
   }
 
-  const digest = payloadDigest(input.operation, input.payload);
+  const digest = payloadDigest(
+    input.operation,
+    input.payload,
+    input.requestedCongregationId,
+  );
   const receiptPath = paths.receipt(input.uid, input.requestId);
 
   return datastore.runTransaction(async (tx) => {
