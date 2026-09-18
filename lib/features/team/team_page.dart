@@ -195,7 +195,9 @@ class _TeamPageState extends State<TeamPage> {
                 cell: (_, DirectoryEntry entry) => Text(
                   entry.scope == ContactScope.supervision
                       ? 'Supervisão'
-                      : (entry.congregationName ?? '—'),
+                      : widget.controller.congregationNameFor(
+                          entry.congregationId,
+                        ),
                 ),
               ),
             ],

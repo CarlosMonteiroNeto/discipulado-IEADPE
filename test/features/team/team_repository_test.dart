@@ -207,5 +207,6 @@ void main() {
     final QueryRequest request = gateway.queries.single;
     expect(request.resource, QueryResource.directory);
     expect(request.equalityFilters?['roleCode'], 'congregationAssistant');
+    expect(request.equalityFilters?['congregationId'], 'c1');
   });
 }

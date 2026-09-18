@@ -16,6 +16,7 @@ import '../../ui/async_content.dart';
 import '../../ui/confirmation_dialog.dart';
 import '../../ui/feedback.dart';
 import '../../ui/form_fields.dart';
+import '../congregations/congregation_repository.dart';
 import 'contact_form.dart';
 import 'phone_actions.dart';
 import 'team_repository.dart';
@@ -26,12 +27,21 @@ class ContactPage extends StatefulWidget {
     required this.repository,
     required this.profile,
     required this.contactId,
+    this.catalog,
+    this.scope,
+    this.congregationId,
     this.onDone,
   });
 
   final TeamRepository repository;
   final AccessProfile profile;
   final String contactId;
+  final CongregationRepository? catalog;
+
+  /// Validated scope/congregation for a direct (archived) lookup, used instead
+  /// of relying only on [profile] (S06, S10).
+  final ContactScope? scope;
+  final String? congregationId;
   final VoidCallback? onDone;
 
   static const Key directoryOnlyKey = Key('contact-directory-only');
@@ -48,6 +58,7 @@ class ContactPage extends StatefulWidget {
 class _ContactPageState extends State<ContactPage> {
   DirectoryEntry? _entry;
   Contact? _contact;
+  String? _congregationName;
   bool _loading = true;
   AppFailure? _failure;
   bool _editing = false;
@@ -71,6 +82,7 @@ class _ContactPageState extends State<ContactPage> {
     setState(() {
       _loading = true;
       _failure = null;
+      _congregationName = null;
     });
     try {
       DirectoryEntry? entry = await widget.repository.getDirectoryEntry(
@@ -78,29 +90,48 @@ class _ContactPageState extends State<ContactPage> {
       );
       Contact? contact;
       if (entry == null) {
-        final String? scopeId = widget.profile.congregationId;
-        if (scopeId != null) {
+        // An archived contact has no directory projection; a validated
+        // scope/congregation supplied by the route (or the caller's own scope)
+        // resolves the private record for authorized direct lookup.
+        final ContactScope? requestedScope = widget.scope;
+        final String? requestedCongregation =
+            widget.congregationId ?? widget.profile.congregationId;
+        if (requestedScope != null) {
           contact = await widget.repository.getContact(
             id: widget.contactId,
-            scope: ContactScope.congregation,
-            congregationId: scopeId,
+            scope: requestedScope,
+            congregationId: requestedCongregation,
           );
           if (contact != null) {
             entry = _entryFromContact(contact);
           }
         }
-      } else if (_canManage(entry) &&
-          entry.scope == ContactScope.congregation) {
+      } else if (_canManage(entry)) {
         contact = await widget.repository.getContact(
           id: entry.id,
           scope: entry.scope,
           congregationId: entry.congregationId,
         );
       }
+      String? congregationName;
+      final CongregationRepository? catalog = widget.catalog;
+      if (entry != null &&
+          entry.scope == ContactScope.congregation &&
+          entry.congregationId != null &&
+          catalog != null) {
+        try {
+          congregationName = (await catalog.getCongregation(
+            entry.congregationId!,
+          ))?.name;
+        } catch (_) {
+          congregationName = null;
+        }
+      }
       if (!mounted) return;
       setState(() {
         _entry = entry;
         _contact = contact;
+        _congregationName = congregationName;
         _loading = false;
       });
     } on AppFailure catch (failure) {
@@ -246,7 +277,7 @@ class _ContactPageState extends State<ContactPage> {
         Text(
           entry.scope == ContactScope.supervision
               ? 'Supervisão'
-              : (entry.congregationName ?? entry.congregationId ?? '—'),
+              : (_congregationName ?? '—'),
           style: Theme.of(context).textTheme.bodyMedium
               ?.copyWith(color: tokens.onSurfaceVariant),
         ),

@@ -758,6 +758,44 @@
         "The correction stays inside the auth/data unit: the public AuthRepository and BackendGateway port contracts in S11 are unchanged (only the internal QueryPlan gains the prefix field), no feature UI is restyled, and no guard, validation or atomicity behavior added by task 7 is weakened. Tests committed by other completed tasks are never modified; the strengthened or new prefix-transport, cursor-paging and emulator-wait assertions live in newly authored test files or in the task-7-owned test files this correction is allowed to extend.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the added prefix-transport and cursor-paging tests failing against the pre-fix QueryPlan. The emulator integration test is executed when the local emulator environment is available; if it cannot run, that check is recorded as incomplete under S13/S14, never as passed, and the gate is not weakened."
       ]
+    },
+    {
+      "id": 22,
+      "title": "Correct the task 9 holder scoping, name resolution, reload and supervision-read findings",
+      "summary": "Remediate the task 9 SEND_BACK findings within the team/congregation feature: scope the administrative-holder lookup to the congregation through the directory query and the client query codec, resolve rendered congregation names from the authorized congregation catalog instead of the directory projection field that is never written, make both reload affordances refresh authoritative holder/revision data instead of only clearing the message, and give supervisors a real scoped read for supervision contacts so rename, archive and restore stop being silent no-ops.",
+      "corrects": 9,
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S06",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/data/query_codec.dart",
+        "lib/features/team/team_repository.dart",
+        "lib/features/team/team_controller.dart",
+        "lib/features/team/team_page.dart",
+        "lib/features/team/contact_page.dart",
+        "lib/features/team/contact_form.dart",
+        "lib/features/congregations/congregation_repository.dart"
+      ],
+      "depends_on": [
+        9,
+        21
+      ],
+      "acceptance": [
+        "findAdministrativeHolder is scoped to the congregation: when a congregation-scoped lookup is requested, the emitted directory QueryRequest carries a congregationId equality filter alongside scope and roleCode, and QueryCodec permits congregationId for the directory resource so the filter is accepted and bound into the plan and the cursor fingerprint (a cursor minted for one congregation and role is rejected for a lookup of the same role in another congregation). FirebaseDataTransport applies it through the existing equality-filter path rather than a client-side post-filter over an unscoped page. A supervision-scoped lookup carries no congregationId filter because supervision role slots are global. Newly authored tests seed two congregations that each hold the same administrative role and assert only the requested congregation's holder is returned (null for the other) and that the emitted query carries the congregation filter; the existing vacuous single-congregation assertion is not treated as sufficient.",
+        "The holder lookup does not silently ship an unsupported query: the emitted directory equality-and-sort shape is served by the declared S09 directory indexes with COLLECTION scope and ascending order. If the congregation-scoped combination is not covered, the task records the missing composite index as an explicit follow-up for a backend corrective (firestore.indexes.json, the S09 query matrix and its index test) instead of assuming it, weakening the lookup, or editing backend test files owned by other tasks.",
+        "Rendered congregation names are resolved from the authorized congregation catalog by congregationId, never from DirectoryEntry.congregationName: the TeamPage congregation column and the ContactPage detail line read the name through CongregationRepository (a catalog lookup or equivalent authorized read), fall back to a neutral placeholder instead of the raw congregation UUID when no name is available, and reflect a renamed congregation after a catalog refresh. Newly authored tests use a directory fixture that omits congregationName and assert the catalog-sourced name in both the list and the detail, including after a rename; no test fabricates the projection field to pass.",
+        "The replacement and save reloads refresh authoritative data instead of only clearing the error: ContactForm passes an onReload to RoleReplacementDialog that re-runs findAdministrativeHolder for the selected role and re-reads the current holder record, updating both previousExpectedRevision and targetExpectedRevision while preserving the selected role and typed inputs, so a resubmit after a conflict can succeed; a save conflict on ContactForm likewise re-fetches the contact record to refresh expectedRevision rather than only clearing _failure. Newly authored tests assert a fresh repository lookup/read occurs on reload (for example by counting calls or returning changed revisions) and that the next submit uses the refreshed revision, not merely that a callback fired.",
+        "Supervisors get a real scoped read for supervision contacts: getContact no longer returns null for supervision scope; it resolves the full record and revision through the S11 BackendGateway.get port using a RecordLocator for the contact with no congregationId, which QueryCodec maps to the supervisor-protected supervisionContacts/{id} document path (never an internal collection and never a guessed congregation), so ContactPage loads the revision and Editar, Arquivar and Restaurar perform real mutations. ContactPage additionally accepts the validated scope/congregation for archived direct lookups instead of relying only on profile.congregationId. Newly authored tests cover supervisor rename, archive and restore of a supervision contact, including a contact absent from the directory because it is archived, assert the archive/restore operations are no longer silent no-ops, and assert that a non-supervisor read or mutation maps to a safe AppFailure.",
+        "The correction stays inside the task 9 feature plus the minimal query-codec extension, does not weaken the S11 port contracts or any guard, validation or atomicity behavior, and keeps birth dates out of the directory UI. New or strengthened tests live in newly authored test files or in task-9-owned test files (the task under correction); tests committed by other completed tasks are never modified and no existing assertion for another task is deleted or relaxed.",
+        "Verification is dispatched under the Flutter gate (flutter test/flutter analyze) with RED evidence from the newly authored or strengthened tests failing against the pre-fix behavior. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

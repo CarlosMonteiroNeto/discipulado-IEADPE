@@ -14,8 +14,9 @@ import '../../domain/ports.dart';
 
 /// The minimal authenticated directory projection (S04).
 ///
-/// It deliberately carries no birth date, address or student field: those only
-/// exist in the scoped full contact record.
+/// It deliberately carries no birth date, address, student field or display
+/// congregation name: the name is resolved from the authorized congregation
+/// catalog by ID (S06), never fabricated in the projection.
 class DirectoryEntry {
   const DirectoryEntry({
     required this.id,
@@ -25,7 +26,6 @@ class DirectoryEntry {
     this.roleCode,
     this.congregationId,
     this.phoneE164,
-    this.congregationName,
   });
 
   final String id;
@@ -35,7 +35,6 @@ class DirectoryEntry {
   final RoleCode? roleCode;
   final String? congregationId;
   final String? phoneE164;
-  final String? congregationName;
 
   String? get roleLabel => roleCode?.label;
 
@@ -49,7 +48,6 @@ class DirectoryEntry {
       roleCode: role == null ? null : RoleCode.fromWire(role),
       congregationId: optionalString(json, 'congregationId'),
       phoneE164: optionalString(json, 'phoneE164'),
-      congregationName: optionalString(json, 'congregationName'),
     );
   }
 
@@ -61,7 +59,6 @@ class DirectoryEntry {
     'roleCode': roleCode?.wire,
     'congregationId': congregationId,
     'phoneE164': phoneE164,
-    'congregationName': congregationName,
   };
 }
 
@@ -264,15 +261,21 @@ class TeamRepository {
   }
 
   /// Reads the scoped full contact record so an authorized editor can obtain
-  /// its revision. Supervision contacts are directory-only on this client.
+  /// its revision. A supervision contact resolves through the top-level
+  /// supervisor-protected `supervisionContacts/{id}` document; a congregation
+  /// contact resolves through its scoped collection.
   Future<Contact?> getContact({
     required String id,
     required ContactScope scope,
     String? congregationId,
   }) async {
-    if (scope != ContactScope.congregation ||
-        congregationId == null ||
-        congregationId.isEmpty) {
+    if (scope == ContactScope.supervision) {
+      final JsonMap? json = await gateway.get(
+        RecordLocator(resource: QueryResource.contacts, id: id),
+      );
+      return json == null ? null : Contact.fromJson(json);
+    }
+    if (congregationId == null || congregationId.isEmpty) {
       return null;
     }
     final JsonMap? json = await gateway.get(
@@ -287,23 +290,44 @@ class TeamRepository {
 
   /// Returns the current holder of an administrative role within one scope,
   /// resolved from the directory projection, or `null` when the role is free.
+  ///
+  /// A congregation lookup is scoped in the query itself: role holders of two
+  /// congregations that share the same role never leak into each other's
+  /// result, and the emitted `congregationId` equality filter is bound into
+  /// the cursor fingerprint. A supervision lookup carries no congregation
+  /// filter because supervision role slots are global.
+  ///
+  /// Follow-up (backend corrective): the emitted directory shape
+  /// `{scope, roleCode, congregationId}` ordered by `normalizedName` is NOT
+  /// covered by the declared S09 directory indexes / `firestore.indexes.json`,
+  /// which ship only `scope+normalizedName`, `scope+roleCode+normalizedName`
+  /// and `congregationId+normalizedName`. A backend corrective must add the
+  /// composite collection-scope index `[scope, roleCode, congregationId,
+  /// normalizedName]` (all ASCENDING) to `firestore.indexes.json`, the S09
+  /// query matrix and its index test. This client emits the required filter
+  /// rather than falling back to an unscoped page.
   Future<DirectoryEntry?> findAdministrativeHolder({
     required ContactScope scope,
     String? congregationId,
     required RoleCode roleCode,
   }) async {
+    final Map<String, Object?> filters = <String, Object?>{
+      'scope': scope.wire,
+      'roleCode': roleCode.wire,
+    };
+    if (scope == ContactScope.congregation &&
+        congregationId != null &&
+        congregationId.isNotEmpty) {
+      filters['congregationId'] = congregationId;
+    }
     final PageResult page = await gateway.query(
-      QueryRequest(
-        resource: QueryResource.directory,
-        equalityFilters: <String, Object?>{
-          'scope': scope.wire,
-          'roleCode': roleCode.wire,
-        },
-      ),
+      QueryRequest(resource: QueryResource.directory, equalityFilters: filters),
     );
     for (final JsonMap item in page.items) {
       final DirectoryEntry entry = DirectoryEntry.fromJson(item);
-      if (entry.roleCode == roleCode) {
+      if (entry.roleCode == roleCode &&
+          (scope == ContactScope.supervision ||
+              entry.congregationId == congregationId)) {
         return entry;
       }
     }

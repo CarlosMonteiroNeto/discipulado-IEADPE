@@ -4,24 +4,34 @@ library;
 import 'package:flutter/foundation.dart';
 
 import '../../domain/access.dart';
+import '../../domain/congregation.dart';
 import '../../domain/contact.dart';
 import '../../domain/ports.dart';
 import '../../ui/async_content.dart';
 import '../auth/auth_controller.dart';
+import '../congregations/congregation_repository.dart';
 import 'team_repository.dart';
 
 class TeamController extends ChangeNotifier implements SessionScoped {
-  TeamController({required this.repository, required this.profile}) {
+  TeamController({
+    required this.repository,
+    required this.profile,
+    this.catalog,
+  }) {
     _query = TeamQuery(congregationId: profile.congregationId);
   }
 
   final TeamRepository repository;
   AccessProfile profile;
 
+  /// Authorized congregation catalog used to resolve rendered names (S06).
+  final CongregationRepository? catalog;
+
   late TeamQuery _query;
   AsyncViewState<List<DirectoryEntry>> _state =
       const AsyncViewState<List<DirectoryEntry>>.loading();
   final List<String?> _cursorStack = <String?>[];
+  final Map<String, String> _congregationNames = <String, String>{};
   String? _nextCursor;
   int _generation = 0;
   bool _disposed = false;
@@ -33,6 +43,15 @@ class TeamController extends ChangeNotifier implements SessionScoped {
   bool get hasPreviousPage => _cursorStack.isNotEmpty;
 
   bool get hasNextPage => _nextCursor != null;
+
+  /// The catalog-resolved display name, or a neutral placeholder. Never the
+  /// raw congregation ID (S06).
+  String congregationNameFor(String? congregationId) {
+    if (congregationId == null || congregationId.isEmpty) {
+      return '—';
+    }
+    return _congregationNames[congregationId] ?? '—';
+  }
 
   /// Whether the caller may edit contacts in the current filter scope. Staff
   /// only ever manage their own congregation; supervisors manage any scope.
@@ -46,8 +65,37 @@ class TeamController extends ChangeNotifier implements SessionScoped {
         _query.congregationId == profile.congregationId;
   }
 
-  /// Reloads the current page without changing filters.
-  Future<void> refresh() => _load(cursor: null);
+  /// Reloads the authorized congregation catalog and the current page.
+  Future<void> refresh() async {
+    await _loadCatalog();
+    await _load(cursor: null);
+  }
+
+  Future<void> _loadCatalog() async {
+    final CongregationRepository? catalog = this.catalog;
+    if (catalog == null) {
+      return;
+    }
+    try {
+      final List<Congregation> active = await catalog.listCongregations(
+        active: true,
+      );
+      final List<Congregation> archived = await catalog.listCongregations(
+        active: false,
+      );
+      _congregationNames
+        ..clear()
+        ..addAll(<String, String>{
+          for (final Congregation congregation in <Congregation>[
+            ...active,
+            ...archived,
+          ])
+            congregation.id: congregation.name,
+        });
+    } catch (_) {
+      // Keep the last known names; rendering falls back to the placeholder.
+    }
+  }
 
   /// Applies new filters and resets pagination (S09).
   Future<void> applyQuery(TeamQuery next) {
@@ -162,6 +210,7 @@ class TeamController extends ChangeNotifier implements SessionScoped {
     _query = TeamQuery(congregationId: profile.congregationId);
     _cursorStack.clear();
     _nextCursor = null;
+    _congregationNames.clear();
     _state = const AsyncViewState<List<DirectoryEntry>>.loading();
     if (!_disposed) {
       notifyListeners();

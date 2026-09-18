@@ -40,7 +40,7 @@ const Set<QueryResource> _prefixResources = <QueryResource>{
 
 const Map<QueryResource, Set<String>> _supportedFilters =
     <QueryResource, Set<String>>{
-      QueryResource.directory: <String>{'scope', 'roleCode'},
+      QueryResource.directory: <String>{'scope', 'roleCode', 'congregationId'},
       QueryResource.congregations: <String>{'active'},
       QueryResource.contacts: <String>{'archived', 'scope', 'roleCode'},
       QueryResource.students: <String>{'archived', 'classId'},
@@ -260,6 +260,15 @@ class QueryCodec {
       case QueryResource.congregations:
         return 'congregations/${locator.id}';
       case QueryResource.contacts:
+        // A contact with no congregation is a supervision contact, stored in
+        // the supervisor-protected top-level collection (S04, S06). The path
+        // is never guessed from the caller's profile.
+        final String? scope = locator.congregationId?.trim();
+        if (scope == null || scope.isEmpty) {
+          return 'supervisionContacts/${locator.id}';
+        }
+        validateId(scope);
+        return 'congregations/$scope/contacts/${locator.id}';
       case QueryResource.students:
       case QueryResource.classes:
       case QueryResource.enrollments:

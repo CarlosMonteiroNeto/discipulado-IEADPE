@@ -71,6 +71,10 @@ class _ContactFormState extends State<ContactForm> {
     text: widget.config.initialPhone ?? '',
   );
   late RoleCode? _role = widget.config.initialRoleCode;
+  late int? _expectedRevision = widget.config.expectedRevision;
+  RoleReplacementRequest? _nextRequest;
+  String? _nextHolderName;
+  bool _reloadRequested = false;
   AppFailure? _failure;
   bool _submitting = false;
 
@@ -150,7 +154,7 @@ class _ContactFormState extends State<ContactForm> {
           phone: phone,
         ),
         id: widget.config.contactId,
-        expectedRevision: widget.config.expectedRevision,
+        expectedRevision: _expectedRevision,
       );
       if (!mounted) return;
       setState(() => _submitting = false);
@@ -166,20 +170,21 @@ class _ContactFormState extends State<ContactForm> {
   }
 
   /// Shows the existing holder and requires explicit confirmation before the
-  /// single holder swap. Cancelling sends no mutation.
+  /// single holder swap. Cancelling sends no mutation. Reloading after a
+  /// conflict re-reads both revisions and re-opens the confirmation with the
+  /// refreshed identity so a resubmit can succeed.
   Future<void> _offerReplacement(DirectoryEntry holder, RoleCode role) async {
     final String? targetId = widget.config.contactId;
-    final int? targetRevision = widget.config.expectedRevision;
-    if (targetId == null || targetRevision == null) {
+    if (targetId == null) {
       return;
     }
-    final Contact? holderRecord = await widget.repository.getContact(
-      id: holder.id,
-      scope: widget.config.scope,
-      congregationId: widget.config.congregationId,
+    final RoleReplacementRequest? initial = await _replacementRequest(
+      holder,
+      role,
+      targetId,
     );
     if (!mounted) return;
-    if (holderRecord == null) {
+    if (initial == null) {
       setState(
         () => _failure = const AppFailure(
           code: AppFailureCode.notFound,
@@ -188,34 +193,149 @@ class _ContactFormState extends State<ContactForm> {
       );
       return;
     }
-    final bool replaced =
-        await showDialog<bool>(
-          context: context,
-          builder: (BuildContext dialogContext) => RoleReplacementDialog(
-            repository: widget.repository,
-            request: RoleReplacementRequest(
+    RoleReplacementRequest current = initial;
+    String holderName = holder.name;
+    while (mounted) {
+      _reloadRequested = false;
+      _nextRequest = null;
+      _nextHolderName = null;
+      final bool replaced =
+          await showDialog<bool>(
+            context: context,
+            builder: (BuildContext dialogContext) => RoleReplacementDialog(
+              repository: widget.repository,
+              request: current,
+              roleLabel: role.label,
+              holderName: holderName,
+              onReload: _reloadReplacement,
+            ),
+          ) ??
+          false;
+      if (!mounted) return;
+      if (replaced) {
+        widget.onSaved?.call(
+          TeamMutationResult(
+            id: targetId,
+            revision: _expectedRevision ?? current.targetExpectedRevision,
+          ),
+        );
+        return;
+      }
+      final RoleReplacementRequest? refreshed = _nextRequest;
+      if (!_reloadRequested || refreshed == null) {
+        return;
+      }
+      current = refreshed;
+      holderName = _nextHolderName ?? holderName;
+    }
+  }
+
+  Future<RoleReplacementRequest?> _replacementRequest(
+    DirectoryEntry holder,
+    RoleCode role,
+    String targetId,
+  ) async {
+    final int? targetRevision = _expectedRevision;
+    if (targetRevision == null) {
+      return null;
+    }
+    final Contact? holderRecord = await widget.repository.getContact(
+      id: holder.id,
+      scope: widget.config.scope,
+      congregationId: widget.config.congregationId,
+    );
+    if (holderRecord == null) {
+      return null;
+    }
+    return RoleReplacementRequest(
+      scope: widget.config.scope,
+      congregationId: widget.config.congregationId,
+      roleCode: role,
+      previousContactId: holder.id,
+      previousExpectedRevision: holderRecord.revision,
+      targetContactId: targetId,
+      targetExpectedRevision: targetRevision,
+    );
+  }
+
+  /// Re-runs the holder lookup and re-reads both contact records, then closes
+  /// the stale confirmation so it can be re-opened with authoritative
+  /// revisions (S06, S11).
+  Future<void> _reloadReplacement() async {
+    _reloadRequested = false;
+    _nextRequest = null;
+    _nextHolderName = null;
+    final RoleCode? role = _role;
+    final String? targetId = widget.config.contactId;
+    if (role != null && targetId != null) {
+      try {
+        final DirectoryEntry? holder = await widget.repository
+            .findAdministrativeHolder(
+              scope: widget.config.scope,
+              congregationId: widget.config.congregationId,
+              roleCode: role,
+            );
+        if (holder != null) {
+          final Contact? holderRecord = await widget.repository.getContact(
+            id: holder.id,
+            scope: widget.config.scope,
+            congregationId: widget.config.congregationId,
+          );
+          final Contact? targetRecord = await widget.repository.getContact(
+            id: targetId,
+            scope: widget.config.scope,
+            congregationId: widget.config.congregationId,
+          );
+          if (holderRecord != null && targetRecord != null) {
+            _expectedRevision = targetRecord.revision;
+            _nextRequest = RoleReplacementRequest(
               scope: widget.config.scope,
               congregationId: widget.config.congregationId,
               roleCode: role,
               previousContactId: holder.id,
               previousExpectedRevision: holderRecord.revision,
               targetContactId: targetId,
-              targetExpectedRevision: targetRevision,
-            ),
-            roleLabel: role.label,
-            holderName: holder.name,
-          ),
-        ) ??
-        false;
-    if (!mounted) return;
-    if (replaced) {
-      widget.onSaved?.call(
-        TeamMutationResult(id: targetId, revision: targetRevision),
-      );
+              targetExpectedRevision: targetRecord.revision,
+            );
+            _nextHolderName = holder.name;
+            _reloadRequested = true;
+          }
+        }
+      } on AppFailure {
+        _reloadRequested = false;
+      }
+    }
+    if (mounted) {
+      Navigator.of(context).pop(false);
     }
   }
 
-  void _reload() => setState(() => _failure = null);
+  /// A save conflict re-fetches the contact record to refresh the revision
+  /// instead of only clearing the message.
+  Future<void> _reload() async {
+    final String? id = widget.config.contactId;
+    if (id == null) {
+      setState(() => _failure = null);
+      return;
+    }
+    try {
+      final Contact? record = await widget.repository.getContact(
+        id: id,
+        scope: widget.config.scope,
+        congregationId: widget.config.congregationId,
+      );
+      if (!mounted) return;
+      setState(() {
+        if (record != null) {
+          _expectedRevision = record.revision;
+        }
+        _failure = null;
+      });
+    } on AppFailure catch (failure) {
+      if (!mounted) return;
+      setState(() => _failure = failure);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
