@@ -1,0 +1,534 @@
+{
+  "feature": "Build the Discipulado IEADPE Flutter web-first application with scoped ministry administration and attendance",
+  "spec_doc": "docs/superpowers/specs/discipulado-ieadpe-spec.md",
+  "global_constraints": [
+    "Implement in a new Flutter project root; preserve the legacy Android folder and its data.",
+    "Flutter web is the release target; support keyboard, pointer, touch, browser history, direct links, refresh, and responsive layouts.",
+    "User-facing copy uses pt-BR; identifiers, code, specifications, and technical documentation use English.",
+    "Use Firebase Auth, Firestore, and authenticated callable functions with a new schema; never reuse legacy credentials or production data.",
+    "The backend enforces authorization and validation; hiding controls or filtering fetched data in Flutter is not authorization.",
+    "Use stable opaque IDs, ISO date-only strings for calendar dates, UTC server timestamps for events, and integer revisions for mutable records.",
+    "Online writes require server confirmation; no offline write queue, automatic retry of mutations, persistent sensitive browser cache, or false success messages.",
+    "Resolve compatible dependencies and commit lockfiles during implementation; no template or extension search is required.",
+    "Keep feature logic separate from widgets and vendor SDKs; use injected repositories and deterministic clocks in tests.",
+    "Do not deploy, push, import legacy data, or send messages automatically. Build and emulator verification are the release evidence for the implementation handoff.",
+    "All spec sections are normative. The plan paths refer to a separate new repository with Flutter at its root; copy spec.md and plan.json there before execution.",
+    "Each touches entry is an exact production/configuration/documentation path exclusively owned by that task. New test files are authored during implementation and omitted from touches to satisfy the installed brief-scaffold contract.",
+    "Tasks consume the exact models and ports in S05 and S11. Widgets never call Firebase directly. Implement and test modules before final entry-point composition; do not create temporary main.dart or functions/src/index.ts files in earlier tasks.",
+    "Resolve the Flutter and backend toolchains before task execution. Require both Flutter and backend/emulator verification; the Flutter-only gate is insufficient. Use the pipeline command wrapper when executing through the two-model runner.",
+    "Use only synthetic fixtures. Release evidence must distinguish executed checks from environment-blocked checks. No acceptance item may be closed on the basis of fake repositories in the final app.",
+    "Design tokens are defined exactly once, in lib/ui/app_theme.dart owned by task 8: primary #002060, secondary #00A3E0, accent #E31B23, white is permitted as a neutral surface. Semantic tokens must meet WCAG AA contrast (text >= 4.5:1, control boundary/focus >= 3:1) in both light and dark modes; dark mode ships dark surfaces with the same color language and sufficient contrast, never inverted text. All simple visual polish (spacing scale, button corner radius and consistent shape system, control heights, small radii) is implemented inside task 8 as one unit, not scattered across feature tasks."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Define the Flutter domain and shared contracts",
+      "summary": "Establish root Flutter package configuration, dependencies, immutable domain types, validation, and injected ports from S05/S11. This is the sole owner of Dart package manifests and contracts consumed by subsequent modules; the executable entry point is composed in task 13.",
+      "spec_refs": [
+        "S01",
+        "S02",
+        "S03",
+        "S05",
+        "S11",
+        "S13",
+        "S14"
+      ],
+      "touches": [
+        "pubspec.yaml",
+        "pubspec.lock",
+        "analysis_options.yaml",
+        ".gitignore",
+        "lib/domain/common.dart",
+        "lib/domain/access.dart",
+        "lib/domain/congregation.dart",
+        "lib/domain/contact.dart",
+        "lib/domain/student.dart",
+        "lib/domain/class_group.dart",
+        "lib/domain/enrollment.dart",
+        "lib/domain/session.dart",
+        "lib/domain/attendance.dart",
+        "lib/domain/validation.dart",
+        "lib/domain/progress.dart",
+        "lib/domain/ports.dart"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "The new root resolves a mutually compatible locked Flutter/Dart dependency set for the libraries named in S11, UUID generation, flutter_test and integration_test; no Android source or legacy configuration is copied. Only dependencies actually used by the final planned app are declared.",
+        "All models, enum values, common metadata, scope ownership and ports in S05/S11 exist with immutable values and explicit JSON serialization; calendar dates do not shift through UTC conversion.",
+        "AuthRepository, BackendGateway, QueryRequest, RecordLocator, PageResult and AppFailure follow S11 signatures; resource identifiers cannot address users, internal role/uniqueness indexes, receipts or roster directly through generic query APIs.",
+        "Validation accepts Brazilian formatted or normalized phone input, rejects malformed structure, accepts empty optional fields, preserves Unicode display names, and produces matching normalized name keys for accented examples.",
+        "New unit tests under test/domain/ cover leap-year acceptance/rejection, impossible dates, future birth dates with a fixed Recife clock, an age below ten without artificial rejection, optional religious answers, contradictory baptism answers and unknown enum decoding.",
+        "Progress unit tests prove 3 present plus 1 absent plus 2 excused yields 75%, zero denominator has no percentage, and open/canceled sessions do not contribute.",
+        "Domain tests run without Firebase or widgets; flutter analyze succeeds on the package and no app main entry point is introduced in this task."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Establish backend authorization and transaction infrastructure",
+      "summary": "Create the TypeScript backend foundation, scoped read rules, indexes, validation and idempotent command infrastructure. Supply emulator configuration and trusted access-profile provisioning so later handlers cannot rely on client-side permissions.",
+      "spec_refs": [
+        "S03",
+        "S04",
+        "S05",
+        "S09",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "firebase.json",
+        "firestore.rules",
+        "firestore.indexes.json",
+        "functions/package.json",
+        "functions/package-lock.json",
+        "functions/tsconfig.json",
+        "functions/vitest.config.ts",
+        "functions/src/core/context.ts",
+        "functions/src/core/datastore.ts",
+        "functions/src/core/errors.ts",
+        "functions/src/core/models.ts",
+        "functions/src/core/validation.ts",
+        "functions/src/core/commands.ts",
+        "functions/src/core/callable.ts",
+        "functions/src/core/queries.ts",
+        "functions/src/core/clock.ts",
+        "functions/tools/provision-access.ts",
+        "functions/tools/seed-emulators.ts"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "Backend package scripts provide build, unit-test and emulator-test entry points with compatible locked dependencies; firebase.json declares local Auth, Firestore and Functions emulators and the eventual web SPA hosting rewrite without a production project binding.",
+        "An authorize-context helper reads the current user profile and congregation on every call, rejects missing/inactive profiles, and enforces supervisor versus congregationStaff scope; roles supplied in payloads grant no access.",
+        "Firestore rules deny all client writes and unspecified reads, expose only an authenticated minimal directory and active congregation names, allow own access-profile reads, and scope private congregational records according to S04. Supervision contacts and archived congregation reads are supervisor-protected.",
+        "Index definitions cover the shipped equality filters and sort orders in S09, including compound scope/role/name directory queries, archived/name students, class/status/name, session class/date/status and enrollment class/student/status/date. A query matrix test enumerates the supported combinations.",
+        "The command wrapper validates requestId and payload digest, authorizes even cached receipt retrieval, transactionally persists seven-day receipts with results, and returns the prior result only for an identical replay. Stable-ID creates reject existing unrelated records; stale revisions fail without writes.",
+        "Backend validation matches Dart examples for names, dates, nullable booleans, enum values, phone normalization and lengths. Unknown fields are rejected rather than copied into Admin SDK writes.",
+        "New emulator tests under functions/test/security/ prove anonymous reads/writes, cross-congregation private reads, forged paths, user-profile self-escalation and deactivated-account operations are denied; directory records omit birth date, address and all student fields.",
+        "Trusted provisioning accepts an existing Auth UID, access role, active flag and valid congregation binding; it is not exported as a callable. Synthetic seeds refuse to operate unless emulator environment variables are present and never load the legacy credential file.",
+        "Backend compilation and infrastructure tests pass without functions/src/index.ts; feature callables are registered only by task 13."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Implement congregation and team transactions",
+      "summary": "Implement congregation lifecycle and contact operations over the task 2 authorized transaction boundary. Preserve single-holder administrative functions and multiple teachers without using names as IDs or deleting displaced contacts.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S06",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/congregations/handlers.ts",
+        "functions/src/congregations/service.ts",
+        "functions/src/contacts/handlers.ts",
+        "functions/src/contacts/service.ts",
+        "functions/src/contacts/role_slots.ts",
+        "functions/src/contacts/directory.ts"
+      ],
+      "depends_on": [
+        2
+      ],
+      "acceptance": [
+        "Exports define saveCongregation, setCongregationArchived, saveContact, replaceRoleHolder and setContactArchived using S11 payload/result conventions, with callable wrappers separate from injectable services.",
+        "Supervisors create uniquely normalized congregation names, rename without changing ID, and archive/restore; archive is blocked by active users, unarchived students/contacts or active classes. Staff cannot mutate congregations or supervision contacts.",
+        "Homonymous contacts coexist, renaming retains ID/createdAt, scope is immutable, and invalid role/scope combinations fail validation. Role codes and labels match all twelve S06 entries.",
+        "Administrative role claims use per-scope transactional slots; teacher permits multiple holders. Replacement checks both revisions, clears only the old assignment, preserves the old person, and commits all affected directory projections and receipt atomically.",
+        "Archiving removes active directory availability and releases role assignment atomically; restoring reintroduces an unassigned active contact. A teacher referenced by an active class cannot be archived or lose teacher eligibility.",
+        "Directory rendering uses the authoritative congregation name by ID after rename and never exposes birth date. Private fields remain solely in the scoped full record.",
+        "New tests under functions/test/contacts/ and functions/test/congregations/ prove concurrent same-role attempts yield exactly one holder, failed replacement leaves all documents unchanged, distinct scopes may use the same role, duplicate request replay is safe, and local staff cannot edit another scope."
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Implement student persistence and class-filtered reads",
+      "summary": "Provide scoped student create/edit/archive/restore and the callable query needed for active-class filtering. Enforce private-record ownership and preserve identity and history independently of the student's name.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S07",
+        "S09",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/students/handlers.ts",
+        "functions/src/students/service.ts",
+        "functions/src/students/queries.ts"
+      ],
+      "depends_on": [
+        2
+      ],
+      "acceptance": [
+        "Exports define saveStudent, setStudentArchived and listClassStudents using S11 authorization, validation, revision and receipt contracts.",
+        "Name is the only required personal field; optional education, marital status, address, phone, birth date and nullable religious answers follow S05 limits. Neither same name nor missing optional information blocks a distinct student.",
+        "Edit preserves ID and creation metadata and cannot change congregation; stale revision cannot overwrite another edit. Archive is blocked by active enrollment and retains history; restore uses the existing ID.",
+        "listClassStudents validates class scope, resolves active enrollment membership and applies prefix ordering/search before page limits; no page is filtered after an unrelated student page was fetched. Cursors bind scope, filter and ordering.",
+        "Query results never include another congregation's students, and unknown/out-of-scope IDs produce a safe not-found/forbidden failure without personal data.",
+        "New tests under functions/test/students/ cover homonyms, rename identity, active-enrollment archive denial, rollback, idempotent creation, forged congregation IDs, and class-filter pagination where matching students lie beyond the first unfiltered page."
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Implement classes and enrollment lifecycle",
+      "summary": "Implement class and enrollment invariants over the authorized backend transaction boundary. Preserve student history, enforce eligible teachers and cohort capacity, and provide stable records for attendance operations in task 6.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S07",
+        "S08",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/classes/handlers.ts",
+        "functions/src/classes/service.ts",
+        "functions/src/enrollments/handlers.ts",
+        "functions/src/enrollments/service.ts"
+      ],
+      "depends_on": [
+        3,
+        4
+      ],
+      "acceptance": [
+        "Exports define saveClass, setClassStatus, enrollStudent and closeEnrollment with the exact operation names and command contracts in S11.",
+        "Class teacher must be a local active teacher contact. Dates, active/completed/archived transitions, enrollment/session prerequisites and read-only completed-class behavior follow S08 and are backend-enforced.",
+        "Enrollment accepts only unarchived same-congregation students and active classes. Per-student active enrollment uniqueness and the cap of 100 total enrollment records including closed records are transactionally enforced; closing an enrollment does not free historical capacity.",
+        "Close records completed or withdrawn plus an explicit valid end date without deleting history. Once present in a frozen roster, startDate cannot change; closing remains allowed when endDate is at least the latest noncanceled frozen session date containing the enrollment. Student, class and teacher IDs from other congregations are denied.",
+        "Class completion is blocked by active enrollments or open sessions. Dates cannot change after any enrollment/session exists; completed classes are immutable except archival. Active empty classes alone may be archived directly.",
+        "New tests under functions/test/enrollments/ and functions/test/classes/ prove anonymous/cross-scope denial, concurrent enrollment exclusivity, capacity at 100 versus 101 including closed records, teacher eligibility, stale revision, request replay and class lifecycle constraints using synthetic session/roster fixtures."
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Implement session rosters and atomic attendance",
+      "summary": "Build session and attendance transactions on the class/enrollment model. Freeze historical membership, protect concurrent submissions and return explicit per-enrollment progress without inferring graduation.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S07",
+        "S08",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/sessions/handlers.ts",
+        "functions/src/sessions/service.ts",
+        "functions/src/attendance/handlers.ts",
+        "functions/src/attendance/service.ts",
+        "functions/src/attendance/roster.ts",
+        "functions/src/attendance/progress.ts"
+      ],
+      "depends_on": [
+        5
+      ],
+      "acceptance": [
+        "Exports define createSession, saveAttendance, cancelSession, getSessionAttendance and getEnrollmentProgress with the exact operation names in S11.",
+        "Session uniqueness is per class/date for noncanceled sessions. First saved attendance freezes eligible enrollment intervals and historical names from authoritative records. Late enrollment cannot silently alter the roster.",
+        "Attendance accepts exactly the complete roster map with present/absent/excused/unmarked, checks expected session revision and atomically commits roster, marks, session revision and receipt. Injected failure leaves all documents unchanged.",
+        "Finalization rejects empty/incomplete rosters and future dates; save-and-finalize is atomic. Authorized correction retains finalized status and frozen membership; cancellation preserves history and excludes it from progress. Completed classes reject attendance mutations.",
+        "Progress returns counts and nullable percentage per enrollment; only finalized noncanceled sessions contribute, excused is excluded, 3 present plus 1 absent yields 75%, and zero denominator remains absent rather than 0%.",
+        "New tests under functions/test/attendance/ prove frozen-roster behavior, historical names, duplicate session/date, stale saves, idempotent retry, partial-write rollback, correction, cancellation and capacity-bounded transaction behavior. Every handler denies anonymous and cross-congregation access."
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Connect individual sessions and scoped Flutter data access",
+      "summary": "Implement Firebase adapters and authentication controllers/pages over the domain ports. Centralize safe errors, query/cursor construction, and in-memory session cleanup before any feature UI depends on remote data.",
+      "spec_refs": [
+        "S03",
+        "S04",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/data/firebase_configuration.dart",
+        "lib/data/firebase_auth_repository.dart",
+        "lib/data/firebase_gateway.dart",
+        "lib/data/query_codec.dart",
+        "lib/data/error_mapper.dart",
+        "lib/features/auth/auth_controller.dart",
+        "lib/features/auth/sign_in_page.dart",
+        "lib/features/auth/password_reset_page.dart",
+        "lib/features/auth/access_denied_page.dart"
+      ],
+      "depends_on": [
+        1,
+        2,
+        8
+      ],
+      "acceptance": [
+        "AuthRepository implements individual sign-in, generic password-reset response and sign-out with session-scoped persistence; public registration and congregation/password matching are absent.",
+        "watchSession resolves both Firebase identity and an active access profile. Missing/inactive profiles show Acesso não autorizado; profile revocation/scope change clears controllers and listeners before another protected frame renders.",
+        "Firebase configuration is supplied explicitly per environment, emulator mode is clearly labeled, persistent Firestore browser caching is disabled, and absent configuration reports a setup error without fallback to legacy credentials.",
+        "BackendGateway implements validated resource reads and stable cursor queries, routes complex query operations to their S11 callable names, translates SDK errors to AppFailure, and rejects internal collection/resource access.",
+        "Mutation payloads retain UUID and requestId for explicit retry, successful UI state requires a server response, timeout preserves draft and retry identity, and no mutation retries itself automatically.",
+        "Authentication pages use shared accessible controls, preserve safe internal return destinations for final router composition, prevent external redirect targets, and never log passwords or account/profile payloads.",
+        "New tests under test/data/ and test/features/auth/ cover profile loading, inactive access, sign-out cleanup, cross-scope cursor reuse, stale query responses, network errors, retained retry IDs and pt-BR field feedback. Auth emulator integration proves a valid password alone does not bypass profile authorization.",
+        "Auth pages and controls consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Create responsive and accessible shared presentation",
+      "summary": "Build the reusable visual primitives, theme tokens, asynchronous states and navigation shell structure for a browser-oriented administration app. Define the entire visual language here in one unit: brand colors, spacing, shape/radius system, control heights, dark mode. Apply the measurable apple-design interaction criteria in S10 without adding gesture or animation frameworks; feature tasks consume these primitives and never re-themed controls.",
+      "spec_refs": [
+        "S03",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/ui/app_theme.dart",
+        "lib/ui/responsive_scaffold.dart",
+        "lib/ui/async_content.dart",
+        "lib/ui/form_fields.dart",
+        "lib/ui/confirmation_dialog.dart",
+        "lib/ui/record_list.dart",
+        "lib/ui/dirty_form_guard.dart",
+        "lib/ui/feedback.dart",
+        "lib/ui/web_preferences.dart"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "Layout follows S10 breakpoints: persistent navigation at >=1024, compact at 600–1023, drawer/cards below 600. Reusable lists and forms reflow at 360/768/1440 and 200% text without clipped primary actions or page-wide horizontal scroll.",
+        "Theme tokens are defined once in app_theme.dart: primary #002060, secondary #00A3E0, accent #E31B23, with white as a permitted neutral surface. Light and dark themes share this color language; every semantic token combination used for text meets >= 4.5:1 and every control boundary/focus indication meets >= 3:1 in both modes, verified by measured token tests.",
+        "The theme applies platform typography, body size >=16, a consistent 4/8 spacing scale, >=44x44 touch targets, a unified control shape system (button corner radius applied consistently across all buttons) and control heights — all implemented here as one unit, with no scattered restyling in feature tasks.",
+        "Buttons provide immediate press/focus feedback but invoke actions only on activation. Keyboard navigation, dialog focus trap, Escape cancellation and trigger focus restoration work with semantic labels and outcome announcements.",
+        "Reduced motion eliminates positional animation and overshoot; default reversible transitions stay interruptible and preserve form state. Any translucent chrome has an opaque reduced-transparency/high-contrast fallback.",
+        "AsyncContent distinguishes initial loading, empty dataset, empty search, error/retry, forbidden and not-found. Forms associate validation errors with fields and focus the first invalid input after submit.",
+        "DirtyFormGuard exposes integration hooks for in-app routing, browser history and supported unload confirmation, while never persisting a sensitive draft locally.",
+        "New widget tests under test/ui/ verify reflow/text scaling, keyboard-only dialog operations, reduced-motion behavior, error focus, long accented names, disabled/submitting control semantics, and contrast compliance for text and focus tokens in light and dark modes."
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Build team directory and congregation workflows",
+      "summary": "Deliver searchable team contacts, scoped editors, administrative-role replacement and supervisor congregation management. Use the minimal directory projection outside a caller's private scope and explicit user actions for external contact.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S06",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/team/team_repository.dart",
+        "lib/features/team/team_controller.dart",
+        "lib/features/team/team_page.dart",
+        "lib/features/team/contact_page.dart",
+        "lib/features/team/contact_form.dart",
+        "lib/features/team/role_replacement_dialog.dart",
+        "lib/features/team/phone_actions.dart",
+        "lib/features/congregations/congregation_repository.dart",
+        "lib/features/congregations/congregation_controller.dart",
+        "lib/features/congregations/congregations_page.dart"
+      ],
+      "depends_on": [
+        3,
+        7,
+        8
+      ],
+      "acceptance": [
+        "Equipe supports name-prefix search, role/scope filters, explicit pagination and refresh with stable ordering; filters are exposed as route state for task 13 and changing filters resets pagination.",
+        "Cross-scope contact detail requests only the directory projection; authorized local/supervisor editors can create, rename, archive and restore by stable ID using the six S06 operations. Birth dates never appear in the directory UI.",
+        "All role labels match S06; occupied administrative roles show the existing holder and explicit replacement confirmation. Cancel sends no mutation; conflict preserves inputs and offers reload; success keeps the old contact unassigned rather than deleting it.",
+        "Supervisors manage congregation lifecycle with backend dependency errors rendered as actionable explanations. Staff see no write controls for congregations or another scope, while backend denial still maps to a safe error.",
+        "WhatsApp links contain only normalized phone digits, are activated explicitly, never send/prefill sensitive data, and offer accessible copy-phone fallback. Missing phone has a labeled disabled state.",
+        "New tests under test/features/team/ and test/features/congregations/ cover homonym rendering, identity-preserving rename, loaded role preselection, replacement cancel/conflict, projection-only access, blocked archive, URL encoding and keyboard focus.",
+        "Team and congregation screens consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Build student records and enrollment history",
+      "summary": "Deliver scoped student lists, grouped forms, private detail and immutable enrollment history. Keep optional personal/religious data optional and connect enrollment progress to authoritative backend results.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/students/student_repository.dart",
+        "lib/features/students/student_controller.dart",
+        "lib/features/students/students_page.dart",
+        "lib/features/students/student_detail_page.dart",
+        "lib/features/students/student_form_page.dart",
+        "lib/features/students/enrollment_history.dart"
+      ],
+      "depends_on": [
+        4,
+        6,
+        7,
+        8
+      ],
+      "acceptance": [
+        "Alunos exposes scope, name-prefix search, archived and active-class filters, pagination, refresh and URL-state hooks. Staff scope is fixed and supervisor creation requires one selected congregation.",
+        "Create/edit require only name; personal/contact/discipleship groups preserve null for unanswered religious fields and follow S05 validation with pt-BR copy. Homonym information never replaces an existing record.",
+        "Student detail includes enrollment history and the S08 counts/percentage; zero denominator displays Sem aulas contabilizadas and there is no automatic graduation/baptism inference.",
+        "Archive/restore uses confirmation and existing ID; active-enrollment denial explains that enrollment must close first. Historical attendance and person identity remain unchanged.",
+        "Forms keep values on backend validation, conflict or unavailable errors, show success only after acknowledgment, warn before dirty navigation, and do not persist drafts or expose private fields in list rows/URLs.",
+        "New tests under test/features/students/ cover optional fields, leap-day input, same-name records, stale revision, dirty cancellation, class-filter pagination, scoped not-found, archive denial, progress rendering and keyboard submit.",
+        "Student screens consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Build classes and explicit attendance editing",
+      "summary": "Deliver class lifecycle, enrollment management, session creation and a four-state attendance editor. Preserve unsaved choices on conflicts and make the difference between saving and finalizing visible.",
+      "spec_refs": [
+        "S04",
+        "S05",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/features/classes/academic_repository.dart",
+        "lib/features/classes/class_controller.dart",
+        "lib/features/classes/classes_page.dart",
+        "lib/features/classes/class_detail_page.dart",
+        "lib/features/classes/class_form.dart",
+        "lib/features/classes/enrollment_editor.dart",
+        "lib/features/attendance/attendance_controller.dart",
+        "lib/features/attendance/attendance_page.dart",
+        "lib/features/attendance/session_editor.dart",
+        "lib/features/attendance/attendance_row.dart"
+      ],
+      "depends_on": [
+        6,
+        7,
+        8
+      ],
+      "acceptance": [
+        "Turmas provides scoped filters, paging, create and detail with teacher, dates, roster and session list. Only eligible teachers/students are selectable and backend failures retain the user's inputs.",
+        "Enrollment can start and close as completed/withdrawn with explicit dates; active-enrollment conflicts show the existing class, and capacity/date/frozen-roster limits have actionable messages. There is no cross-congregation transfer flow.",
+        "Session creation preserves date/topic, displays status, prevents duplicate submissions, and links to a deep-linkable attendance page using class and session IDs.",
+        "Every row exposes Presente, Ausente, Justificado and Não marcado with text/semantics as well as color. Initial load does not convert unmarked to absent. Marcar todos presentes is explicit and remains unsaved until Salvar chamada.",
+        "Save submits a complete roster map with expected session revision; timeout retains request identity and choices, conflict offers reload with a visible comparison copy, and no partial or stale response is announced as success.",
+        "Finalization explains incomplete/future-date failures, correction preserves frozen membership, cancellation requires confirmation and completed-class controls are read-only. Progress refreshes after successful changes.",
+        "New tests under test/features/classes/ and test/features/attendance/ cover keyboard-only marking, all four statuses, complete-map submission, finalization error, capacity boundary, stale save, cancellation, frozen historical names and narrow/text-scaled layout.",
+        "Class, session and attendance screens consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Deliver scoped overview counts and navigation",
+      "summary": "Provide authoritative dashboard counts and corresponding filtered navigation. Keep the overview limited to operational information grounded in the legacy discipleship concepts.",
+      "spec_refs": [
+        "S04",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/overview/handlers.ts",
+        "functions/src/overview/service.ts",
+        "lib/features/overview/overview_repository.dart",
+        "lib/features/overview/overview_controller.dart",
+        "lib/features/overview/overview_page.dart"
+      ],
+      "depends_on": [
+        6,
+        7,
+        8
+      ],
+      "acceptance": [
+        "getOverview returns counts of unarchived students, active classes and open sessions through today's Recife date, using authorized server queries rather than downloading all records to the browser.",
+        "Staff always receive their own congregation; supervision may select one or Todas. Caller-provided scope cannot expand staff access and inactive profiles are rejected.",
+        "Visão geral renders counts with clear labels and links carrying the same scope/filter to students, classes and open sessions; no zero count is fabricated when the endpoint fails.",
+        "Page entry, Atualizar and relevant successful mutations invalidate counts. Stale results from a previous congregation cannot appear after a scope switch.",
+        "New tests under functions/test/overview/ and test/features/overview/ verify two-congregation aggregation, canceled/future-session exclusion, archived-student exclusion, authorization, error/retry state and keyboard navigation links.",
+        "listPendingSessions provides the paginated overview section selected by pendentes=true, ordered by date/ID and scoped to the caller; each row links to the exact class/session with congregation ID. Tests cover authorized all-congregation paging and reject cursor reuse across scopes.",
+        "The overview page consumes app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Compose the application and verify the browser release",
+      "summary": "Wire the completed modules into one executable Flutter web application and export the backend callables. Add reproducible local/CI verification and the runbook, proving the complete emulator-backed flow without deployment or legacy access.",
+      "spec_refs": [
+        "S01",
+        "S02",
+        "S03",
+        "S04",
+        "S05",
+        "S06",
+        "S07",
+        "S08",
+        "S09",
+        "S10",
+        "S11",
+        "S12",
+        "S13",
+        "S14"
+      ],
+      "touches": [
+        "lib/main.dart",
+        "lib/app/app.dart",
+        "lib/app/bootstrap.dart",
+        "lib/app/router.dart",
+        "lib/app/dependencies.dart",
+        "lib/app/navigation.dart",
+        "lib/app/not_found_page.dart",
+        "functions/src/index.ts",
+        "web/index.html",
+        "web/manifest.json",
+        ".github/workflows/verify.yml",
+        "tool/verify.ps1",
+        "tool/verify.sh",
+        "tool/run-local.ps1",
+        "tool/run-local.sh",
+        "README.md",
+        "docs/verification.md"
+      ],
+      "depends_on": [
+        9,
+        10,
+        11,
+        12
+      ],
+      "acceptance": [
+        "Application entry points inject real AuthRepository, BackendGateway and feature repositories; emulator configuration remains explicit. Backend index exports every S11 callable exactly once and no unguarded provisioning endpoint.",
+        "All S10 routes work with deep links, hard refresh, browser back/forward and URL filter state. Session loading preserves internal destination; dirty forms get supported navigation protection; invalid IDs/paths show safe not-found/forbidden screens.",
+        "Signed-out users cannot display loaded private content, another congregation cannot reuse a forged scope/deep link, and profile deactivation/scope change disposes the old data. All accessible navigation labels and scope selectors match the specification.",
+        "New browser integration tests under integration_test/ exercise sign-in, contact homonym/rename/role replacement, student/class creation, enrollment, attendance save/finalization/progress, reload/history, sign-out and denied second-congregation access against real local emulators.",
+        "The verification entry points fail on Flutter analysis/tests/build, backend compilation/unit/emulator tests, or critical browser-flow failure; CI invokes the same entry points. Backend authorization checks cannot be bypassed by a green Flutter test suite.",
+        "Record executed commands, exit codes, actual browser/runtime versions and responsive/accessibility findings in docs/verification.md. Chromium end-to-end plus Firefox/WebKit smoke, 360/768/1440 layouts, 200% text, reduced motion and keyboard/screen-reader checks meet S13. Any environment-blocked check remains explicitly incomplete.",
+        "README documents dependency setup, locked runtimes, explicit emulator startup, synthetic fixtures, first-supervisor provisioning, dev login/reset, web build and SPA rewrite. It explains archive/history, class capacity and progress semantics without claiming production deployment or legal compliance.",
+        "The release build contains no Admin SDK credentials, legacy password arrays, sensitive fixture records or production fallbacks; runtime logs do not disclose people, phones or religious status. No placeholder screens or production fake repositories remain.",
+        "No push, deployment, message send, legacy import or Android packaging occurs; completed work is a locally runnable and verified Flutter web implementation ready for a separate release decision.",
+        "The composed shell, router, and not-found page consume app_theme.dart tokens and lib/ui primitives exclusively; no hardcoded colors, corner radii, spacing or duplicated control styling, in light or dark mode."
+      ]
+    }
+  ]
+}
