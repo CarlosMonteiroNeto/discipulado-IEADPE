@@ -7,6 +7,7 @@ library;
 import 'dart:convert';
 
 import '../domain/ports.dart';
+import '../domain/validation.dart';
 import 'error_mapper.dart';
 
 const int defaultPageSize = 50;
@@ -71,6 +72,16 @@ const Map<QueryResource, String> _collectionNames = <QueryResource, String>{
 AppFailure _invalid(String message) =>
     AppFailure(code: AppFailureCode.validation, message: message);
 
+/// Normalizes a raw prefix with the same key as the stored `normalizedName`
+/// field (S05/S09). A blank prefix is not a search and yields `null`.
+String? _normalizedPrefix(String? raw) {
+  if (raw == null) {
+    return null;
+  }
+  final String normalized = normalizeName(raw);
+  return normalized.isEmpty ? null : normalized;
+}
+
 class QueryFilter {
   const QueryFilter(this.field, this.value);
 
@@ -89,6 +100,7 @@ class QueryPlan {
     this.congregationId,
     this.cursor,
     this.callableOperation,
+    this.namePrefix,
   });
 
   final QueryResource resource;
@@ -100,6 +112,10 @@ class QueryPlan {
   final String? congregationId;
   final String? cursor;
   final String? callableOperation;
+
+  /// Normalized name prefix bound into this plan (S09). The single source for
+  /// both cursor identity and the Firestore range constraint.
+  final String? namePrefix;
 }
 
 class QueryCursor {
@@ -155,6 +171,7 @@ class QueryCodec {
       congregationId: request.congregationId,
       cursor: request.cursor,
       callableOperation: callable,
+      namePrefix: _normalizedPrefix(request.namePrefix),
     );
   }
 
@@ -180,8 +197,9 @@ class QueryCodec {
     for (final MapEntry<String, String> entry in sorted) {
       buffer.write('${entry.key}=${entry.value};');
     }
-    if (request.namePrefix != null) {
-      buffer.write('prefix=${request.namePrefix};');
+    final String? prefix = _normalizedPrefix(request.namePrefix);
+    if (prefix != null) {
+      buffer.write('prefix=$prefix;');
     }
     return buffer.toString();
   }

@@ -66,20 +66,36 @@ void main() {
         firestore: FirebaseFirestore.instance,
       ),
     );
+    final Completer<AppFailure> denial = Completer<AppFailure>();
     final List<AuthSession?> sessions = <AuthSession?>[];
-    final List<Object> errors = <Object>[];
     final StreamSubscription<AuthSession?> subscription = repository
         .watchSession()
-        .listen(sessions.add, onError: errors.add);
+        .listen(
+          sessions.add,
+          onError: (Object error) {
+            if (!denial.isCompleted && error is AppFailure) {
+              denial.complete(error);
+            }
+          },
+        );
     addTearDown(subscription.cancel);
 
-    await tester.pumpAndSettle(const Duration(seconds: 2));
+    // Happy path: the valid password produced a real Firebase identity.
+    expect(auth.currentUser, isNotNull);
+
+    // Deterministic bounded wait: resolve only when the profile-authorization
+    // outcome arrives; pumping frames would race the emulator round-trip.
+    final AppFailure failure = await denial.future.timeout(
+      const Duration(seconds: 10),
+      onTimeout: () => throw TimeoutException(
+        'No profile-authorization outcome within 10 seconds.',
+      ),
+    );
 
     expect(sessions, isEmpty);
-    expect(errors, isNotEmpty);
-    expect((errors.first as AppFailure).code, AppFailureCode.forbidden);
+    expect(failure.code, AppFailureCode.forbidden);
 
-    await auth.signOut();
     await auth.currentUser?.delete();
+    await auth.signOut();
   });
 }

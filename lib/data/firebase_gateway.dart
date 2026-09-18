@@ -17,6 +17,25 @@ class TransportPage {
   final String? nextCursor;
 }
 
+/// Inclusive/exclusive bounds for a normalized name-prefix range scan (S09).
+class PrefixRange {
+  const PrefixRange({required this.lower, required this.upper});
+
+  final String lower;
+  final String upper;
+}
+
+/// The Firestore range constraint a prefix plan must apply, or `null` when the
+/// plan is not prefix-bound. Keeping it a pure function makes the constraint
+/// testable without an emulator.
+PrefixRange? prefixRangeFor(QueryPlan plan) {
+  final String? prefix = plan.namePrefix;
+  if (prefix == null) {
+    return null;
+  }
+  return PrefixRange(lower: prefix, upper: '$prefix\uf8ff');
+}
+
 /// Thin seam over Firestore/Cloud Functions so the gateway stays testable.
 abstract interface class FirebaseTransport {
   Future<JsonMap?> getDocument(String path);
@@ -228,6 +247,16 @@ class FirebaseDataTransport implements FirebaseTransport {
     Query<Map<String, dynamic>> query = firestore.collection(plan.collection);
     for (final QueryFilter filter in plan.filters) {
       query = query.where(filter.field, isEqualTo: filter.value);
+    }
+    // A normalized name prefix is a real range constraint on the order key,
+    // applied before cursor paging so every page stays prefix-bounded (S09).
+    final PrefixRange? range = prefixRangeFor(plan);
+    if (range != null) {
+      query = query.where(
+        plan.orderBy,
+        isGreaterThanOrEqualTo: range.lower,
+        isLessThan: range.upper,
+      );
     }
     query = query.orderBy(plan.orderBy).orderBy(FieldPath.documentId);
     final String? cursor = plan.cursor;

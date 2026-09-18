@@ -730,6 +730,34 @@
         "The correction is confined to the shared presentation unit: no feature code is restyled, no public primitive contract is weakened, and no existing assertion is deleted or relaxed. Tests committed by unrelated completed tasks are not modified; the stronger assertions live in the same theme-token test files owned by the task 8/19 presentation unit or in a newly authored test file.",
         "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence showing the added elevated focused-side and overlay assertions failing under the pre-fix mapping. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 21,
+      "title": "Bind the validated name prefix to the Firestore query and de-race the emulator auth test",
+      "summary": "Remediate the task 7 SEND_BACK Important findings: QueryCodec.plan validates and fingerprints QueryRequest.namePrefix but QueryPlan carries no prefix, so FirebaseDataTransport.runQuery silently returns unfiltered pages instead of S09 prefix matches; and the acceptance-mandated emulator denial test waits with pumpAndSettle, whose duration argument is an inter-frame budget, not a network wait, so the assertion can race the profile round-trip. Carry the normalized prefix through QueryPlan into the transport as a real range constraint preserved across cursors, and await the emulator denial result deterministically under a bounded timeout.",
+      "corrects": 7,
+      "spec_refs": [
+        "S04",
+        "S09",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/data/query_codec.dart",
+        "lib/data/firebase_gateway.dart"
+      ],
+      "depends_on": [
+        7
+      ],
+      "acceptance": [
+        "QueryPlan carries the validated name prefix: QueryCodec.plan exposes a nullable namePrefix populated from QueryRequest.namePrefix whenever the prefix is allowed for the resource, normalized consistently with the stored normalized-name order key rather than re-fingerprinted from the raw input. A prefix is no longer validated and folded into filterFingerprint while being discarded from the plan; when the field is present, QueryPlan is the single source of the prefix for both cursor identity and query construction.",
+        "FirebaseDataTransport.runQuery applies the prefix to the Firestore query before paging: when plan.namePrefix is non-null it adds a range constraint on the plan's normalized-name order field (>= prefix and < prefix + '\\uf8ff') combined with the existing equality filters, and only then applies startAfter/cursor paging. A prefix read over the resources that permit it (directory, students, classes) returns only normalized-name matches; it never returns the first N records ordered by normalizedName as if unfiltered, and the cursor fingerprint can no longer claim a prefix that the query does not bind.",
+        "Paging preserves the prefix: a continuation page fetched from a cursor spans the same range constraint, so every page of a prefixed query remains prefix-bounded and a cursor minted under a prefix is not accepted for a differently-scoped query (and vice versa). New tests under test/data/ assert that the transport receives the prefix condition and that a page-after page still carries it; no test proves prefix behavior only through the fingerprint, and the existing cross-scope cursor and stale-response assertions are preserved.",
+        "The emulator integration test no longer uses pumpAndSettle with a duration as a stand-in for a network wait. It awaits the profile-authorization outcome explicitly through a bounded future (a completer completed by the session error, awaited with a timeout such as 10 seconds) and asserts the expected AppFailure code only after that future resolves, so a slow or absent emulator response fails the test instead of racing it. The valid-password-alone denial claim and the happy-path assertion remain and none is weakened.",
+        "The correction stays inside the auth/data unit: the public AuthRepository and BackendGateway port contracts in S11 are unchanged (only the internal QueryPlan gains the prefix field), no feature UI is restyled, and no guard, validation or atomicity behavior added by task 7 is weakened. Tests committed by other completed tasks are never modified; the strengthened or new prefix-transport, cursor-paging and emulator-wait assertions live in newly authored test files or in the task-7-owned test files this correction is allowed to extend.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the added prefix-transport and cursor-paging tests failing against the pre-fix QueryPlan. The emulator integration test is executed when the local emulator environment is available; if it cannot run, that check is recorded as incomplete under S13/S14, never as passed, and the gate is not weakened."
+      ]
     }
   ]
 }
