@@ -565,6 +565,30 @@
         "Verification for this task is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands). Backend compilation and tests pass and the Node gate is not weakened; if the gate cannot run, report an environment blocker under S13/S14.",
         "All verification added by this task lives in newly authored test files. Tests committed by earlier tasks are never modified: a modified committed test is pipeline tampering, so every additional assertion is proven from a new file."
       ]
+    },
+    {
+      "id": 15,
+      "title": "Restore the committed emulator denial matrix and harden the gate assertions",
+      "summary": "Remediate the task 14 SEND_BACK findings: stop excluding the committed task-2 anonymous/cross-scope denial matrix from the emulator entry while keeping it excluded from non-emulator runs, and replace the task-14 gate test's raw-substring and working-tree-versus-index assertions with behavioral checks that fail on the bypass and compare the committed suite against its task-2 revision.",
+      "corrects": 14,
+      "spec_refs": [
+        "S04",
+        "S13"
+      ],
+      "touches": [
+        "functions/vitest.config.ts"
+      ],
+      "depends_on": [
+        14
+      ],
+      "acceptance": [
+        "functions/vitest.config.ts no longer lists test/security/rules.security.test.ts in the emulator-run `exclude`; `npm run test:emulator` loads and executes both the committed task-2 test/security/rules.security.test.ts anonymous/cross-scope denial matrix and the task-14 hardening suite. The non-emulator branches keep excluding test/security/**, so no entry point is widened to run security tests without emulators, and the committed matrix is no longer excluded from every entry point.",
+        "The emulator gate test's wiring assertion is behavioral, not raw substring presence: it proves the emulator run configuration includes both security suites and does not exclude test/security/rules.security.test.ts, and it fails against the previously buggy configuration that excluded the committed matrix instead of passing on the exclusion text. The FIRESTORE_EMULATOR_HOST fail-fast assertion remains.",
+        "The byte-identity guard compares test/security/rules.security.test.ts against an explicit base/task-2 revision (a git object or a pinned content hash), never the working tree against the index; it fails when the committed task-2 suite diverges from that revision, independent of commit state.",
+        "Only the task-14-authored gate test is edited. functions/test/security/rules.security.test.ts and every test committed by task 2 stay byte-identical to their committed revision, and no rule, guard or production check added by task 14 is weakened.",
+        "When the emulator environment is available, the executed run reports both security suites including the committed anonymous and cross-scope denial cases, so a run that still omits the matrix cannot be recorded as green; an environment-blocked execution is stated as incomplete, never as passed.",
+        "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes with the corrected gate assertions. If the Node gate or emulator environment cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

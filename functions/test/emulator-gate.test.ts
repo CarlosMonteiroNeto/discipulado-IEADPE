@@ -1,10 +1,65 @@
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { resolve } from "node:path";
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import {
   assertEmulatorHosts,
   missingEmulatorHosts,
 } from "./security/emulator-guard";
+
+/**
+ * Behavioral guard for the emulator entry point.
+ *
+ * The wiring proof does not grep the config source. It re-evaluates
+ * `vitest.config.ts` with a cache-busted import under a controlled
+ * `npm_lifecycle_event` and inspects the *resolved* test options, so it proves
+ * the committed denial matrix is not excluded rather than blessing the
+ * exclusion text. The previously buggy configuration (which excluded
+ * `test/security/rules.security.test.ts`) fails this assertion.
+ *
+ * The committed task-2 suite is pinned to its revision object
+ * (`0774d7eaea10b35d8b5bac53fa1e62dd7f5516c2`, task 2 green) by content hash,
+ * so divergence is detected independent of the working tree or commit state.
+ */
+
+const functionsDir = resolve(__dirname, "..");
+const rootDir = resolve(functionsDir, "..");
+const configPath = resolve(functionsDir, "vitest.config.ts");
+const task2Revision = "0774d7eaea10b35d8b5bac53fa1e62dd7f5516c2";
+const task2RulesSuiteSha256 =
+  "6826b53d5414b2086eb5be221859d98638bce04418bb618201f45d2b24c855e1";
+
+interface ResolvedTestOptions {
+  include?: string[];
+  exclude?: string[];
+}
+
+/** Re-evaluate the Vitest config under the given lifecycle. */
+async function resolveTestOptions(
+  lifecycle: string | undefined,
+): Promise<ResolvedTestOptions> {
+  const previous = process.env.npm_lifecycle_event;
+  if (lifecycle === undefined) {
+    delete process.env.npm_lifecycle_event;
+  } else {
+    process.env.npm_lifecycle_event = lifecycle;
+  }
+  try {
+    // The query string busts the module cache so the config re-evaluates.
+    const url = `${configPath}?lifecycle=${lifecycle ?? "none"}-${Date.now()}`;
+    const module = (await import(/* @vite-ignore */ url)) as {
+      default: { test: ResolvedTestOptions };
+    };
+    return module.default.test;
+  } finally {
+    if (previous === undefined) {
+      delete process.env.npm_lifecycle_event;
+    } else {
+      process.env.npm_lifecycle_event = previous;
+    }
+  }
+}
 
 describe("emulator security entry point", () => {
   it("fails fast when the required emulator hosts are absent", () => {
@@ -23,28 +78,49 @@ describe("emulator security entry point", () => {
 
   it("wires a fail-fast host check into the npm test:emulator script", () => {
     const pkg = JSON.parse(
-      readFileSync(resolve(__dirname, "../package.json"), "utf8"),
+      readFileSync(resolve(functionsDir, "package.json"), "utf8"),
     ) as { scripts: Record<string, string> };
     expect(pkg.scripts["test:emulator"]).toContain("FIRESTORE_EMULATOR_HOST");
     expect(pkg.scripts["test:emulator"]).toContain("process.exit(1)");
   });
 
-  it("loads the newly authored hardening suite only for the emulator run", () => {
-    const config = readFileSync(resolve(__dirname, "../vitest.config.ts"), "utf8");
-    expect(config).toContain("npm_lifecycle_event");
-    expect(config).toContain("test/security/**/*.test.ts");
-    expect(config).toContain("test:emulator");
-    // The task-2 suite is committed by an earlier task and is never modified.
-    expect(config).toContain("test/security/rules.security.test.ts");
+  it("loads both security suites under test:emulator and excludes neither", async () => {
+    const options = await resolveTestOptions("test:emulator");
+    expect(options.include).toContain("test/security/**/*.test.ts");
+    // Behavioral proof: the committed task-2 denial matrix is not excluded.
+    expect(options.exclude ?? []).not.toContain("test/security/rules.security.test.ts");
+    expect(options.exclude ?? []).not.toContain("test/security/**");
   });
 
-  it("keeps the committed task-2 security suite byte-identical to HEAD", () => {
-    const { spawnSync } = require("node:child_process") as typeof import("node:child_process");
-    const result = spawnSync(
+  it("keeps security suites out of every non-emulator run", async () => {
+    for (const lifecycle of [undefined, "test", "test:unit"]) {
+      const options = await resolveTestOptions(lifecycle);
+      expect(options.exclude ?? []).toContain("test/security/**");
+      expect(options.include).not.toContain("test/security/**/*.test.ts");
+    }
+  });
+
+  it("keeps the committed task-2 security suite byte-identical to its revision", () => {
+    // Line endings are normalized before hashing: the repository stores LF
+    // while a Windows checkout materializes CRLF, so the guard must compare
+    // content, not the platform's checkout encoding.
+    const normalize = (text: string): string => text.replace(/\r\n/g, "\n");
+    const committed = spawnSync(
       "git",
-      ["diff", "--quiet", "--", "test/security/rules.security.test.ts"],
-      { cwd: resolve(__dirname, ".."), encoding: "utf8" },
+      ["show", `${task2Revision}:functions/test/security/rules.security.test.ts`],
+      { cwd: rootDir, encoding: "utf8" },
     );
-    expect(result.status).toBe(0);
+    expect(committed.status).toBe(0);
+    expect(createHash("sha256").update(normalize(committed.stdout)).digest("hex")).toBe(
+      task2RulesSuiteSha256,
+    );
+    // And the working file must match that pinned revision content too.
+    const working = readFileSync(
+      resolve(functionsDir, "test/security/rules.security.test.ts"),
+      "utf8",
+    );
+    expect(createHash("sha256").update(normalize(working)).digest("hex")).toBe(
+      task2RulesSuiteSha256,
+    );
   });
 });
