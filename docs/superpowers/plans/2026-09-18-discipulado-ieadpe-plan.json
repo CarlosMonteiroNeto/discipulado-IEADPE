@@ -622,6 +622,29 @@
         "All verification added by this task lives in newly authored test files; tests committed by tasks 2 and 3 are never modified, and no guard, validation or atomicity check added by earlier tasks is weakened.",
         "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 17,
+      "title": "Add rollback coverage for the paired student and counter write",
+      "summary": "Remediate the task 4 SEND_BACK finding: the acceptance-mandated rollback coverage is absent, because no test injects a failure after a write has been staged, so the paired student document and congregations/{id}/internal/references.unarchivedStudents update are not proven atomic. Add fault-injection tests proving both saveStudent and setStudentArchived leave every document and receipt unchanged when the transaction fails between the two writes.",
+      "corrects": 4,
+      "spec_refs": [
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [],
+      "depends_on": [
+        4
+      ],
+      "acceptance": [
+        "New fault-injection tests under functions/test/students/ prove the paired student-plus-counter write is atomic: a datastore double wraps the real InMemoryDatastore transaction, delegates reads and staged writes to it, and throws when writing the `congregations/{id}/internal/references` document after the student write has been staged. Calling saveStudent on a create then asserts the student document is absent, the references document is unchanged (or absent) and no command receipt exists for that requestId.",
+        "The same technique is applied to setStudentArchived. A failed archive leaves the student unarchived at its original revision, leaves the `unarchivedStudents` count unchanged and writes no receipt; a failed restore leaves the student archived at its original revision and the count unchanged. No partial document remains in either case.",
+        "The failure is injected after the student write is staged and before commit, so the assertions exercise the production transaction boundary through the real saveStudent and setStudentArchived entry points and the S11 runCommand wrapper. The test double never writes documents itself and never replaces or bypasses the production transaction.",
+        "No test seeds `congregations/{id}/internal/references` directly. The counter's pre-failure value is established by a prior real create, archive or restore operation through the service, and the rollback assertion compares the post-failure state against that value.",
+        "The new tests are newly authored files under functions/test/students/; tests committed by task 4 are not modified, and no existing guard, validation or atomicity behavior is weakened.",
+        "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }
