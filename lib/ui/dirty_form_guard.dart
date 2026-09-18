@@ -72,19 +72,25 @@ class DirtyFormGuard extends ChangeNotifier {
   }
 
   /// Wraps a form so browser history and in-app pops are intercepted.
+  ///
+  /// The [PopScope] is rebuilt from this [ChangeNotifier] so a form that only
+  /// becomes dirty after the route is built still blocks the next pop.
   Widget wrap(BuildContext context, {required Widget child}) {
-    return PopScope<Object?>(
-      canPop: !_dirty,
-      onPopInvokedWithResult: (bool didPop, Object? result) async {
-        if (didPop) {
-          return;
-        }
-        final bool leave = await confirmLeave(context);
-        if (leave && context.mounted) {
-          Navigator.of(context).pop();
-        }
-      },
-      child: child,
+    return ListenableBuilder(
+      listenable: this,
+      builder: (BuildContext context, Widget? _) => PopScope<Object?>(
+        canPop: !_dirty,
+        onPopInvokedWithResult: (bool didPop, Object? result) async {
+          if (didPop) {
+            return;
+          }
+          final bool leave = await confirmLeave(context);
+          if (leave && context.mounted) {
+            Navigator.of(context).pop();
+          }
+        },
+        child: child,
+      ),
     );
   }
 }

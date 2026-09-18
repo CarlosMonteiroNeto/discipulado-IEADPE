@@ -34,6 +34,8 @@ void main() {
       ),
     );
 
+    triggerFocus.requestFocus();
+    await tester.pump();
     await tester.tap(find.byType(AppButton));
     await tester.pumpAndSettle();
     expect(find.byKey(ConfirmationDialog.dialogKey), findsOneWidget);
@@ -42,10 +44,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(result, isTrue);
     expect(find.byKey(ConfirmationDialog.dialogKey), findsNothing);
+    expect(triggerFocus.hasFocus, isTrue);
   });
 
   testWidgets('cancelling returns false and changes nothing', (tester) async {
     late bool result;
+    final triggerFocus = FocusNode();
+    addTearDown(triggerFocus.dispose);
     await pumpApp(
       tester,
       Scaffold(
@@ -53,6 +58,7 @@ void main() {
           builder: (context) => Center(
             child: AppButton(
               label: 'Arquivar',
+              focusNode: triggerFocus,
               onPressed: () async {
                 result = await showConfirmationDialog(
                   context,
@@ -66,11 +72,14 @@ void main() {
       ),
     );
 
+    triggerFocus.requestFocus();
+    await tester.pump();
     await tester.tap(find.byType(AppButton));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(ConfirmationDialog.cancelKey));
     await tester.pumpAndSettle();
     expect(result, isFalse);
+    expect(triggerFocus.hasFocus, isTrue);
   });
 
   testWidgets('is fully operable with the keyboard alone', (tester) async {

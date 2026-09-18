@@ -673,6 +673,39 @@
         "Tests added by this task live in newly authored files under functions/test/attendance/; tests committed by task 6 are not modified, and no existing guard, validation or atomicity behavior is weakened.",
         "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 19,
+      "title": "Correct the task 8 focus-indicator, shell-actions and dirty-guard findings",
+      "summary": "Remediate the task 8 SEND_BACK findings within the shared presentation unit: give the focus indicator >=3:1 contrast against the control fills it borders in both light and dark modes and actually measure that pair, render ResponsiveScaffold's public actions at every breakpoint including the rail layouts, and make DirtyFormGuard.wrap reactive to dirty-state changes so the clean-to-dirty browser-back interception fires. Also close the acceptance-gap and polish minors raised with the findings.",
+      "corrects": 8,
+      "spec_refs": [
+        "S03",
+        "S10",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/ui/app_theme.dart",
+        "lib/ui/responsive_scaffold.dart",
+        "lib/ui/dirty_form_guard.dart",
+        "lib/ui/web_preferences.dart",
+        "lib/ui/async_content.dart"
+      ],
+      "depends_on": [
+        8
+      ],
+      "acceptance": [
+        "The focus indicator reaches >=3:1 against every control fill it borders in both modes. Dark mode no longer reuses the dark primary fill color (#A8C7FA) as its focusRing; the light focusRing is changed so it measures >=3:1 against primary #002060, or the indicator is drawn outside the fill and measured against the surrounding surface instead. The measured token tests extend their boundary pairs to focusRing versus primary, secondary, accent, error/danger and the neutral surfaces in both light and dark themes, instead of comparing focusRing only against surface/surfaceVariant; existing text-contrast assertions are preserved and none is weakened.",
+        "On filled primary and error/danger control variants the pressed/focused/hovered overlay is perceptibly distinct from the control fill it is composited over (a contrasting overlay color or an equivalent non-ripple pressed cue), and a token test asserts the overlay differs measurably from that fill in both light and dark modes rather than reusing tokens.primary unconditionally.",
+        "ResponsiveScaffold renders the public `actions` parameter at every breakpoint, including the expanded (>=1024) and medium (600-1023) rail layouts, not only the drawer/compact AppBar branch. A widget test passes a recognizable action widget and asserts it is found at 1440, 768 and below 600, so a shell-level control such as Atualizar cannot silently disappear on the primary desktop/tablet widths.",
+        "DirtyFormGuard.wrap rebuilds its PopScope from the guard's ChangeNotifier (e.g. ListenableBuilder/AnimatedBuilder) so canPop is re-evaluated when markDirty() notifies, instead of being captured once at construction. A widget test mounts the wrapped page clean, calls markDirty() afterwards without rebuilding the wrapper, issues pageBack(), and asserts the confirmation dialog is shown and the pop is intercepted; the previously tested mark-dirty-before-push path keeps passing.",
+        "The disabled-button test proves non-activation with an activation counter (or is renamed so it no longer claims what it does not assert), and trigger focus restoration is asserted for the confirm and cancel dismissal paths in addition to Escape.",
+        "AppReversiblePanel's hidden state either removes the panel from layout and hit-testing or its reduced-offset intent is documented and the collapsed panel is no longer hit-testable; the unused AppSizes.compactControlHeight and AppRadii.dialog/dialogRadius are removed or actually used; async_content.dart's doc comment cites the correct spec sections (S03, S10-S13).",
+        "The fixes stay inside the shared presentation unit, do not weaken any existing acceptance behavior or public primitive contract, and do not introduce scattered restyling in feature code. Task 8's test files may be extended with stronger assertions but no assertion is deleted or relaxed; tests committed by other completed tasks are never modified.",
+        "Verification is dispatched under the Flutter gate (`flutter test`/`flutter analyze`) with RED evidence from the added or extended tests. If the Flutter gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

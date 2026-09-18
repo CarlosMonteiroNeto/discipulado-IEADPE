@@ -151,4 +151,53 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('rascunho'), findsNothing);
   });
+
+  testWidgets(
+    'intercepts a browser history back issued after the form becomes dirty',
+    (tester) async {
+      final guard = DirtyFormGuard();
+      addTearDown(guard.dispose);
+
+      await pumpApp(
+        tester,
+        Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: AppButton(
+                label: 'Editar',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => guard.wrap(
+                        context,
+                        child: Scaffold(
+                          appBar: AppBar(title: const Text('Editar')),
+                          body: const Text('rascunho'),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.byType(AppButton));
+      await tester.pumpAndSettle();
+      expect(find.text('rascunho'), findsOneWidget);
+
+      // The form starts clean and only becomes dirty after the route is built;
+      // the guard must react to the notification without an external rebuild.
+      guard.markDirty();
+      await tester.pump();
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(ConfirmationDialog.dialogKey), findsOneWidget);
+      expect(find.text('rascunho'), findsOneWidget);
+    },
+  );
 }

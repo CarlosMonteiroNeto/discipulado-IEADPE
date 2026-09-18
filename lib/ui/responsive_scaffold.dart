@@ -127,8 +127,35 @@ class ResponsiveScaffold extends StatelessWidget {
             ],
           ),
           const VerticalDivider(width: 1),
-          Expanded(child: _content()),
+          Expanded(
+            child: Column(
+              children: <Widget>[
+                if (actions.isNotEmpty) _actionBar(),
+                Expanded(child: _content()),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _actionBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.x4,
+        AppSpacing.x3,
+        AppSpacing.x4,
+        0,
+      ),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
+          children: actions,
+        ),
       ),
     );
   }

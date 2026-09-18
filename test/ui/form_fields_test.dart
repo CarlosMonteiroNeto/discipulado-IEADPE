@@ -117,25 +117,24 @@ void main() {
     },
   );
 
-  testWidgets(
-    'a disabled button is semantically disabled and never activates',
-    (tester) async {
-      final handle = tester.ensureSemantics();
-      await pumpApp(
-        tester,
-        const Scaffold(
-          body: Center(child: AppButton(label: 'Salvar')),
-        ),
-      );
+  testWidgets('a button without a callback exposes disabled semantics', (
+    tester,
+  ) async {
+    final handle = tester.ensureSemantics();
+    await pumpApp(
+      tester,
+      const Scaffold(
+        body: Center(child: AppButton(label: 'Salvar')),
+      ),
+    );
 
-      final node = tester.getSemantics(find.byType(AppButton));
-      expect(node.flagsCollection.isEnabled.toBoolOrNull(), isFalse);
+    final node = tester.getSemantics(find.byType(AppButton));
+    expect(node.flagsCollection.isEnabled.toBoolOrNull(), isFalse);
 
-      await tester.tap(find.byType(AppButton), warnIfMissed: false);
-      await tester.pump();
-      handle.dispose();
-    },
-  );
+    await tester.tap(find.byType(AppButton), warnIfMissed: false);
+    await tester.pump();
+    handle.dispose();
+  });
 
   testWidgets(
     'a submitting button exposes progress and blocks duplicate activation',

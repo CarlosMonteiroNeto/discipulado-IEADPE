@@ -160,4 +160,43 @@ void main() {
       expect(find.text('rascunho preservado'), findsOneWidget);
     },
   );
+
+  testWidgets('a collapsed reversible panel is not hit-testable', (
+    tester,
+  ) async {
+    var activations = 0;
+    var expanded = true;
+
+    await pumpApp(
+      tester,
+      Scaffold(
+        body: StatefulBuilder(
+          builder: (context, setState) => Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              AppButton(
+                label: expanded ? 'Recolher' : 'Expandir',
+                onPressed: () => setState(() => expanded = !expanded),
+              ),
+              AppReversiblePanel(
+                expanded: expanded,
+                child: AppButton(label: 'Ação', onPressed: () => activations++),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Ação'));
+    await tester.pump();
+    expect(activations, 1);
+
+    await tester.tap(find.text('Recolher'));
+    await tester.pump();
+
+    await tester.tap(find.text('Ação'), warnIfMissed: false);
+    await tester.pump();
+    expect(activations, 1, reason: 'collapsed panel must not be tappable');
+  });
 }

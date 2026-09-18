@@ -67,6 +67,65 @@ void main() {
     }
   });
 
+  test('button overlays are measurably distinct from the fills they cover', () {
+    for (final tokens in <AppTokens>[AppTokens.light, AppTokens.dark]) {
+      for (final fill in <Color>[
+        tokens.primary,
+        tokens.secondary,
+        tokens.accent,
+        tokens.error,
+      ]) {
+        final overlay = tokens.controlOverlay(fill);
+        final blended = Color.alphaBlend(overlay, fill);
+        expect(blended, isNot(equals(fill)));
+        expect(
+          appContrastRatio(blended, fill),
+          greaterThanOrEqualTo(1.1),
+          reason: 'overlay over $fill must be perceptible',
+        );
+      }
+    }
+  });
+
+  test('the drawn focus side clears every fill it borders', () {
+    for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
+      final tokens = theme.extension<AppTokens>()!;
+
+      final filled = theme.filledButtonTheme.style!.side!.resolve(
+        const <WidgetState>{WidgetState.focused},
+      );
+      expect(filled, isNotNull);
+      for (final fill in <Color>[tokens.primary, tokens.error]) {
+        expect(
+          appContrastRatio(filled!.color, fill),
+          greaterThanOrEqualTo(3.0),
+          reason: 'filled focus ring vs $fill',
+        );
+      }
+
+      for (final style in <ButtonStyle?>[
+        theme.outlinedButtonTheme.style,
+        theme.textButtonTheme.style,
+      ]) {
+        final side = style!.side!.resolve(const <WidgetState>{
+          WidgetState.focused,
+        });
+        expect(side, isNotNull);
+        expect(
+          appContrastRatio(side!.color, tokens.surface),
+          greaterThanOrEqualTo(3.0),
+        );
+      }
+    }
+  });
+
+  test('the dialog shape uses the shared dialog radius token', () {
+    for (final theme in <ThemeData>[AppTheme.light, AppTheme.dark]) {
+      final shape = theme.dialogTheme.shape as RoundedRectangleBorder;
+      expect(shape.borderRadius, AppRadii.dialogRadius);
+    }
+  });
+
   test('dark mode ships dark surfaces using the same color language', () {
     expect(
       appRelativeLuminance(AppTokens.dark.surface),

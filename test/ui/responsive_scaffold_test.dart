@@ -135,6 +135,33 @@ void main() {
       expect(find.byType(AppButton), findsOneWidget);
     }
   });
+
+  testWidgets('public actions render at every breakpoint', (tester) async {
+    for (final width in <double>[1440, 768, 360]) {
+      await pumpApp(
+        tester,
+        ResponsiveScaffold(
+          title: 'Discipulado',
+          destinations: _destinations,
+          selectedIndex: 0,
+          onDestinationSelected: _noop,
+          actions: <Widget>[AppButton(label: 'Atualizar', onPressed: () {})],
+          body: const Text('conteúdo principal'),
+        ),
+        width: width,
+      );
+
+      expect(
+        find.text('Atualizar'),
+        findsOneWidget,
+        reason: 'shell action must render at width $width',
+      );
+      expect(
+        find.byKey(ResponsiveScaffold.persistentNavKey),
+        width >= 1024 ? findsOneWidget : findsNothing,
+      );
+    }
+  });
 }
 
 class _FormBody extends StatelessWidget {

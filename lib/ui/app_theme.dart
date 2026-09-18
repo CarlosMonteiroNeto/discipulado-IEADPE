@@ -91,6 +91,43 @@ class AppTokens extends ThemeExtension<AppTokens> {
   final Color disabledSurface;
   final Color onDisabled;
 
+  /// Focus-indicator color for a control filled with [fill].
+  ///
+  /// No single token clears 3:1 against both the brand fills and the neutral
+  /// surfaces, so the ring color actually drawn on a filled control is chosen
+  /// per fill from the tokens that clear the fill it borders.
+  Color focusRingFor(Color fill) => focusRingForAll(<Color>[fill]);
+
+  /// Focus-indicator color clearing 3:1 against every fill in [fills].
+  ///
+  /// Used by a control family that can render more than one fill, such as a
+  /// filled button that is either primary or danger/error.
+  Color focusRingForAll(Iterable<Color> fills) {
+    final List<Color> targets = fills.toList(growable: false);
+    if (targets.isEmpty) {
+      return focusRing;
+    }
+    for (final Color candidate in <Color>[focusRing, onSurface, surface]) {
+      if (targets.every((fill) => appContrastRatio(candidate, fill) >= 3.0)) {
+        return candidate;
+      }
+    }
+    return surface;
+  }
+
+  /// Pressed/focused/hovered overlay for a control filled with [fill].
+  ///
+  /// Picks the ink token most distinct from the fill instead of reusing
+  /// [primary] unconditionally, so the overlay stays visible on a primary or
+  /// danger fill.
+  Color controlOverlay(Color fill) {
+    final Color ink =
+        appContrastRatio(onSurface, fill) >= appContrastRatio(surface, fill)
+        ? onSurface
+        : surface;
+    return ink.withValues(alpha: 0.2);
+  }
+
   static const AppTokens light = AppTokens(
     surface: AppBrandColors.white,
     onSurface: Color(0xFF1A1A1A),
@@ -105,7 +142,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     error: Color(0xFFB3261E),
     onError: AppBrandColors.white,
     outline: Color(0xFF6B7280),
-    focusRing: Color(0xFF0B57D0),
+    focusRing: Color(0xFF3A6FD8),
     disabledSurface: Color(0xFFE3E6EA),
     onDisabled: Color(0xFF4B5563),
   );
@@ -124,7 +161,7 @@ class AppTokens extends ThemeExtension<AppTokens> {
     error: Color(0xFFFFB4AB),
     onError: Color(0xFF690005),
     outline: Color(0xFF8A9199),
-    focusRing: Color(0xFFA8C7FA),
+    focusRing: Color(0xFFE6E9EE),
     disabledSurface: Color(0xFF2A323B),
     onDisabled: Color(0xFF9AA3AD),
   );
@@ -233,10 +270,37 @@ abstract final class AppTheme {
       scaffoldBackgroundColor: tokens.surface,
       extensions: <ThemeExtension<dynamic>>[tokens],
       textTheme: _textTheme(brightness),
-      filledButtonTheme: FilledButtonThemeData(style: _buttonStyle(tokens)),
-      elevatedButtonTheme: ElevatedButtonThemeData(style: _buttonStyle(tokens)),
-      outlinedButtonTheme: OutlinedButtonThemeData(style: _buttonStyle(tokens)),
-      textButtonTheme: TextButtonThemeData(style: _buttonStyle(tokens)),
+      filledButtonTheme: FilledButtonThemeData(
+        style: _buttonStyle(
+          tokens,
+          fill: tokens.primary,
+          ringFills: <Color>[tokens.primary, tokens.error],
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: _buttonStyle(
+          tokens,
+          fill: tokens.primary,
+          ringFills: <Color>[tokens.primary, tokens.error],
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: _buttonStyle(
+          tokens,
+          fill: tokens.surface,
+          minHeight: AppSizes.compactControlHeight,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: _buttonStyle(
+          tokens,
+          fill: tokens.surface,
+          minHeight: AppSizes.compactControlHeight,
+        ),
+      ),
+      dialogTheme: const DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: AppRadii.dialogRadius),
+      ),
       inputDecorationTheme: _inputDecorationTheme(tokens),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: tokens.onSurface,
@@ -261,10 +325,17 @@ abstract final class AppTheme {
     );
   }
 
-  static ButtonStyle _buttonStyle(AppTokens tokens) {
+  static ButtonStyle _buttonStyle(
+    AppTokens tokens, {
+    required Color fill,
+    double minHeight = AppSizes.controlHeight,
+    List<Color>? ringFills,
+  }) {
+    final List<Color> ringTargets = ringFills ?? <Color>[fill];
+    final Color focusColor = tokens.focusRingForAll(ringTargets);
     return ButtonStyle(
-      minimumSize: const WidgetStatePropertyAll<Size>(
-        Size(AppSizes.minTouchTarget, AppSizes.controlHeight),
+      minimumSize: WidgetStatePropertyAll<Size>(
+        Size(AppSizes.minTouchTarget, minHeight),
       ),
       padding: const WidgetStatePropertyAll<EdgeInsetsGeometry>(
         EdgeInsets.symmetric(
@@ -282,13 +353,13 @@ abstract final class AppTheme {
         Set<WidgetState> states,
       ) {
         if (states.contains(WidgetState.pressed)) {
-          return tokens.primary.withValues(alpha: 0.16);
+          return tokens.controlOverlay(fill);
         }
         if (states.contains(WidgetState.focused)) {
-          return tokens.primary.withValues(alpha: 0.24);
+          return tokens.controlOverlay(fill);
         }
         if (states.contains(WidgetState.hovered)) {
-          return tokens.primary.withValues(alpha: 0.08);
+          return tokens.controlOverlay(fill).withValues(alpha: 0.12);
         }
         return null;
       }),
@@ -296,7 +367,7 @@ abstract final class AppTheme {
         Set<WidgetState> states,
       ) {
         if (states.contains(WidgetState.focused)) {
-          return BorderSide(color: tokens.focusRing, width: 2);
+          return BorderSide(color: focusColor, width: 2);
         }
         return null;
       }),

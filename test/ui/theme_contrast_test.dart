@@ -55,6 +55,7 @@ void main() {
         'outline/surfaceVariant': [tokens.outline, tokens.surfaceVariant],
         'focusRing/surface': [tokens.focusRing, tokens.surface],
         'focusRing/surfaceVariant': [tokens.focusRing, tokens.surfaceVariant],
+        'focusRing/disabledSurface': [tokens.focusRing, tokens.disabledSurface],
       };
 
       boundaryPairs.forEach((pair, colors) {
@@ -66,7 +67,37 @@ void main() {
           );
         });
       });
+
+      // The indicator drawn on a filled control must clear the fill it
+      // borders, not only the neutral surfaces.
+      final fills = <String, Color>{
+        'primary': tokens.primary,
+        'secondary': tokens.secondary,
+        'accent': tokens.accent,
+        'error': tokens.error,
+      };
+
+      fills.forEach((name, fill) {
+        test('focus indicator on $name meets 3:1', () {
+          expect(
+            appContrastRatio(tokens.focusRingFor(fill), fill),
+            greaterThanOrEqualTo(3.0),
+            reason: 'focusRingFor($name)',
+          );
+        });
+      });
     });
+  });
+
+  test('light focusRing meets 3:1 against the primary fill', () {
+    expect(
+      appContrastRatio(AppTokens.light.focusRing, AppTokens.light.primary),
+      greaterThanOrEqualTo(3.0),
+    );
+  });
+
+  test('dark focusRing is not the dark primary fill', () {
+    expect(AppTokens.dark.focusRing, isNot(AppTokens.dark.primary));
   });
 
   test('contrastRatio matches the hand-computed black-on-white extreme', () {

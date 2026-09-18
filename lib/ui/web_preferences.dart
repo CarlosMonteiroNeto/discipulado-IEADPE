@@ -51,6 +51,12 @@ abstract final class AppSurface {
 
 /// A reversible panel that keeps its child state, never overshoots and drops
 /// positional animation entirely under reduced motion.
+///
+/// The collapsed state uses a small intentional nudge (5% of the panel size)
+/// rather than removing the child, so a reversible transition can restart from
+/// the current presentation without rebuilding or losing form state. Because
+/// only a nudge is applied, the collapsed panel is made inert with
+/// [IgnorePointer] so it cannot be tapped while out of view.
 class AppReversiblePanel extends StatelessWidget {
   const AppReversiblePanel({
     super.key,
@@ -68,14 +74,17 @@ class AppReversiblePanel extends StatelessWidget {
     final Offset hidden = axis == Axis.horizontal
         ? const Offset(0.05, 0)
         : const Offset(0, 0.05);
-    return AnimatedSlide(
-      duration: AppMotion.durationOf(
-        context,
-        const Duration(milliseconds: 200),
+    return IgnorePointer(
+      ignoring: !expanded,
+      child: AnimatedSlide(
+        duration: AppMotion.durationOf(
+          context,
+          const Duration(milliseconds: 200),
+        ),
+        curve: Curves.easeOut,
+        offset: expanded ? Offset.zero : hidden,
+        child: child,
       ),
-      curve: Curves.easeOut,
-      offset: expanded ? Offset.zero : hidden,
-      child: child,
     );
   }
 }
