@@ -645,6 +645,32 @@
         "The new tests are newly authored files under functions/test/students/; tests committed by task 4 are not modified, and no existing guard, validation or atomicity behavior is weakened.",
         "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
       ]
+    },
+    {
+      "id": 18,
+      "title": "Guard cancelSession against completed and archived classes",
+      "summary": "Remediate the task 6 SEND_BACK important finding: cancelSession mutates a session without checking the owning class status, so an authorized caller can cancel a finalized session in a completed, read-only class and silently drop that session from progress after completion. Apply the same class-status guard that createSession and saveAttendance already enforce, and prove it with a regression test.",
+      "corrects": 6,
+      "spec_refs": [
+        "S04",
+        "S08",
+        "S11",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "functions/src/sessions/service.ts"
+      ],
+      "depends_on": [
+        6
+      ],
+      "acceptance": [
+        "Inside cancelSession's transaction, after locating the session and before any updateWithRevision write, the service reads the owning class at paths.classGroup(congregationId, session.classId) and fails with a stable conflict error when the class is missing, belongs to another congregation, or has a status other than ClassStatus.active (completed, archived or otherwise non-active). The guard mirrors attendance/service.ts assertMutableClass and blocks every mutating cancellation path; as with saveAttendance, the already-canceled idempotent branch performs no write and is out of scope. No session status/revision, roster, attendance or receipt document is written when the guard fails.",
+        "A newly authored regression test under functions/test/attendance/ seeds a completed class with a noncanceled session, calls cancelSession, asserts the conflict failure, and verifies the session status and revision, every roster/attendance document, and any receipt are unchanged. A companion assertion seeds an active class and proves cancelSession still succeeds and commits the expected session status/revision, so the guard does not regress the happy path.",
+        "The class-status guard rejects an archived class as well as a completed class, consistent with the read-only completed/archived-class behavior enforced by createSession (locateActiveClass) and saveAttendance (assertMutableClass); the guard is evaluated from authoritative datastore records, not from payload or client-supplied class data.",
+        "Tests added by this task live in newly authored files under functions/test/attendance/; tests committed by task 6 are not modified, and no existing guard, validation or atomicity behavior is weakened.",
+        "Verification is dispatched under the backend Node gate (`two-model-coder-node`, Node build/test commands); functions/ compiles and the non-emulator suite passes. If the Node gate cannot run, report an environment blocker under S13/S14 rather than weakening this acceptance."
+      ]
     }
   ]
 }

@@ -155,6 +155,29 @@ async function locateActiveClass(
   return document;
 }
 
+/**
+ * Completed and archived classes are read-only (S08), so cancellation is
+ * refused for the same reason createSession and saveAttendance refuse it.
+ * The owning class is resolved from the authoritative datastore record inside
+ * the transaction, never from caller-supplied class data.
+ */
+async function assertMutableClass(
+  tx: Transaction,
+  congregationId: string,
+  classId: unknown,
+): Promise<void> {
+  if (typeof classId !== "string" || classId.length === 0) {
+    throw conflictError("The session class is unavailable.");
+  }
+  const document = await tx.read(paths.classGroup(congregationId, classId));
+  if (document === null || document.congregationId !== congregationId) {
+    throw conflictError("The session class is unavailable.");
+  }
+  if (document.status !== ClassStatus.active) {
+    throw conflictError("Completed and archived classes are read-only.");
+  }
+}
+
 async function appendSessionIndex(
   tx: Transaction,
   congregationId: string,
@@ -282,6 +305,10 @@ export async function cancelSession(
           status: SessionStatus.canceled,
         };
       }
+
+      // The owning class must still be active; completed and archived classes
+      // are read-only, so their sessions cannot be canceled after completion.
+      await assertMutableClass(tx, congregationId, session.classId);
 
       const nowIso = clock.now().toISOString();
       const next = await tx.updateWithRevision(
