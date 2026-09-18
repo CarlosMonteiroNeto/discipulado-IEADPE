@@ -1,0 +1,96 @@
+rules_version = '2';
+
+// Deny-by-default authorization matrix for the Discipulado IEADPE release.
+// Every client write is denied: all mutations go through callable functions
+// using the Admin SDK (S04, S11). Reads are limited to the scoped projections
+// and private congregational records described by S04.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function currentUid() {
+      return request.auth.uid;
+    }
+
+    function hasProfile() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(currentUid()));
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(currentUid())).data;
+    }
+
+    function activeProfile() {
+      return hasProfile() && profile().active == true;
+    }
+
+    function isSupervisor() {
+      return activeProfile() && profile().accessRole == 'supervisor';
+    }
+
+    function isStaffOf(congregationId) {
+      return activeProfile()
+        && profile().accessRole == 'congregationStaff'
+        && profile().congregationId == congregationId;
+    }
+
+    // Supervision reads every scope; staff read only their assigned
+    // congregation. The path already carries the congregation id, so no
+    // duplicated field check is required.
+    function mayReadCongregation(congregationId) {
+      return isSupervisor() || isStaffOf(congregationId);
+    }
+
+    // Own access profile only; access assignments are provisioned by a trusted
+    // operator, never by a client.
+    match /users/{userId} {
+      allow read: if signedIn() && userId == currentUid();
+      allow write: if false;
+    }
+
+    // Active congregation names are readable by authenticated staff; archived
+    // congregations are supervisor-protected.
+    match /congregations/{congregationId} {
+      allow read: if activeProfile() && (isSupervisor() || resource.data.active == true);
+      allow write: if false;
+
+      // Private congregational resources (contacts, students, classes,
+      // enrollments, sessions, attendance, roster, internal uniqueness docs).
+      match /{document=**} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if false;
+      }
+    }
+
+    // Minimal authenticated directory projection.
+    match /directory/{contactId} {
+      allow read: if activeProfile();
+      allow write: if false;
+    }
+
+    // Supervision contacts are supervisor-only.
+    match /supervisionContacts/{contactId} {
+      allow read: if isSupervisor();
+      allow write: if false;
+    }
+
+    match /supervisionRoleSlots/{slotId} {
+      allow read: if isSupervisor();
+      allow write: if false;
+    }
+
+    // Internal idempotency receipts are never client readable.
+    match /operations/{document=**} {
+      allow read, write: if false;
+    }
+
+    // Unspecified paths deny every read and write.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
