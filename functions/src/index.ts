@@ -8,6 +8,7 @@
  */
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { FieldPath } from "firebase-admin/firestore";
 import type { DocumentData, Query } from "firebase-admin/firestore";
 
 import { systemClock } from "./core/clock";
@@ -65,6 +66,15 @@ import {
   saveStudentCallable,
   setStudentArchivedCallable,
 } from "./students/handlers";
+import type { ClassEnrollmentQuery, ClassEnrollmentReader } from "./attendance/roster";
+import type {
+  ClassSessionQuery,
+  ClassSessionReader,
+} from "./classes/service";
+import type {
+  ClassStudentQuery,
+  StudentQueryReader,
+} from "./students/queries";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -200,25 +210,129 @@ class FirestoreOverviewReader implements OverviewQueryReader {
   }
 }
 
+function chunkIds(ids: readonly string[]): string[][] {
+  const chunks: string[][] = [];
+  for (let index = 0; index < ids.length; index += 30) {
+    chunks.push(ids.slice(index, index + 30));
+  }
+  return chunks;
+}
+
+/** Firestore-backed student directory reads (S07, S09, S11). */
+class FirestoreStudentDirectory implements StudentQueryReader {
+  async listEnrollments(
+    query: { congregationId: string; classId: string; status: string },
+  ): Promise<JsonMap[]> {
+    const snapshot = await firestore
+      .collection(`congregations/${query.congregationId}/enrollments`)
+      .where("classId", "==", query.classId)
+      .where("status", "==", query.status)
+      .get();
+    return snapshot.docs.map(
+      (document) => ({ id: document.id, ...document.data() }) as JsonMap,
+    );
+  }
+
+  async listStudents(query: ClassStudentQuery): Promise<JsonMap[]> {
+    const results: JsonMap[] = [];
+    for (const ids of chunkIds(query.studentIds)) {
+      const snapshot = await firestore
+        .collection(`congregations/${query.congregationId}/students`)
+        .where(FieldPath.documentId(), "in", ids)
+        .where("archived", "==", query.archived)
+        .get();
+      for (const document of snapshot.docs) {
+        const student = { id: document.id, ...document.data() } as JsonMap;
+        if (
+          query.namePrefix !== undefined &&
+          !String(student.normalizedName ?? "").startsWith(query.namePrefix)
+        ) {
+          continue;
+        }
+        results.push(student);
+      }
+    }
+    return results;
+  }
+}
+
+/** Firestore-backed class session and frozen-roster reads (S08, S11). */
+class FirestoreClassSessionReader implements ClassSessionReader {
+  async listSessions(query: ClassSessionQuery): Promise<JsonMap[]> {
+    const snapshot = await firestore
+      .collection(`congregations/${query.congregationId}/sessions`)
+      .where("classId", "==", query.classId)
+      .get();
+    return snapshot.docs.map(
+      (document) => ({ id: document.id, ...document.data() }) as JsonMap,
+    );
+  }
+
+  async listRosterEntries(
+    query: ClassSessionQuery & { sessionId: string },
+  ): Promise<JsonMap[]> {
+    const snapshot = await firestore
+      .collection(
+        `congregations/${query.congregationId}/sessions/${query.sessionId}/roster`,
+      )
+      .get();
+    return snapshot.docs
+      .map(
+        (document) => ({ id: document.id, ...document.data() }) as JsonMap,
+      )
+      .filter(
+        (entry) =>
+          entry.sessionId === query.sessionId &&
+          (entry.classId === undefined || entry.classId === query.classId),
+      );
+  }
+}
+
+/** Firestore-backed class enrollment reads (S11). */
+class FirestoreClassEnrollmentReader implements ClassEnrollmentReader {
+  async listClassEnrollments(query: ClassEnrollmentQuery): Promise<JsonMap[]> {
+    const snapshot = await firestore
+      .collection(`congregations/${query.congregationId}/enrollments`)
+      .where("classId", "==", query.classId)
+      .get();
+    return snapshot.docs.map(
+      (document) => ({ id: document.id, ...document.data() }) as JsonMap,
+    );
+  }
+}
+
 const datastore = new FirestoreDatastore();
 const clock = systemClock;
 const reader = new FirestoreOverviewReader();
+const studentDirectory = new FirestoreStudentDirectory();
+const classSessionReader = new FirestoreClassSessionReader();
+const classEnrollmentReader = new FirestoreClassEnrollmentReader();
 
 const congregationDependencies: CongregationHandlerDependencies = {
   datastore,
   clock,
 };
 const contactDependencies: ContactHandlerDependencies = { datastore, clock };
-const studentDependencies: StudentHandlerDependencies = { datastore, clock };
-const classDependencies: ClassHandlerDependencies = { datastore, clock };
+const studentDependencies: StudentHandlerDependencies = {
+  datastore,
+  clock,
+  directory: studentDirectory,
+};
+const classDependencies: ClassHandlerDependencies = {
+  datastore,
+  clock,
+  sessions: classSessionReader,
+};
 const enrollmentDependencies: EnrollmentHandlerDependencies = {
   datastore,
   clock,
+  sessions: classSessionReader,
 };
 const sessionDependencies: SessionHandlerDependencies = { datastore, clock };
 const attendanceDependencies: AttendanceHandlerDependencies = {
   datastore,
   clock,
+  enrollments: classEnrollmentReader,
 };
 const overviewDependencies: OverviewHandlerDependencies = {
   datastore,
