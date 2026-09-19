@@ -1,12 +1,12 @@
 {
-    "name": "discipulado_ieadpe",
-    "short_name": "discipulado_ieadpe",
+    "name": "Discipulado IEADPE",
+    "short_name": "Discipulado IEADPE",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#002060",
+    "theme_color": "#002060",
+    "description": "Gestão do discipulado das congregações IEADPE.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
