@@ -958,10 +958,10 @@
         13
       ],
       "acceptance": [
-        "pm --prefix functions run build\\ (tsc) exits 0 with no type errors in src/index.ts.",
+        "`npm --prefix functions run build` (tsc) exits 0 with no type errors in src/index.ts.",
         "Every handler dependency interface is fully satisfied: studentDependencies supplies a StudentQueryReader (directory), class and enrollment dependencies supply a ClassSessionReader (sessions), attendanceDependencies supplies a ClassEnrollmentReader (enrollments) - all Firestore-backed like FirestoreDatastore/FirestoreOverviewReader, never in-memory seeds.",
         "The exported callable set is unchanged: every S11 operation exported exactly once and no unguarded provisioning endpoint (the flutter suite test/app/backend_exports_test.dart stays green).",
-        "pm --prefix functions test\\ passes across the full backend unit suite.",
+        "`npm --prefix functions test` passes across the full backend unit suite.",
         "Node RED is evidenced before the fix (npm run build fails) and Node GREEN after (build + unit suite pass)."
       ]
     }
