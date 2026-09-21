@@ -68,3 +68,35 @@ manual inspection is incomplete.
 No push, deployment, message send, legacy import or Android packaging was
 performed. This implementation is locally runnable and awaits a separate
 release decision.
+
+---
+
+## Internal-mode plan (2026-09-21) — task 10 gate evidence
+
+Internal-mode task 10 rewrote `firestore.rules` to the write matrix, added the
+plain-query composites to `firestore.indexes.json` and rewrote the Node
+rules/security suites. Evidence for the committed task (HEAD `1d499d7`,
+task commit `b394b56` + corrective re-pin `1d499d7`):
+
+| Command | Exit code | Result |
+| --- | --- | --- |
+| `npm run build` (functions) | 0 | tsc compiler pass |
+| `npm run typecheck` (functions) | 0 | `tsc --noEmit` clean |
+| `npm run test:unit` (functions) | 0 | 239 tests / 36 files pass, incl. emulator-gate byte-identity re-pin |
+| `flutter analyze` | 0 | No issues found |
+| `flutter test` (full suite) | - | not rerun for this task (no Dart source changed) |
+
+### Environment-blocked (incomplete, never weakened)
+
+Both emulator-backed security suites — the re-pinned `rules.security.test.ts`
+(write matrix, allowlisted owner self-claim, catch-all denial) and the adapted
+`rules-hardening.test.ts` (scoped-readable/writable roleSlots and roster,
+supervision records sealed, uniqueness paths denied) — were rewritten and
+committed but could **not** be executed: this session has no
+`FIRESTORE_EMULATOR_HOST` / `FIREBASE_AUTH_EMULATOR_HOST`. They must be run
+through the emulator entry point (`npm run test:emulator`) before release.
+
+`emulator-gate.test.ts` re-pinning completed: the suite's sha256 constant was
+recomputed against the new `rules.security.test.ts` (LF-normalized) before the
+task commit, and the revision constant was re-pointed to the task commit in the
+corrective re-pin commit; the final unit run passes the byte-identity proof.
