@@ -1,12 +1,15 @@
 /// Callable-free [FirebaseTransport] that dispatches operations to
 /// handlers over the [DirectStore] seam (internal mode).
 ///
-/// Reads and queries stay direct Firestore reads with the exact semantics of
-/// the retired callable transport: equality filters, a normalized
-/// name-prefix range on the order key and cursor paging as `startAfter`.
-/// Mutations never call Cloud Functions; [callFunction] resolves the operation
-/// in the [HandlerRegistry] and runs the registered handler with the caller's
-/// identity and clock.
+/// Reads and queries stay direct Firestore reads. Equality filters and the
+/// order key are pushed to the store query; when a name prefix or cursor is
+/// present the transport drops the server-side limit and applies the prefix
+/// range and cursor paging in Dart, so every page of a prefixed or cursored
+/// query reads the whole collection once per page. Capacity accounting for
+/// Spark read quota in directory/global name searches and paged lists must
+/// budget for that amplification. Mutations never call Cloud Functions;
+/// [callFunction] resolves the operation in the [HandlerRegistry] and runs the
+/// registered handler with the caller's identity and clock.
 library;
 
 import '../domain/common.dart';

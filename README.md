@@ -78,21 +78,26 @@ enforces the write matrix.
 
 ### Trust model and bootstrap
 
-- A signed-in user may **self-create and self-update their own** `users/{uid}`
-  profile as `congregationStaff`. This is the internal-mode bootstrap that
-  replaces the retired trusted provisioning utility.
-- A `supervisor` self-claim is granted **only** when the authenticated token
-  email equals the single allowlist credential in `firestore.rules`
-  (`allowlistedOwner()`). Replace the placeholder
-  `owner@discipulado-ieadpe.example` with the real owner address before
+- Access profiles live in `users/{uid}` and are provisioned **out-of-band**: the
+  owner/supervisor profile is created in the Firebase (or Firestore) console with
+  `accessRole: supervisor`, and staff profiles with `accessRole:
+  congregationStaff` plus their `congregationId` (see `docs/verification.md`
+  "Allowlist bootstrap flow"). The shipped app has no screen that writes
+  `users/{uid}`.
+- The rules additionally let a signed-in user **self-create and self-update
+  their own** `users/{uid}` profile; the supervisor self-claim is granted only
+  when the authenticated token email equals the single allowlist credential in
+  `firestore.rules` (`allowlistedOwner()`). That allowance is defense-in-depth
+  for future tooling — keep the placeholder
+  `owner@discipulado-ieadpe.example` replaced with the real owner address before
   deploying.
 - Writes of the congregation subtree (`contacts`, `students`, `classes`,
-  `enrollments`, `sessions`, session `attendance`, session `roster`,
-  `roleSlots`), the `directory` projection and the parent `congregations`
-  document are allowed for **supervisors anywhere** and for **staff within
-  their own `congregationId`**. `supervisionContacts` and
-  `supervisionRoleSlots` stay supervisor-only. Every other path is denied by the
-  catch-all.
+  `enrollments`, class `roster`, `activeEnrollmentRefs`, `sessions`, session
+  `attendance`, session `roster`, `roleSlots`), the `directory` projection and
+  the parent `congregations` document are allowed for **supervisors anywhere**
+  and for **staff within their own `congregationId`**. `supervisionContacts`
+  and `supervisionRoleSlots` stay supervisor-only. Every other path is denied by
+  the catch-all.
 
 ### Relaxed invariants
 
@@ -107,6 +112,10 @@ deliberately relaxed and enforced as best-effort client checks:
   possible and must be resolved by the operator.
 - **Best-effort enrollment cap.** The class capacity check runs before the
   write but is not atomic; a simultaneous enroll can exceed it by a race.
+- **Client-side paging amplification.** Name-prefix and cursor pages read the
+  whole matching collection once per page (the direct transport pages in Dart),
+  so directory and global name searches multiply Firestore reads on Spark;
+  budget quota accordingly.
 
 ### Re-tightening before broader use
 

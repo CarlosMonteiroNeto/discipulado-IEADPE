@@ -146,13 +146,23 @@ hard refreshes resolve through the router.
 
 ### Allowlist bootstrap flow
 
-1. Create the owner Auth identity (email/password) in the Firebase console.
+The app ships without a profile-provisioning screen, so profiles are created
+out-of-band before first use:
+
+1. Create the owner Auth identity (email/password) in the Firebase console and
+   note its UID.
 2. Set `allowlistedOwner()` in `firestore.rules` to that exact email and deploy
    (`firebase deploy --only firestore --project discipulado-ieadpe`).
-3. Sign in on the deployed app; the owner's first profile write self-claims
-   `supervisor` because the token email matches the allowlist.
-4. Staff accounts self-create their own profile as `congregationStaff` with
-   their `congregationId`; no trusted provisioning utility is involved.
+3. In the Firestore console, create the owner profile at
+   `users/{ownerUid}` with `accessRole: supervisor`, `active: true`,
+   `congregationId: null` and `revision: 1`.
+4. For each staff member, create their Auth identity and the matching
+   `users/{uid}` profile with `accessRole: congregationStaff`, their
+   `congregationId` and `active: true`.
+
+Signing in afterwards loads the created profile; a signed-in identity without
+one shows the access-denied page. The rules-side self-create allowance remains
+as defense-in-depth (the supervisor claim is gated by the allowlist email).
 
 ### Smoke checks proving the write matrix
 
@@ -172,3 +182,49 @@ The emulator-backed suites that automate these checks
 (`functions/test/security/rules.security.test.ts` and `rules-hardening.test.ts`)
 remain environment-blocked in this session; they must be executed through
 `npm run test:emulator` where both emulator hosts are present.
+
+---
+
+## Final review fixes (2026-09-21, task 13)
+
+The final code review found one critical and one important regression, both
+now fixed.
+
+### Critical: two client-writable paths were missing from the rule grants
+
+The direct-transport handlers write `congregations/{cg}/activeEnrollmentRefs/{studentId}`
+(`enrollStudent`, `closeEnrollment`, read by `setStudentArchived`) and
+`congregations/{cg}/classes/{classId}/roster/{enrollmentId}` (written by
+`enrollStudent`, read to freeze attendance membership), but the task-10 write
+matrix enumerated neither, so those operations fell to the deny catch-all and
+would have failed with `PERMISSION_DENIED` against any real project. `firestore.rules`
+now grants both scoped paths to `mayReadCongregation`/`mayWriteCongregation`,
+and the security suites cover the allowed/denied matrix for them.
+
+### Important: stale `student.classId` backfill after closing an enrollment
+
+`closeEnrollment` only removed the `activeEnrollmentRefs` record, leaving the
+student's `classId` backfill set, so the plain students-by-class query kept
+returning completed/withdrawn students. The handler now clears the backfill
+(removes the `classId` field) when the closed enrollment's class matches.
+
+### Re-pin
+
+The emulator-gate byte-identity constants were re-pinned: sha256 recomputed
+against the new `rules.security.test.ts` content before the fix commit, and the
+revision constant re-pointed to the fix commit (`f0130cf`) in the corrective
+re-pin commit.
+
+### Gates rerun
+
+| Command | Result |
+| --- | --- |
+| `npm run build` / `npm run typecheck` (functions) | clean |
+| `npm run test:unit` (functions) | 239 tests / 36 files pass, emulator-gate byte-identity proof green |
+| `flutter analyze` | No issues found |
+| `flutter test` (full suite) | 632 tests pass |
+
+The emulator-backed security suites were rewritten (they assert the new grants)
+but remain **environment-blocked** — they have still never executed. Run
+`npm run test:emulator` where both emulator hosts are present before relying on
+the rules in production.

@@ -158,9 +158,9 @@ class StudentRepository {
   String newRecordId() => recordIdFactory?.call() ?? _uuid.v4();
 
   /// Lists students in the caller's scope. A class filter is routed through the
-  /// backend `listClassStudents` callable (the query codec recognizes the
-  /// `classId` filter), so membership is resolved before the page is assembled
-  /// (S07, S09).
+  /// plain students-by-class query (the query codec recognizes the `classId`
+  /// filter), whose membership resolves through the student `classId` backfill
+  /// maintained by the enrollment handlers (S07, S09).
   Future<PageResult> listStudents(StudentQuery query) {
     final Map<String, Object?> filters = <String, Object?>{
       'archived': query.archived,
