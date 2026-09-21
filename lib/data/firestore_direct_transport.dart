@@ -2,7 +2,7 @@
 /// handlers over the [DirectStore] seam (internal mode).
 ///
 /// Reads and queries stay direct Firestore reads with the exact semantics of
-/// the legacy [FirebaseDataTransport]: equality filters, a normalized
+/// the retired callable transport: equality filters, a normalized
 /// name-prefix range on the order key and cursor paging as `startAfter`.
 /// Mutations never call Cloud Functions; [callFunction] resolves the operation
 /// in the [HandlerRegistry] and runs the registered handler with the caller's

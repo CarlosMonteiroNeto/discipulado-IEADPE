@@ -1,6 +1,6 @@
 /// Browser integration against the real local emulators (S13).
 ///
-/// Run with the Auth, Firestore and Functions emulators started and seeded
+/// Run with the Auth and Firestore emulators started and seeded
 /// (`firebase emulators:start`, synthetic fixtures with UIDs
 /// `emulator-supervisor`, `emulator-staff-central` and `emulator-staff-norte`):
 ///
@@ -12,12 +12,14 @@
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:discipulado_ieadpe/app/app.dart';
 import 'package:discipulado_ieadpe/app/dependencies.dart';
 import 'package:discipulado_ieadpe/app/navigation.dart';
 import 'package:discipulado_ieadpe/data/firebase_auth_repository.dart';
 import 'package:discipulado_ieadpe/data/firebase_gateway.dart';
+import 'package:discipulado_ieadpe/data/firestore_direct_store.dart';
+import 'package:discipulado_ieadpe/data/firestore_direct_transport.dart';
+import 'package:discipulado_ieadpe/data/handlers/registry.dart';
 import 'package:discipulado_ieadpe/domain/attendance.dart';
 import 'package:discipulado_ieadpe/domain/common.dart';
 import 'package:discipulado_ieadpe/domain/contact.dart';
@@ -42,19 +44,16 @@ const int _firestorePort = int.fromEnvironment(
   'FIREBASE_FIRESTORE_EMULATOR_PORT',
   defaultValue: 8080,
 );
-const int _functionsPort = int.fromEnvironment(
-  'FIREBASE_FUNCTIONS_EMULATOR_PORT',
-  defaultValue: 5001,
-);
 
 const String _centralEmail = 'emulator-staff-central@example.test';
 const String _norteEmail = 'emulator-staff-norte@example.test';
 const String _password = 'Emulator-Only-123';
 
 BackendGateway _gateway() => FirebaseGateway(
-  transport: FirebaseDataTransport(
-    firestore: FirebaseFirestore.instance,
-    functions: FirebaseFunctions.instance,
+  transport: FirestoreDirectTransport(
+    store: FirestoreDirectStore(firestore: FirebaseFirestore.instance),
+    registry: composeHandlerRegistry(),
+    uid: () => FirebaseAuth.instance.currentUser?.uid ?? 'system',
   ),
 );
 
@@ -73,7 +72,6 @@ void main() {
     );
     FirebaseAuth.instance.useAuthEmulator(_host, _authPort);
     FirebaseFirestore.instance.useFirestoreEmulator(_host, _firestorePort);
-    FirebaseFunctions.instance.useFunctionsEmulator(_host, _functionsPort);
   });
 
   testWidgets(

@@ -3,7 +3,6 @@
 library;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +11,9 @@ import '../data/error_mapper.dart';
 import '../data/firebase_auth_repository.dart';
 import '../data/firebase_configuration.dart';
 import '../data/firebase_gateway.dart';
+import '../data/firestore_direct_store.dart';
+import '../data/firestore_direct_transport.dart';
+import '../data/handlers/registry.dart';
 import '../ui/app_theme.dart';
 import 'app.dart';
 import 'dependencies.dart';
@@ -56,9 +58,10 @@ Future<void> bootstrap() async {
   // Persistent browser caching is disabled for this release (S12).
   firestore.settings = const Settings(persistenceEnabled: false);
   final FirebaseAuth auth = FirebaseAuth.instance;
-  final FirebaseFunctions functions = FirebaseFunctions.instance;
 
   if (configuration.usesEmulator) {
+    // Only Auth and Firestore run locally: the direct transport never calls a
+    // Functions emulator or a Cloud Functions backend.
     auth.useAuthEmulator(
       configuration.emulatorHost,
       configuration.authEmulatorPort,
@@ -66,10 +69,6 @@ Future<void> bootstrap() async {
     firestore.useFirestoreEmulator(
       configuration.emulatorHost,
       configuration.firestoreEmulatorPort,
-    );
-    functions.useFunctionsEmulator(
-      configuration.emulatorHost,
-      configuration.functionsEmulatorPort,
     );
   }
 
@@ -79,9 +78,11 @@ Future<void> bootstrap() async {
   await authRepository.adapter.configureSessionPersistence();
 
   final FirebaseGateway gateway = FirebaseGateway(
-    transport: FirebaseDataTransport(
-      firestore: firestore,
-      functions: functions,
+    transport: FirestoreDirectTransport(
+      store: FirestoreDirectStore(firestore: firestore),
+      registry: composeHandlerRegistry(),
+      uid: () => auth.currentUser?.uid ?? 'system',
+      now: DateTime.now,
     ),
   );
 

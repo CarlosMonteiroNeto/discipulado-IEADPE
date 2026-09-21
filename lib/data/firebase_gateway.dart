@@ -1,8 +1,6 @@
 /// Firebase-backed [BackendGateway] and retry/generation guards (S11, S12).
 library;
 
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:uuid/uuid.dart';
 
 import '../domain/common.dart';
@@ -36,7 +34,7 @@ PrefixRange? prefixRangeFor(QueryPlan plan) {
   return PrefixRange(lower: prefix, upper: '$prefix\uf8ff');
 }
 
-/// Thin seam over Firestore/Cloud Functions so the gateway stays testable.
+/// Thin seam over the backend transport so the gateway stays testable.
 abstract interface class FirebaseTransport {
   Future<JsonMap?> getDocument(String path);
 
@@ -211,80 +209,5 @@ class FirebaseGateway implements BackendGateway {
         .whereType<Map<Object?, Object?>>()
         .map((Map<Object?, Object?> item) => Map<String, Object?>.from(item))
         .toList(growable: false);
-  }
-}
-
-/// Real Firestore/Cloud Functions transport (S11, S12).
-///
-/// It deliberately disables persistent browser caching and never issues an
-/// automatic retry; every failure surfaces as a safe [AppFailure].
-class FirebaseDataTransport implements FirebaseTransport {
-  FirebaseDataTransport({
-    required this.firestore,
-    required this.functions,
-    this.codec = const QueryCodec(),
-  });
-
-  final FirebaseFirestore firestore;
-  final FirebaseFunctions functions;
-  final QueryCodec codec;
-
-  /// Persistent Firestore browser caching stays off for this release (S12).
-  static void disablePersistentCache(FirebaseFirestore firestore) {
-    firestore.settings = const Settings(persistenceEnabled: false);
-  }
-
-  @override
-  Future<JsonMap?> getDocument(String path) async {
-    final DocumentSnapshot<Map<String, dynamic>> snapshot = await firestore
-        .doc(path)
-        .get();
-    return snapshot.data();
-  }
-
-  @override
-  Future<TransportPage> runQuery(QueryPlan plan) async {
-    Query<Map<String, dynamic>> query = firestore.collection(plan.collection);
-    for (final QueryFilter filter in plan.filters) {
-      query = query.where(filter.field, isEqualTo: filter.value);
-    }
-    // A normalized name prefix is a real range constraint on the order key,
-    // applied before cursor paging so every page stays prefix-bounded (S09).
-    final PrefixRange? range = prefixRangeFor(plan);
-    if (range != null) {
-      query = query.where(
-        plan.orderBy,
-        isGreaterThanOrEqualTo: range.lower,
-        isLessThan: range.upper,
-      );
-    }
-    query = query.orderBy(plan.orderBy).orderBy(FieldPath.documentId);
-    final String? cursor = plan.cursor;
-    if (cursor != null) {
-      final QueryCursor decoded = codec.decodeCursor(cursor);
-      query = query.startAfter(<Object?>[
-        decoded.lastSortValue,
-        decoded.lastId,
-      ]);
-    }
-    final QuerySnapshot<Map<String, dynamic>> snapshot = await query
-        .limit(plan.limit)
-        .get();
-    return TransportPage(
-      items: snapshot.docs
-          .map(
-            (QueryDocumentSnapshot<Map<String, dynamic>> doc) =>
-                <String, Object?>{'id': doc.id, ...doc.data()},
-          )
-          .toList(growable: false),
-    );
-  }
-
-  @override
-  Future<JsonMap> callFunction(String operation, JsonMap payload) async {
-    final HttpsCallableResult<Map<String, dynamic>> result = await functions
-        .httpsCallable(operation)
-        .call<Map<String, dynamic>>(payload);
-    return Map<String, Object?>.from(result.data);
   }
 }
