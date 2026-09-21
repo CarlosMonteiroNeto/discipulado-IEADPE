@@ -7,6 +7,7 @@ import 'package:discipulado_ieadpe/ui/confirmation_dialog.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../ui/ui_test_support.dart';
 import 'student_test_support.dart';
 
 void main() {
@@ -76,8 +77,9 @@ void main() {
     );
 
     await tester.enterText(find.byKey(StudentFormPage.nameFieldKey), 'Ana');
-    await tester.enterText(
-      find.byKey(StudentFormPage.birthDateFieldKey),
+    await setFormText(
+      tester,
+      StudentFormPage.birthDateFieldKey,
       '29/02/2024',
     );
     await tapVisible(tester, StudentFormPage.saveKey);
@@ -97,8 +99,9 @@ void main() {
     );
 
     await tester.enterText(find.byKey(StudentFormPage.nameFieldKey), 'Ana');
-    await tester.enterText(
-      find.byKey(StudentFormPage.birthDateFieldKey),
+    await setFormText(
+      tester,
+      StudentFormPage.birthDateFieldKey,
       '29/02/2023',
     );
     await tapVisible(tester, StudentFormPage.saveKey);

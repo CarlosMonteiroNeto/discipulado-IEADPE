@@ -3,6 +3,7 @@ import 'package:discipulado_ieadpe/domain/ports.dart';
 import 'package:discipulado_ieadpe/features/classes/class_form.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../ui/ui_test_support.dart';
 import 'class_test_support.dart';
 
 void main() {
@@ -40,8 +41,9 @@ void main() {
       find.byKey(ClassForm.nameFieldKey),
       'Discipulado 2026',
     );
-    await tester.enterText(
-      find.byKey(ClassForm.startDateFieldKey),
+    await setFormText(
+      tester,
+      ClassForm.startDateFieldKey,
       '05/01/2026',
     );
     await tester.tap(find.byKey(ClassForm.teacherFieldKey));
@@ -78,8 +80,9 @@ void main() {
       find.byKey(ClassForm.nameFieldKey),
       'Discipulado Alfa',
     );
-    await tester.enterText(
-      find.byKey(ClassForm.startDateFieldKey),
+    await setFormText(
+      tester,
+      ClassForm.startDateFieldKey,
       '05/01/2026',
     );
     await tapVisible(tester, ClassForm.saveKey);

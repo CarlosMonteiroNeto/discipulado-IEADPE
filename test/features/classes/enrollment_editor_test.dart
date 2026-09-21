@@ -6,6 +6,7 @@ import 'package:discipulado_ieadpe/features/classes/enrollment_editor.dart';
 import 'package:discipulado_ieadpe/ui/form_fields.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../ui/ui_test_support.dart';
 import 'class_test_support.dart';
 
 List<Enrollment> enrollments(int count) => List<Enrollment>.generate(
@@ -101,8 +102,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ana Souza').last);
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(EnrollmentEditor.startDateFieldKey),
+    await setFormText(
+      tester,
+      EnrollmentEditor.startDateFieldKey,
       '10/01/2026',
     );
     await tapVisible(tester, EnrollmentEditor.addKey);
@@ -137,8 +139,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Ana Souza').last);
     await tester.pumpAndSettle();
-    await tester.enterText(
-      find.byKey(EnrollmentEditor.startDateFieldKey),
+    await setFormText(
+      tester,
+      EnrollmentEditor.startDateFieldKey,
       '10/01/2026',
     );
     await tapVisible(tester, EnrollmentEditor.addKey);

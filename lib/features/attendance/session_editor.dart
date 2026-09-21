@@ -100,12 +100,11 @@ class _SessionEditorState extends State<SessionEditor> {
       children: <Widget>[
         Text('Nova chamada', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: AppSpacing.x3),
-        AppTextField(
+        AppDateField(
           key: SessionEditor.dateFieldKey,
           label: 'Data',
           controller: _date,
           helperText: 'Formato dd/MM/aaaa.',
-          keyboardType: TextInputType.datetime,
         ),
         const SizedBox(height: AppSpacing.x3),
         AppTextField(

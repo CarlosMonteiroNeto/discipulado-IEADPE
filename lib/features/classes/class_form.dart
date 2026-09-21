@@ -280,22 +280,20 @@ class _ClassFormState extends State<ClassForm> {
                   }),
           ),
           const SizedBox(height: AppSpacing.x3),
-          AppTextField(
+          AppDateField(
             key: ClassForm.startDateFieldKey,
             label: 'Início',
             controller: _startDate,
             required: true,
             helperText: 'Formato dd/MM/aaaa.',
-            keyboardType: TextInputType.datetime,
             validator: _validateRequiredDate,
           ),
           const SizedBox(height: AppSpacing.x3),
-          AppTextField(
+          AppDateField(
             key: ClassForm.endDateFieldKey,
             label: 'Término',
             controller: _endDate,
             helperText: 'Formato dd/MM/aaaa.',
-            keyboardType: TextInputType.datetime,
             validator: _validateOptionalDate,
           ),
           if (_failure != null) ...<Widget>[
@@ -343,7 +341,10 @@ class _ClassFormState extends State<ClassForm> {
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.enter, control: true): _submit,
       },
-      child: _guard.wrap(context, child: form),
+      child: _guard.wrap(
+        context,
+        child: AppFormScrollView(child: form),
+      ),
     );
   }
 }

@@ -6,11 +6,22 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 
 import '../features/auth/access_denied_page.dart';
 import '../features/auth/auth_controller.dart';
 import '../ui/app_theme.dart';
 import 'dependencies.dart';
+
+const List<LocalizationsDelegate<dynamic>> _localizationsDelegates =
+    <LocalizationsDelegate<dynamic>>[
+  GlobalMaterialLocalizations.delegate,
+  GlobalWidgetsLocalizations.delegate,
+  GlobalCupertinoLocalizations.delegate,
+];
+
+const _supportedLocales = <Locale>[Locale('pt', 'BR')];
+const _locale = Locale('pt', 'BR');
 
 class DiscipuladoApp extends StatefulWidget {
   const DiscipuladoApp({super.key, required this.dependencies});
@@ -56,6 +67,9 @@ class _DiscipuladoAppState extends State<DiscipuladoApp> {
             theme: AppTheme.light,
             darkTheme: AppTheme.dark,
             home: AccessDeniedPage(controller: auth),
+            localizationsDelegates: _localizationsDelegates,
+            supportedLocales: _supportedLocales,
+            locale: _locale,
           );
         }
         return MaterialApp.router(
@@ -63,6 +77,9 @@ class _DiscipuladoAppState extends State<DiscipuladoApp> {
           theme: AppTheme.light,
           darkTheme: AppTheme.dark,
           routerConfig: widget.dependencies.router,
+          localizationsDelegates: _localizationsDelegates,
+          supportedLocales: _supportedLocales,
+          locale: _locale,
         );
       },
     );

@@ -194,12 +194,11 @@ class _EnrollmentEditorState extends State<EnrollmentEditor> {
               : (String? value) => setState(() => _studentId = value),
         ),
         const SizedBox(height: AppSpacing.x3),
-        AppTextField(
+        AppDateField(
           key: EnrollmentEditor.startDateFieldKey,
           label: 'Início',
           controller: _startDate,
           helperText: 'Formato dd/MM/aaaa.',
-          keyboardType: TextInputType.datetime,
         ),
         const SizedBox(height: AppSpacing.x3),
         Align(
@@ -364,12 +363,11 @@ class _CloseEnrollmentDialogState extends State<_CloseEnrollmentDialog> {
             },
           ),
           const SizedBox(height: AppSpacing.x3),
-          AppTextField(
+          AppDateField(
             key: EnrollmentEditor.closeEndDateKey,
             label: 'Término',
             controller: _endDate,
             helperText: 'Formato dd/MM/aaaa.',
-            keyboardType: TextInputType.datetime,
           ),
           if (_error != null) ...<Widget>[
             const SizedBox(height: AppSpacing.x2),

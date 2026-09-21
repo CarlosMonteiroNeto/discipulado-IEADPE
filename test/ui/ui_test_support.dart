@@ -40,3 +40,22 @@ Future<void> pumpApp(
     await tester.pump();
   }
 }
+
+/// Sets [text] directly on the controller backing the editable with [fieldKey].
+///
+/// Read-only fields (e.g. date fields that open a picker) ignore `enterText`,
+/// so tests that want to seed a value must write to the [TextEditingController]
+/// the field holds. Requires the field to be discoverable below [fieldKey].
+Future<void> setFormText(
+  WidgetTester tester,
+  Key fieldKey,
+  String text,
+) async {
+  final Finder editable = find.descendant(
+    of: find.byKey(fieldKey),
+    matching: find.byType(EditableText),
+  );
+  expect(editable, findsOneWidget);
+  tester.widget<EditableText>(editable).controller.text = text;
+  await tester.pump();
+}

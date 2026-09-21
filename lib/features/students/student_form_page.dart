@@ -17,6 +17,7 @@ import '../../domain/validation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/dirty_form_guard.dart';
 import '../../ui/form_fields.dart';
+import '../../ui/phone_formatter.dart';
 import 'enrollment_history.dart';
 import 'student_repository.dart';
 
@@ -115,7 +116,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
           ? ''
           : formatBrazilianDate(initial!.birthDate!),
     );
-    _phone = TextEditingController(text: initial?.phoneE164 ?? '');
+    _phone = TextEditingController(text: formatPhone(initial?.phoneE164 ?? ''));
     _education = TextEditingController(text: initial?.education ?? '');
     _maritalStatus = TextEditingController(text: initial?.maritalStatus ?? '');
     _street = TextEditingController(text: initial?.address?.street ?? '');
@@ -337,11 +338,10 @@ class _StudentFormPageState extends State<StudentFormPage> {
             textInputAction: TextInputAction.next,
           ),
           const SizedBox(height: AppSpacing.x3),
-          AppTextField(
+          AppDateField(
             key: StudentFormPage.birthDateFieldKey,
             label: 'Data de nascimento',
             controller: _birthDate,
-            keyboardType: TextInputType.datetime,
             helperText: StudentFormPage.birthDateHelper,
             validator: _validateBirthDate,
           ),
@@ -367,6 +367,7 @@ class _StudentFormPageState extends State<StudentFormPage> {
             label: 'Telefone',
             controller: _phone,
             keyboardType: TextInputType.phone,
+            inputFormatters: <TextInputFormatter>[PhoneInputFormatter()],
             helperText:
                 'Compartilhado com a equipe autenticada quando informado.',
             validator: validatePhone,
@@ -488,7 +489,10 @@ class _StudentFormPageState extends State<StudentFormPage> {
       bindings: <ShortcutActivator, VoidCallback>{
         const SingleActivator(LogicalKeyboardKey.enter, control: true): _submit,
       },
-      child: _guard.wrap(context, child: form),
+      child: _guard.wrap(
+        context,
+        child: AppFormScrollView(child: form),
+      ),
     );
   }
 

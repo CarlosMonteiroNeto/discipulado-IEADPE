@@ -6,12 +6,14 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../domain/contact.dart';
 import '../../domain/ports.dart';
 import '../../domain/validation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/form_fields.dart';
+import '../../ui/phone_formatter.dart';
 import 'role_replacement_dialog.dart';
 import 'team_repository.dart';
 
@@ -68,7 +70,7 @@ class _ContactFormState extends State<ContactForm> {
     text: widget.config.initialName,
   );
   late final TextEditingController _phone = TextEditingController(
-    text: widget.config.initialPhone ?? '',
+    text: formatPhone(widget.config.initialPhone ?? ''),
   );
   late RoleCode? _role = widget.config.initialRoleCode;
   late int? _expectedRevision = widget.config.expectedRevision;
@@ -343,13 +345,14 @@ class _ContactFormState extends State<ContactForm> {
     final List<RoleCode> roles = RoleCode.values
         .where((RoleCode role) => role.scope == widget.config.scope)
         .toList(growable: false);
-    return AppForm(
-      key: _formKey,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          AppTextField(
-            key: ContactForm.nameFieldKey,
+    return AppFormScrollView(
+      child: AppForm(
+        key: _formKey,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            AppTextField(
+              key: ContactForm.nameFieldKey,
             label: 'Nome',
             controller: _name,
             required: true,
@@ -379,6 +382,7 @@ class _ContactFormState extends State<ContactForm> {
             label: 'Telefone',
             controller: _phone,
             keyboardType: TextInputType.phone,
+            inputFormatters: <TextInputFormatter>[PhoneInputFormatter()],
             helperText:
                 'Compartilhado com a equipe autenticada quando informado.',
             validator: validatePhone,
@@ -420,7 +424,8 @@ class _ContactFormState extends State<ContactForm> {
               ),
             ],
           ),
-        ],
+          ],
+        ),
       ),
     );
   }

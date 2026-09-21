@@ -1,6 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:intl/intl.dart';
 
 import 'app_theme.dart';
+
+/// A full-page scroll wrapper so the on-screen keyboard never covers the
+/// focused field and footer actions stay reachable on small screens.
+///
+/// The bottom padding tracks the keyboard inset, giving the layout extra room
+/// to bring the trailing save/cancel buttons above the keyboard. Painting the
+/// content taller than the viewport makes it scrollable; nesting inside an
+/// outer scroll view is harmless (it expands to its content).
+class AppFormScrollView extends StatelessWidget {
+  const AppFormScrollView({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: child,
+    );
+  }
+}
 
 class _AppFormFieldEntry {
   const _AppFormFieldEntry(this.fieldKey, this.focusNode);
@@ -84,6 +110,10 @@ class AppTextField extends StatefulWidget {
     this.textInputAction,
     this.helperText,
     this.required = false,
+    this.readOnly = false,
+    this.suffixIcon,
+    this.onTap,
+    this.inputFormatters,
   });
 
   final String label;
@@ -96,6 +126,10 @@ class AppTextField extends StatefulWidget {
   final TextInputAction? textInputAction;
   final String? helperText;
   final bool required;
+  final bool readOnly;
+  final Widget? suffixIcon;
+  final VoidCallback? onTap;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -140,6 +174,9 @@ class _AppTextFieldState extends State<AppTextField> {
       focusNode: _focusNode,
       enabled: widget.enabled,
       obscureText: widget.obscureText,
+      readOnly: widget.readOnly,
+      onTap: widget.onTap,
+      inputFormatters: widget.inputFormatters,
       keyboardType: widget.keyboardType,
       textInputAction: widget.textInputAction,
       validator: widget.validator,
@@ -147,10 +184,89 @@ class _AppTextFieldState extends State<AppTextField> {
       decoration: InputDecoration(
         labelText: widget.required ? '${widget.label} *' : widget.label,
         helperText: widget.helperText,
+        suffixIcon: widget.suffixIcon,
         filled: !widget.enabled,
         fillColor: tokens.disabledSurface,
       ),
     );
+  }
+}
+
+final DateFormat _brazilianDateFormat = DateFormat('dd/MM/yyyy');
+
+/// A date entry field that reads like a [TextFormField] but opens the
+/// platform date picker on tap instead of accepting free-form input. The
+/// selected date is written back as `dd/MM/yyyy` through the app's formatter
+/// so validators keep consuming the same representation.
+class AppDateField extends StatelessWidget {
+  const AppDateField({
+    super.key,
+    required this.label,
+    this.controller,
+    this.validator,
+    this.enabled = true,
+    this.helperText,
+    this.focusNode,
+    this.required = false,
+    this.firstDate,
+    this.lastDate,
+    this.initialDate,
+  });
+
+  final String label;
+  final TextEditingController? controller;
+  final String? Function(String? value)? validator;
+  final bool enabled;
+  final String? helperText;
+  final FocusNode? focusNode;
+  final bool required;
+  final DateTime? firstDate;
+  final DateTime? lastDate;
+  final DateTime? initialDate;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppTextField(
+      label: label,
+      controller: controller,
+      validator: validator,
+      enabled: enabled,
+      helperText: helperText,
+      focusNode: focusNode,
+      required: required,
+      readOnly: true,
+      suffixIcon: IconButton(
+        tooltip: 'Escolher data',
+        icon: const Icon(Icons.calendar_today_outlined),
+        onPressed: enabled ? () => _pick(context) : null,
+      ),
+      onTap: enabled ? () => _pick(context) : null,
+    );
+  }
+
+  Future<void> _pick(BuildContext context) async {
+    final DateTime today = DateTime.now();
+    final DateTime? parsed = _parse(controller?.text);
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: parsed ?? initialDate ?? today,
+      firstDate: firstDate ?? DateTime(1900),
+      lastDate: lastDate ?? DateTime(today.year + 100, 12, 31),
+    );
+    if (picked == null) {
+      return;
+    }
+    if (!context.mounted) {
+      return;
+    }
+    controller?.text = _brazilianDateFormat.format(picked);
+  }
+
+  DateTime? _parse(String? text) {
+    if (text == null || text.isEmpty) {
+      return null;
+    }
+    return _brazilianDateFormat.tryParse(text);
   }
 }
 

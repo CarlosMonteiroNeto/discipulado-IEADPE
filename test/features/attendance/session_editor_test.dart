@@ -5,6 +5,7 @@ import 'package:discipulado_ieadpe/domain/ports.dart';
 import 'package:discipulado_ieadpe/features/attendance/session_editor.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../ui/ui_test_support.dart';
 import 'attendance_test_support.dart';
 
 void main() {
@@ -24,8 +25,9 @@ void main() {
       ),
     );
 
-    await tester.enterText(
-      find.byKey(SessionEditor.dateFieldKey),
+    await setFormText(
+      tester,
+      SessionEditor.dateFieldKey,
       '03/02/2026',
     );
     await tester.enterText(find.byKey(SessionEditor.topicFieldKey), 'Aula 1');
@@ -60,8 +62,9 @@ void main() {
       ),
     );
 
-    await tester.enterText(
-      find.byKey(SessionEditor.dateFieldKey),
+    await setFormText(
+      tester,
+      SessionEditor.dateFieldKey,
       '03/02/2026',
     );
     await tester.enterText(find.byKey(SessionEditor.topicFieldKey), 'Aula 1');
