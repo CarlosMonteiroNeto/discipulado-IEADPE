@@ -19,17 +19,17 @@ import {
  * `test/security/rules.security.test.ts`) fails this assertion.
  *
  * The committed task-2 suite is pinned to its revision object
- * (`b394b56fcca49140fc5cad55ec287b6c5fee1372`, task 10 green) by content hash,
- * so divergence is detected independent of the working tree or commit state.
- * The task-13 fix commit that added the class-roster and active-enrollment-ref
- * grants to the denial matrix re-pins this constant before commit and the
- * corrective re-pin re-points the revision after it.
+ * (`f0130cf689aa2b8a300b3f99fad3488eed35f8c9`, write-matrix fix) by content
+ * hash, so divergence is detected independent of the working tree or commit
+ * state. The task-13 fix commit that added the class-roster and
+ * active-enrollment-ref grants to the denial matrix re-pinned this constant
+ * before commit and this corrective re-pin re-pointed the revision after it.
  */
 
 const functionsDir = resolve(__dirname, "..");
 const rootDir = resolve(functionsDir, "..");
 const configPath = resolve(functionsDir, "vitest.config.ts");
-const task2Revision = "b394b56fcca49140fc5cad55ec287b6c5fee1372";
+const task2Revision = "f0130cf689aa2b8a300b3f99fad3488eed35f8c9";
 const task2RulesSuiteSha256 =
   "0a71be857ddf1d996ecb3d9d56fdc19eb89ccea9d965516d091a7cdda996c0f4";
 
