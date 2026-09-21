@@ -25,6 +25,12 @@ describe("S09 index hardening", () => {
       { collectionGroup: "enrollments", queryScope: "COLLECTION", fields: [{ fieldPath: "classId", order: "ASCENDING" }, { fieldPath: "status", order: "ASCENDING" }, { fieldPath: "startDate", order: "ASCENDING" }] },
       { collectionGroup: "enrollments", queryScope: "COLLECTION", fields: [{ fieldPath: "studentId", order: "ASCENDING" }, { fieldPath: "status", order: "ASCENDING" }, { fieldPath: "startDate", order: "ASCENDING" }] },
       { collectionGroup: "enrollments", queryScope: "COLLECTION", fields: [{ fieldPath: "congregationId", order: "ASCENDING" }, { fieldPath: "studentId", order: "ASCENDING" }, { fieldPath: "status", order: "ASCENDING" }, { fieldPath: "startDate", order: "ASCENDING" }] },
+      { collectionGroup: "students", queryScope: "COLLECTION", fields: [{ fieldPath: "classId", order: "ASCENDING" }, { fieldPath: "normalizedName", order: "ASCENDING" }] },
+      { collectionGroup: "students", queryScope: "COLLECTION_GROUP", fields: [{ fieldPath: "classId", order: "ASCENDING" }, { fieldPath: "normalizedName", order: "ASCENDING" }] },
+      { collectionGroup: "sessions", queryScope: "COLLECTION", fields: [{ fieldPath: "classId", order: "ASCENDING" }, { fieldPath: "date", order: "ASCENDING" }] },
+      { collectionGroup: "sessions", queryScope: "COLLECTION_GROUP", fields: [{ fieldPath: "classId", order: "ASCENDING" }, { fieldPath: "date", order: "ASCENDING" }] },
+      { collectionGroup: "sessions", queryScope: "COLLECTION", fields: [{ fieldPath: "status", order: "ASCENDING" }, { fieldPath: "date", order: "ASCENDING" }] },
+      { collectionGroup: "sessions", queryScope: "COLLECTION_GROUP", fields: [{ fieldPath: "status", order: "ASCENDING" }, { fieldPath: "date", order: "ASCENDING" }] },
     ];
     const indexes = JSON.parse(
       readFileSync(resolve(root, "firestore.indexes.json"), "utf8"),

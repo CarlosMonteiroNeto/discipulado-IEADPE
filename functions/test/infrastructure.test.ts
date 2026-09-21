@@ -30,12 +30,15 @@ describe("backend infrastructure manifests", () => {
     expect(JSON.stringify(firebase)).not.toContain("projects/");
   });
 
-  it("ships deny-by-default Firestore rules", () => {
+  it("ships internal-mode Firestore rules with a deny-by-default catch-all", () => {
     const rulesPath = resolve(root, "firestore.rules");
     expect(existsSync(rulesPath)).toBe(true);
     const rules = readFileSync(rulesPath, "utf8");
     expect(rules).toContain("service cloud.firestore");
-    expect(rules).toContain("allow write: if false");
+    expect(rules).toContain("match /{document=**}");
+    expect(rules).toContain("allow read, write: if false");
+    expect(rules).toContain("mayWriteCongregation");
+    expect(rules).toContain("allowlistedOwner");
     expect(rules).toContain("match /directory/{contactId}");
     expect(rules).toContain("match /supervisionContacts/{contactId}");
   });
@@ -43,7 +46,7 @@ describe("backend infrastructure manifests", () => {
   it("declares composite indexes for the shipped query matrix", () => {
     const indexes = readJson(resolve(root, "firestore.indexes.json"));
     expect(Array.isArray(indexes.indexes)).toBe(true);
-    expect((indexes.indexes as unknown[]).length).toBeGreaterThanOrEqual(8);
+    expect((indexes.indexes as unknown[]).length).toBeGreaterThanOrEqual(18);
   });
 
   it("provides build, unit-test and emulator-test entry points", () => {

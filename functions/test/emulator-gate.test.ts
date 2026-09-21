@@ -28,7 +28,7 @@ const rootDir = resolve(functionsDir, "..");
 const configPath = resolve(functionsDir, "vitest.config.ts");
 const task2Revision = "0774d7eaea10b35d8b5bac53fa1e62dd7f5516c2";
 const task2RulesSuiteSha256 =
-  "6826b53d5414b2086eb5be221859d98638bce04418bb618201f45d2b24c855e1";
+  "29c5b3546350619a72cbf94b550c9c2f5ce40c8e3e8dbf72c87466ea5ecefc67";
 
 interface ResolvedTestOptions {
   include?: string[];

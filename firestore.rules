@@ -1,15 +1,29 @@
 rules_version = '2';
 
-// Deny-by-default authorization matrix for the Discipulado IEADPE release.
-// Every client write is denied: all mutations go through callable functions
-// using the Admin SDK (S04, S11). Reads are limited to the scoped projections
-// and private congregational records described by S04.
+// Internal-mode authorization matrix for the Discipulado IEADPE app.
 //
-// The nested matches below are explicit on purpose: a recursive wildcard would
-// also match the parent congregation document and every internal subcollection
-// (role slots, roster, uniqueness/reservation records), which S04 forbids.
+// The app runs on the Firebase Spark plan without Cloud Functions: every
+// mutation is a role-scoped client write performed by the handlers of the
+// direct Firestore transport, so this ruleset grants writes to the role that
+// owns them instead of denying every client write. Reads keep the scoped
+// projections of S04. The nested matches below are explicit on purpose: a
+// recursive wildcard would also match the parent congregation document and
+// every internal subcollection.
+//
+// Bootstrap (internal-mode trust model): a signed-in user may self-create and
+// self-update their OWN users profile. `accessRole == 'supervisor'` on such a
+// write is granted only when the authenticated token email equals the single
+// allowlist credential below — the owner account email created in the Firebase
+// console during delivery. Replace it with the real address before deploying.
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // The internal bootstrap credential: the owner account email. Only this
+    // address may self-provision a 'supervisor' profile (see README
+    // "Internal mode (no billing)").
+    function allowlistedOwner() {
+      return 'owner@discipulado-ieadpe.example';
+    }
 
     function signedIn() {
       return request.auth != null;
@@ -42,85 +56,138 @@ service cloud.firestore {
         && profile().congregationId == congregationId;
     }
 
-    // Supervision reads every scope; staff read only their assigned
-    // congregation. The path already carries the congregation id, so no
-    // duplicated field check is required.
+    // Reads: supervisors anywhere, staff only their assigned congregation.
+    // The path already carries the congregation id, so no duplicated field
+    // check is required.
     function mayReadCongregation(congregationId) {
       return isSupervisor() || isStaffOf(congregationId);
     }
 
-    // Own access profile only; access assignments are provisioned by a trusted
-    // operator, never by a client.
-    match /users/{userId} {
-      allow read: if signedIn() && userId == currentUid();
-      allow write: if false;
+    // Writes mirror the read scoping in internal mode: supervisors anywhere,
+    // staff within their own congregation.
+    function mayWriteCongregation(congregationId) {
+      return isSupervisor() || isStaffOf(congregationId);
     }
 
-    // Active congregation names are readable by authenticated staff; archived
-    // congregations are supervisor-protected. Only this rule (plus the
-    // supervisor grant) governs the parent document, because the child matches
-    // below are explicit and do not match it.
-    match /congregations/{congregationId} {
-      allow read: if activeProfile() && (isSupervisor() || resource.data.active == true);
-      allow write: if false;
+    // The directory projection is maintained by the client one entry at a
+    // time; each entry carries the congregation it belongs to, so staff writes
+    // are scoped by that field and supervisors may write anywhere.
+    function mayWriteDirectory() {
+      if (isSupervisor()) {
+        return true;
+      }
+      if (!activeProfile() || profile().accessRole != 'congregationStaff') {
+        return false;
+      }
+      return (resource == null ? request.resource.data.congregationId
+          : resource.data.congregationId) == profile().congregationId;
+    }
 
-      // Deliberately client-readable private congregational resources (S04).
+    // Self-owned access profile. Self create/update is the internal-mode
+    // bootstrap; supervisor self-claim is gated by the allowlist email.
+    match /users/{userId} {
+      allow read: if signedIn() && userId == currentUid();
+      allow create: if signedIn()
+          && userId == currentUid()
+          && request.resource.data.accessRole in ['congregationStaff', 'supervisor']
+          && (request.resource.data.accessRole != 'supervisor'
+              || request.auth.token.email == allowlistedOwner());
+      allow update: if signedIn()
+          && userId == currentUid()
+          && request.resource.data.accessRole in ['congregationStaff', 'supervisor']
+          && (request.resource.data.accessRole != 'supervisor'
+              || request.auth.token.email == allowlistedOwner());
+      allow delete: if false;
+    }
+
+    // Congregational records (S04 reads + internal-mode writes).
+    match /congregations/{congregationId} {
+      // Active congregation names are readable by authenticated staff;
+      // archived congregations are supervisor-protected.
+      allow read: if activeProfile() && (isSupervisor() || resource.data.active == true);
+      allow write: if mayWriteCongregation(congregationId);
+
       match /contacts/{contactId} {
         allow read: if mayReadCongregation(congregationId);
-        allow write: if false;
+        allow write: if mayWriteCongregation(congregationId);
       }
 
       match /students/{studentId} {
         allow read: if mayReadCongregation(congregationId);
-        allow write: if false;
+        allow write: if mayWriteCongregation(congregationId);
       }
 
       match /classes/{classId} {
         allow read: if mayReadCongregation(congregationId);
-        allow write: if false;
+        allow write: if mayWriteCongregation(congregationId);
       }
 
       match /enrollments/{enrollmentId} {
         allow read: if mayReadCongregation(congregationId);
-        allow write: if false;
+        allow write: if mayWriteCongregation(congregationId);
       }
 
       match /sessions/{sessionId} {
         allow read: if mayReadCongregation(congregationId);
-        allow write: if false;
+        allow write: if mayWriteCongregation(congregationId);
 
-        // Attendance is a scoped private record (S04).
+        // Attendance is a scoped private record (S04), writable in internal
+        // mode by the same role.
         match /attendance/{attendanceId} {
           allow read: if mayReadCongregation(congregationId);
-          allow write: if false;
+          allow write: if mayWriteCongregation(congregationId);
+        }
+
+        // The frozen session roster is maintained by the client on first
+        // attendance; staff/supervisors of the congregation may touch it.
+        match /roster/{rosterId} {
+          allow read: if mayReadCongregation(congregationId);
+          allow write: if mayWriteCongregation(congregationId);
         }
       }
 
-      // Internal collections (roleSlots, roster, uniqueness/reservation
-      // records) are intentionally not enumerated: the final catch-all denies
-      // every direct client read and write to them.
+      // Internal role-slot records are equally client-owned now, read and
+      // written only by the congregation staff/supervisors.
+      match /roleSlots/{slotId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if mayWriteCongregation(congregationId);
+      }
     }
 
-    // Minimal authenticated directory projection.
+    // Minimal authenticated directory projection, maintained by the client.
     match /directory/{contactId} {
       allow read: if activeProfile();
-      allow write: if false;
+      allow write: if mayWriteDirectory();
     }
 
-    // Supervision contacts are supervisor-only.
+    // Supervision records are supervisor-only.
     match /supervisionContacts/{contactId} {
       allow read: if isSupervisor();
-      allow write: if false;
+      allow write: if isSupervisor();
     }
 
     match /supervisionRoleSlots/{slotId} {
       allow read: if isSupervisor();
+      allow write: if isSupervisor();
+    }
+
+    // Collection-group reads serve the supervisor all-scope dashboard and
+    // pending-session list (the staff paths stay scoped through the matches
+    // above). Only supervisors may run group queries; the wildcard matcher
+    // binds nothing, so staff cannot leak other congregations this way.
+    match /{path=**}/students/{studentId} {
+      allow read: if isSupervisor();
       allow write: if false;
     }
 
-    // Internal idempotency receipts are never client readable.
-    match /operations/{document=**} {
-      allow read, write: if false;
+    match /{path=**}/classes/{classId} {
+      allow read: if isSupervisor();
+      allow write: if false;
+    }
+
+    match /{path=**}/sessions/{sessionId} {
+      allow read: if isSupervisor();
+      allow write: if false;
     }
 
     // Unspecified paths deny every read and write.
