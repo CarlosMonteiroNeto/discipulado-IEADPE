@@ -1,0 +1,334 @@
+{
+  "feature": "Convert the Discipulado IEADPE app to internal mode: move every mutation and aggregation from Cloud Functions into Dart client handlers over a direct Firestore transport, and move the authorization matrix into firestore.rules, so the app runs on the Firebase Spark (free) plan with no Cloud Functions deployment",
+  "spec_doc": "docs/superpowers/specs/2026-09-19-internal-mode-design.md",
+  "global_constraints": [
+    "Programs: user-facing copy stays pt-BR; all code, comments, tests, specs, plans and documentation stay English.",
+    "Implement in the existing app repository (discipulado-app) at the main branch seam. The `functions/` tree and its tests are retained as the canonical reference for the original invariants but are never modified for behavior, never deployed and never imported by the Flutter app.",
+    "The new `FirestoreDirectTransport` (lib/data/firestore_direct_transport.dart) implements the existing `FirebaseTransport` interface from lib/data/firebase_gateway.dart: getDocument and runQuery stay direct Firestore reads with the exact semantics of the old `FirebaseDataTransport` (name-prefix ranges, cursors, filters, orderBy). callFunction stops calling Cloud Functions and dispatches through the handler registry instead.",
+    "Handlers are plain functions over the `DirectStore` seam (lib/data/direct_store.dart) that validate their payload, write through `StorePaths` from lib/data/transport_support.dart, apply revision-based optimistic concurrency with Firestore transactions, write `updatedAt`/`updatedBy`, and return the exact wire shape the feature repositories decode. Handler code never touches Firebase classes directly except through the store.",
+    "Wire shapes are frozen so the existing repositories (team_repository.dart, student_repository.dart, academic_repository.dart, overview_repository.dart, enrollment_history.dart) decode unchanged: TeamMutationResult {id, revision, previousContactId?, previousRevision?}; StudentMutationResult {id, revision}; AcademicMutationResult {id, revision}; AttendanceView {session, roster: [{enrollmentId, studentId, studentName, status}]} (the roster key may be 'roster'); EnrollmentProgressView {enrollmentId, classId, present, absent, excused, percentage?}; OverviewCounts {students, classes, openSessions, throughDate}; PendingSessionPage {items: [{id, classId, className?, congregationId, date, topic?}], nextCursor}.",
+    "Payloads are reserved exactly as the repositories send them: saveCongregation, setCongregationArchived, saveContact, replaceRoleHolder {…previousExpectedRevision, targetContactId, targetExpectedRevision…}, setContactArchived, saveStudent, setStudentArchived, saveClass, setClassStatus, enrollStudent, closeEnrollment, createSession, cancelSession, saveAttendance {…expectedRevision, finalize, attendance: {enrollmentId: status}, requestId…}, getSessionAttendance, getEnrollmentProgress, getOverview {congregationId}, listPendingSessions {congregationId, limit, cursor}.",
+    "Relaxed invariants from the spec are honored and implemented as documented best-effort checks, never as hard server-side guarantees: no reference counters, no receipts/TTL, advisory normalized-name checks only, and MAX_ENROLLMENTS_PER_CLASS as a best-effort length check. Revision-based optimistic concurrency is KEPT and implemented with client Firestore transactions.",
+    "do_not_edit (existing committed tests): each task touches only the paths in its touches list plus new test files it authors. The ONLY committed tests that may be modified are the ones the spec explicitly redefines: test/data/query_codec_test.dart and test/data/firebase_gateway_test.dart (the listClassStudents callable route, task 2), plus the Node rules/security suites (functions/test/rules-structure.test.ts, emulator-gate.test.ts, functions/test/security/rules.security.test.ts, rules-hardening.test.ts, task 10). No other committed test is edited for any reason.",
+    "Task gates per ecosystem: Flutter tasks run under the `two-model-coder` operador with `flutter test`/`flutter analyze` as the authoritative gate and Flutter-format RED evidence at the task RED path. The single Node task (task 10: firestore.rules/firestore.indexes.json and the security suites) runs under the installed `two-model-coder-node` operador with the Node build and vitest commands and Node-format RED evidence. The auto-detected root pubspec.yaml -> flutter entry must never dispatch task 10; a Node task dispatched without the Node gate is an environment/scheduling blocker under S13/S14, never a reason to weaken acceptance or skip its touch ownership. Script CEO enforces the declared `depends_on` graph and restores the tree to the last `task_complete` commit before each task.",
+    "Emulator-dependent checks run only when both FIRESTORE_EMULATOR_HOST and FIREBASE_AUTH_EMULATOR_HOST are present; without them the rules/security evidence must explicitly record environment-blocked checks. Unit tests for handlers and the codec run on the in-memory DirectStore and are the primary release evidence; no acceptance item is closed based on fake repositories in the final app wiring.",
+    "Task 10 rewrites rules.security.test.ts and must re-pin the emulator-gate byte-identity guard: after its green commit, the corrective re-pin step re-points the revision+sha256 constants in functions/test/emulator-gate.test.ts to the new committed rules.security.test.ts and the final Node gate run is green. The byte-identity pin must never be weakened to a content-contains assertion.",
+    "The listClassStudents read becomes a plain query in task 2; the students/classId scoped collection query therefore requires a composite index (students, classId + normalizedName). The rules task (task 10) owns firestore.indexes.json and must add exactly the composite indexes the shipped plain queries need (listClassStudents students/classId/normalizedName; sessions by classId/date, sessions by status/date, and group-scoped variants for supervisor overview/pending-session reads), keeping every existing index.",
+    "No automatic retries of client mutations (S12 discipline kept): timeouts surface as AppFailure via the unchanged ErrorMapper (permission-denied -> forbidden, not-found -> notFound, aborted/failed-precondition -> conflict, network -> unavailable, others -> validation/unknown).",
+    "Working-tree hygiene, single-owner touches, RED-before-GREEN, and evidence-before-claims apply exactly as established in the prior build contract; a task is recorded `task_complete` only when its own green gate passes with evidence, its acceptance items are satisfied, and it is committed."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Create the direct transport shell over the DirectStore seam",
+      "summary": "Implement `lib/data/firestore_direct_transport.dart` as a `FirebaseTransport`: `getDocument`/`runQuery` delegate to a Firestore-backed store with the exact prefix/cursor/filter semantics the old transport had, and `callFunction` dispatch-slices look up handlers in an injected `HandlerRegistry` (currently empty) with an unknown-operation failure. This is the composition point subsequent feature tasks plug registry slices into.",
+      "spec_refs": [
+        "Architecture",
+        "New client transport",
+        "Error handling",
+        "Testing"
+      ],
+      "touches": [
+        "lib/data/firestore_direct_transport.dart"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "FirestoreDirectTransport implements FirebaseTransport and is constructible with an injected DirectStore (Firestore-backed real implementation from the seam), a HandlerRegistry, a uid provider and a clock; production wiring is deferred to task 11.",
+        "getDocument(path) returns the decoded document map or null for a missing document and maps store failures through the unchanged ErrorMapper.",
+        "runQuery applies QueryPlan filters, orderBy, name-prefix range and the encoded cursor exactly as the previous transport did, returning TransportPage with items and nextCursor; unit tests prove prefix ranges (\u0000..\uf8ff), equality filters, cursor bounds and ordering on the in-memory store.",
+        "callFunction(operation, payload) resolves the operation in the registry and invokes the handler with HandlerContext(store, uid, now); an operation absent from the registry raises a deterministic AppFailure, and handler AppFailures propagate unchanged.",
+        "New Dart tests under test/data/ exercise the transport against a fake/in-memory DirectStore with injected uid/clock: document read, query page assembly, prefix and cursor behavior, registry miss, and error mapping; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Route listClassStudents through the plain query codec",
+      "summary": "Per spec, `QueryPlan.callableOperation` becomes always null and the students+classId case (query_codec.dart) becomes a plain filtered query. This is a spec-mandated behavior change, so the two committed tests that pinned the old callable route are updated together with production code.",
+      "spec_refs": [
+        "Reads",
+        "query_codec.dart",
+        "Testing"
+      ],
+      "touches": [
+        "lib/data/query_codec.dart",
+        "test/data/query_codec_test.dart",
+        "test/data/firebase_gateway_test.dart"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "QueryCodec.plan never sets callableOperation (always null); the students+classId request now produces a plain scoped query plan carrying the classId equality filter and the normalizedName orderBy, with the same collection path, cursor and filter-fingerprint behavior as before.",
+        "The committed query_codec_test.dart test that asserted the 'listClassStudents' callable route is updated to assert the plain-query plan instead (filter classId='cl1', callableOperation null, orderBy normalizedName); no other codec behavior regresses (limit validation, cursor round-trip, scope/prefix rejection).",
+        "The committed firebase_gateway_test.dart test that routed complex student-by-class reads to the callable handler is updated so the fake transport serves the query through runQuery (TransportPage) instead of callFunction; it asserts the classId filter reaches the transport and the gateway decodes items/nextCursor from the page.",
+        "The remainder of both committed test files is untouched; flutter analyze and the full committed Dart suite stay green.",
+        "This change documents in its test that the students+classId plain query requires the task-10 composite index (students, classId + normalizedName) to run against a real Firestore project."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Implement congregation and contact handlers",
+      "summary": "Dart handlers for saveCongregation, setCongregationArchived, saveContact, replaceRoleHolder and setContactArchived over DirectStore transactions, mirroring functions/src/congregations and functions/src/contacts including the directory projection and per-scope role slots.",
+      "spec_refs": [
+        "Operation inventory",
+        "Firestore rules",
+        "Error handling",
+        "Testing",
+        "S04",
+        "S06",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/congregations.dart",
+        "lib/data/handlers/contacts.dart"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "A congregations registry slice exposes saveCongregation and setCongregationArchived and a contacts slice exposes saveContact, replaceRoleHolder and setContactArchived, each returning the exact TeamMutationResult wire shapes (previousContactId/previousRevision present on role replacement).",
+        "saveContact writes the scoped contact document and the directory projection in one DirectStore transaction (atomic two-doc write); address/private fields never leak into the directory document; normalizedName advisory uniqueness is a best-effort read check, never a reservation write.",
+        "replaceRoleHolder validates both expected revisions, clears only the previous assignment, preserves the displaced person, and commits the contract/role-slot/directory projection changes atomically; teacher roles permit multiple holders while administrative roles use per-scope slots.",
+        "setContactArchived releases assignments and removes directory availability in the same transaction; archived/restore transitions bump revision and updatedAt/updatedBy.",
+        "saveCongregation enforces advisory normalized-name uniqueness (best-effort), preserves createdAt across renames, bumps revision, and setCongregationArchived flips active while keeping the record; no reference-count documents are written anywhere.",
+        "New tests under test/data/handlers/ (RED first, in-memory DirectStore) prove validation failures, revision conflicts, atomic directory+contact writes, directory projection completeness, role replacement with two revisions, and the TeamMutationResult decode; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Implement student persistence handlers",
+      "summary": "Dart handlers for saveStudent and setStudentArchived over DirectStore, mirroring functions/src/students with validation and revisioned writes and no private-data leaks to any projection.",
+      "spec_refs": [
+        "Operation inventory",
+        "S05",
+        "S07",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/students.dart"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "The students registry slice exposes saveStudent and setStudentArchived returning StudentMutationResult {id, revision}.",
+        "saveStudent validates the payload (name normalization, dates, optional answers) applying the same rules the reference did, preserves identity and createdAt on renames, bumps revision, and writes updatedAt/updatedBy; archive/restore transitions an active flag with a revisioned write.",
+        "No student field is ever written outside the congregation-scoped students collection; advisory normalized-name checks are best-effort reads only.",
+        "New tests under test/data/handlers/ prove create-vs-update, validation rejection, revision conflicts on stale expectedRevision, archive/restore, and the StudentMutationResult decode; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Implement class lifecycle handlers",
+      "summary": "Dart handlers for saveClass and setClassStatus over DirectStore, including advisory teacher-eligibility verification against the contacts/roleSlots data written by task 3.",
+      "spec_refs": [
+        "Operation inventory",
+        "S08",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/classes.dart"
+      ],
+      "depends_on": [
+        3
+      ],
+      "acceptance": [
+        "The classes registry slice exposes saveClass and setClassStatus returning AcademicMutationResult {id, revision}.",
+        "saveClass validates name/startDate/teacherContactId/endDate, verifies as a best-effort read that the referenced teacher is an active eligible teacher (roleSlots/contacts), bumps revision and writes updatedAt/updatedBy.",
+        "setClassStatus validates the allowed transitions and flips status with a revisioned write; no reference counters are written.",
+        "New tests under test/data/handlers/ prove create/edit with teacher eligibility, invalid status transitions, revision conflicts, and the AcademicMutationResult decode; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Implement enrollment handlers with roster subcollection and best-effort limits",
+      "summary": "Dart handlers for enrollStudent and closeEnrollment over DirectStore mirroring functions/src/enrollments, writing the class roster subcollection and the optional student.classId backfill, with MAX_ENROLLMENTS enforced as a documented best-effort length check.",
+      "spec_refs": [
+        "Operation inventory",
+        "Relaxed invariants",
+        "S07",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/enrollments.dart"
+      ],
+      "depends_on": [
+        4,
+        5
+      ],
+      "acceptance": [
+        "The enrollments registry slice exposes enrollStudent and closeEnrollment returning AcademicMutationResult {id, revision}.",
+        "enrollStudent writes the enrollment record, appends the class roster subcollection entry, records the student's current class backfill on the optional student.classId, and enforces MAX_ENROLLMENTS_PER_CLASS as a best-effort length check (documented, race window accepted).",
+        "closeEnrollment validates the allowed status transition (active -> completed/withdrawn), writes endDate, bumps revision and writes updatedAt/updatedBy.",
+        "New tests under test/data/handlers/ prove enrollment create with roster subcollection entry, the classId backfill, the best-effort capacity check behavior, closed-enrollment transitions, revision conflicts, and the AcademicMutationResult decode; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 7,
+      "title": "Implement session creation and cancellation handlers",
+      "summary": "Dart handlers for createSession and cancelSession over DirectStore mirroring functions/src/sessions, with receipts/TTL dropped (plain status write) and advisory session-date checks.",
+      "spec_refs": [
+        "Operation inventory",
+        "Relaxed invariants",
+        "S08",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/sessions.dart"
+      ],
+      "depends_on": [
+        6
+      ],
+      "acceptance": [
+        "The sessions registry slice exposes createSession and cancelSession returning AcademicMutationResult {id, revision}.",
+        "createSession writes the session document (congregationId, classId, date, topic, status open, rosterFrozen false, revision 1) and performs an advisory same-date check for the class; no session-date lock, index or receipt documents are created.",
+        "cancelSession validates the session exists and the expected revision, flips status to canceled, bumps revision and writes updatedAt/updatedBy; the complete roster and attendance history under the session are preserved with no TTL or receipt cleanup.",
+        "New tests under test/data/handlers/ prove session creation with open status, advisory duplicate detection, cancel with stale-revision conflict, roster preservation on cancel, and the AcademicMutationResult decode; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Implement attendance and progress handlers",
+      "summary": "Dart handlers for saveAttendance, getSessionAttendance and getEnrollmentProgress mirroring functions/src/attendance: frozen student-name roster snapshot, expected-revision guarded atomic write of attendance, and a client-side progress aggregation over enrollments and sessions.",
+      "spec_refs": [
+        "Operation inventory",
+        "Reads",
+        "Relaxed invariants",
+        "S08",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/attendance.dart"
+      ],
+      "depends_on": [
+        6,
+        7
+      ],
+      "acceptance": [
+        "The attendance registry slice exposes saveAttendance, getSessionAttendance and getEnrollmentProgress; mutations return AcademicMutationResult {id, revision} and reads return the AttendanceView and EnrollmentProgressView wire shapes.",
+        "saveAttendance accepts the complete roster map plus expectedRevision and finalize; within a DirectStore transaction it freezes the roster (studentName captured at first save and preserved on renames), writes per-student status marks under attendance, sets rosterFrozen, bumps the session revision, and on finalize transitions the session to finalized.",
+        "getSessionAttendance reads the session plus its frozen roster and current marks and returns AttendanceView {session, roster:[{enrollmentId, studentId, studentName, status}]}; missing-enrollment marks decode as unmarked without format errors.",
+        "getEnrollmentProgress aggregates only over sessions relevant to the enrollment (open/finalized, within its start/end window), producing present/absent/excused counts and the nullable whole-percent percentage (zero-denominator yields null), matching the reference fixture expectation of 3 present + 1 absent + 2 excused -> 75%.",
+        "New tests under test/data/handlers/ prove the frozen-name snapshot across renames, stale expectedRevision conflict, finalize transition, progress aggregation fixtures, and the exact AttendanceView/EnrollmentProgressView decodes; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Implement overview reads and pending-session paging",
+      "summary": "Dart handlers for getOverview and listPendingSessions producing OverviewCounts and a cursor-paged PendingSessionPage over direct queries, mirroring functions/src/overview.",
+      "spec_refs": [
+        "Operation inventory",
+        "Reads",
+        "S09",
+        "S11"
+      ],
+      "touches": [
+        "lib/data/handlers/overview.dart"
+      ],
+      "depends_on": [
+        4,
+        5,
+        7,
+        8
+      ],
+      "acceptance": [
+        "The overview registry slice exposes getOverview and listPendingSessions.",
+        "getOverview(scoped or null congregation) counts unarchived students, active classes and open sessions and returns OverviewCounts with throughDate from the injected clock (Recife), using scoped Firestore queries (aggregation counts where the query shape allows, else client counts over paged queries with the documented index coverage).",
+        "listPendingSessions returns one cursor-page of sessions with status pending ordered by date then id, joined with className from the class document, wrapped in {items, nextCursor}; the cursor stays session-local and honors the encoded cursor/filter binding from the codec.",
+        "New tests under test/data/handlers/ prove exact counts per scope, throughDate semantics, pending-session filtering/ordering/className join, page cursors and empty results; flutter analyze is clean."
+      ]
+    },
+    {
+      "id": 10,
+      "title": "Rewrite firestore rules, indexes and the Node security suite to the write matrix",
+      "summary": "Adapt `firestore.rules` from deny-all-client-writes to the internal-mode write grants, add the composite indexes the plain queries need (including the students/classId route from task 2), and rewrite the Node security suites so rules.security.test.ts proves the write matrix, rules-hardening flips to the new readable/writable internal records, rules-structure accepts the enumerated roleSlots/roster grants, and emulator-gate is byte-identity re-pinned after the task's green commit.",
+      "spec_refs": [
+        "Firestore rules (free, server-side)",
+        "Testing",
+        "S03",
+        "S04",
+        "S13"
+      ],
+      "touches": [
+        "firestore.rules",
+        "firestore.indexes.json",
+        "functions/test/security/rules.security.test.ts",
+        "functions/test/security/rules-hardening.test.ts",
+        "functions/test/rules-structure.test.ts",
+        "functions/test/emulator-gate.test.ts"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "firestore.rules keeps the existing helpers (signedIn, currentUid, hasProfile, activeProfile, isSupervisor, isStaffOf, mayReadCongregation) and adds the write grants: users/{userId} self read + self create/update of the own profile with accessRole supervisor gated by a single email-allowlist constant (documented as the internal bootstrap credential); congregation subtree (contacts, students, classes, enrollments, sessions, session attendance, roster, roleSlots) writable by supervisors anywhere and staff within their own congregationId; directory scoped the same way; supervisionContacts and supervisionRoleSlots supervisor read/write; every other path stays denied via the catch-all.",
+        "firestore.indexes.json gains exactly the composites the plain queries need and keeps all existing indexes: students {classId, normalizedName} scoped; sessions {classId, date}, {status, date} scoped plus the collection-group variants required for supervisor all-scope overview/pending-session reads, and the students {classId, normalizedName} route from task 2.",
+        "functions/test/security/rules.security.test.ts is rewritten (without weakening to content-contains assertions) so the emulator matrix proves role-scoped writes are allowed for the right roles/scopes and denied otherwise, supervisor allowlist self-claim works only for the allowlisted email, self-claim of congregationStaff works within the caller's congregation, and the catch-all denies everything unlisted.",
+        "functions/test/security/rules-hardening.test.ts is adapted to the redesign: internal roleSlots and roster records are now scoped-readable/writable by authorized staff/supervisors for the congregation, uniqueness reserved records no longer exist, and cross-congregation and supervisor-only records stay sealed from staff.",
+        "functions/test/rules-structure.test.ts updates its structural checks: the 'allow write: if false' assertion is replaced by the write-matrix enumeration, roleSlots/roster gain explicit enumerated grants, no recursive wildcard under /congregations/{congregationId} remains unguarded, and the uniqueness records stay unenumerated.",
+        "functions/test/emulator-gate.test.ts is byte-identity re-pinned: before commit the task computes the sha256 of the new committed rules.security.test.ts content (LF-normalized) and updates the constant, and after the task's green commit the corrective re-pin step re-points the revision constant to the new commit; the final Node gate run of emulator-gate.test.ts is green and still proves the committed suite is not excluded from the emulator run.",
+        "The Node builds, the vitest unit suite and (when both emulator hosts are present) the adapted security suites pass under the **two-model-coder-node** gate with Node-format RED evidence at the task RED path; emulator-dependent cases without hosts are recorded as environment-blocked and never weakened. This task is never dispatched under the auto-detected Flutter gate."
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Wire the direct transport, remove cloud_functions, and fix the browser integration",
+      "summary": "Compose the handler registry slices into the FirestoreDirectTransport in bootstrap, remove the old FirebaseDataTransport class and the cloud_functions dependency (pubspec + lock + function-emulator wiring), and update the browser_flow_test transport construction. The firebase_configuration functions port is left as unused legacy config so its committed test stays byte-identical.",
+      "spec_refs": [
+        "New client transport",
+        "Wiring",
+        "Error handling",
+        "Delivery",
+        "S12",
+        "S13"
+      ],
+      "touches": [
+        "lib/app/bootstrap.dart",
+        "lib/app/dependencies.dart",
+        "lib/data/firebase_gateway.dart",
+        "integration_test/browser_flow_test.dart",
+        "pubspec.yaml",
+        "pubspec.lock"
+      ],
+      "depends_on": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "acceptance": [
+        "bootstrap.dart constructs FirestoreDirectTransport(firestore, store: Firestore-backed DirectStore, registry: composed congregation/contact/student/class/enrollment/session/attendance/overview slices, uid: current FirebaseAuth user, clock: DateTime.now) and connects it to FirebaseGateway; the emulator branch configures only Auth and Firestore emulators, never a Functions emulator.",
+        "FirebaseDataTransport is removed from lib/data/firebase_gateway.dart along with every cloud_functions import; FirebaseTransport, FirebaseGateway, TransportPage, PrefixRange, QueryRunner and the ErrorMapper contract remain exported and unchanged in behavior.",
+        "pubspec.yaml and pubspec.lock drop cloud_functions (^6.4.0) with the remaining locked dependency set unchanged; flutter pub get produces a clean resolution and the app still builds for web.",
+        "integration_test/browser_flow_test.dart constructs the transport via the direct transport wiring (or the same helper bootstrap uses), drops FirebaseFunctions import and useFunctionsEmulator, and the seed/flows remain valid; it runs its existing sign-in, contact, enrollment, attendance, progress, reload and denied-scope flow assertions against the emulator when the emulator hosts and seeded fixtures are available.",
+        "Inline adapter/ports (lib/app/dependencies.dart) keep the same constructor arguments so repositories and widgets compile unchanged; a new Dart unit test asserts the composed registry contains every S11 operation name exactly once and that get/getDocument and query/runQuery still satisfy the gateway contract as exercised by the committed gateway tests (which remain byte-identical apart from the task-2 route test).",
+        "flutter analyze and the full committed Dart suite pass; the function-emulator configuration field remains so functions/firebase_configuration tests stay green byte-for-byte."
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Document internal mode and update verification",
+      "summary": "Add the README 'Internal mode (no billing)' section describing the trust model, the self-claim bootstrap, the relaxed invariants and the future re-tightening note, and refresh docs/verification.md with the new firestore rules smoke checks.",
+      "spec_refs": [
+        "Documentation",
+        "Delivery"
+      ],
+      "touches": [
+        "README.md",
+        "docs/verification.md"
+      ],
+      "depends_on": [
+        11
+      ],
+      "acceptance": [
+        "README.md contains the 'Internal mode (no billing)' section covering the trust model (rules-only authorization, in-app gating is UX only), the allowlisted supervisor self-claim bootstrap and congregationStaff self-claim, the relaxed invariants (no reference counters, no receipts/TTL, advisory uniqueness, best-effort enrollment cap), and the closing note that before publishing for broader use the rule-critical invariants must move back to trusted server-side code (Cloud Functions on a Blaze project) with firestore.rules re-tightened.",
+        "docs/verification.md documents the firestore-only deploy command (`firebase deploy --only firestore --project discipulado-ieadpe`, free on Spark), the web build dart-defines, the Tailscale serving step, the allowlist bootstrap flow, and smoke checks that prove the write matrix (supervisor write, staff own-congregation write, denied staff cross-congregation write, denied role escalation).",
+        "All documentation is English; no behavior changes and no committed tests are touched by this task."
+      ]
+    }
+  ]
+}
