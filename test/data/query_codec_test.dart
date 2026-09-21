@@ -80,7 +80,7 @@ void main() {
       );
     });
 
-    test('routes student-by-class to the S11 callable read handler', () {
+    test('keeps student-by-class reads on the plain query codec', () {
       final QueryPlan plan = codec.plan(
         const QueryRequest(
           resource: QueryResource.students,
@@ -88,7 +88,9 @@ void main() {
           equalityFilters: <String, Object?>{'classId': 'cl1'},
         ),
       );
-      expect(plan.callableOperation, 'listClassStudents');
+      expect(plan.collection, 'congregations/c1/students');
+      expect(plan.callableOperation, isNull);
+      expect(plan.filters.single.field, 'classId');
     });
   });
 

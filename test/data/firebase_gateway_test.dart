@@ -131,14 +131,14 @@ void main() {
     });
 
     test(
-      'routes complex student-by-class reads to the callable handler',
+      'keeps complex student-by-class reads on the plain query path',
       () async {
         final _FakeTransport transport = _FakeTransport()
-          ..callResponse = const <String, Object?>{
-            'items': <Object?>[
+          ..page = const TransportPage(
+            items: <JsonMap>[
               <String, Object?>{'id': 's1'},
             ],
-          };
+          );
         final FirebaseGateway gateway = FirebaseGateway(transport: transport);
 
         final PageResult result = await gateway.query(
@@ -149,8 +149,8 @@ void main() {
           ),
         );
 
-        expect(transport.operations.single, 'listClassStudents');
-        expect(transport.payloads.single['classId'], 'cl1');
+        expect(transport.operations, isEmpty);
+        expect(transport.plans.single.filters.single.field, 'classId');
         expect(result.items.single['id'], 's1');
       },
     );

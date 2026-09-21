@@ -156,11 +156,6 @@ class QueryCodec {
       }
       filters.add(QueryFilter(key, value));
     });
-    final String? callable =
-        request.resource == QueryResource.students &&
-            request.equalityFilters?['classId'] != null
-        ? 'listClassStudents'
-        : null;
     return QueryPlan(
       resource: request.resource,
       collection: collectionPath(request),
@@ -170,7 +165,6 @@ class QueryCodec {
       filterFingerprint: filterFingerprint(request),
       congregationId: request.congregationId,
       cursor: request.cursor,
-      callableOperation: callable,
       namePrefix: _normalizedPrefix(request.namePrefix),
     );
   }
