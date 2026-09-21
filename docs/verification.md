@@ -100,3 +100,75 @@ through the emulator entry point (`npm run test:emulator`) before release.
 recomputed against the new `rules.security.test.ts` (LF-normalized) before the
 task commit, and the revision constant was re-pointed to the task commit in the
 corrective re-pin commit; the final unit run passes the byte-identity proof.
+
+---
+
+## Internal mode deployment and smoke checks (2026-09-21 plan, task 12)
+
+Internal mode runs on the Firebase **Spark (free)** plan with no Cloud
+Functions; authorization is enforced entirely by `firestore.rules`. Deployment
+is Firestore-only:
+
+```bash
+firebase deploy --only firestore --project discipulado-ieadpe
+```
+
+This deploy (rules + composite indexes) is free on Spark; no Functions or
+Hosting deploy is required for the write matrix.
+
+### Web build dart-defines
+
+Build the web bundle with explicit Firebase configuration; an absent value is a
+setup error, never a fallback to a hardcoded project:
+
+```bash
+flutter build web --release \
+  --dart-define=FIREBASE_PROJECT_ID=discipulado-ieadpe \
+  --dart-define=FIREBASE_API_KEY=<api-key> \
+  --dart-define=FIREBASE_AUTH_DOMAIN=discipulado-ieadpe.firebaseapp.com \
+  --dart-define=FIREBASE_APP_ID=<app-id> \
+  --dart-define=FIREBASE_STORAGE_BUCKET=<bucket> \
+  --dart-define=FIREBASE_MESSAGING_SENDER_ID=<sender-id>
+```
+
+### Serving over Tailscale
+
+Serve the built bundle to the private tailnet only (no public exposure):
+
+```bash
+python -m http.server 8080 --directory build/web
+tailscale serve --bg --https=443 http://127.0.0.1:8080
+tailscale serve status
+```
+
+The static server must route unknown paths to `index.html` so deep links and
+hard refreshes resolve through the router.
+
+### Allowlist bootstrap flow
+
+1. Create the owner Auth identity (email/password) in the Firebase console.
+2. Set `allowlistedOwner()` in `firestore.rules` to that exact email and deploy
+   (`firebase deploy --only firestore --project discipulado-ieadpe`).
+3. Sign in on the deployed app; the owner's first profile write self-claims
+   `supervisor` because the token email matches the allowlist.
+4. Staff accounts self-create their own profile as `congregationStaff` with
+   their `congregationId`; no trusted provisioning utility is involved.
+
+### Smoke checks proving the write matrix
+
+Run against the emulator (or the deployed project with a test account) and
+confirm:
+
+| Actor | Action | Expected |
+| --- | --- | --- |
+| Supervisor | write `congregations/{any}/students/{id}` | allowed |
+| Staff | write `congregations/{own}/students/{id}` | allowed |
+| Staff | write `congregations/{other}/students/{id}` | denied |
+| Staff | self-update `users/{self}` to `accessRole: supervisor` | denied |
+| Allowlisted owner | self-create `users/{self}` as `supervisor` | allowed |
+| Any client | read/write an unlisted path (e.g. `collections/x`) | denied |
+
+The emulator-backed suites that automate these checks
+(`functions/test/security/rules.security.test.ts` and `rules-hardening.test.ts`)
+remain environment-blocked in this session; they must be executed through
+`npm run test:emulator` where both emulator hosts are present.

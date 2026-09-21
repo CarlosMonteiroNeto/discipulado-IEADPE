@@ -67,6 +67,55 @@ The script compiles the backend, starts the emulators and serves the web app
 with explicit emulator configuration (`FIREBASE_USE_EMULATOR=true`). A missing
 configuration shows a setup error; it never falls back to a production project.
 
+## Internal mode (no billing)
+
+The app runs on the Firebase **Spark (free)** plan. There are no Cloud
+Functions: every mutation and projection is a direct client write handled by
+the direct transport (`lib/data/handlers/`) over Firestore, and **authorization
+lives in `firestore.rules`**. In-app role gating is user-experience only; it is
+not a security boundary, and the rules are the only thing that actually
+enforces the write matrix.
+
+### Trust model and bootstrap
+
+- A signed-in user may **self-create and self-update their own** `users/{uid}`
+  profile as `congregationStaff`. This is the internal-mode bootstrap that
+  replaces the retired trusted provisioning utility.
+- A `supervisor` self-claim is granted **only** when the authenticated token
+  email equals the single allowlist credential in `firestore.rules`
+  (`allowlistedOwner()`). Replace the placeholder
+  `owner@discipulado-ieadpe.example` with the real owner address before
+  deploying.
+- Writes of the congregation subtree (`contacts`, `students`, `classes`,
+  `enrollments`, `sessions`, session `attendance`, session `roster`,
+  `roleSlots`), the `directory` projection and the parent `congregations`
+  document are allowed for **supervisors anywhere** and for **staff within
+  their own `congregationId`**. `supervisionContacts` and
+  `supervisionRoleSlots` stay supervisor-only. Every other path is denied by the
+  catch-all.
+
+### Relaxed invariants
+
+Because there is no trusted server-side transaction layer, some invariants are
+deliberately relaxed and enforced as best-effort client checks:
+
+- **No reference counters.** Archive/restore no longer maintains scope
+  counters; counts are computed from scoped queries.
+- **No receipts or TTL documents.** Operations are plain, revisioned writes.
+- **Advisory uniqueness.** Name uniqueness (congregation, contact, student,
+  class) is a pre-write read, not a reservation; a concurrent double-submit is
+  possible and must be resolved by the operator.
+- **Best-effort enrollment cap.** The class capacity check runs before the
+  write but is not atomic; a simultaneous enroll can exceed it by a race.
+
+### Re-tightening before broader use
+
+Before publishing the app for broader or untrusted use, the rule-critical
+invariants (uniqueness reservations, atomic enrollment cap, reference counters,
+and trusted role provisioning) must move back into **trusted server-side code**
+(Cloud Functions on a Blaze project) and `firestore.rules` must be re-tightened
+to deny the client writes it now allows.
+
 ## Web build and hosting rewrite
 
 ```bash
