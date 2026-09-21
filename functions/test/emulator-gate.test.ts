@@ -19,14 +19,14 @@ import {
  * `test/security/rules.security.test.ts`) fails this assertion.
  *
  * The committed task-2 suite is pinned to its revision object
- * (`0774d7eaea10b35d8b5bac53fa1e62dd7f5516c2`, task 2 green) by content hash,
+ * (`b394b56fcca49140fc5cad55ec287b6c5fee1372`, task 10 green) by content hash,
  * so divergence is detected independent of the working tree or commit state.
  */
 
 const functionsDir = resolve(__dirname, "..");
 const rootDir = resolve(functionsDir, "..");
 const configPath = resolve(functionsDir, "vitest.config.ts");
-const task2Revision = "0774d7eaea10b35d8b5bac53fa1e62dd7f5516c2";
+const task2Revision = "b394b56fcca49140fc5cad55ec287b6c5fee1372";
 const task2RulesSuiteSha256 =
   "29c5b3546350619a72cbf94b550c9c2f5ce40c8e3e8dbf72c87466ea5ecefc67";
 
