@@ -20,7 +20,13 @@ describe("firestore.rules internal-mode write matrix structure", () => {
 
   it("matches each client-writable subcollection explicitly, scoped by read and write predicates", () => {
     const block = congregationBlock();
-    for (const collection of ["contacts", "students", "classes", "enrollments"]) {
+    for (const collection of [
+      "contacts",
+      "students",
+      "classes",
+      "enrollments",
+      "activeEnrollmentRefs",
+    ]) {
       expect(block).toContain(`match /${collection}/{`);
     }
     expect(block).toContain("match /sessions/{sessionId}");
@@ -31,20 +37,22 @@ describe("firestore.rules internal-mode write matrix structure", () => {
     expect(block).toContain("mayWriteCongregation(congregationId)");
   });
 
-  it("enumerates the congregation-subtree write matrix for the seven record groups", () => {
+  it("enumerates the congregation-subtree write matrix for the nine record groups", () => {
     const writeGrants = congregationBlock().match(
       /allow write: if mayWriteCongregation\(congregationId\);/g,
     );
-    // The parent congregation document plus contacts, students, classes,
-    // enrollments, sessions, session attendance, session roster and roleSlots
-    // all grant the same scoped write; nothing else in the subtree does.
-    expect(writeGrants?.length).toBe(9);
+    // The parent congregation document plus contacts, students, classes
+    // (with its class-level roster), enrollments, activeEnrollmentRefs,
+    // sessions (with session attendance and session roster) and roleSlots all
+    // grant the same scoped write; nothing else in the subtree does.
+    expect(writeGrants?.length).toBe(11);
   });
 
-  it("lists roleSlots and roster grants explicitly while uniqueness stays unenumerated", () => {
+  it("lists roleSlots, roster and activeEnrollmentRefs grants explicitly while uniqueness stays unenumerated", () => {
     const block = congregationBlock();
     expect(block).toMatch(/match \/roleSlots\/\{slotId\}/);
     expect(block).toMatch(/match \/roster\/\{rosterId\}/);
+    expect(block).toMatch(/match \/activeEnrollmentRefs\/\{refId\}/);
     expect(block).not.toMatch(/match \/uniqueness\//);
   });
 

@@ -130,6 +130,25 @@ describe("firestore rules hardening", () => {
     }));
   });
 
+  it("makes the class roster and active-enrollment refs scoped-readable and writable for authorized staff", async () => {
+    const staff = asUser("staff-active");
+    await assertSucceeds(staff.doc("congregations/c1/classes/class-a/roster/e1").get());
+    await assertSucceeds(staff.doc("congregations/c1/classes/class-a/roster/e2").set({
+      id: "e2",
+      enrollmentId: "e2",
+      studentId: "s2",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+    await assertSucceeds(staff.doc("congregations/c1/activeEnrollmentRefs/s1").get());
+    await assertSucceeds(staff.doc("congregations/c1/activeEnrollmentRefs/s2").set({
+      studentId: "s2",
+      enrollmentId: "e2",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+  });
+
   it("seals cross-congregation internal records from staff and keeps supervisor scope open", async () => {
     const staff = asUser("staff-active");
     const supervisor = asUser("sup1");
@@ -139,6 +158,8 @@ describe("firestore rules hardening", () => {
       roleCode: "supervisor",
       congregationId: "c-old",
     }));
+    await assertFails(staff.doc("congregations/c-old/classes/class-old/roster/e1").get());
+    await assertFails(staff.doc("congregations/c-old/activeEnrollmentRefs/s1").get());
     await assertSucceeds(supervisor.doc("congregations/c-old/roleSlots/slot-old").get());
   });
 

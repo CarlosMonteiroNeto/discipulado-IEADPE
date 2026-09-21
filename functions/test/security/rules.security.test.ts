@@ -104,6 +104,19 @@ suite("firestore security rules", () => {
         studentId: "s1",
         congregationId: "c1",
       });
+      await db.doc("congregations/c1/classes/class-a/roster/e1").set({
+        id: "e1",
+        enrollmentId: "e1",
+        studentId: "s1",
+        classId: "class-a",
+        congregationId: "c1",
+      });
+      await db.doc("congregations/c1/activeEnrollmentRefs/s1").set({
+        studentId: "s1",
+        enrollmentId: "e1",
+        classId: "class-a",
+        congregationId: "c1",
+      });
       await db.doc("congregations/c1/roleSlots/slot1").set({
         id: "slot1",
         roleCode: "teacher",
@@ -190,6 +203,58 @@ suite("firestore security rules", () => {
       congregationId: "c1",
     }));
     await assertFails(otherStaff.doc("congregations/c1/roleSlots/slot1").get());
+  });
+
+  it("allows staff scoped reads and writes of the class roster and active-enrollment refs", async () => {
+    const staff = asUser("staff1");
+    await assertSucceeds(staff.doc("congregations/c1/classes/class-a/roster/e1").get());
+    await assertSucceeds(staff.doc("congregations/c1/classes/class-a/roster/e2").set({
+      id: "e2",
+      enrollmentId: "e2",
+      studentId: "s2",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+    await assertSucceeds(staff.doc("congregations/c1/activeEnrollmentRefs/s1").get());
+    await assertSucceeds(staff.doc("congregations/c1/activeEnrollmentRefs/s2").set({
+      studentId: "s2",
+      enrollmentId: "e2",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+    await assertSucceeds(staff.doc("congregations/c1/activeEnrollmentRefs/s1").delete());
+
+    const otherStaff = asUser("staff2");
+    await assertFails(otherStaff.doc("congregations/c1/classes/class-a/roster/e1").get());
+    await assertFails(otherStaff.doc("congregations/c1/classes/class-a/roster/e3").set({
+      id: "e3",
+      enrollmentId: "e3",
+      studentId: "s3",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+    await assertFails(otherStaff.doc("congregations/c1/activeEnrollmentRefs/s1").get());
+    await assertFails(otherStaff.doc("congregations/c1/activeEnrollmentRefs/s3").set({
+      studentId: "s3",
+      enrollmentId: "e3",
+      classId: "class-a",
+      congregationId: "c1",
+    }));
+
+    const supervisor = asUser("sup1");
+    await assertSucceeds(supervisor.doc("congregations/c2/classes/class-b/roster/e9").set({
+      id: "e9",
+      enrollmentId: "e9",
+      studentId: "s9",
+      classId: "class-b",
+      congregationId: "c2",
+    }));
+    await assertSucceeds(supervisor.doc("congregations/c2/activeEnrollmentRefs/s9").set({
+      studentId: "s9",
+      enrollmentId: "e9",
+      classId: "class-b",
+      congregationId: "c2",
+    }));
   });
 
   it("seals supervision records from staff and leaves them supervisor read/write", async () => {

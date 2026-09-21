@@ -498,6 +498,10 @@ void main() {
         'congregations/c1/classes/$_classUuid',
         seededClass(enrollmentCount: 1, activeEnrollmentCount: 1),
       );
+      store.write(
+        'congregations/c1/students/$_studentUuid',
+        <String, Object?>{...seededStudent(_studentUuid), 'classId': _classUuid},
+      );
 
       final JsonMap result = await handlers['closeEnrollment']!(
         context,

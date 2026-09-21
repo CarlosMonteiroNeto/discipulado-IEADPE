@@ -120,9 +120,23 @@ service cloud.firestore {
       match /classes/{classId} {
         allow read: if mayReadCongregation(congregationId);
         allow write: if mayWriteCongregation(congregationId);
+
+        // The per-class historical roster entry written at enrollment and read
+        // to freeze attendance membership; scoped like the class itself.
+        match /roster/{rosterId} {
+          allow read: if mayReadCongregation(congregationId);
+          allow write: if mayWriteCongregation(congregationId);
+        }
       }
 
       match /enrollments/{enrollmentId} {
+        allow read: if mayReadCongregation(congregationId);
+        allow write: if mayWriteCongregation(congregationId);
+      }
+
+      // The internal single-active-enrollment uniqueness records: written at
+      // enrollment, deleted at close and read by the student archive guard.
+      match /activeEnrollmentRefs/{refId} {
         allow read: if mayReadCongregation(congregationId);
         allow write: if mayWriteCongregation(congregationId);
       }

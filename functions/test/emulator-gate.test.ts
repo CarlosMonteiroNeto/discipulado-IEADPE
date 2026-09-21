@@ -21,6 +21,9 @@ import {
  * The committed task-2 suite is pinned to its revision object
  * (`b394b56fcca49140fc5cad55ec287b6c5fee1372`, task 10 green) by content hash,
  * so divergence is detected independent of the working tree or commit state.
+ * The task-13 fix commit that added the class-roster and active-enrollment-ref
+ * grants to the denial matrix re-pins this constant before commit and the
+ * corrective re-pin re-points the revision after it.
  */
 
 const functionsDir = resolve(__dirname, "..");
@@ -28,7 +31,7 @@ const rootDir = resolve(functionsDir, "..");
 const configPath = resolve(functionsDir, "vitest.config.ts");
 const task2Revision = "b394b56fcca49140fc5cad55ec287b6c5fee1372";
 const task2RulesSuiteSha256 =
-  "29c5b3546350619a72cbf94b550c9c2f5ce40c8e3e8dbf72c87466ea5ecefc67";
+  "0a71be857ddf1d996ecb3d9d56fdc19eb89ccea9d965516d091a7cdda996c0f4";
 
 interface ResolvedTestOptions {
   include?: string[];

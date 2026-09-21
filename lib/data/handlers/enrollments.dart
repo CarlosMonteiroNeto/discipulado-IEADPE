@@ -479,6 +479,19 @@ Future<JsonMap> closeEnrollmentHandler(
       if (reference != null && reference['enrollmentId'] == id) {
         await tx.delete(referencePath);
       }
+      // The plain students-by-class query resolves membership through the
+      // optional student.classId backfill, so closing the active enrollment
+      // must clear it; otherwise completed/withdrawn students keep appearing in
+      // the class list.
+      final String studentPath = StorePaths.student(
+        congregationId,
+        storedStudentId,
+      );
+      final JsonMap? student = await tx.read(studentPath);
+      if (student != null && student['classId'] == classId) {
+        final JsonMap cleared = <String, Object?>{...student}..remove('classId');
+        await tx.write(studentPath, cleared);
+      }
     }
 
     await tx.write(
