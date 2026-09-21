@@ -50,9 +50,7 @@
         "Testing"
       ],
       "touches": [
-        "lib/data/query_codec.dart",
-        "test/data/query_codec_test.dart",
-        "test/data/firebase_gateway_test.dart"
+        "lib/data/query_codec.dart"
       ],
       "depends_on": [
         1
@@ -251,11 +249,7 @@
       ],
       "touches": [
         "firestore.rules",
-        "firestore.indexes.json",
-        "functions/test/security/rules.security.test.ts",
-        "functions/test/security/rules-hardening.test.ts",
-        "functions/test/rules-structure.test.ts",
-        "functions/test/emulator-gate.test.ts"
+        "firestore.indexes.json"
       ],
       "depends_on": [],
       "acceptance": [
@@ -284,7 +278,6 @@
         "lib/app/bootstrap.dart",
         "lib/app/dependencies.dart",
         "lib/data/firebase_gateway.dart",
-        "integration_test/browser_flow_test.dart",
         "pubspec.yaml",
         "pubspec.lock"
       ],
