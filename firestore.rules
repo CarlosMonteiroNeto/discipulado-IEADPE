@@ -22,7 +22,7 @@ service cloud.firestore {
     // address may self-provision a 'supervisor' profile (see README
     // "Internal mode (no billing)").
     function allowlistedOwner() {
-      return 'owner@discipulado-ieadpe.example';
+      return 'ccm.neto@gmail.com';
     }
 
     function signedIn() {
@@ -73,14 +73,11 @@ service cloud.firestore {
     // time; each entry carries the congregation it belongs to, so staff writes
     // are scoped by that field and supervisors may write anywhere.
     function mayWriteDirectory() {
-      if (isSupervisor()) {
-        return true;
-      }
-      if (!activeProfile() || profile().accessRole != 'congregationStaff') {
-        return false;
-      }
-      return (resource == null ? request.resource.data.congregationId
-          : resource.data.congregationId) == profile().congregationId;
+      return isSupervisor()
+          || (activeProfile()
+              && profile().accessRole == 'congregationStaff'
+              && (resource == null ? request.resource.data.congregationId
+                  : resource.data.congregationId) == profile().congregationId);
     }
 
     // Self-owned access profile. Self create/update is the internal-mode
