@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../domain/class_group.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_bar.dart';
 import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../classes/academic_repository.dart';
@@ -109,35 +110,31 @@ class _OverviewPageState extends State<OverviewPage> {
         !widget.controller.congregations.any(
           (congregation) => congregation.id == selected,
         );
-    return Wrap(
-      spacing: AppSpacing.x3,
-      runSpacing: AppSpacing.x3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: <Widget>[
+    return AppFilterBar(
+      fields: <Widget>[
         if (widget.controller.isSupervisor)
-          SizedBox(
-            width: AppSizes.filterControlWidth,
-            child: AppFilterField<String>(
-              fieldKey: OverviewPage.congregationFilterKey,
-              label: 'Congregação',
-              value: selected,
-              nullLabel: 'Todas',
-              options: <AppFilterOption<String>>[
-                for (final congregation in widget.controller.congregations)
-                  AppFilterOption<String>(
-                    value: congregation.id,
-                    label: congregation.name,
-                  ),
-              ],
-              fallback: selectedMissing
-                  ? AppFilterOption<String>(
-                      value: selected,
-                      label: 'Congregação selecionada',
-                    )
-                  : null,
-              onChanged: widget.controller.setCongregation,
-            ),
+          AppFilterField<String>(
+            fieldKey: OverviewPage.congregationFilterKey,
+            label: 'Congregação',
+            value: selected,
+            nullLabel: 'Todas',
+            options: <AppFilterOption<String>>[
+              for (final congregation in widget.controller.congregations)
+                AppFilterOption<String>(
+                  value: congregation.id,
+                  label: congregation.name,
+                ),
+            ],
+            fallback: selectedMissing
+                ? AppFilterOption<String>(
+                    value: selected,
+                    label: 'Congregação selecionada',
+                  )
+                : null,
+            onChanged: widget.controller.setCongregation,
           ),
+      ],
+      actions: <Widget>[
         AppButton(
           key: OverviewPage.refreshKey,
           label: 'Atualizar',
@@ -149,40 +146,58 @@ class _OverviewPageState extends State<OverviewPage> {
   }
 
   Widget _counts(BuildContext context, OverviewCounts counts) {
-    return Wrap(
-      spacing: AppSpacing.x4,
-      runSpacing: AppSpacing.x4,
-      children: <Widget>[
-        _CountCard(
-          key: OverviewPage.countsStudentsKey,
-          label: 'Alunos não arquivados',
-          value: counts.students,
-          linkKey: OverviewPage.openStudentsKey,
-          linkLabel: 'Ver alunos',
-          onOpen: () =>
-              widget.onOpenStudents?.call(widget.controller.congregationId),
-        ),
-        _CountCard(
-          key: OverviewPage.countsClassesKey,
-          label: 'Turmas ativas',
-          value: counts.classes,
-          linkKey: OverviewPage.openClassesKey,
-          linkLabel: 'Ver turmas',
-          onOpen: () => widget.onOpenClasses?.call(
-            ClassesLinkTarget(
-              congregationId: widget.controller.congregationId,
-              status: ClassStatus.active,
-            ),
+    final List<Widget> cards = <Widget>[
+      _CountCard(
+        key: OverviewPage.countsStudentsKey,
+        label: 'Alunos não arquivados',
+        value: counts.students,
+        linkKey: OverviewPage.openStudentsKey,
+        linkLabel: 'Ver alunos',
+        onOpen: () =>
+            widget.onOpenStudents?.call(widget.controller.congregationId),
+      ),
+      _CountCard(
+        key: OverviewPage.countsClassesKey,
+        label: 'Turmas ativas',
+        value: counts.classes,
+        linkKey: OverviewPage.openClassesKey,
+        linkLabel: 'Ver turmas',
+        onOpen: () => widget.onOpenClasses?.call(
+          ClassesLinkTarget(
+            congregationId: widget.controller.congregationId,
+            status: ClassStatus.active,
           ),
         ),
-        _CountCard(
-          key: OverviewPage.countsOpenSessionsKey,
-          label: 'Chamadas em aberto',
-          value: counts.openSessions,
-          linkKey: OverviewPage.openPendingKey,
-          linkLabel: 'Ver chamadas pendentes',
-          onOpen: widget.controller.togglePending,
-        ),
+      ),
+      _CountCard(
+        key: OverviewPage.countsOpenSessionsKey,
+        label: 'Chamadas em aberto',
+        value: counts.openSessions,
+        linkKey: OverviewPage.openPendingKey,
+        linkLabel: 'Ver chamadas pendentes',
+        onOpen: widget.controller.togglePending,
+      ),
+    ];
+    final bool wide =
+        MediaQuery.sizeOf(context).width >= AppSizes.filterBarRowBreakpoint;
+    if (wide) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          for (int i = 0; i < cards.length; i++) ...<Widget>[
+            if (i > 0) const SizedBox(width: AppSpacing.x4),
+            Expanded(child: cards[i]),
+          ],
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        for (int i = 0; i < cards.length; i++) ...<Widget>[
+          if (i > 0) const SizedBox(height: AppSpacing.x4),
+          cards[i],
+        ],
       ],
     );
   }
@@ -230,6 +245,18 @@ class _OverviewPageState extends State<OverviewPage> {
     );
   }
 
+  String _congregationName(String? congregationId) {
+    if (congregationId == null) {
+      return '';
+    }
+    for (final congregation in widget.controller.congregations) {
+      if (congregation.id == congregationId) {
+        return congregation.name;
+      }
+    }
+    return congregationId;
+  }
+
   Widget _pendingList(BuildContext context, List<PendingSessionEntry> items) {
     final AppTokens tokens = AppTheme.tokensOf(context);
     return Column(
@@ -256,7 +283,7 @@ class _OverviewPageState extends State<OverviewPage> {
                         ),
                         const SizedBox(height: AppSpacing.x1),
                         Text(
-                          '${formatBrazilianDate(entry.date)} · ${entry.congregationId}',
+                          '${formatBrazilianDate(entry.date)} · ${_congregationName(entry.congregationId)}',
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                       ],

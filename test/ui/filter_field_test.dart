@@ -6,41 +6,59 @@ import 'package:flutter_test/flutter_test.dart';
 import 'ui_test_support.dart';
 
 void main() {
-  test('filter widths are positive multiples of the 4/8 scale', () {
-    expect(AppSizes.filterControlWidth, greaterThan(0));
-    expect(AppSizes.filterControlWidth % 4, 0);
-    expect(AppSizes.searchControlWidth, greaterThan(0));
-    expect(AppSizes.searchControlWidth % 4, 0);
+  test('filter field tokens are positive multiples of the 4/8 scale', () {
+    expect(AppSizes.filterFieldMaxWidth, greaterThan(0));
+    expect(AppSizes.filterFieldMaxWidth % 4, 0);
+    expect(AppSizes.filterBarRowBreakpoint, greaterThan(0));
+    expect(AppSizes.filterBarRowBreakpoint % 4, 0);
   });
 
-  testWidgets('the label always floats so it never overlaps the value', (
+  testWidgets('the caption label stays above the value at every text scale', (
     tester,
   ) async {
-    await pumpApp(
-      tester,
-      Scaffold(
-        body: AppFilterField<String>(
-          key: AppFilterFieldTestKeys.congregation,
-          label: 'Congregação',
-          value: null,
-          nullLabel: 'Todas',
-          options: <AppFilterOption<String>>[
-            AppFilterOption<String>(value: 'c1', label: 'Alvorada'),
-          ],
-          onChanged: (_) {},
+    const String valueLabel = 'Assembleia de Deus Central de Campo Grande';
+    for (final double scale in <double>[1.0, 1.3, 2.0]) {
+      await pumpApp(
+        tester,
+        Scaffold(
+          body: Padding(
+            padding: const EdgeInsets.all(AppSpacing.x4),
+            child: AppFilterField<String>(
+              key: AppFilterFieldTestKeys.congregation,
+              label: 'Congregação',
+              value: 'c1',
+              nullLabel: 'Todas',
+              options: <AppFilterOption<String>>[
+                AppFilterOption<String>(value: 'c1', label: valueLabel),
+              ],
+              onChanged: (_) {},
+            ),
+          ),
         ),
-      ),
-    );
+        width: 390,
+        textScale: scale,
+      );
 
-    final Finder field = find.byType(DropdownButtonFormField<String?>);
-    expect(field, findsOneWidget);
-    final DropdownButtonFormField<String?> dropdown =
-        tester.widget<DropdownButtonFormField<String?>>(field);
-    expect(
-      dropdown.decoration.floatingLabelBehavior,
-      FloatingLabelBehavior.always,
-    );
-    expect(find.text('Congregação'), findsOneWidget);
+      final Finder field = find.byType(DropdownButtonFormField<String?>);
+      expect(field, findsOneWidget);
+      final DropdownButtonFormField<String?> dropdown =
+          tester.widget<DropdownButtonFormField<String?>>(field);
+      expect(dropdown.decoration.labelText, isNull);
+
+      final Rect label = tester.getRect(find.text('Congregação'));
+      final Rect value = tester.getRect(find.text(valueLabel));
+      final Rect overlap = label.intersect(value);
+      expect(
+        overlap.isEmpty,
+        isTrue,
+        reason: 'caption overlaps the value at scale $scale: $overlap',
+      );
+      expect(
+        label.bottom,
+        lessThanOrEqualTo(value.top),
+        reason: 'caption must sit above the value at scale $scale',
+      );
+    }
   });
 
   testWidgets('a null option is offered first and selection reports value', (

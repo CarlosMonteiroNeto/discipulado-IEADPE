@@ -8,6 +8,7 @@ import '../../domain/class_group.dart';
 import '../../domain/congregation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_bar.dart';
 import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
@@ -100,62 +101,52 @@ class _StudentsPageState extends State<StudentsPage> {
           (Congregation congregation) =>
               congregation.id == query.congregationId,
         );
-    return Wrap(
-      spacing: AppSpacing.x3,
-      runSpacing: AppSpacing.x3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: <Widget>[
+    return AppFilterBar(
+      fields: <Widget>[
         if (widget.controller.isSupervisor)
-          SizedBox(
-            width: AppSizes.filterControlWidth,
-            child: AppFilterField<String>(
-              fieldKey: StudentsPage.congregationFilterKey,
-              label: 'Congregação',
-              value: query.congregationId,
-              nullLabel: 'Selecione uma congregação',
-              options: <AppFilterOption<String>>[
-                for (final Congregation congregation in congregations)
-                  AppFilterOption<String>(
-                    value: congregation.id,
-                    label: congregation.name,
-                  ),
-              ],
-              fallback: selectedMissing
-                  ? AppFilterOption<String>(
-                      value: query.congregationId!,
-                      label: 'Congregação selecionada',
-                    )
-                  : null,
-              onChanged: widget.controller.setCongregation,
-            ),
-          ),
-        SizedBox(
-          width: AppSizes.searchControlWidth,
-          child: AppTextField(
-            key: StudentsPage.searchFieldKey,
-            label: 'Buscar por nome',
-            controller: _search,
-            helperText: 'Busca por prefixo do nome.',
-          ),
-        ),
-        SizedBox(
-          width: AppSizes.filterControlWidth,
-          child: AppFilterField<String>(
-            fieldKey: StudentsPage.classFilterKey,
-            label: 'Turma ativa',
-            value: query.classId,
-            nullLabel: 'Todas as turmas',
+          AppFilterField<String>(
+            fieldKey: StudentsPage.congregationFilterKey,
+            label: 'Congregação',
+            value: query.congregationId,
+            nullLabel: 'Selecione uma congregação',
             options: <AppFilterOption<String>>[
-              for (final ClassGroup classGroup in widget.controller.classes)
+              for (final Congregation congregation in congregations)
                 AppFilterOption<String>(
-                  value: classGroup.id,
-                  label: classGroup.name,
+                  value: congregation.id,
+                  label: congregation.name,
                 ),
             ],
-            enabled: scoped,
-            onChanged: widget.controller.setClassFilter,
+            fallback: selectedMissing
+                ? AppFilterOption<String>(
+                    value: query.congregationId!,
+                    label: 'Congregação selecionada',
+                  )
+                : null,
+            onChanged: widget.controller.setCongregation,
           ),
+        AppTextField(
+          key: StudentsPage.searchFieldKey,
+          label: 'Buscar por nome',
+          controller: _search,
+          caption: true,
         ),
+        AppFilterField<String>(
+          fieldKey: StudentsPage.classFilterKey,
+          label: 'Turma ativa',
+          value: query.classId,
+          nullLabel: 'Todas as turmas',
+          options: <AppFilterOption<String>>[
+            for (final ClassGroup classGroup in widget.controller.classes)
+              AppFilterOption<String>(
+                value: classGroup.id,
+                label: classGroup.name,
+              ),
+          ],
+          enabled: scoped,
+          onChanged: widget.controller.setClassFilter,
+        ),
+      ],
+      actions: <Widget>[
         FilterChip(
           key: StudentsPage.archivedFilterKey,
           label: const Text('Arquivados'),

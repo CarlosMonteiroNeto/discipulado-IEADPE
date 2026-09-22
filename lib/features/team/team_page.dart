@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../domain/contact.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_bar.dart';
 import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
@@ -97,54 +98,44 @@ class _TeamPageState extends State<TeamPage> {
         )
         .toList(growable: false);
     final bool canArchive = query.congregationId != null;
-    return Wrap(
-      spacing: AppSpacing.x3,
-      runSpacing: AppSpacing.x3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: <Widget>[
-        SizedBox(
-          width: AppSizes.searchControlWidth,
-          child: AppTextField(
-            key: TeamPage.searchFieldKey,
-            label: 'Buscar por nome',
-            controller: _search,
-            helperText: 'Busca por prefixo do nome.',
-          ),
+    return AppFilterBar(
+      fields: <Widget>[
+        AppTextField(
+          key: TeamPage.searchFieldKey,
+          label: 'Buscar por nome',
+          controller: _search,
+          caption: true,
         ),
-        SizedBox(
-          width: AppSizes.filterControlWidth,
-          child: AppFilterField<ContactScope>(
-            fieldKey: TeamPage.scopeFilterKey,
-            label: 'Escopo',
-            value: query.scope,
-            nullLabel: 'Todos',
-            options: const <AppFilterOption<ContactScope>>[
-              AppFilterOption<ContactScope>(
-                value: ContactScope.congregation,
-                label: 'Congregação',
-              ),
-              AppFilterOption<ContactScope>(
-                value: ContactScope.supervision,
-                label: 'Supervisão',
-              ),
-            ],
-            onChanged: widget.controller.setScopeFilter,
-          ),
+        AppFilterField<ContactScope>(
+          fieldKey: TeamPage.scopeFilterKey,
+          label: 'Escopo',
+          value: query.scope,
+          nullLabel: 'Todos',
+          options: const <AppFilterOption<ContactScope>>[
+            AppFilterOption<ContactScope>(
+              value: ContactScope.congregation,
+              label: 'Congregação',
+            ),
+            AppFilterOption<ContactScope>(
+              value: ContactScope.supervision,
+              label: 'Supervisão',
+            ),
+          ],
+          onChanged: widget.controller.setScopeFilter,
         ),
-        SizedBox(
-          width: AppSizes.filterControlWidth,
-          child: AppFilterField<RoleCode>(
-            fieldKey: TeamPage.roleFilterKey,
-            label: 'Papel',
-            value: query.roleCode,
-            nullLabel: 'Todos os papéis',
-            options: <AppFilterOption<RoleCode>>[
-              for (final RoleCode role in roles)
-                AppFilterOption<RoleCode>(value: role, label: role.label),
-            ],
-            onChanged: widget.controller.setRoleFilter,
-          ),
+        AppFilterField<RoleCode>(
+          fieldKey: TeamPage.roleFilterKey,
+          label: 'Papel',
+          value: query.roleCode,
+          nullLabel: 'Todos os papéis',
+          options: <AppFilterOption<RoleCode>>[
+            for (final RoleCode role in roles)
+              AppFilterOption<RoleCode>(value: role, label: role.label),
+          ],
+          onChanged: widget.controller.setRoleFilter,
         ),
+      ],
+      actions: <Widget>[
         FilterChip(
           key: TeamPage.archivedFilterKey,
           label: const Text('Arquivados'),

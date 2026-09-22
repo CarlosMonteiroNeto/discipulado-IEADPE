@@ -49,14 +49,15 @@ abstract final class AppSizes {
   static const double maxContentWidth = 1200;
   static const double bodyFontSize = 16;
 
-  /// Shared width for labelled filter fields (dropdowns). Derived from the
-  /// content scale so a filter bar reads consistently across every page; on
-  /// compact viewports `Wrap` moves each field to its own line instead of
-  /// squeezing names.
-  static const double filterControlWidth = maxContentWidth / 4;
+  /// Shared width for labelled filter fields (dropdowns) and search fields in
+  /// a filtered toolbar: fields share the available row width equally and
+  /// never grow beyond this bound, so both edges line up instead of ending at
+  /// ragged widths.
+  static const double filterFieldMaxWidth = 360;
 
-  /// Shared width for text-search fields in the same filter bars.
-  static const double searchControlWidth = maxContentWidth / 3;
+  /// Minimum content width at which a filtered toolbar lays its fields on a
+  /// single aligned row; below it fields stack full width.
+  static const double filterBarRowBreakpoint = 1000;
 }
 
 /// Semantic color tokens shared by light and dark modes.
@@ -252,6 +253,20 @@ abstract final class AppTheme {
 
   static AppTokens tokensOf(BuildContext context) =>
       Theme.of(context).extension<AppTokens>() ?? AppTokens.light;
+
+  /// Caption rendered above a control in a filtered toolbar. A static label
+  /// (never a floating one) keeps the caption out of the value area at every
+  /// text scale, matching the labelSmall+body idiom used by detail pages.
+  static TextStyle? barFieldCaption(
+    BuildContext context, {
+    bool enabled = true,
+  }) {
+    final AppTokens tokens = tokensOf(context);
+    return Theme.of(context).textTheme.labelMedium?.copyWith(
+      color: enabled ? tokens.onSurfaceVariant : tokens.onDisabled,
+      fontWeight: FontWeight.w600,
+    );
+  }
 
   static ThemeData _build(Brightness brightness, AppTokens tokens) {
     final ColorScheme scheme = ColorScheme(

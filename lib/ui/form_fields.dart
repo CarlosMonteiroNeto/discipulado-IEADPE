@@ -114,6 +114,7 @@ class AppTextField extends StatefulWidget {
     this.suffixIcon,
     this.onTap,
     this.inputFormatters,
+    this.caption = false,
   });
 
   final String label;
@@ -130,6 +131,10 @@ class AppTextField extends StatefulWidget {
   final Widget? suffixIcon;
   final VoidCallback? onTap;
   final List<TextInputFormatter>? inputFormatters;
+
+  /// Renders the floating label as a static caption above the field instead.
+  /// Used by toolbar search fields so they match the labelled filter fields.
+  final bool caption;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -168,7 +173,7 @@ class _AppTextFieldState extends State<AppTextField> {
   @override
   Widget build(BuildContext context) {
     final AppTokens tokens = AppTheme.tokensOf(context);
-    return TextFormField(
+    final Widget field = TextFormField(
       key: _fieldKey,
       controller: widget.controller,
       focusNode: _focusNode,
@@ -182,12 +187,30 @@ class _AppTextFieldState extends State<AppTextField> {
       validator: widget.validator,
       autovalidateMode: AutovalidateMode.onUserInteraction,
       decoration: InputDecoration(
-        labelText: widget.required ? '${widget.label} *' : widget.label,
+        labelText: widget.caption
+            ? null
+            : (widget.required ? '${widget.label} *' : widget.label),
+        hintText: widget.caption ? widget.label : null,
         helperText: widget.helperText,
         suffixIcon: widget.suffixIcon,
         filled: !widget.enabled,
         fillColor: tokens.disabledSurface,
       ),
+    );
+    if (!widget.caption) {
+      return field;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          widget.label,
+          style: AppTheme.barFieldCaption(context, enabled: widget.enabled),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        field,
+      ],
     );
   }
 }

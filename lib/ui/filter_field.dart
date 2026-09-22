@@ -1,10 +1,11 @@
 /// A labelled filter dropdown shared by every list toolbar.
 ///
-/// Wraps `DropdownButtonFormField` with the app's layout rules: a label that
-/// always floats above the field (so it never overlaps the selected value),
-/// expanded items that truncate with an ellipsis, and an explicit "all / none"
-/// null option. [AppSizes.filterControlWidth] sizes the field; callers wrap it
-/// in the shared width and let `Wrap` reflow on narrow viewports.
+/// The static [label] caption sits above the field instead of floating inside
+/// it, so the label can never overlap the selected value no matter the text
+/// scale (the floating-label variant in Flutter clips at high scales). The
+/// field itself expands to its parent's width (`isExpanded`), truncates long
+/// items with an ellipsis, and offers an explicit "all / none" [nullLabel]
+/// option. Callers place it inside [AppFilterBar], which sizes the fields.
 library;
 
 import 'package:flutter/material.dart';
@@ -40,7 +41,7 @@ class AppFilterField<T> extends StatelessWidget {
   /// [key] for the `AppFilterField` element itself).
   final Key? fieldKey;
 
-  /// The `InputDecoration.labelText`.
+  /// The caption shown above the field.
   final String label;
 
   /// Label for the null ("Todas" / "Todos") first option.
@@ -65,24 +66,48 @@ class AppFilterField<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DropdownButtonFormField<T?>(
-      key: fieldKey,
-      initialValue: value,
-      isExpanded: true,
-      iconEnabledColor: enabled ? null : Theme.of(context).colorScheme.outline,
-      decoration: InputDecoration(
-        labelText: label,
-        floatingLabelBehavior: FloatingLabelBehavior.always,
-        enabled: enabled,
-      ),
-      items: <DropdownMenuItem<T?>>[
-        DropdownMenuItem<T?>(value: null, child: _ellipsized(nullLabel)),
-        for (final AppFilterOption<T> option in options)
-          DropdownMenuItem<T?>(value: option.value, key: option.key, child: _ellipsized(option.label)),
-        if (fallback != null)
-          DropdownMenuItem<T?>(value: fallback!.value, key: fallback!.key, child: _ellipsized(fallback!.label)),
+    final AppTokens tokens = AppTheme.tokensOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          label,
+          style: AppTheme.barFieldCaption(context, enabled: enabled),
+        ),
+        const SizedBox(height: AppSpacing.x1),
+        DropdownButtonFormField<T?>(
+          key: fieldKey,
+          initialValue: value,
+          isExpanded: true,
+          iconEnabledColor: enabled ? null : tokens.outline,
+          decoration: InputDecoration(
+            enabled: enabled,
+            filled: !enabled,
+            fillColor: tokens.disabledSurface,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.x3,
+              vertical: AppSpacing.x3,
+            ),
+          ),
+          items: <DropdownMenuItem<T?>>[
+            DropdownMenuItem<T?>(value: null, child: _ellipsized(nullLabel)),
+            for (final AppFilterOption<T> option in options)
+              DropdownMenuItem<T?>(
+                value: option.value,
+                key: option.key,
+                child: _ellipsized(option.label),
+              ),
+            if (fallback != null)
+              DropdownMenuItem<T?>(
+                value: fallback!.value,
+                key: fallback!.key,
+                child: _ellipsized(fallback!.label),
+              ),
+          ],
+          onChanged: enabled ? onChanged : null,
+        ),
       ],
-      onChanged: enabled ? onChanged : null,
     );
   }
 

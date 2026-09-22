@@ -8,6 +8,7 @@ import '../../domain/class_group.dart';
 import '../../domain/congregation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_bar.dart';
 import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
@@ -33,11 +34,6 @@ class ClassesPage extends StatefulWidget {
   static const Key createKey = Key('classes-create');
   static const Key nextPageKey = Key('classes-next-page');
   static const Key previousPageKey = Key('classes-previous-page');
-
-  // Filter control widths derive from the shared [AppSizes] content scale
-  // instead of page-local literals (S10).
-  static const double filterControlWidth = AppSizes.filterControlWidth;
-  static const double searchControlWidth = AppSizes.searchControlWidth;
 
   @override
   State<ClassesPage> createState() => _ClassesPageState();
@@ -106,62 +102,52 @@ class _ClassesPageState extends State<ClassesPage> {
           (Congregation congregation) =>
               congregation.id == query.congregationId,
         );
-    return Wrap(
-      spacing: AppSpacing.x3,
-      runSpacing: AppSpacing.x3,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: <Widget>[
+    return AppFilterBar(
+      fields: <Widget>[
         if (widget.controller.isSupervisor)
-          SizedBox(
-            width: ClassesPage.filterControlWidth,
-            child: AppFilterField<String>(
-              fieldKey: ClassesPage.congregationFilterKey,
-              label: 'Congregação',
-              value: query.congregationId,
-              nullLabel: 'Selecione uma congregação',
-              options: <AppFilterOption<String>>[
-                for (final Congregation congregation in congregations)
-                  AppFilterOption<String>(
-                    value: congregation.id,
-                    label: congregation.name,
-                  ),
-              ],
-              fallback: selectedMissing
-                  ? AppFilterOption<String>(
-                      value: query.congregationId!,
-                      label: 'Congregação selecionada',
-                    )
-                  : null,
-              onChanged: widget.controller.setCongregation,
-            ),
-          ),
-        SizedBox(
-          width: ClassesPage.searchControlWidth,
-          child: AppTextField(
-            key: ClassesPage.searchFieldKey,
-            label: 'Buscar por nome',
-            controller: _search,
-            helperText: 'Busca por prefixo do nome.',
-          ),
-        ),
-        SizedBox(
-          width: ClassesPage.filterControlWidth,
-          child: AppFilterField<ClassStatus>(
-            fieldKey: ClassesPage.statusFilterKey,
-            label: 'Situação',
-            value: query.status,
-            nullLabel: 'Todas as situações',
-            options: <AppFilterOption<ClassStatus>>[
-              for (final ClassStatus status in ClassStatus.values)
-                AppFilterOption<ClassStatus>(
-                  value: status,
-                  label: classStatusLabel(status),
+          AppFilterField<String>(
+            fieldKey: ClassesPage.congregationFilterKey,
+            label: 'Congregação',
+            value: query.congregationId,
+            nullLabel: 'Selecione uma congregação',
+            options: <AppFilterOption<String>>[
+              for (final Congregation congregation in congregations)
+                AppFilterOption<String>(
+                  value: congregation.id,
+                  label: congregation.name,
                 ),
             ],
-            enabled: scoped,
-            onChanged: widget.controller.setStatus,
+            fallback: selectedMissing
+                ? AppFilterOption<String>(
+                    value: query.congregationId!,
+                    label: 'Congregação selecionada',
+                  )
+                : null,
+            onChanged: widget.controller.setCongregation,
           ),
+        AppTextField(
+          key: ClassesPage.searchFieldKey,
+          label: 'Buscar por nome',
+          controller: _search,
+          caption: true,
         ),
+        AppFilterField<ClassStatus>(
+          fieldKey: ClassesPage.statusFilterKey,
+          label: 'Situação',
+          value: query.status,
+          nullLabel: 'Todas as situações',
+          options: <AppFilterOption<ClassStatus>>[
+            for (final ClassStatus status in ClassStatus.values)
+              AppFilterOption<ClassStatus>(
+                value: status,
+                label: classStatusLabel(status),
+              ),
+          ],
+          enabled: scoped,
+          onChanged: widget.controller.setStatus,
+        ),
+      ],
+      actions: <Widget>[
         AppButton(
           key: ClassesPage.refreshKey,
           label: 'Atualizar',
