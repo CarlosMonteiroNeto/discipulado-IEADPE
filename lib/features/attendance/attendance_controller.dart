@@ -52,6 +52,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   String? _conflictMessage;
   bool _submitting = false;
   bool _dirty = false;
+  bool _lessonFinished = false;
   String? _requestId;
   int? _expectedRevision;
   int _generation = 0;
@@ -72,6 +73,10 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
   bool get isSubmitting => _submitting;
 
   bool get isDirty => _dirty;
+
+  /// True when the supervisor concluded the lesson (S11); edited locally and
+  /// persisted with the next save.
+  bool get lessonFinished => _lessonFinished;
 
   /// True when every roster member carries a non-unmarked status.
   bool get allMarked =>
@@ -200,6 +205,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
         ),
       );
     _expectedRevision = view.session.revision;
+    _lessonFinished = view.session.lessonFinished;
   }
 
   void mark(String enrollmentId, AttendanceStatus status) {
@@ -221,6 +227,18 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
     for (final AttendanceRosterEntry entry in _roster) {
       _marks[entry.enrollmentId] = AttendanceStatus.present;
     }
+    _dirty = true;
+    _validationMessage = null;
+    notifyListeners();
+  }
+
+  /// Toggles the supervisor's conclusion; the change stays unsaved until the
+  /// next save (S11).
+  void setLessonFinished(bool value) {
+    if (isReadOnly || _lessonFinished == value) {
+      return;
+    }
+    _lessonFinished = value;
     _dirty = true;
     _validationMessage = null;
     notifyListeners();
@@ -286,6 +304,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
         expectedRevision: _expectedRevision ?? _session?.revision ?? 1,
         marks: Map<String, AttendanceStatus>.of(_marks),
         finalize: finalize,
+        lessonFinished: _lessonFinished,
         requestId: requestId,
       );
       if (_disposed || generation != _generation) {
@@ -463,6 +482,7 @@ class AttendanceController extends ChangeNotifier implements SessionScoped {
     _submitting = false;
     _dirty = false;
     _requestId = null;
+    _lessonFinished = false;
     _expectedRevision = null;
     _state = const AsyncViewState<List<AttendanceRosterEntry>>.loading();
     if (!_disposed) {

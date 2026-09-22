@@ -202,6 +202,38 @@ void main() {
     );
   });
 
+  testWidgets('the concluded checkbox toggles and submits its value', (
+    WidgetTester tester,
+  ) async {
+    final FakeAcademicGateway gateway = FakeAcademicGateway()
+      ..onInvoke = (String operation, JsonMap _) =>
+          operation == 'saveAttendance'
+          ? const <String, Object?>{'id': 'ses1', 'revision': 2}
+          : singleView(status: 'present');
+    final AttendanceController controller = attendanceController(gateway);
+    addTearDown(controller.dispose);
+
+    await pumpApp(tester, AttendancePage(controller: controller), height: 2000);
+
+    expect(controller.lessonFinished, isFalse);
+
+    await tester.tap(find.byKey(AttendancePage.concludedKey));
+    await tester.pumpAndSettle();
+
+    expect(controller.lessonFinished, isTrue);
+
+    await tester.tap(find.byKey(AttendancePage.saveKey));
+    await tester.pumpAndSettle();
+
+    final JsonMap payload = gateway.invocations
+        .lastWhere(
+          (({String operation, JsonMap payload}) call) =>
+              call.operation == 'saveAttendance',
+        )
+        .payload;
+    expect(payload['lessonFinished'], isTrue);
+  });
+
   testWidgets('renders the frozen historical student name', (
     WidgetTester tester,
   ) async {

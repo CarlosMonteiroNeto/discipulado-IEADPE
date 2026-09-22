@@ -120,6 +120,7 @@ JsonMap sessionJson({
   String? topic,
   String status = 'open',
   bool rosterFrozen = false,
+  bool lessonFinished = false,
   int revision = 1,
 }) => <String, Object?>{
   'id': id,
@@ -133,6 +134,7 @@ JsonMap sessionJson({
   'topic': topic,
   'status': status,
   'rosterFrozen': rosterFrozen,
+  'lessonFinished': lessonFinished,
 };
 
 JsonMap contactJson({

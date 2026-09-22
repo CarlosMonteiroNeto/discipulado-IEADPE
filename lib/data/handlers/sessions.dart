@@ -8,8 +8,8 @@
 library;
 
 import '../../domain/common.dart';
+import '../../domain/curriculum.dart';
 import '../../domain/session.dart';
-import '../../domain/validation.dart';
 import '../direct_store.dart';
 import '../error_mapper.dart';
 import '../transport_support.dart';
@@ -167,6 +167,9 @@ Future<List<JsonMap>> _sessionsOf(
   ),
 );
 
+/// The class's past sessions that carry lesson fields, earliest date first.
+/// Canceled sessions never participate in the sequence (S09-like).
+
 Future<JsonMap> createSessionHandler(
   HandlerContext context,
   JsonMap payload,
@@ -175,24 +178,11 @@ Future<JsonMap> createSessionHandler(
   final String id = _requireId(payload['id'], 'id');
   final String classId = _requireId(payload['classId'], 'classId');
   final CalendarDate date = _parseDate(payload['date'], 'date');
-  final String? topicError = validateOptionalText(
-    _nonEmpty(payload['topic']),
-    maxLength: sessionTopicMaxLength,
-  );
-  if (topicError != null) {
-    throw validationFailure(topicError, fieldErrors: <String, String>{
-      'topic': topicError,
-    });
-  }
   if (!_uuidPattern.hasMatch(id)) {
     throw validationFailure('id deve ser um UUID.', fieldErrors: <String, String>{
       'id': 'id deve ser um UUID.',
     });
   }
-  final String? topic = payload['topic'] is String
-      ? (payload['topic']! as String).trim()
-      : null;
-  final String? trimmedTopic = _nonEmpty(topic);
   final String dateString = date.toIso8601String();
   final String path = StorePaths.session(congregationId, id);
 
@@ -209,6 +199,31 @@ Future<JsonMap> createSessionHandler(
   if (duplicate) {
     throw conflictFailure('Já existe uma reunião para esta turma e data.');
   }
+
+  final List<JsonMap> sequenced = classSessions
+      .where(
+        (JsonMap session) =>
+            session['status'] != SessionStatus.canceled.wire &&
+            session['lessonIndex'] is int &&
+            session['lessonPart'] is int,
+      )
+      .toList()
+    ..sort(
+      (JsonMap a, JsonMap b) =>
+          '${a['date']}'.compareTo('${b['date']}'),
+    );
+  final NextLesson next = nextLesson(<NextLesson>[
+    for (final JsonMap session in sequenced)
+      NextLesson(
+        lessonIndex: session['lessonIndex'] as int,
+        lessonPart: session['lessonPart'] as int,
+        lessonFinished: session['lessonFinished'] == true,
+      ),
+  ]);
+  final String topic = lessonTopic(
+    lessonIndex: next.lessonIndex,
+    lessonPart: next.lessonPart,
+  );
 
   return context.store.runTransaction<JsonMap>((DirectTransaction tx) async {
     await _assertActiveCongregation(tx, congregationId);
@@ -229,9 +244,12 @@ Future<JsonMap> createSessionHandler(
         'congregationId': congregationId,
         'classId': classId,
         'date': dateString,
-        'topic': trimmedTopic,
+        'topic': topic,
         'status': SessionStatus.open.wire,
         'rosterFrozen': false,
+        'lessonIndex': next.lessonIndex,
+        'lessonPart': next.lessonPart,
+        'lessonFinished': false,
       },
       now: context.now,
       uid: context.uid,

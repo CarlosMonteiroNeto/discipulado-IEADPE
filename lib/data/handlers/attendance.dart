@@ -258,6 +258,15 @@ Future<JsonMap> saveAttendanceHandler(
     payload['expectedRevision'],
   );
   final bool finalize = _requireBool(payload['finalize']);
+  final Object? rawLessonFinished = payload['lessonFinished'];
+  if (rawLessonFinished != null && rawLessonFinished is! bool) {
+    throw validationFailure(
+      'Valor inválido.',
+      fieldErrors: <String, String>{'lessonFinished': 'Valor inválido.'},
+    );
+  }
+  final bool? lessonFinished =
+      rawLessonFinished is bool ? rawLessonFinished : null;
   final Map<String, String> marks = _requireMarks(payload['attendance']);
   final List<String> markKeys = marks.keys.toList()..sort();
   if (markKeys.length > maxEnrollmentRecords) {
@@ -431,6 +440,7 @@ Future<JsonMap> saveAttendanceHandler(
       session,
       changes: <String, Object?>{
         if (requiresFreeze) 'rosterFrozen': true,
+        'lessonFinished': ?lessonFinished,
         'status': targetStatus,
       },
       now: nowIso,
@@ -458,11 +468,31 @@ Future<JsonMap> getSessionAttendanceHandler(
     throw notFoundFailure(kNotFoundMessage);
   }
 
-  final List<JsonMap> rosterEntries = await _sessionRosterEntries(
-    store,
-    congregationId,
-    sessionId,
-  );
+  final List<JsonMap> rosterEntries;
+  if (session['rosterFrozen'] != true) {
+    // A not-yet-saved session has no frozen roster prefix; surface the
+    // currently eligible enrollments so the editor never looks empty (S08).
+    final String? classId = _nonEmpty(session['classId']);
+    final String? dateString = _nonEmpty(session['date']);
+    if (classId == null || dateString == null) {
+      throw conflictFailure('A turma ou data da reunião está indisponível.');
+    }
+    rosterEntries = await _frozenRosterEntries(
+      store,
+      congregationId,
+      classId,
+      sessionId,
+      dateString,
+      context.now,
+      context.uid,
+    );
+  } else {
+    rosterEntries = await _sessionRosterEntries(
+      store,
+      congregationId,
+      sessionId,
+    );
+  }
   final List<JsonMap> attendanceEntries = await store.query(
     StoreQuery(
       collection: StorePaths.attendance(congregationId, sessionId),

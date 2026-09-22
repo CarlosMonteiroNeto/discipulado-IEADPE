@@ -34,6 +34,7 @@ class AttendancePage extends StatefulWidget {
   static const Key comparisonKey = Key('attendance-comparison');
   static const Key validationKey = Key('attendance-validation');
   static const Key errorKey = Key('attendance-error');
+  static const Key concludedKey = Key('attendance-lesson-concluded');
 
   /// Deep-linkable route using the class and session IDs (S10).
   static String routePath(String classId, String sessionId) =>
@@ -124,6 +125,7 @@ class _AttendancePageState extends State<AttendancePage> {
 
   Widget _header(BuildContext context, Session session) {
     final AppTokens tokens = AppTheme.tokensOf(context);
+    final AttendanceController controller = widget.controller;
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.x3),
       child: Column(
@@ -141,6 +143,19 @@ class _AttendancePageState extends State<AttendancePage> {
           Text(
             _sessionStatusLabel(session.status),
             style: Theme.of(context).textTheme.labelLarge,
+          ),
+          const SizedBox(height: AppSpacing.x2),
+          CheckboxListTile(
+            key: AttendancePage.concludedKey,
+            value: controller.lessonFinished,
+            onChanged: controller.isReadOnly || controller.isSubmitting
+                ? null
+                : (bool? value) =>
+                    controller.setLessonFinished(value ?? false),
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            dense: true,
+            title: const Text('Aula concluída?'),
           ),
         ],
       ),

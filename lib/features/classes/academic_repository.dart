@@ -467,12 +467,12 @@ class AcademicRepository {
     return AcademicMutationResult.fromJson(response);
   }
 
-  /// S08 create an open session with date and optional topic.
+  /// S08/S11 create an open session; the lesson theme is derived server-side
+  /// from the fixed curriculum and past sessions.
   Future<AcademicMutationResult> createSession({
     required String congregationId,
     required String classId,
     required CalendarDate date,
-    String? topic,
     String? requestId,
   }) async {
     final JsonMap response = await gateway.invoke(
@@ -482,7 +482,6 @@ class AcademicRepository {
         'congregationId': congregationId,
         'classId': classId,
         'date': date.toIso8601String(),
-        'topic': topic,
         'requestId': requestId ?? newRequestId(),
       },
     );
@@ -543,6 +542,7 @@ class AcademicRepository {
     required int expectedRevision,
     required Map<String, AttendanceStatus> marks,
     required bool finalize,
+    required bool lessonFinished,
     String? requestId,
   }) async {
     final JsonMap response = await gateway.invoke(
@@ -553,6 +553,7 @@ class AcademicRepository {
         'sessionId': sessionId,
         'expectedRevision': expectedRevision,
         'finalize': finalize,
+        'lessonFinished': lessonFinished,
         'attendance': <String, Object?>{
           for (final MapEntry<String, AttendanceStatus> entry in marks.entries)
             entry.key: entry.value.wire,

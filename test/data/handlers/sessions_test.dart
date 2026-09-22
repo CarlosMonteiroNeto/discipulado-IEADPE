@@ -88,17 +88,24 @@ JsonMap seededClass({
 
 JsonMap seededSession({
   String id = _sessionUuid,
+  String date = '2026-05-10',
   String status = 'open',
   int revision = 1,
+  Object? lessonIndex,
+  Object? lessonPart,
+  Object? lessonFinished,
 }) =>
     <String, Object?>{
       'id': id,
       'congregationId': 'c1',
       'classId': _classUuid,
-      'date': '2026-05-10',
+      'date': date,
       'topic': 'Tema',
       'status': status,
       'rosterFrozen': false,
+      'lessonIndex': ?lessonIndex,
+      'lessonPart': ?lessonPart,
+      'lessonFinished': ?lessonFinished,
       'revision': revision,
       'createdAt': '2026-04-01T12:00:00.000Z',
       'updatedAt': '2026-04-01T12:00:00.000Z',
@@ -127,10 +134,10 @@ void main() {
       );
     });
 
-    test('creates an open session and returns revision 1', () async {
+    test('creates the first lesson of the curriculum', () async {
       final JsonMap result = await handlers['createSession']!(
         context,
-        createSessionPayload(topic: 'Secção 1'),
+        createSessionPayload(),
       );
 
       expect(result, <String, Object?>{'id': _sessionUuid, 'revision': 1});
@@ -141,24 +148,119 @@ void main() {
       expect(session?['congregationId'], 'c1');
       expect(session?['classId'], _classUuid);
       expect(session?['date'], '2026-05-10');
-      expect(session?['topic'], 'Secção 1');
+      expect(session?['lessonIndex'], 0);
+      expect(session?['lessonPart'], 1);
+      expect(session?['topic'], 'Aula 1 — Introdução ao discipulado');
+      expect(session?['lessonFinished'], isFalse);
       expect(session?['status'], 'open');
       expect(session?['rosterFrozen'], false);
       expect(session?['revision'], 1);
       expect(session?['updatedBy'], 'u1');
     });
 
-    test('trims an empty topic to null', () async {
+    test('continues an unconcluded lesson into the next part', () async {
+      store.write(
+        'congregations/c1/sessions/$_secondSessionUuid',
+        seededSession(
+          id: _secondSessionUuid,
+          date: '2026-05-03',
+          lessonIndex: 0,
+          lessonPart: 2,
+          lessonFinished: false,
+        ),
+      );
+
+      await handlers['createSession']!(context, createSessionPayload());
+
+      final JsonMap? session = await store.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['lessonIndex'], 0);
+      expect(session?['lessonPart'], 3);
+      expect(session?['topic'], 'Aula 1 — Introdução ao discipulado (parte 3)');
+    });
+
+    test('advances to the next lesson after a concluded one', () async {
+      store.write(
+        'congregations/c1/sessions/$_secondSessionUuid',
+        seededSession(
+          id: _secondSessionUuid,
+          date: '2026-05-03',
+          lessonIndex: 2,
+          lessonPart: 1,
+          lessonFinished: true,
+        ),
+      );
+
+      await handlers['createSession']!(context, createSessionPayload());
+
+      final JsonMap? session = await store.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['lessonIndex'], 3);
+      expect(session?['lessonPart'], 1);
+      expect(session?['topic'], 'Aula 4 — Superando conflitos e dúvidas');
+    });
+
+    test('holds the last lesson and increments its part past the curriculum end',
+        () async {
+      store.write(
+        'congregations/c1/sessions/$_secondSessionUuid',
+        seededSession(
+          id: _secondSessionUuid,
+          date: '2026-05-03',
+          lessonIndex: 24,
+          lessonPart: 1,
+          lessonFinished: true,
+        ),
+      );
+
+      await handlers['createSession']!(context, createSessionPayload());
+
+      final JsonMap? session = await store.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['lessonIndex'], 24);
+      expect(session?['lessonPart'], 2);
+      expect(
+        session?['topic'],
+        'Aula 25 — Prova do ciclo avançado (parte 2)',
+      );
+    });
+
+    test('ignores a client-supplied topic and computes its own', () async {
       final JsonMap result = await handlers['createSession']!(
         context,
-        createSessionPayload(topic: '   '),
+        createSessionPayload(topic: 'Tema livre'),
       );
 
       expect(result['revision'], 1);
       final JsonMap? session = await store.read(
         'congregations/c1/sessions/$_sessionUuid',
       );
-      expect(session?['topic'], isNull);
+      expect(session?['topic'], 'Aula 1 — Introdução ao discipulado');
+    });
+
+    test('canceled sessions do not advance the lesson sequence', () async {
+      store.write(
+        'congregations/c1/sessions/$_secondSessionUuid',
+        seededSession(
+          id: _secondSessionUuid,
+          date: '2026-05-03',
+          status: 'canceled',
+          lessonIndex: 10,
+          lessonPart: 3,
+          lessonFinished: true,
+        ),
+      );
+
+      await handlers['createSession']!(context, createSessionPayload());
+
+      final JsonMap? session = await store.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['lessonIndex'], 0);
+      expect(session?['lessonPart'], 1);
     });
 
     test('the createSession result decodes as AcademicMutationResult',
@@ -223,22 +325,6 @@ void main() {
         handlers['createSession']!(
           context,
           createSessionPayload(date: '2027-02-01'),
-        ),
-        throwsA(
-          isA<AppFailure>().having(
-            (AppFailure f) => f.code,
-            'code',
-            AppFailureCode.validation,
-          ),
-        ),
-      );
-    });
-
-    test('rejects an over-long topic', () async {
-      await expectLater(
-        handlers['createSession']!(
-          context,
-          createSessionPayload(topic: 'x' * 201),
         ),
         throwsA(
           isA<AppFailure>().having(

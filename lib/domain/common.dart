@@ -215,6 +215,13 @@ bool? optionalBool(JsonMap json, String key) {
   throw DataFormatException('Invalid optional boolean field "$key".');
 }
 
+int? optionalInt(JsonMap json, String key) {
+  final value = json[key];
+  if (value == null) return null;
+  if (value is int) return value;
+  throw DataFormatException('Invalid optional integer field "$key".');
+}
+
 DateTime _requiredUtcTimestamp(JsonMap json, String key) {
   final value = json[key];
   if (value is! String) {

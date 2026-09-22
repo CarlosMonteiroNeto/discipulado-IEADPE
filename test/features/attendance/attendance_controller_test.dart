@@ -151,6 +151,49 @@ void main() {
     });
   });
 
+  test('the concluded flag loads from the session and submits with the save',
+      () async {
+    final FakeAcademicGateway gateway = FakeAcademicGateway()
+      ..onInvoke = (String operation, JsonMap _) =>
+          operation == 'saveAttendance'
+          ? const <String, Object?>{'id': 'ses1', 'revision': 2}
+          : attendanceViewJson(
+              session: sessionJson(
+                id: 'ses1',
+                classId: 'cls1',
+                date: '2026-01-10',
+                lessonFinished: true,
+              ),
+              roster: <JsonMap>[
+                rosterEntryJson(
+                  enrollmentId: 'e1',
+                  studentId: 's1',
+                  studentName: 'Ana Souza',
+                  status: 'present',
+                ),
+              ],
+            );
+    final AttendanceController controller = attendanceController(gateway);
+    addTearDown(controller.dispose);
+
+    await controller.load();
+
+    expect(controller.lessonFinished, isTrue);
+    expect(controller.isDirty, isFalse);
+
+    controller.setLessonFinished(false);
+    final bool saved = await controller.save(finalize: false);
+
+    expect(saved, isTrue);
+    final JsonMap payload = gateway.invocations
+        .lastWhere(
+          (({String operation, JsonMap payload}) call) =>
+              call.operation == 'saveAttendance',
+        )
+        .payload;
+    expect(payload['lessonFinished'], isFalse);
+  });
+
   test('finalization is refused while any member is unmarked', () async {
     final FakeAcademicGateway gateway = FakeAcademicGateway()
       ..onInvoke = (_, _) => view(

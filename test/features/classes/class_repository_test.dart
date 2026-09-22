@@ -171,7 +171,7 @@ void main() {
     expect(call.payload['expectedRevision'], 2);
   });
 
-  test('session creation sends date and topic with a fresh ID', () async {
+  test('session creation sends date with a fresh ID and no topic', () async {
     gateway.onInvoke = (_, _) => const <String, Object?>{
       'id': 'new-id',
       'revision': 1,
@@ -181,7 +181,6 @@ void main() {
       congregationId: 'c1',
       classId: 'cls1',
       date: CalendarDate(2026, 2, 3),
-      topic: 'Aula 1',
     );
 
     final ({String operation, JsonMap payload}) call =
@@ -190,7 +189,7 @@ void main() {
     expect(call.payload['id'], 'new-id');
     expect(call.payload['classId'], 'cls1');
     expect(call.payload['date'], '2026-02-03');
-    expect(call.payload['topic'], 'Aula 1');
+    expect(call.payload.containsKey('topic'), isFalse);
   });
 
   test(
@@ -213,6 +212,7 @@ void main() {
           'e4': AttendanceStatus.unmarked,
         },
         finalize: false,
+        lessonFinished: true,
       );
 
       final ({String operation, JsonMap payload}) call =
@@ -222,6 +222,7 @@ void main() {
       expect(call.payload['expectedRevision'], 1);
       expect(call.payload['finalize'], false);
       expect(call.payload['requestId'], 'req-1');
+      expect(call.payload['lessonFinished'], isTrue);
       expect(call.payload['attendance'], <String, Object?>{
         'e1': 'present',
         'e2': 'absent',

@@ -168,7 +168,6 @@ void main() {
         congregationId: 'emulator-central',
         classId: classGroup.id,
         date: start,
-        topic: 'Aula 1',
       );
       await academic.saveAttendance(
         congregationId: 'emulator-central',
@@ -179,6 +178,7 @@ void main() {
           enrollment.id: AttendanceStatus.present,
         },
         finalize: true,
+        lessonFinished: true,
       );
 
       // --- getEnrollmentProgress ------------------------------------------

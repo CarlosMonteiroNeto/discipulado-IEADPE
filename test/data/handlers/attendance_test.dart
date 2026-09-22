@@ -184,6 +184,7 @@ JsonMap saveAttendancePayload({
   required Map<String, AttendanceStatus> marks,
   bool finalize = false,
   String sessionId = _sessionUuid,
+  Object? lessonFinished,
 }) =>
     <String, Object?>{
       'congregationId': 'c1',
@@ -195,6 +196,7 @@ JsonMap saveAttendancePayload({
         for (final MapEntry<String, AttendanceStatus> entry in marks.entries)
           entry.key: entry.value.wire,
       },
+      'lessonFinished': ?lessonFinished,
       'requestId': 'req-att',
     };
 
@@ -732,6 +734,35 @@ void main() {
       );
     });
 
+    test('saveAttendance persists the concluded flag onto the session', () async {
+      final HandlerContext context = contextWith(store);
+      await handlers['saveAttendance']!(context, saveAttendancePayload(
+        expectedRevision: 1,
+        marks: <String, AttendanceStatus>{_e1: AttendanceStatus.present},
+        lessonFinished: true,
+      ));
+
+      final JsonMap? session = await store.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['lessonFinished'], isTrue);
+      expect(session?['lessonIndex'], isNull);
+      expect(session?['lessonPart'], isNull);
+    });
+
+    test('saveAttendance rejects a non-boolean concluded flag', () async {
+      final HandlerContext context = contextWith(store);
+      await expectLater(
+        handlers['saveAttendance']!(context, saveAttendancePayload(
+          expectedRevision: 1,
+          marks: <String, AttendanceStatus>{_e1: AttendanceStatus.present},
+          lessonFinished: 'sim',
+        )),
+        throwsA(isA<AppFailure>()
+            .having((AppFailure f) => f.code, 'code', AppFailureCode.validation)),
+      );
+    });
+
     test('reads decode an unmarked roster without marks', () async {
       final DirectStore storeWithRoster = InMemoryDirectStore(<String, JsonMap>{
         'congregations/c1': seededCongregation(),
@@ -761,6 +792,91 @@ void main() {
       expect(view.entries.single.studentId, _s1);
       expect(view.entries.single.studentName, 'Aluna Congelada');
       expect(view.entries.single.status, AttendanceStatus.unmarked);
+    });
+
+    test('an unfrozen session lists the currently eligible students', () async {
+      final DirectStore storeWithEnrollment = InMemoryDirectStore(<String, JsonMap>{
+        'congregations/c1': seededCongregation(),
+        'congregations/c1/classes/$_classUuid': seededClass(),
+        'congregations/c1/sessions/$_sessionUuid': seededSession(),
+        'congregations/c1/enrollments/$_e1': seededEnrollment(
+          id: _e1,
+          studentId: _s1,
+        ),
+        'congregations/c1/classes/$_classUuid/roster/$_e1':
+            seededClassRosterEntry(
+              enrollmentId: _e1,
+              studentId: _s1,
+              studentName: 'Aluna Ativa',
+            ),
+      });
+      final HandlerContext ctx = contextWith(storeWithEnrollment);
+
+      final AttendanceView view = AttendanceView.fromJson(
+        await handlers['getSessionAttendance']!(ctx, getSessionAttendancePayload()),
+      );
+
+      expect(view.session.rosterFrozen, isFalse);
+      expect(view.entries, hasLength(1));
+      expect(view.entries.single.enrollmentId, _e1);
+      expect(view.entries.single.studentId, _s1);
+      expect(view.entries.single.studentName, 'Aluna Ativa');
+      expect(view.entries.single.status, AttendanceStatus.unmarked);
+    });
+
+    test('an unfrozen session excludes students outside their enrollment window',
+        () async {
+      final DirectStore storeWithWindows = InMemoryDirectStore(<String, JsonMap>{
+        'congregations/c1': seededCongregation(),
+        'congregations/c1/classes/$_classUuid': seededClass(),
+        'congregations/c1/sessions/$_sessionUuid': seededSession(),
+        // Starts after the session date.
+        'congregations/c1/enrollments/$_e1': seededEnrollment(
+          id: _e1,
+          studentId: _s1,
+          startDate: '2026-06-01',
+        ),
+        // Ended before the session date.
+        'congregations/c1/enrollments/$_e2': seededEnrollment(
+          id: _e2,
+          studentId: _s2,
+          endDate: '2026-04-30',
+        ),
+      });
+      final HandlerContext ctx = contextWith(storeWithWindows);
+
+      final AttendanceView view = AttendanceView.fromJson(
+        await handlers['getSessionAttendance']!(ctx, getSessionAttendancePayload()),
+      );
+
+      expect(view.entries, isEmpty);
+    });
+
+    test('reading an unfrozen session does not freeze the roster', () async {
+      final DirectStore storeWithEnrollment = InMemoryDirectStore(<String, JsonMap>{
+        'congregations/c1': seededCongregation(),
+        'congregations/c1/classes/$_classUuid': seededClass(),
+        'congregations/c1/sessions/$_sessionUuid': seededSession(),
+        'congregations/c1/enrollments/$_e1': seededEnrollment(
+          id: _e1,
+          studentId: _s1,
+        ),
+      });
+      final HandlerContext ctx = contextWith(storeWithEnrollment);
+
+      await handlers['getSessionAttendance']!(ctx, getSessionAttendancePayload());
+
+      final JsonMap? session = await storeWithEnrollment.read(
+        'congregations/c1/sessions/$_sessionUuid',
+      );
+      expect(session?['rosterFrozen'], isFalse);
+      final List<JsonMap> roster = await storeWithEnrollment.query(
+        const StoreQuery(
+          collection: 'congregations/c1/sessions/'
+              '22111111-2222-4333-8444-555555555555/roster',
+        ),
+      );
+      expect(roster, isEmpty);
     });
 
     test('reads merge the current marks into the roster', () async {
