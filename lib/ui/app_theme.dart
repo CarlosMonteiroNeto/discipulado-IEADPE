@@ -48,6 +48,15 @@ abstract final class AppSizes {
   static const double compactControlHeight = 44;
   static const double maxContentWidth = 1200;
   static const double bodyFontSize = 16;
+
+  /// Shared width for labelled filter fields (dropdowns). Derived from the
+  /// content scale so a filter bar reads consistently across every page; on
+  /// compact viewports `Wrap` moves each field to its own line instead of
+  /// squeezing names.
+  static const double filterControlWidth = maxContentWidth / 4;
+
+  /// Shared width for text-search fields in the same filter bars.
+  static const double searchControlWidth = maxContentWidth / 3;
 }
 
 /// Semantic color tokens shared by light and dark modes.

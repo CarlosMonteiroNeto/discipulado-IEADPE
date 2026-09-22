@@ -8,6 +8,7 @@ import '../../domain/class_group.dart';
 import '../../domain/congregation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
 import 'academic_repository.dart';
@@ -33,10 +34,10 @@ class ClassesPage extends StatefulWidget {
   static const Key nextPageKey = Key('classes-next-page');
   static const Key previousPageKey = Key('classes-previous-page');
 
-  /// Filter control widths derive from the shared [AppSizes] content scale
-  /// instead of page-local literals (S10).
-  static const double filterControlWidth = AppSizes.maxContentWidth / 5;
-  static const double searchControlWidth = AppSizes.maxContentWidth / 4;
+  // Filter control widths derive from the shared [AppSizes] content scale
+  // instead of page-local literals (S10).
+  static const double filterControlWidth = AppSizes.filterControlWidth;
+  static const double searchControlWidth = AppSizes.searchControlWidth;
 
   @override
   State<ClassesPage> createState() => _ClassesPageState();
@@ -93,11 +94,8 @@ class _ClassesPageState extends State<ClassesPage> {
     );
   }
 
-  // Follow-up (presentation corrective owned by task 8): the filter dropdowns,
-  // archived chip and loading state are assembled from the existing lib/ui
-  // primitives. Consolidating them into a dedicated shared filter/loading
-  // control requires a new lib/ui primitive and is intentionally not performed
-  // in this corrective; no new inline styling system is introduced here.
+  // Filter controls now route through the shared [AppFilterField] primitive
+  // in lib/ui; no page-local dropdown assembly remains (S10).
   Widget _filters(BuildContext context) {
     final ClassQuery query = widget.controller.query;
     final bool scoped = query.congregationId != null;
@@ -116,26 +114,24 @@ class _ClassesPageState extends State<ClassesPage> {
         if (widget.controller.isSupervisor)
           SizedBox(
             width: ClassesPage.filterControlWidth,
-            child: DropdownButtonFormField<String?>(
-              key: ClassesPage.congregationFilterKey,
-              initialValue: query.congregationId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Congregação'),
-              items: <DropdownMenuItem<String?>>[
-                const DropdownMenuItem<String?>(
-                  child: Text('Selecione uma congregação'),
-                ),
+            child: AppFilterField<String>(
+              fieldKey: ClassesPage.congregationFilterKey,
+              label: 'Congregação',
+              value: query.congregationId,
+              nullLabel: 'Selecione uma congregação',
+              options: <AppFilterOption<String>>[
                 for (final Congregation congregation in congregations)
-                  DropdownMenuItem<String?>(
+                  AppFilterOption<String>(
                     value: congregation.id,
-                    child: Text(congregation.name),
-                  ),
-                if (selectedMissing)
-                  DropdownMenuItem<String?>(
-                    value: query.congregationId,
-                    child: const Text('Congregação selecionada'),
+                    label: congregation.name,
                   ),
               ],
+              fallback: selectedMissing
+                  ? AppFilterOption<String>(
+                      value: query.congregationId!,
+                      label: 'Congregação selecionada',
+                    )
+                  : null,
               onChanged: widget.controller.setCongregation,
             ),
           ),
@@ -150,22 +146,20 @@ class _ClassesPageState extends State<ClassesPage> {
         ),
         SizedBox(
           width: ClassesPage.filterControlWidth,
-          child: DropdownButtonFormField<ClassStatus?>(
-            key: ClassesPage.statusFilterKey,
-            initialValue: query.status,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Situação'),
-            items: <DropdownMenuItem<ClassStatus?>>[
-              const DropdownMenuItem<ClassStatus?>(
-                child: Text('Todas as situações'),
-              ),
+          child: AppFilterField<ClassStatus>(
+            fieldKey: ClassesPage.statusFilterKey,
+            label: 'Situação',
+            value: query.status,
+            nullLabel: 'Todas as situações',
+            options: <AppFilterOption<ClassStatus>>[
               for (final ClassStatus status in ClassStatus.values)
-                DropdownMenuItem<ClassStatus?>(
+                AppFilterOption<ClassStatus>(
                   value: status,
-                  child: Text(classStatusLabel(status)),
+                  label: classStatusLabel(status),
                 ),
             ],
-            onChanged: scoped ? widget.controller.setStatus : null,
+            enabled: scoped,
+            onChanged: widget.controller.setStatus,
           ),
         ),
         AppButton(
@@ -216,8 +210,10 @@ class _ClassesPageState extends State<ClassesPage> {
           ),
         ),
         const SizedBox(height: AppSpacing.x3),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
           children: <Widget>[
             AppButton(
               key: ClassesPage.previousPageKey,
@@ -227,7 +223,6 @@ class _ClassesPageState extends State<ClassesPage> {
                   ? widget.controller.previousPage
                   : null,
             ),
-            const SizedBox(width: AppSpacing.x2),
             AppButton(
               key: ClassesPage.nextPageKey,
               label: 'Próxima',

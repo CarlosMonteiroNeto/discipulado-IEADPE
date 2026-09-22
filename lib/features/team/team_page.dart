@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../domain/contact.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
 import 'team_controller.dart';
@@ -102,7 +103,7 @@ class _TeamPageState extends State<TeamPage> {
       crossAxisAlignment: WrapCrossAlignment.center,
       children: <Widget>[
         SizedBox(
-          width: 280,
+          width: AppSizes.searchControlWidth,
           child: AppTextField(
             key: TeamPage.searchFieldKey,
             label: 'Buscar por nome',
@@ -111,40 +112,35 @@ class _TeamPageState extends State<TeamPage> {
           ),
         ),
         SizedBox(
-          width: 200,
-          child: DropdownButtonFormField<ContactScope?>(
-            key: TeamPage.scopeFilterKey,
-            initialValue: query.scope,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Escopo'),
-            items: const <DropdownMenuItem<ContactScope?>>[
-              DropdownMenuItem<ContactScope?>(child: Text('Todos')),
-              DropdownMenuItem<ContactScope?>(
+          width: AppSizes.filterControlWidth,
+          child: AppFilterField<ContactScope>(
+            fieldKey: TeamPage.scopeFilterKey,
+            label: 'Escopo',
+            value: query.scope,
+            nullLabel: 'Todos',
+            options: const <AppFilterOption<ContactScope>>[
+              AppFilterOption<ContactScope>(
                 value: ContactScope.congregation,
-                child: Text('Congregação'),
+                label: 'Congregação',
               ),
-              DropdownMenuItem<ContactScope?>(
+              AppFilterOption<ContactScope>(
                 value: ContactScope.supervision,
-                child: Text('Supervisão'),
+                label: 'Supervisão',
               ),
             ],
             onChanged: widget.controller.setScopeFilter,
           ),
         ),
         SizedBox(
-          width: 260,
-          child: DropdownButtonFormField<RoleCode?>(
-            key: TeamPage.roleFilterKey,
-            initialValue: query.roleCode,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Papel'),
-            items: <DropdownMenuItem<RoleCode?>>[
-              const DropdownMenuItem<RoleCode?>(child: Text('Todos os papéis')),
+          width: AppSizes.filterControlWidth,
+          child: AppFilterField<RoleCode>(
+            fieldKey: TeamPage.roleFilterKey,
+            label: 'Papel',
+            value: query.roleCode,
+            nullLabel: 'Todos os papéis',
+            options: <AppFilterOption<RoleCode>>[
               for (final RoleCode role in roles)
-                DropdownMenuItem<RoleCode?>(
-                  value: role,
-                  child: Text(role.label),
-                ),
+                AppFilterOption<RoleCode>(value: role, label: role.label),
             ],
             onChanged: widget.controller.setRoleFilter,
           ),
@@ -204,8 +200,10 @@ class _TeamPageState extends State<TeamPage> {
           ),
         ),
         const SizedBox(height: AppSpacing.x3),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
           children: <Widget>[
             AppButton(
               key: TeamPage.previousPageKey,
@@ -215,7 +213,6 @@ class _TeamPageState extends State<TeamPage> {
                   ? widget.controller.previousPage
                   : null,
             ),
-            const SizedBox(width: AppSpacing.x2),
             AppButton(
               key: TeamPage.nextPageKey,
               label: 'Próxima',

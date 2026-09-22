@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 import '../../domain/class_group.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../classes/academic_repository.dart';
 import 'overview_controller.dart';
@@ -115,28 +116,25 @@ class _OverviewPageState extends State<OverviewPage> {
       children: <Widget>[
         if (widget.controller.isSupervisor)
           SizedBox(
-            width: 240,
-            child: DropdownButtonFormField<String?>(
-              key: OverviewPage.congregationFilterKey,
-              initialValue: selected,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Congregação'),
-              items: <DropdownMenuItem<String?>>[
-                const DropdownMenuItem<String?>(
-                  value: null,
-                  child: Text('Todas'),
-                ),
+            width: AppSizes.filterControlWidth,
+            child: AppFilterField<String>(
+              fieldKey: OverviewPage.congregationFilterKey,
+              label: 'Congregação',
+              value: selected,
+              nullLabel: 'Todas',
+              options: <AppFilterOption<String>>[
                 for (final congregation in widget.controller.congregations)
-                  DropdownMenuItem<String?>(
+                  AppFilterOption<String>(
                     value: congregation.id,
-                    child: Text(congregation.name),
-                  ),
-                if (selectedMissing)
-                  DropdownMenuItem<String?>(
-                    value: selected,
-                    child: const Text('Congregação selecionada'),
+                    label: congregation.name,
                   ),
               ],
+              fallback: selectedMissing
+                  ? AppFilterOption<String>(
+                      value: selected,
+                      label: 'Congregação selecionada',
+                    )
+                  : null,
               onChanged: widget.controller.setCongregation,
             ),
           ),
@@ -205,8 +203,10 @@ class _OverviewPageState extends State<OverviewPage> {
           dataBuilder: _pendingList,
         ),
         const SizedBox(height: AppSpacing.x3),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
           children: <Widget>[
             AppButton(
               key: OverviewPage.pendingPreviousPageKey,
@@ -216,7 +216,6 @@ class _OverviewPageState extends State<OverviewPage> {
                   ? widget.controller.previousPendingPage
                   : null,
             ),
-            const SizedBox(width: AppSpacing.x2),
             AppButton(
               key: OverviewPage.pendingNextPageKey,
               label: 'Próxima',

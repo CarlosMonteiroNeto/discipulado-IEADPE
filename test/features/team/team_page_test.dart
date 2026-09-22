@@ -70,4 +70,36 @@ void main() {
     expect(find.textContaining('1990'), findsNothing);
     expect(find.textContaining('04/05/1990'), findsNothing);
   });
+
+  testWidgets(
+    'the filter bar reflows at 360 with 200% text without overflowing',
+    (WidgetTester tester) async {
+      final FakeTeamGateway gateway = FakeTeamGateway()
+        ..onQuery = (_) => PageResult(
+          items: <JsonMap>[
+            directoryJson(
+              id: 'a',
+              name: 'Maria José da Conceição Araújo e Silva dos Santos',
+            ),
+          ],
+        );
+      final TeamController controller = TeamController(
+        repository: TeamRepository(gateway: gateway),
+        profile: testProfile(),
+      );
+      addTearDown(controller.dispose);
+
+      await pumpApp(
+        tester,
+        TeamPage(controller: controller),
+        width: 360,
+        textScale: 2.0,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(TeamPage.searchFieldKey), findsOneWidget);
+      expect(find.byKey(TeamPage.scopeFilterKey), findsOneWidget);
+      expect(find.byKey(TeamPage.roleFilterKey), findsOneWidget);
+    },
+  );
 }

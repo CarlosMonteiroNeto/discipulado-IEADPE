@@ -306,4 +306,28 @@ void main() {
     await tester.pumpAndSettle();
     expect(overviewCalls, 2);
   });
+
+  testWidgets(
+    'the supervisor toolbar reflows at 360 with 200% text without overflow',
+    (WidgetTester tester) async {
+      final FakeOverviewGateway gateway = FakeOverviewGateway()
+        ..onInvoke = (_, _) async => overviewJson();
+      final OverviewController controller = _controller(
+        gateway,
+        supervisor: true,
+      );
+      addTearDown(controller.dispose);
+
+      await pumpApp(
+        tester,
+        OverviewPage(controller: controller),
+        width: 360,
+        textScale: 2.0,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(OverviewPage.congregationFilterKey), findsOneWidget);
+      expect(find.byKey(OverviewPage.refreshKey), findsOneWidget);
+    },
+  );
 }

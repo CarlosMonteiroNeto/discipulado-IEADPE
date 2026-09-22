@@ -132,6 +132,25 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     return teacherContactId;
   }
 
+  Widget _field(BuildContext context, String label, String value) {
+    final AppTokens tokens = AppTheme.tokensOf(context);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.x2),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelSmall
+                ?.copyWith(color: tokens.onSurfaceVariant),
+          ),
+          const SizedBox(height: AppSpacing.x1),
+          Text(value, style: Theme.of(context).textTheme.bodyMedium),
+        ],
+      ),
+    );
+  }
+
   Future<void> _setStatus(ClassGroup classGroup, ClassStatus status) async {
     final bool confirmed = await showConfirmationDialog(
       context,
@@ -239,19 +258,19 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           ],
         ),
         const SizedBox(height: AppSpacing.x2),
-        Text('Professor(a)', style: Theme.of(context).textTheme.labelSmall),
-        Text(
-          teacherName ?? 'Não definido',
-          style: Theme.of(context).textTheme.bodyMedium,
+        _field(context, 'Professor(a)', teacherName ?? 'Não definido'),
+        _field(
+          context,
+          'Período',
+          classGroup.endDate == null
+              ? '${formatBrazilianDate(classGroup.startDate)} – em andamento'
+              : '${formatBrazilianDate(classGroup.startDate)} – '
+                    '${formatBrazilianDate(classGroup.endDate!)}',
         ),
-        Text(
-          'Período: ${formatBrazilianDate(classGroup.startDate)} – '
-          '${classGroup.endDate == null ? 'em andamento' : formatBrazilianDate(classGroup.endDate!)}',
-          style: Theme.of(context).textTheme.bodyMedium,
-        ),
-        Text(
+        _field(
+          context,
+          'Matrículas e chamadas',
           '${_enrollments.length} matrícula(s) · ${_sessions.length} chamada(s)',
-          style: Theme.of(context).textTheme.bodyMedium,
         ),
         if (_failure != null) ...<Widget>[
           const SizedBox(height: AppSpacing.x3),

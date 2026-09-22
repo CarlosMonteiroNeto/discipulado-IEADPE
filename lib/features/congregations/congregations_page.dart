@@ -11,6 +11,7 @@ import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
 import '../../ui/confirmation_dialog.dart';
 import '../../ui/form_fields.dart';
+import '../../ui/responsive_scaffold.dart';
 import 'congregation_controller.dart';
 
 class CongregationsPage extends StatefulWidget {
@@ -122,30 +123,11 @@ class _CongregationsPageState extends State<CongregationsPage> {
             builder: (BuildContext context, Widget? _) => Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Text(
-                        'Congregações',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                    ),
-                    if (widget.controller.isSupervisor)
-                      AppButton(
-                        key: CongregationsPage.createKey,
-                        label: 'Nova congregação',
-                        icon: Icons.add,
-                        onPressed: _create,
-                      ),
-                    const SizedBox(width: AppSpacing.x2),
-                    AppButton(
-                      key: CongregationsPage.refreshKey,
-                      label: 'Atualizar',
-                      variant: AppButtonVariant.secondary,
-                      onPressed: widget.controller.refresh,
-                    ),
-                  ],
-                ),
+                if (AppLayout.fromWidth(MediaQuery.sizeOf(context).width) ==
+                    AppLayout.compact)
+                  _headerCompact(context)
+                else
+                  _headerRow(context),
                 if (widget.controller.archiveExplanation != null) ...<Widget>[
                   const SizedBox(height: AppSpacing.x3),
                   Container(
@@ -177,6 +159,63 @@ class _CongregationsPageState extends State<CongregationsPage> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _headerRow(BuildContext context) {
+    return Row(
+      children: <Widget>[
+        Expanded(
+          child: Text(
+            'Congregações',
+            style: Theme.of(context).textTheme.headlineSmall,
+          ),
+        ),
+        if (widget.controller.isSupervisor)
+          AppButton(
+            key: CongregationsPage.createKey,
+            label: 'Nova congregação',
+            icon: Icons.add,
+            onPressed: _create,
+          ),
+        const SizedBox(width: AppSpacing.x2),
+        AppButton(
+          key: CongregationsPage.refreshKey,
+          label: 'Atualizar',
+          variant: AppButtonVariant.secondary,
+          onPressed: widget.controller.refresh,
+        ),
+      ],
+    );
+  }
+
+  Widget _headerCompact(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        Text('Congregações', style: Theme.of(context).textTheme.headlineSmall),
+        const SizedBox(height: AppSpacing.x3),
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
+          children: <Widget>[
+            if (widget.controller.isSupervisor)
+              AppButton(
+                key: CongregationsPage.createKey,
+                label: 'Nova congregação',
+                icon: Icons.add,
+                onPressed: _create,
+              ),
+            AppButton(
+              key: CongregationsPage.refreshKey,
+              label: 'Atualizar',
+              variant: AppButtonVariant.secondary,
+              onPressed: widget.controller.refresh,
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -222,34 +261,70 @@ class _CongregationsPageState extends State<CongregationsPage> {
       shape: const RoundedRectangleBorder(borderRadius: AppRadii.cardRadius),
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.x3),
-        child: Row(
-          children: <Widget>[
-            Expanded(child: Text(congregation.name)),
-            if (widget.controller.isSupervisor) ...<Widget>[
-              if (!archived) ...<Widget>[
-                AppButton(
-                  key: CongregationsPage.renameKey(congregation.id),
-                  label: 'Renomear',
-                  variant: AppButtonVariant.text,
-                  onPressed: () => _rename(congregation),
-                ),
-                AppButton(
-                  key: CongregationsPage.archiveKey(congregation.id),
-                  label: 'Arquivar',
-                  variant: AppButtonVariant.danger,
-                  onPressed: () => _archive(congregation),
-                ),
-              ] else
-                AppButton(
-                  key: CongregationsPage.restoreKey(congregation.id),
-                  label: 'Restaurar',
-                  variant: AppButtonVariant.secondary,
-                  onPressed: () => widget.controller.restore(congregation),
-                ),
-            ],
-          ],
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final List<Widget> actions = _actions(
+              context,
+              congregation,
+              archived: archived,
+            );
+            if (AppLayout.fromWidth(constraints.maxWidth) ==
+                AppLayout.compact) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(congregation.name),
+                  if (actions.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: AppSpacing.x2),
+                    Wrap(
+                      spacing: AppSpacing.x2,
+                      runSpacing: AppSpacing.x2,
+                      children: actions,
+                    ),
+                  ],
+                ],
+              );
+            }
+            return Row(
+              children: <Widget>[
+                Expanded(child: Text(congregation.name)),
+                ...actions,
+              ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  List<Widget> _actions(
+    BuildContext context,
+    Congregation congregation, {
+    required bool archived,
+  }) {
+    return widget.controller.isSupervisor
+        ? <Widget>[
+            if (!archived) ...<Widget>[
+              AppButton(
+                key: CongregationsPage.renameKey(congregation.id),
+                label: 'Renomear',
+                variant: AppButtonVariant.text,
+                onPressed: () => _rename(congregation),
+              ),
+              AppButton(
+                key: CongregationsPage.archiveKey(congregation.id),
+                label: 'Arquivar',
+                variant: AppButtonVariant.danger,
+                onPressed: () => _archive(congregation),
+              ),
+            ] else
+              AppButton(
+                key: CongregationsPage.restoreKey(congregation.id),
+                label: 'Restaurar',
+                variant: AppButtonVariant.secondary,
+                onPressed: () => widget.controller.restore(congregation),
+              ),
+          ]
+        : const <Widget>[];
   }
 }

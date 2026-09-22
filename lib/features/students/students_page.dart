@@ -8,6 +8,7 @@ import '../../domain/class_group.dart';
 import '../../domain/congregation.dart';
 import '../../ui/app_theme.dart';
 import '../../ui/async_content.dart';
+import '../../ui/filter_field.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/record_list.dart';
 import 'student_controller.dart';
@@ -106,32 +107,30 @@ class _StudentsPageState extends State<StudentsPage> {
       children: <Widget>[
         if (widget.controller.isSupervisor)
           SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<String?>(
-              key: StudentsPage.congregationFilterKey,
-              initialValue: query.congregationId,
-              isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Congregação'),
-              items: <DropdownMenuItem<String?>>[
-                const DropdownMenuItem<String?>(
-                  child: Text('Selecione uma congregação'),
-                ),
+            width: AppSizes.filterControlWidth,
+            child: AppFilterField<String>(
+              fieldKey: StudentsPage.congregationFilterKey,
+              label: 'Congregação',
+              value: query.congregationId,
+              nullLabel: 'Selecione uma congregação',
+              options: <AppFilterOption<String>>[
                 for (final Congregation congregation in congregations)
-                  DropdownMenuItem<String?>(
+                  AppFilterOption<String>(
                     value: congregation.id,
-                    child: Text(congregation.name),
-                  ),
-                if (selectedMissing)
-                  DropdownMenuItem<String?>(
-                    value: query.congregationId,
-                    child: const Text('Congregação selecionada'),
+                    label: congregation.name,
                   ),
               ],
+              fallback: selectedMissing
+                  ? AppFilterOption<String>(
+                      value: query.congregationId!,
+                      label: 'Congregação selecionada',
+                    )
+                  : null,
               onChanged: widget.controller.setCongregation,
             ),
           ),
         SizedBox(
-          width: 280,
+          width: AppSizes.searchControlWidth,
           child: AppTextField(
             key: StudentsPage.searchFieldKey,
             label: 'Buscar por nome',
@@ -140,21 +139,21 @@ class _StudentsPageState extends State<StudentsPage> {
           ),
         ),
         SizedBox(
-          width: 240,
-          child: DropdownButtonFormField<String?>(
-            key: StudentsPage.classFilterKey,
-            initialValue: query.classId,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Turma ativa'),
-            items: <DropdownMenuItem<String?>>[
-              const DropdownMenuItem<String?>(child: Text('Todas as turmas')),
+          width: AppSizes.filterControlWidth,
+          child: AppFilterField<String>(
+            fieldKey: StudentsPage.classFilterKey,
+            label: 'Turma ativa',
+            value: query.classId,
+            nullLabel: 'Todas as turmas',
+            options: <AppFilterOption<String>>[
               for (final ClassGroup classGroup in widget.controller.classes)
-                DropdownMenuItem<String?>(
+                AppFilterOption<String>(
                   value: classGroup.id,
-                  child: Text(classGroup.name),
+                  label: classGroup.name,
                 ),
             ],
-            onChanged: scoped ? widget.controller.setClassFilter : null,
+            enabled: scoped,
+            onChanged: widget.controller.setClassFilter,
           ),
         ),
         FilterChip(
@@ -204,8 +203,10 @@ class _StudentsPageState extends State<StudentsPage> {
           ),
         ),
         const SizedBox(height: AppSpacing.x3),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: AppSpacing.x2,
+          runSpacing: AppSpacing.x2,
           children: <Widget>[
             AppButton(
               key: StudentsPage.previousPageKey,
@@ -215,7 +216,6 @@ class _StudentsPageState extends State<StudentsPage> {
                   ? widget.controller.previousPage
                   : null,
             ),
-            const SizedBox(width: AppSpacing.x2),
             AppButton(
               key: StudentsPage.nextPageKey,
               label: 'Próxima',

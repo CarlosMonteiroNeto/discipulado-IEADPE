@@ -94,4 +94,37 @@ void main() {
     expect(find.byKey(CongregationsPage.explanationKey), findsOneWidget);
     expect(find.textContaining('vínculos'), findsOneWidget);
   });
+
+  testWidgets(
+    'header and rows reflow instead of overflowing at 360 with 200% text',
+    (WidgetTester tester) async {
+      final FakeTeamGateway gateway = FakeTeamGateway();
+      final JsonMap longName = _congregationJson(
+        name: 'Assembléia de Deus Ministério Restauração do Belém',
+      );
+      gateway.onQuery = (QueryRequest request) =>
+          request.equalityFilters?['active'] == true
+          ? PageResult(
+              items: <JsonMap>[
+                longName,
+                _congregationJson(id: 'c2', name: 'Central'),
+              ],
+            )
+          : const PageResult(items: <JsonMap>[]);
+      final CongregationController controller = _controller(gateway);
+      addTearDown(controller.dispose);
+
+      await pumpApp(
+        tester,
+        CongregationsPage(controller: controller),
+        width: 360,
+        textScale: 2.0,
+      );
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(CongregationsPage.createKey), findsOneWidget);
+      expect(find.byKey(CongregationsPage.renameKey('c1')), findsOneWidget);
+      expect(find.byKey(CongregationsPage.archiveKey('c1')), findsOneWidget);
+    },
+  );
 }

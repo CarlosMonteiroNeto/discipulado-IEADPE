@@ -170,4 +170,41 @@ void main() {
       expect(controller.canCreate, isTrue);
     },
   );
+
+  testWidgets(
+    'the filter bar reflows at 360 with 200% text without overflowing',
+    (WidgetTester tester) async {
+      final FakeStudentGateway gateway = FakeStudentGateway()
+        ..onQuery = (QueryRequest request) =>
+            request.resource == QueryResource.students
+            ? PageResult(
+                items: <JsonMap>[
+                  studentJson(
+                    id: 'a',
+                    name: 'Maria José da Conceição Araújo e Silva dos Santos',
+                  ),
+                ],
+              )
+            : const PageResult(items: <JsonMap>[]);
+      final StudentController supervisor = StudentController(
+        repository: StudentRepository(gateway: gateway),
+        profile: supervisorProfile(),
+      );
+      addTearDown(supervisor.dispose);
+
+      await pumpApp(
+        tester,
+        StudentsPage(controller: supervisor),
+        width: 360,
+        textScale: 2.0,
+      );
+      await supervisor.setCongregation('c2');
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(StudentsPage.congregationFilterKey), findsOneWidget);
+      expect(find.byKey(StudentsPage.classFilterKey), findsOneWidget);
+      expect(find.byKey(StudentsPage.searchFieldKey), findsOneWidget);
+    },
+  );
 }
