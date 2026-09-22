@@ -120,9 +120,22 @@ class InMemoryDirectStore implements DirectStore {
   Future<T> runTransaction<T>(
     Future<T> Function(DirectTransaction tx) work,
   ) async {
+    // Mirrors the Firestore client-SDK contract (S09): in a transaction every
+    // read must precede every write, otherwise the SDK aborts with
+    // "Firestore transactions require all reads to be executed before all
+    // writes." The in-memory store enforces the same ordering so handler tests
+    // catch read-after-write defects that would only surface on web/mobile.
+    bool hasWritten = false;
+
     final Map<String, JsonMap?> staged = <String, JsonMap?>{};
 
     Future<JsonMap?> readStaged(String path) async {
+      if (hasWritten) {
+        throw StateError(
+          'Firestore transactions require all reads to be executed before '
+          'all writes. ($path)',
+        );
+      }
       if (staged.containsKey(path)) {
         final JsonMap? value = staged[path];
         return value == null ? null : _clone(value);
@@ -132,7 +145,10 @@ class InMemoryDirectStore implements DirectStore {
 
     final DirectTransaction tx = _InMemoryTransaction(
       readStaged: readStaged,
-      stage: (String path, JsonMap? data) => staged[path] = data,
+      stage: (String path, JsonMap? data) {
+        hasWritten = true;
+        staged[path] = data;
+      },
     );
 
     final T result = await work(tx);

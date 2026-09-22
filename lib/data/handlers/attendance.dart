@@ -379,6 +379,18 @@ Future<JsonMap> saveAttendanceHandler(
     await _assertMutableClass(tx, congregationId, classId);
     _assertRevision(session, expectedRevision);
 
+    // All transaction reads must precede all writes (S09): resolve the
+    // attendance documents before any mutation (roster freeze, marks)
+    // so the web SDK does not abort with a read-after-write violation.
+    final Map<String, (JsonMap?, Object?)> attendanceStates =
+        <String, (JsonMap?, Object?)>{};
+    for (final String key in markKeys) {
+      final JsonMap? existing = await tx.read(
+        '${StorePaths.attendance(congregationId, sessionId)}/$key',
+      );
+      attendanceStates[key] = (existing, existing?['createdAt']);
+    }
+
     if (requiresFreeze) {
       for (final JsonMap entry in frozenEntries) {
         final String enrollmentId = '${entry['enrollmentId']}';
@@ -395,8 +407,7 @@ Future<JsonMap> saveAttendanceHandler(
       );
       final String attendancePath =
           '${StorePaths.attendance(congregationId, sessionId)}/$key';
-      final JsonMap? existing = await tx.read(attendancePath);
-      final Object? priorCreatedAt = existing?['createdAt'];
+      final (JsonMap? existing, Object? priorCreatedAt) = attendanceStates[key]!;
       await tx.write(attendancePath, <String, Object?>{
         'id': key,
         'enrollmentId': key,

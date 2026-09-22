@@ -179,9 +179,9 @@ Future<void> _claimAdministrativeSlot(
   required String contactId,
   required DateTime now,
   required String uid,
+  required JsonMap? slot,
 }) async {
   final String path = _roleSlotPath(scope, congregationId, roleCode);
-  final JsonMap? slot = await tx.read(path);
   if (slot == null) {
     await tx.write(
       path,
@@ -223,9 +223,9 @@ Future<void> _releaseAdministrativeSlot(
   required String contactId,
   required DateTime now,
   required String uid,
+  required JsonMap? slot,
 }) async {
   final String path = _roleSlotPath(scope, congregationId, roleCode);
-  final JsonMap? slot = await tx.read(path);
   if (slot == null || slot['contactId'] != contactId) {
     return;
   }
@@ -384,8 +384,13 @@ Future<JsonMap> saveContactHandler(
         uid: context.uid,
         revision: 1,
       );
-      await tx.write(path, document);
+      // All transaction reads must precede all writes (S09): read the
+      // administrative slot while its document is readable, before the contact
+      // mutation below.
       if (roleCode != null && _isAdministrativeRole(roleCode)) {
+        final JsonMap? slot = await tx.read(
+          _roleSlotPath(scope, congregationId, roleCode),
+        );
         await _claimAdministrativeSlot(
           tx,
           scope: scope,
@@ -394,8 +399,10 @@ Future<JsonMap> saveContactHandler(
           contactId: id,
           now: context.now,
           uid: context.uid,
+          slot: slot,
         );
       }
+      await tx.write(path, document);
       await _writeDirectoryProjection(tx, document);
       return <String, Object?>{'id': id, 'revision': 1};
     }
@@ -424,7 +431,24 @@ Future<JsonMap> saveContactHandler(
       throw conflictFailure('O contato está arquivado; restaure-o antes de editar.');
     }
     _assertRevision(storedContact, expectedRevision);
+    // All transaction reads must precede all writes (S09): pre-read any
+    // administrative slots that the mutation will reclaim or release, so the
+    // web SDK does not abort with a read-after-write violation.
     final RoleCode? previousRole = _storedRoleCode(storedContact);
+    final bool releasesSlot = previousRole != null &&
+        previousRole != roleCode &&
+        _isAdministrativeRole(previousRole);
+    final String? previousSlotPath =
+        releasesSlot ? _roleSlotPath(scope, congregationId, previousRole) : null;
+    final JsonMap? previousSlot = previousSlotPath == null
+        ? null
+        : await tx.read(previousSlotPath);
+    final bool claimsSlot =
+        roleCode != null && _isAdministrativeRole(roleCode);
+    final String? newSlotPath =
+        claimsSlot ? _roleSlotPath(scope, congregationId, roleCode) : null;
+    final JsonMap? newSlot =
+        newSlotPath == null ? null : await tx.read(newSlotPath);
     final JsonMap next = _revised(
       storedContact,
       changes: <String, Object?>{
@@ -437,9 +461,7 @@ Future<JsonMap> saveContactHandler(
       now: context.now,
       uid: context.uid,
     );
-    if (previousRole != null &&
-        previousRole != roleCode &&
-        _isAdministrativeRole(previousRole)) {
+    if (releasesSlot) {
       await _releaseAdministrativeSlot(
         tx,
         scope: scope,
@@ -448,9 +470,10 @@ Future<JsonMap> saveContactHandler(
         contactId: id,
         now: context.now,
         uid: context.uid,
+        slot: previousSlot,
       );
     }
-    if (roleCode != null && _isAdministrativeRole(roleCode)) {
+    if (claimsSlot) {
       await _claimAdministrativeSlot(
         tx,
         scope: scope,
@@ -459,6 +482,7 @@ Future<JsonMap> saveContactHandler(
         contactId: id,
         now: context.now,
         uid: context.uid,
+        slot: newSlot,
       );
     }
     await tx.write(path, next);
@@ -518,6 +542,9 @@ Future<JsonMap> setContactArchivedHandler(
       uid: context.uid,
     );
     if (previousRole != null && _isAdministrativeRole(previousRole)) {
+      final JsonMap? slot = await tx.read(
+        _roleSlotPath(scope, congregationId, previousRole),
+      );
       await _releaseAdministrativeSlot(
         tx,
         scope: scope,
@@ -526,6 +553,7 @@ Future<JsonMap> setContactArchivedHandler(
         contactId: id,
         now: context.now,
         uid: context.uid,
+        slot: slot,
       );
     }
     await tx.write(_contactPath(scope, congregationId, id), next);
@@ -601,6 +629,9 @@ Future<JsonMap> replaceRoleHolderHandler(
     if (targetPreviousRole != null &&
         targetPreviousRole != roleCode &&
         _isAdministrativeRole(targetPreviousRole)) {
+      final JsonMap? previousSlot = await tx.read(
+        _roleSlotPath(scope, congregationId, targetPreviousRole),
+      );
       await _releaseAdministrativeSlot(
         tx,
         scope: scope,
@@ -609,6 +640,7 @@ Future<JsonMap> replaceRoleHolderHandler(
         contactId: targetContactId,
         now: context.now,
         uid: context.uid,
+        slot: previousSlot,
       );
     }
     _assertRevision(previous, previousExpectedRevision);

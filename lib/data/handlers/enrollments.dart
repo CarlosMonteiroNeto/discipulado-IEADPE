@@ -332,12 +332,11 @@ Future<JsonMap> enrollStudentHandler(
         },
       );
 
-      final JsonMap? currentStudent = await tx.read(
-        StorePaths.student(congregationId, studentId),
-      );
+      // Same-transaction writes must come after every read (S09), so the
+      // student was already read above and the classId backfill just reuses it.
       await tx.write(
         StorePaths.student(congregationId, studentId),
-        <String, Object?>{...?currentStudent, 'classId': classId},
+        <String, Object?>{...student, 'classId': classId},
       );
 
       return <String, Object?>{'id': id, 'revision': 1};
@@ -465,29 +464,34 @@ Future<JsonMap> closeEnrollmentHandler(
       now: context.now,
       uid: context.uid,
     );
-    await tx.write(located.path, next);
 
+    // All transaction reads must precede all writes (S09): resolve the
+    // reference and student documents before the enrollment mutation below.
     final String storedStudentId = stored['studentId'] is String
         ? stored['studentId']! as String
         : '';
+    final String referencePath = storedStudentId.isEmpty
+        ? ''
+        : _activeEnrollmentReferencePath(congregationId, storedStudentId);
+    final JsonMap? reference = storedStudentId.isEmpty
+        ? null
+        : await tx.read(referencePath);
+    // The plain students-by-class query resolves membership through the
+    // optional student.classId backfill, so closing the active enrollment
+    // must clear it; otherwise completed/withdrawn students keep appearing in
+    // the class list.
+    final String studentPath = storedStudentId.isEmpty
+        ? ''
+        : StorePaths.student(congregationId, storedStudentId);
+    final JsonMap? student =
+        storedStudentId.isEmpty ? null : await tx.read(studentPath);
+
+    await tx.write(located.path, next);
+
     if (storedStudentId.isNotEmpty) {
-      final String referencePath = _activeEnrollmentReferencePath(
-        congregationId,
-        storedStudentId,
-      );
-      final JsonMap? reference = await tx.read(referencePath);
       if (reference != null && reference['enrollmentId'] == id) {
         await tx.delete(referencePath);
       }
-      // The plain students-by-class query resolves membership through the
-      // optional student.classId backfill, so closing the active enrollment
-      // must clear it; otherwise completed/withdrawn students keep appearing in
-      // the class list.
-      final String studentPath = StorePaths.student(
-        congregationId,
-        storedStudentId,
-      );
-      final JsonMap? student = await tx.read(studentPath);
       if (student != null && student['classId'] == classId) {
         final JsonMap cleared = <String, Object?>{...student}..remove('classId');
         await tx.write(studentPath, cleared);

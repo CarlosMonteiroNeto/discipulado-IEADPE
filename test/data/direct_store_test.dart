@@ -105,13 +105,21 @@ void main() {
       expect(await store.read('a/remove'), isNull);
     });
 
-    test('transaction sees its own staged writes', () async {
+    test('forbids reading a document staged after a write, like the web SDK', () async {
       final DirectStore store = InMemoryDirectStore();
-      await store.runTransaction<void>((DirectTransaction tx) async {
-        await tx.write('a/b', <String, Object?>{'id': 'b', 'v': 1});
-        expect((await tx.read('a/b'))!['v'], 1);
-      });
-      expect((await store.read('a/b'))!['v'], 1);
+      await expectLater(
+        store.runTransaction<void>((DirectTransaction tx) async {
+          await tx.write('a/b', <String, Object?>{'id': 'b', 'v': 1});
+          await tx.read('a/b');
+        }),
+        throwsA(
+          isA<StateError>().having(
+            (StateError error) => error.message,
+            'message',
+            contains('all reads to be executed before all writes'),
+          ),
+        ),
+      );
     });
 
     test('transaction rolls back staged writes when the work throws', () async {
