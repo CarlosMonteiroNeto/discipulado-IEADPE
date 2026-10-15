@@ -106,7 +106,7 @@ class SupabaseGateway implements Gateway {
     String? name,
     bool excludeDeleted = false,
   }) async {
-    if (!{'converts', 'user_access'}.contains(table)) {
+    if (!{'converts', 'user_access', 'photo_assets'}.contains(table)) {
       throw ArgumentError.value(table, 'table');
     }
     final result = await _run(context, () {
@@ -157,6 +157,8 @@ class SupabaseGateway implements Gateway {
       'delete_convert' || 'revoke_access' => {'id'},
       'transition_convert' => {'id', 'action'},
       'confirm_zero' => {'congregation_id'},
+      'create_photo_draft' => <String>{},
+      'detach_photo' => {'id'},
       'save_access' => {'id', 'user_email', 'role', 'congregation_id'},
       _ => throw ArgumentError.value(command, 'command'),
     };
