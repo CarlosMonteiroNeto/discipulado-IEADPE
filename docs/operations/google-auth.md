@@ -1,0 +1,28 @@
+# Google authentication integration
+
+Task 4 provides reusable components. Task 19 must initialize and mount them in the application root; the bootstrap screen intentionally remains until that integration.
+
+## Client and navigation wiring
+
+1. Construct `Configuration.fromEnvironment()` using only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` public build values. Never include service-role keys or Google secrets.
+2. Before rendering the root, call `AuthRepository.initialize(configuration, policy)` once. On web, policy is `AuthRedirectPolicy(Uri.parse('https://YOUR_HOST/auth/callback'))`; local web uses `http://localhost:3000/auth/callback`. Android uses `AuthRedirectPolicy(Uri.parse(AuthRedirectPolicy.androidCallback))`. Do not use arbitrary incoming origins to construct this trusted policy.
+3. Construct `SessionRouter(repository, clearProtectedCaches: clearAllProtectedState, intendedRoute: policy.intendedFrom(incomingCallback))`. For direct internal navigation pass `safeRoute(requestedPath)` instead. Listen to route/allowedRoutes/checking/unavailable, and render actual feature pages only for the guard's current authorized route. The web callback path must be served by the static host's Flutter SPA fallback.
+4. Mount `LoginPage(auth: repository, intendedRoute: requestedPath)` for `/login`. Never infer successful login from launching a browser: the SDK exchanges the PKCE code with its stored verifier and emits the authenticated session. Returning/cancelling keeps the login button usable. Provider errors must show a plain retry message.
+5. Register every protected cache, record/photo state and pending request owner in the required synchronous clear callback. It runs before each scope revalidation, on session errors, signout, and guard disposal. In-flight protected reads must capture their own generation and ignore results after this callback advances it; clearing a collection alone cannot cancel outstanding requests. Never persist protected photos or records.
+6. All signout UI must call `SessionRouter.signOut()`. SDK 2.27.3 removes its local session before remote logout; the guard additionally excludes scope reload while logout is pending. Surface a plain retry action if remote revocation fails. Scope refresh runs automatically on resume/auth events and can be explicitly awaited after grant changes. A failed refresh immediately removes protected scope/routes; expose a recoverable retry screen using `unavailable`.
+
+Scope comes only from authenticated `ieadpe_get_scope` without arguments. The guard never grants access from editable metadata. A registrar's primary navigation contains only Register (`/register`); feedback may be launched from its own action. RLS and transactional RPCs enforce current grants independently of navigation.
+
+## Provider setup (external release action)
+
+The local config enables global account creation so a first Google identity can be created. Email and SMS providers remain disabled. Turning global `auth.enable_signup` off blocks new OAuth identities too; do not use that setting to disable password login. See [Supabase general configuration](https://supabase.com/docs/guides/auth/general-configuration), [CLI auth configuration](https://supabase.com/docs/guides/local-development/cli/config), and [Auth server configuration](https://github.com/supabase/auth/blob/master/README.md).
+
+An operator must enable Google in the Supabase dashboard (or their private local provider configuration) and supply their Google client ID/secret there. Google must allow the Supabase Auth service callback (`https://PROJECT.supabase.co/auth/v1/callback`, or the externally reachable local Auth service URL). Google secrets belong only on the Auth service. Request only openid, email and profile. No Google configuration or secrets are provisioned by this change; do not enable billing.
+
+In Supabase URL configuration, set the final web site URL and allow each exact application return URL. Local examples are in config.toml. Include `/auth/callback` and its four exact `?next=%2Fregister`, `?next=%2Fhome`, `?next=%2Fconverts`, `?next=%2Fadmin` variants for the trusted web origin and `ieadpe://login/auth/callback`. Avoid production wildcards. Browser callback code, state and verifier validation is delegated to Supabase Auth/SDK PKCE; our predicate rejects unexpected callback origins, paths, fragments, unknown query keys, duplicate values and unsafe destinations before SDK exchange. The destination remains subject to server scope even after a valid exchange.
+
+## Required external checks before release
+
+Automated tests cover local policy/controller behavior and an actual SDK request to a synthetic loopback HTTP RPC fixture. They do not prove the Google provider, Supabase Auth HTTP service, browser persistence, or Android intent delivery.
+
+On an operator-provisioned test project, run first-time Google signup, existing-user login, provider denial/cancel, browser back, full web redirect reload with safe intent, invalid/missing verifier, duplicate/replayed callback, Android cold/warm callback, logout offline/online, and scope removal then resume. Confirm no stale protected records/photos survive logout, user switching or lost grants. Exercise a registrar, direction and global manager against the actual backend. Record browser/device and provider configuration evidence. Android custom scheme callbacks are protected by PKCE; installation and signature/release verification remain separate actions.
