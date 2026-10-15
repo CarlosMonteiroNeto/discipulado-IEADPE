@@ -14,7 +14,7 @@ Status: accepted backend direction; implementation pending. Supersedes the Fireb
 
 ## Evidence and scope
 
-The workspace contains documentation and a complete 101-file source capture, not a Flutter implementation or Git repository. Capture paths and SHA-256 hashes are in reference/base44/manifest.json. Six entity schemas and 179 internal imports were inspected. Production data has not been exported; never place personal records in fixtures, logs or briefs.
+At discovery, the workspace contained documentation and a complete 101-file source capture. The migration branch now contains a generated Flutter scaffold and local Git history; product implementation and parity remain to be completed. Capture paths and SHA-256 hashes are in reference/base44/manifest.json. Six entity schemas and 179 internal imports were inspected. Production data has not been exported; never place personal records in fixtures, logs or briefs.
 
 Deliver registration/editing, shared photos, scoped convert lists, visits, discipleship, Home, weekly reports, congregation/access management, conversion charts, event history, XLSX import/export and feedback. Preserve five Admin tabs (Congregações, Acessos, Relatório, Eventos, Backup); expose feedback management through an Admin action. Base44 OAuthConsent is platform-specific and is replaced by the normal Supabase Google callback.
 
@@ -99,3 +99,11 @@ This Windows host has no Docker/WSL service. Use a portable PostgreSQL 17 instan
 Google OAuth provider setup, Storage HTTP enforcement and real-device file retrieval require explicit integration evidence in the final report. Distinguish implemented code, unit/SQL checks and unrun service/device checks. No mocked test proves a live service.
 
 Native test server: IEADPE_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/postgres (disposable local trust-auth instance, loopback only). Test harness creates isolated databases, executes migrations and assertion SQL, then drops only its own databases. Plain PostgreSQL DO/RAISE assertions are acceptable in the native profile; do not fake a pgTAP implementation. Preserve full-stack integration instructions separately.
+
+## Runtime transport boundary
+
+The script pipeline uses the exact requested model and effort with native tools in a read-only sandbox. Attempt-bound MCP capabilities enforce declared file writes and closed scoped checks independently of local hook coverage. The source capture, pipeline control files, runtime tooling and dependency manifests remain protected. Workers may read project code and documentation to inspect predecessor interfaces. Script CEO retains dispatch, authoritative gates, ledger, commits and independent review. Tests execute project code and are not an OS sandbox against arbitrary authored test code; candidate and scope checks remain mandatory.
+
+## Execution workflow update — 2026-10-15
+
+The user required fallback to standard Superpowers after any additional custom pipeline issue. That condition occurred. Standard Superpowers SDD now supersedes the Runtime transport boundary section for this implementation: use native subagents, direct workspace tools, TDD, independent task reviews and final branch review, all pinned to gpt-6.1-sol/low. The accepted product requirements and local verification profiles remain binding. Custom pipeline repair is suspended and its unfinished source is preserved separately.

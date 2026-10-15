@@ -1,6 +1,6 @@
 # IEADPE Flutter + Supabase Free Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use two-model-sdd-pipeline with flutter-app-pipeline task-by-task. The user fixes every model and effort; no escalation. Steps use checkbox syntax.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use standard superpowers:subagent-driven-development task-by-task. The user switched away from the custom pipeline on 2026-10-15. The user fixes every model and effort; no escalation. Steps use checkbox syntax.
 
 **Goal:** Recreate the captured IEADPE app in Flutter for web and Android using Supabase Free and Google OAuth.
 

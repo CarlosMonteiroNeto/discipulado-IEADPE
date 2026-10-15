@@ -9,7 +9,9 @@
     "Every SDD role uses gpt-6.1-sol with low reasoning effort; no automatic escalation.",
     "PostgreSQL RLS and authorized transactional RPCs enforce access and business invariants.",
     "Preserve all 101 captured source files unchanged; use synthetic local development data.",
-    "Production deployment, live access grants and private-record migration are separate release actions."
+    "Production deployment, live access grants and private-record migration are separate release actions.",
+    "Standard Superpowers SDD uses native Codex subagents, TDD, independent task review and a broad final review. Every role is gpt-6.1-sol with low reasoning effort. Use normal workspace tools and direct project checks; do not invoke or repair the custom two-model pipeline. Preserve the captured source and existing unrelated work.",
+    "End-user error states use plain pt-BR and a useful next action. Do not expose raw SQL, stack traces, provider internals or environment-variable setup instructions in ordinary user screens; keep technical setup in operations documentation."
   ],
   "tasks": [
     {
@@ -744,24 +746,72 @@
     },
     {
       "id": 19,
-      "title": "Complete verification and independent review",
-      "summary": "Run local SQL/security/concurrency suites, Dart/widget/integration tests, analyzer and web/Android debug builds. Independently review whole branch using the fixed model; investigate every failure and fix in-scope causes before final handoff.",
+      "title": "Integrate complete application and verify workflows",
+      "summary": "Connect all completed features to the production Supabase gateway, authentication and routes; remove placeholder scaffold behavior and verify complete journeys. Script CEO and final local release checks supply independent review, full suites, analyzer and web/Android builds.",
       "spec_refs": [
-        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries"
       ],
       "touches": [
         "docs/verification/final-report.md",
-        "test/workflows_test.dart"
+        "test/workflows_test.dart",
+        "lib/main.dart",
+        "lib/app.dart",
+        "lib/configuration.dart",
+        "lib/domain/models.dart",
+        "lib/domain/business_calendar.dart",
+        "lib/domain/convert_policy.dart",
+        "lib/domain/worship_types.dart",
+        "lib/features/auth/auth_repository.dart",
+        "lib/features/auth/login_page.dart",
+        "lib/routing/router.dart",
+        "lib/data/supabase_gateway.dart",
+        "lib/data/convert_repository.dart",
+        "lib/data/access_repository.dart",
+        "lib/features/photos/photo_repository.dart",
+        "lib/features/photos/photo_processor.dart",
+        "lib/features/converts/convert_form.dart",
+        "lib/features/converts/register_page.dart",
+        "lib/features/converts/edit_page.dart",
+        "lib/features/converts/converts_page.dart",
+        "lib/features/converts/convert_card.dart",
+        "lib/features/converts/convert_actions.dart",
+        "lib/features/weekly/weekly_repository.dart",
+        "lib/features/weekly/weekly_panel.dart",
+        "lib/features/home/home_page.dart",
+        "lib/features/home/home_repository.dart",
+        "lib/widgets/app_shell.dart",
+        "lib/widgets/brand_header.dart",
+        "lib/features/admin/admin_page.dart",
+        "lib/features/admin/congregations_panel.dart",
+        "lib/features/admin/access_panel.dart",
+        "lib/features/reports/reports_repository.dart",
+        "lib/features/reports/events_panel.dart",
+        "lib/features/reports/conversion_panel.dart",
+        "lib/platform/file_exporter.dart",
+        "lib/features/backup/backup_codec.dart",
+        "lib/features/backup/backup_models.dart",
+        "lib/features/backup/backup_repository.dart",
+        "lib/features/backup/backup_panel.dart",
+        "lib/features/feedback/feedback_repository.dart",
+        "lib/features/feedback/feedback_dialog.dart",
+        "lib/features/feedback/feedback_manager.dart",
+        "web/index.html",
+        "web/manifest.json",
+        "web/favicon.svg",
+        "web/icons/ieadpe.svg",
+        "android/app/src/main/AndroidManifest.xml",
+        "android/app/src/main/res/drawable/ic_ieadpe.xml"
       ],
       "depends_on": [
         18
       ],
       "acceptance": [
         "Synthetic end-to-end registrar/direction/supervision/admin journeys cover photo, visit, weekly race, import retry, access revocation and web/Android file retrieval.",
-        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks.",
+        "The configured app boots through Google sign-in into role-scoped live Supabase screens. Every implemented feature is reachable through the responsive shell or Admin UI; production routes contain no mock repositories or placeholder pages. Missing backend configuration remains an explicit pt-BR state.",
+        "Web page language is pt-BR and web/Android names and launcher marks use the IEADPE church/navy identity instead of Flutter scaffold branding. Prefer source/native SVG and Android vector resources for these simple marks."
       ],
       "interfaces": {
         "produces": [
