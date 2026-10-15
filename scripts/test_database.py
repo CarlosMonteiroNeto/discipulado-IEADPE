@@ -7,12 +7,15 @@ import subprocess
 from urllib.parse import urlparse, urlunparse
 import uuid
 
+from database_access_concurrency import check_access_concurrency
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", nargs="?", default="access_test.sql")
+    parser.add_argument("--access-concurrency", action="store_true")
     args = parser.parse_args()
     scenario = (ROOT / "supabase/tests/database" / args.scenario).resolve()
     if scenario.parent != (ROOT / "supabase/tests/database").resolve():
@@ -38,8 +41,11 @@ def main():
         run(target, "-f", str(ROOT / "supabase/tests/fixtures/local_auth_storage.sql"))
         for migration in sorted((ROOT / "supabase/migrations").glob("*.sql")):
             run(target, "-f", str(migration))
-        run(target, "-f", str(scenario))
-        print("PASS: " + args.scenario, flush=True)
+        if args.access_concurrency:
+            check_access_concurrency(psql, target)
+        else:
+            run(target, "-f", str(scenario))
+            print("PASS: " + args.scenario, flush=True)
     finally:
         run(admin, "-c", f'DROP DATABASE "{database}" WITH (FORCE)')
 

@@ -58,6 +58,10 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE verified_email text; bound_count integer;
 BEGIN
  IF auth.uid() IS NULL THEN RAISE EXCEPTION 'unauthorized' USING ERRCODE='42501'; END IF;
+ -- Binding and grant editing share discovery serialization. Take this BEFORE
+ -- reading identities so an editor cannot retain a pre-binding old user_id.
+ -- Order: grant-discovery mutex -> email mutex -> sorted UID version rows.
+ PERFORM pg_advisory_xact_lock(711039001);
  SELECT lower(btrim(email)) INTO verified_email FROM auth.users WHERE id=auth.uid() AND email_confirmed_at IS NOT NULL;
  -- Same email mutex is used by grant changes; no email from JWT/user_metadata is trusted.
  IF verified_email IS NOT NULL THEN
@@ -90,7 +94,8 @@ BEGIN
  access_id := (payload->>'id')::uuid;
  IF command_name='revoke_access' AND access_id IS NULL THEN
   RAISE EXCEPTION 'invalid_payload' USING ERRCODE='22023'; END IF;
- -- Serialize all access edits before discovering affected users, then lock UIDs sorted.
+ -- Serialize access edits AND pending binding before discovering affected users.
+ -- get_scope uses the same mutex, then email mutex, then sorted UID version rows.
  -- Business writes use only lock_access; this mutex never follows UID locks.
  PERFORM pg_advisory_xact_lock(711039001);
  IF access_id IS NOT NULL THEN SELECT * INTO old_row FROM public.user_access WHERE id=access_id; END IF;
