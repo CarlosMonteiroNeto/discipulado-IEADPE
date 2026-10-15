@@ -7,3 +7,5 @@ The installed Codex hook module supports exact approved reads and edits, but its
 A native PostgreSQL 17.11 distribution from EDB was extracted to the user's local tooling directory and started on loopback port 54329. This avoids installing Windows services, WSL or Docker. It proves local PostgreSQL behavior only, not Supabase HTTP integration. The source and binary checksum are retained in the ignored preflight log.
 
 References: [CLI](https://learn.chatgpt.com/docs/codex/cli), [state environment](https://learn.chatgpt.com/docs/config-file/environment-variables), [hooks](https://learn.chatgpt.com/docs/hooks).
+
+Live minimal transport succeeded with gpt-6.1-sol / low on CLI 0.162.1. Launch uses the same normal account authentication, isolated SQLite state, explicit invocation-local project trust and --ignore-user-config for worker exec calls. This avoids unrelated global plugin/settings overhead while preserving the pipeline role overrides and project hooks. Flutter scaffold test and analysis passed; analyzer reported no issues. Product tasks remain pending until script-owned gates approve them.
