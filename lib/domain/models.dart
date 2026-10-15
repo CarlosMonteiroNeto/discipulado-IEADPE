@@ -6,10 +6,12 @@ enum Gender {
 
   const Gender(this.wireValue);
   final String wireValue;
-  static Gender fromWire(String value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw FormatException('Unknown Gender: $value'),
-  );
+  static Gender fromWire(String value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) return candidate;
+    }
+    throw FormatException('Invalid Gender wire value: $value');
+  }
 }
 
 enum ConvertEventType {
@@ -20,10 +22,12 @@ enum ConvertEventType {
 
   const ConvertEventType(this.wireValue);
   final String wireValue;
-  static ConvertEventType fromWire(String value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw FormatException('Unknown ConvertEventType: $value'),
-  );
+  static ConvertEventType fromWire(String value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) return candidate;
+    }
+    throw FormatException('Invalid ConvertEventType wire value: $value');
+  }
 }
 
 enum FeedbackStatus {
@@ -33,10 +37,12 @@ enum FeedbackStatus {
 
   const FeedbackStatus(this.wireValue);
   final String wireValue;
-  static FeedbackStatus fromWire(String value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw FormatException('Unknown FeedbackStatus: $value'),
-  );
+  static FeedbackStatus fromWire(String value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) return candidate;
+    }
+    throw FormatException('Invalid FeedbackStatus wire value: $value');
+  }
 }
 
 enum AccessRole {
@@ -45,10 +51,12 @@ enum AccessRole {
 
   const AccessRole(this.wireValue);
   final String wireValue;
-  static AccessRole fromWire(String value) => values.firstWhere(
-    (item) => item.wireValue == value,
-    orElse: () => throw FormatException('Unknown AccessRole: $value'),
-  );
+  static AccessRole fromWire(String value) {
+    for (final candidate in values) {
+      if (candidate.wireValue == value) return candidate;
+    }
+    throw FormatException('Invalid AccessRole wire value: $value');
+  }
 }
 
 final class ConvertRecord {
@@ -327,9 +335,10 @@ final class AccessScope {
   final bool isAdmin, isSupervision;
   final Set<String> congregationIds;
   bool get isGlobalManager => isAdmin || isSupervision;
-  bool canAccess(String? congregationId) =>
-      isGlobalManager ||
-      (congregationId != null && congregationIds.contains(congregationId));
+  bool canAccess(String? congregationId) {
+    if (isGlobalManager) return true;
+    return congregationId != null && congregationIds.contains(congregationId);
+  }
 }
 
 enum MutationStatus { applied, rejected }
