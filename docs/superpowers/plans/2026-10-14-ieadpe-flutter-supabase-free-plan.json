@@ -70,7 +70,7 @@
         1
       ],
       "acceptance": [
-        "Assert due boundaries 1/7/30 days, completion 89/90 days, deviation 2/3 visits, missing start, age zero, all 64 source worship values and Sunday 19:59/20:00 in Sao Paulo."
+        "Assert due boundaries 1/7/30 days, completion 89/90 days, deviation 2/3 visits, missing start, age zero, all 64 source worship values and Sunday 19:59/20:00 in Sao Paulo. Completion is rejected when discipleship is inactive, even with an old known start date."
       ],
       "interfaces": {
         "produces": [
@@ -231,7 +231,7 @@
         5
       ],
       "acceptance": [
-        "Double visit yields one increment/event; concurrent completion/deviation cannot create conflicting terminal state; actor/time spoof denied; stop creates no event; revoked actor cannot finish a later authorized write."
+        "Double visit yields one increment/event; concurrent completion/deviation cannot create conflicting terminal state; actor/time spoof denied; stop creates no event; revoked actor cannot finish a later authorized write. Completion requires active discipleship and a known start at least 90 business days earlier."
       ],
       "interfaces": {
         "produces": [
