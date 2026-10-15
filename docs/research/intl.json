@@ -1,0 +1,61 @@
+{
+  "package": "intl",
+  "criteria": {
+    "pub_points": 20.0,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 7
+  },
+  "total": 67.0,
+  "verdict": "DEVELOPER_DECISION",
+  "data": {
+    "package": "intl",
+    "version": "0.20.3",
+    "registry_source": "https://pub.dev/packages/intl",
+    "license": "BSD-3-Clause",
+    "granted_points": 160,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 6,
+    "open_issues": 189,
+    "closed_issues": 588
+  },
+  "research_record": {
+    "name": "intl",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/intl"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "0.20.3"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "BSD-3-Clause"
+    }
+  }
+}

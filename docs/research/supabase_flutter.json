@@ -1,0 +1,61 @@
+{
+  "package": "supabase_flutter",
+  "criteria": {
+    "pub_points": 18.75,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 15
+  },
+  "total": 73.8,
+  "verdict": "AUTO_APPROVE",
+  "data": {
+    "package": "supabase_flutter",
+    "version": "2.18.3",
+    "registry_source": "https://pub.dev/packages/supabase_flutter",
+    "license": "MIT",
+    "granted_points": 150,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 1,
+    "open_issues": 7,
+    "closed_issues": 809
+  },
+  "research_record": {
+    "name": "supabase_flutter",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/supabase_flutter"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "2.18.3"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "MIT"
+    }
+  }
+}

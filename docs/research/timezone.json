@@ -1,0 +1,61 @@
+{
+  "package": "timezone",
+  "criteria": {
+    "pub_points": 20.0,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 7
+  },
+  "total": 67.0,
+  "verdict": "DEVELOPER_DECISION",
+  "data": {
+    "package": "timezone",
+    "version": "0.11.2",
+    "registry_source": "https://pub.dev/packages/timezone",
+    "license": "BSD-3-Clause",
+    "granted_points": 160,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 2,
+    "open_issues": 51,
+    "closed_issues": 140
+  },
+  "research_record": {
+    "name": "timezone",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/timezone"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "0.11.2"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "BSD-3-Clause"
+    }
+  }
+}

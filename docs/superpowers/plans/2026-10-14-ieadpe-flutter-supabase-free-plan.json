@@ -1,0 +1,817 @@
+{
+  "version": 1,
+  "title": "IEADPE Flutter + Supabase Free",
+  "spec_doc": "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md",
+  "global_constraints": [
+    "Flutter web and Android; app UI is pt-BR; communication, comments and artifacts are English.",
+    "Supabase Free only; no billing activation, paid add-ons or mandatory Edge Functions.",
+    "Google OAuth is the baseline login; email/password and SMS are deferred.",
+    "Every SDD role uses gpt-6.1-sol with low reasoning effort; no automatic escalation.",
+    "PostgreSQL RLS and authorized transactional RPCs enforce access and business invariants.",
+    "Preserve all 101 captured source files unchanged; use synthetic local development data.",
+    "Production deployment, live access grants and private-record migration are separate release actions."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Bootstrap the local application",
+      "summary": "Create Flutter web/Android scaffold, resolve and lock packages, initialize local Supabase and Git after checking parent instructions. Record Flutter, Java, Android SDK, Docker and CLI availability.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#architecture-and-dependencies",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries"
+      ],
+      "touches": [
+        "pubspec.yaml",
+        "lib/main.dart",
+        "lib/app.dart",
+        "supabase/config.toml",
+        "scripts/check.ps1",
+        "test/widget_test.dart",
+        "README.md",
+        "lib/configuration.dart"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "Empty app starts with pt-BR locale; missing backend configuration shows a recoverable setup screen, never a production fallback."
+      ],
+      "interfaces": {
+        "produces": [
+          "App() -> Widget; local-only configuration through --dart-define."
+        ],
+        "consumes": []
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/app_smoke_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 2,
+      "title": "Domain models and business calendar",
+      "summary": "Define immutable DTO/domain types, date-only codecs, source enum mappings and pure lifecycle predicates. Define Page<T>(items,nextCursor), AccessScope and MutationResult.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "reference/base44/src/utils/worshipTypes.js#",
+        "reference/base44/base44/entities/Convert.jsonc#"
+      ],
+      "touches": [
+        "lib/domain/models.dart",
+        "lib/domain/business_calendar.dart",
+        "lib/domain/convert_policy.dart",
+        "lib/domain/worship_types.dart"
+      ],
+      "depends_on": [
+        1
+      ],
+      "acceptance": [
+        "Assert due boundaries 1/7/30 days, completion 89/90 days, deviation 2/3 visits, missing start, age zero, all 64 source worship values and Sunday 19:59/20:00 in Sao Paulo."
+      ],
+      "interfaces": {
+        "produces": [
+          "BusinessCalendar.today(DateTime instant) -> DateOnly; visitState(ConvertRecord, DateOnly) -> VisitState."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/domain/convert_policy_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 3,
+      "title": "Schema, verified identity and RLS",
+      "summary": "Create schema, indexes, profiles trigger, private helpers, default-deny policies, fixed search_path and restricted execution. Add access-version locking, trusted pending-email binding and admin bootstrap instructions.\r Implement native PostgreSQL test profile per spec, exposing real SQL assertions through Dart test wrappers. The PostgreSQL binaries are supervisor-provided by IEADPE_PG_BIN; do not install dependencies inside a worker.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#atomic-commands-and-concurrency",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
+        "reference/base44/base44/entities/UserAccess.jsonc#",
+        "reference/base44/src/Layout.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140001_identity.sql",
+        "supabase/migrations/202610140002_schema.sql",
+        "supabase/migrations/202610140003_access.sql",
+        "supabase/tests/database/access_test.sql",
+        "scripts/test_database.py",
+        "supabase/tests/fixtures/local_auth_storage.sql",
+        "test/database/database_harness.dart"
+      ],
+      "depends_on": [
+        2
+      ],
+      "acceptance": [
+        "Anonymous reads denied; registrar cannot enumerate converts; direction cannot cross congregation; supervision global; editable metadata cannot grant admin; unverified email cannot bind a pending grant; revoked access denies the next read."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_save_access(operation_id uuid,payload jsonb) -> jsonb; ieadpe_revoke_access(operation_id uuid,payload jsonb) -> jsonb; private.can_access_congregation(uuid) -> boolean."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/database/task_3_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 4,
+      "title": "Google session and navigation guards",
+      "summary": "Implement Supabase PKCE flow, web redirect configuration and Android deep link. Define Configuration for URL/publishable key and require external Google secrets only in provider setup.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries",
+        "reference/base44/src/components/AuthLayout.jsx#"
+      ],
+      "touches": [
+        "lib/features/auth/auth_repository.dart",
+        "lib/features/auth/login_page.dart",
+        "lib/routing/router.dart",
+        "android/app/src/main/AndroidManifest.xml"
+      ],
+      "depends_on": [
+        3
+      ],
+      "acceptance": [
+        "Cancelled login remains usable; callback restores intended safe route; registrar sees Register only; sign-out and lost grants clear protected caches; malformed callback cannot bypass guards."
+      ],
+      "interfaces": {
+        "produces": [
+          "AuthRepository.signInWithGoogle() -> Future<void>; watchSession() -> Stream<Session?>; loadScope() -> Future<AccessScope>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/auth/auth_flow_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 5,
+      "title": "Transactional registration, edits and deletion",
+      "summary": "Implement receipts, strict payload validation, sorted locks and congregation-week counters. Expose minimal create result to registrar, soft delete and remove matching zero report atomically. Include confirm-zero SQL now so race is tested here.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#atomic-commands-and-concurrency",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
+        "reference/base44/src/pages/Register.jsx#",
+        "reference/base44/src/components/converts/ConvertForm.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140004_convert_commands.sql",
+        "supabase/tests/database/convert_commands_test.sql"
+      ],
+      "depends_on": [
+        4
+      ],
+      "acceptance": [
+        "Retry creates one record; changed payload with same ID fails; scope-changing edit checks both scopes; future date fails; simultaneous create/zero-confirm cannot leave a false zero report; tombstone retains internal ID."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_create_convert; ieadpe_edit_convert; ieadpe_delete_convert: (operation_id uuid,payload jsonb) -> jsonb."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/database/task_5_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 6,
+      "title": "Atomic lifecycle commands",
+      "summary": "Lock and re-read current state; enforce server date predicates, immutable event snapshots and receipt coupling in one transaction. Test concurrent sessions as well as sequential calls.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#atomic-commands-and-concurrency",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
+        "reference/base44/src/components/converts/ConvertCard.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140005_lifecycle.sql",
+        "supabase/tests/database/lifecycle_test.sql"
+      ],
+      "depends_on": [
+        5
+      ],
+      "acceptance": [
+        "Double visit yields one increment/event; concurrent completion/deviation cannot create conflicting terminal state; actor/time spoof denied; stop creates no event; revoked actor cannot finish a later authorized write."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_transition_convert(operation_id uuid,payload jsonb) -> jsonb; action in visit/start/stop/complete/deviate."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/database/task_6_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 7,
+      "title": "Flutter data gateway and scoped pagination",
+      "summary": "Implement strict DTO decoding, cursor pagination and 3-attempt transient retry policy. Keep backend errors distinct from empty results and inject gateway for widget tests.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#architecture-and-dependencies"
+      ],
+      "touches": [
+        "lib/data/supabase_gateway.dart",
+        "lib/data/convert_repository.dart",
+        "lib/data/access_repository.dart"
+      ],
+      "depends_on": [
+        6
+      ],
+      "acceptance": [
+        "A 1,205-row fixture returns every permitted row exactly once; changed access discards stale response; timeout retries reuse operation ID; permanent permission errors do not retry."
+      ],
+      "interfaces": {
+        "produces": [
+          "Gateway.command(String command,String operationId,Map<String,Object?> payload) -> Future<MutationResult>; ConvertRepository.list(ConvertQuery query,String? cursor) -> Future<Page<ConvertRecord>>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/data/repositories_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 8,
+      "title": "Private photo draft and upload protocol",
+      "summary": "Create private bucket/policies and asset protocol; extend create/edit commands for attachment. Use authenticated bytes, no upsert or public URLs. Test Storage API policies against local backend in addition to SQL asset tests.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#shared-photos",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
+        "reference/base44/src/components/converts/PhotoUpload.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140006_photos.sql",
+        "lib/features/photos/photo_repository.dart",
+        "lib/features/photos/photo_processor.dart",
+        "supabase/tests/database/photos_test.sql"
+      ],
+      "depends_on": [
+        7
+      ],
+      "acceptance": [
+        "Cross-owner attach, expired draft, public read and oversize upload denied; image becomes 192x192 JPEG; upload/attach failure keeps old photo; revoked uploader cannot read attached image through ownership."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_create_photo_draft; ieadpe_detach_photo: standard RPC envelope; PhotoRepository.upload(bytes) -> Future<PhotoAsset>; download(PhotoAsset) -> Future<Uint8List>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/photos/photo_test.dart",
+          "test/database/task_8_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 9,
+      "title": "Registration and edit forms",
+      "summary": "Build source form with 512 width, pt-BR validation, optional photo, recoverable save failure and registration success state; inject repositories from Tasks 7–8.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#shared-photos",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/converts/ConvertForm.jsx#",
+        "reference/base44/src/pages/Register.jsx#"
+      ],
+      "touches": [
+        "lib/features/converts/convert_form.dart",
+        "lib/features/converts/register_page.dart",
+        "lib/features/converts/edit_page.dart"
+      ],
+      "depends_on": [
+        8
+      ],
+      "acceptance": [
+        "Phone/congregation may be empty; required trimmed name/landmark fail when blank; age zero survives; double tap submits once; photo selection cancellation preserves draft; source worship selection round-trips.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ConvertForm(initial: ConvertRecord?,onSubmit: Future<void> Function(ConvertDraft)) -> Widget."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/converts/form_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 10,
+      "title": "Lists, cards and lifecycle UI",
+      "summary": "Connect scoped pagination and policies to source cards/actions with pending controls, confirmations and server-refresh on stale mutation. Normalize Brazilian WhatsApp URLs.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/pages/Converts.jsx#",
+        "reference/base44/src/components/utils/sortCongregations.jsx#"
+      ],
+      "touches": [
+        "lib/features/converts/converts_page.dart",
+        "lib/features/converts/convert_card.dart",
+        "lib/features/converts/convert_actions.dart"
+      ],
+      "depends_on": [
+        9
+      ],
+      "acceptance": [
+        "Overdue discipleship is yellow, terminal records are excluded, source name/status/congregation filters work, sede sorts first, unknown congregations last and invalid WhatsApp is disabled.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ConvertsPage(scope: AccessScope) -> Widget; ConvertActions.execute(ConvertAction action,ConvertRecord record) -> Future<void>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/converts/list_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 11,
+      "title": "Weekly reports UI and overview",
+      "summary": "Consume Task 5 confirm command, implement server-authoritative reporting window RPC and scoped overview; avoid browser timezone eligibility.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#atomic-commands-and-concurrency",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/home/WeeklyConversionReport.jsx#",
+        "reference/base44/src/utils/weeklyReportUtils.js#"
+      ],
+      "touches": [
+        "lib/features/weekly/weekly_repository.dart",
+        "lib/features/weekly/weekly_panel.dart",
+        "supabase/migrations/202610140007_weekly_reads.sql",
+        "supabase/tests/database/weekly_test.sql"
+      ],
+      "depends_on": [
+        10
+      ],
+      "acceptance": [
+        "Sunday 19:59 hides and 20:00 shows; direction sees own congregation; global overview shows confirmed/waiting; move/delete/import updates affected week counts correctly.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "WeeklyRepository.overview() -> Future<WeeklyOverview>; confirmZero(String congregationId,String operationId) -> Future<MutationResult>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/weekly/weekly_test.dart",
+          "test/database/task_11_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 12,
+      "title": "Responsive shell and Home",
+      "summary": "Port source gradient, branding and navigation at 768 breakpoint, max width 896, Home metrics, weekly panel and floating feedback placeholder. Aggregate all permitted pages without source 1,000-row truncation.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#business-behavior",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/Layout.jsx#",
+        "reference/base44/src/pages/Home.jsx#"
+      ],
+      "touches": [
+        "lib/features/home/home_page.dart",
+        "lib/features/home/home_repository.dart",
+        "lib/widgets/app_shell.dart",
+        "lib/widgets/brand_header.dart"
+      ],
+      "depends_on": [
+        11
+      ],
+      "acceptance": [
+        "Widths 360/768/1280 have usable navigation; Home totals include terminal but exclude deleted; recent list uses last 7 days/latest 5; registrar redirects private deep link.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "HomeRepository.summary() -> Future<HomeSummary>; AppShell(child: Widget) -> Widget."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/home/home_test.dart",
+          "test/widgets/app_shell_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 13,
+      "title": "Congregation and access management",
+      "summary": "Build five-tab Admin shell, source congregation/access controls and live scope refresh. Reuse Task 3 grant RPCs; expose feedback action later.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/admin/CongregationManager.jsx#",
+        "reference/base44/src/components/admin/UserAccessManager.jsx#"
+      ],
+      "touches": [
+        "lib/features/admin/admin_page.dart",
+        "lib/features/admin/congregations_panel.dart",
+        "lib/features/admin/access_panel.dart",
+        "supabase/migrations/202610140008_catalog_commands.sql",
+        "supabase/tests/database/catalog_test.sql"
+      ],
+      "depends_on": [
+        12
+      ],
+      "acceptance": [
+        "Referenced congregation archives without orphaning records; archived catalog cannot be selected for new record; pending verified-email grant binds once; multiple direction grants work; manager cannot create admin.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_save_congregation; ieadpe_archive_congregation: standard RPC envelope; AdminPage(scope: AccessScope) -> Widget."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/admin/catalog_test.dart",
+          "test/database/task_13_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 14,
+      "title": "Event and conversion reports with file adapters",
+      "summary": "Implement source chart/grouping and XLSX headers. Save web download and Android user-selected accessible destination through platform adapter; no false success toast.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#reports-backup-and-feedback",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/admin/ConversionReport.jsx#",
+        "reference/base44/src/components/admin/ConvertEventsLog.jsx#"
+      ],
+      "touches": [
+        "lib/features/reports/reports_repository.dart",
+        "lib/features/reports/events_panel.dart",
+        "lib/features/reports/conversion_panel.dart",
+        "lib/platform/file_exporter.dart"
+      ],
+      "depends_on": [
+        13
+      ],
+      "acceptance": [
+        "Inclusive dates, explicit Aplicar, column sort and congregation filter export exactly displayed rows; >1,000 rows survive; accents preserved; save cancelled differs from saved on both platforms.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ReportsRepository.events(EventQuery) -> Future<List<ConvertEvent>>; conversions(DateRange) -> Future<List<WorshipCount>>; FileExporter.save(String filename,Uint8List bytes) -> Future<SaveOutcome>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/reports/reports_test.dart",
+          "test/platform/file_exporter_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 15,
+      "title": "Versioned safe XLSX codec",
+      "summary": "Implement exact spec headers, typed text exports, version metadata, limits and deterministic row diagnostics; no binary photos in workbook.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#reports-backup-and-feedback",
+        "reference/base44/src/components/admin/BackupManager.jsx#"
+      ],
+      "touches": [
+        "lib/features/backup/backup_codec.dart",
+        "lib/features/backup/backup_models.dart"
+      ],
+      "depends_on": [
+        14
+      ],
+      "acceptance": [
+        "Round-trip age zero, source 14 columns and v2 dates; legacy missing start stays null; reject formula cells, .xls, malformed ZIP and 10,001 rows; reject compressed >10MiB or expanded >50MiB before unbounded allocation."
+      ],
+      "interfaces": {
+        "produces": [
+          "BackupCodec.decode(Uint8List bytes) -> ImportPreview; encode(List<ConvertRecord> records) -> Uint8List."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/backup/backup_codec_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 16,
+      "title": "Resumable import and backup UI",
+      "summary": "Add global-only validated row RPC sharing Task 5 invariants and unique keys; import per row, persist operation/progress IDs without raw personal values in logs. Connect preview/confirm/progress/export to Backup tab.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#reports-backup-and-feedback",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#atomic-commands-and-concurrency",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/admin/BackupManager.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140009_import.sql",
+        "lib/features/backup/backup_repository.dart",
+        "lib/features/backup/backup_panel.dart",
+        "supabase/tests/database/import_test.sql"
+      ],
+      "depends_on": [
+        15
+      ],
+      "acceptance": [
+        "Import/reimport creates one stable record per internal ID; tombstones skip; interrupted retry resumes; unknown congregation warns/null and ambiguous errors; historical fields preserve eligibility and week counters.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_import_convert(operation_id uuid,payload jsonb) -> jsonb; BackupRepository.importRows(ImportPreview preview) -> Stream<ImportProgress>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/backup/import_test.dart",
+          "test/database/task_16_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 17,
+      "title": "Feedback submission and management",
+      "summary": "Complete floating action and Admin management action; preserve five tabs, strict status enum and recoverable pending UI.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#reports-backup-and-feedback",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#data-model-and-authorization",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#pipeline-ui-requirements",
+        "reference/base44/src/components/FeedbackButton.jsx#",
+        "reference/base44/src/components/admin/FeedbackManager.jsx#"
+      ],
+      "touches": [
+        "supabase/migrations/202610140010_feedback.sql",
+        "lib/features/feedback/feedback_repository.dart",
+        "lib/features/feedback/feedback_dialog.dart",
+        "lib/features/feedback/feedback_manager.dart",
+        "supabase/tests/database/feedback_test.sql"
+      ],
+      "depends_on": [
+        16
+      ],
+      "acceptance": [
+        "Registrar submits but cannot list; blank or >5,000-character message rejected; server actor cannot be spoofed; global manager transitions pending/read/resolved; retry creates one feedback.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "ieadpe_submit_feedback; ieadpe_update_feedback: standard RPC envelope; FeedbackRepository.submit(String message,String operationId) -> Future<MutationResult>."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/features/feedback/feedback_test.dart",
+          "test/database/task_17_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": "Dart database tests must execute the SQL scenarios against real loopback PostgreSQL; SQL text matching or mocked authorization is not sufficient."
+      }
+    },
+    {
+      "id": 18,
+      "title": "Free operations and release preparation",
+      "summary": "Document quotas, inactivity/manual resume, manual DB+Storage backups, Google console/PKCE setup, static web hosting and Android signing. Prepare dry-run cleanup and deployment instructions without provisioning remote resources or activating billing.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#shared-photos",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles"
+      ],
+      "touches": [
+        "docs/operations/supabase-free.md",
+        "docs/operations/google-oauth.md",
+        "docs/operations/release.md",
+        "scripts/maintenance_photos.ps1",
+        "web/_redirects"
+      ],
+      "depends_on": [
+        17
+      ],
+      "acceptance": [
+        "Missing configuration cannot contact production; maintenance skips attached photos and handles partial failure; deep-link refresh works under static hosting configuration; oversized hosting artifact is reported.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "Maintenance dry-run outputs IDs/counts; explicit apply uses Storage API before metadata cleanup."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "test/operations/configuration_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    },
+    {
+      "id": 19,
+      "title": "Complete verification and independent review",
+      "summary": "Run local SQL/security/concurrency suites, Dart/widget/integration tests, analyzer and web/Android debug builds. Independently review whole branch using the fixed model; investigate every failure and fix in-scope causes before final handoff.",
+      "spec_refs": [
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#local-verification-profiles",
+        "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries"
+      ],
+      "touches": [
+        "docs/verification/final-report.md",
+        "test/workflows_test.dart"
+      ],
+      "depends_on": [
+        18
+      ],
+      "acceptance": [
+        "Synthetic end-to-end registrar/direction/supervision/admin journeys cover photo, visit, weekly race, import retry, access revocation and web/Android file retrieval.",
+        "UI uses pt-BR, immediate press feedback, visible focus, 200% text scaling, reduced-motion handling and responsive layout without decorative input locks."
+      ],
+      "interfaces": {
+        "produces": [
+          "Final report contains actual commands/results, screenshots, manifest hashes, review rulings and release dependencies."
+        ],
+        "consumes": [
+          "Predecessor interfaces in the human-readable plan; inspect existing callers before edits."
+        ]
+      },
+      "toolchain_id": "flutter-default",
+      "verification": {
+        "new_test_files": [
+          "integration_test/app_workflows_test.dart"
+        ],
+        "command": "flutter test",
+        "notes": ""
+      }
+    }
+  ],
+  "verification": {
+    "toolchains": [
+      {
+        "id": "flutter-default",
+        "language": "flutter",
+        "test": {
+          "argv": [
+            "flutter",
+            "test"
+          ],
+          "cwd": "."
+        },
+        "analyze": {
+          "argv": [
+            "flutter",
+            "analyze"
+          ],
+          "cwd": "."
+        },
+        "format": {
+          "argv": [
+            "dart",
+            "format",
+            "--set-exit-if-changed",
+            "lib",
+            "test"
+          ],
+          "cwd": "."
+        }
+      }
+    ]
+  }
+}

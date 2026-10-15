@@ -22,7 +22,7 @@ Deliver registration/editing, shared photos, scoped convert lists, visits, disci
 
 Flutter Material 3 with Riverpod, go_router and feature repositories. Use supabase_flutter for Auth, PostgREST RPC and private Storage. SQL migrations own schema, grants, RLS, triggers and business functions. No TypeScript server or Edge Function is required for this release. Keep domain policies pure Dart for UI explanation; SQL is authoritative.
 
-Use intl/timezone, image/image_picker, file_picker, excel/archive, file_saver, url_launcher and uuid where needed. Resolve supported versions once during bootstrap, record rationale and commit pubspec.lock. Web and Android must share domain logic and repository contracts; isolate platform file/auth adapters. Local backend verification uses Supabase CLI + Docker, pgTAP and synthetic accounts. Stop on missing local backend rather than using production as a fallback.
+Use intl/timezone, image/image_picker, file_picker, archive/xml, file_saver, url_launcher and uuid where needed. Resolve supported versions once during bootstrap, record rationale and commit pubspec.lock. Web and Android must share domain logic and repository contracts; isolate platform file/auth adapters. Local backend verification uses Supabase CLI + Docker, pgTAP and synthetic accounts. Stop on missing local backend rather than using production as a fallback.
 
 ## Data model and authorization
 
@@ -87,3 +87,15 @@ Supabase does not host the Flutter website. Prepare build/web for separate stati
 - [Storage access](https://supabase.com/docs/guides/storage/security/access-control)
 - [Local development](https://supabase.com/docs/guides/local-development/cli/getting-started)
 - [Static hosting limits](https://developers.cloudflare.com/pages/platform/limits/)
+
+## Pipeline UI requirements
+
+Apply the installed apple-design principles while preserving source branding: immediate press feedback, readable system typography, text scaling to 200%, keyboard/focus access, spatially consistent reversible panels and no input lock during decorative transitions. Prefer standard Flutter scroll/sheet physics; custom motion must be interruptible. Respect MediaQuery.disableAnimations with a non-spatial transition and preserve layout at 360px. Never obscure pt-BR content with gratuitous blur or motion.
+
+## Local verification profiles
+
+This Windows host has no Docker/WSL service. Use a portable PostgreSQL 17 instance bound to loopback for actual migration, transaction and RLS tests. The test fixture must provide only the Supabase auth/storage schema contracts needed by migrations, including auth.uid()/auth.jwt() and roles; never claim this verifies the Auth or Storage HTTP service. scripts/test_database.py owns isolated databases and runs SQL assertions with ON_ERROR_STOP; Dart database test wrappers surface failures to the Flutter gate. Use IEADPE_PG_BIN for the supervisor-installed binaries. No database fixture may contact production or silently skip when PostgreSQL is missing. Keep SQL assertion scenarios compatible with the full Supabase CLI profile for later service integration.
+
+Google OAuth provider setup, Storage HTTP enforcement and real-device file retrieval require explicit integration evidence in the final report. Distinguish implemented code, unit/SQL checks and unrun service/device checks. No mocked test proves a live service.
+
+Native test server: IEADPE_DATABASE_URL=postgresql://postgres@127.0.0.1:54329/postgres (disposable local trust-auth instance, loopback only). Test harness creates isolated databases, executes migrations and assertion SQL, then drops only its own databases. Plain PostgreSQL DO/RAISE assertions are acceptable in the native profile; do not fake a pgTAP implementation. Preserve full-stack integration instructions separately.

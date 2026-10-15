@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "backend": "codex",
+  "roles": {
+    "operator": {
+      "model": "gpt-6.1-sol",
+      "settings": {
+        "model_reasoning_effort": "low"
+      },
+      "policy": "workspace-write",
+      "instruction": "C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/codex/operator.md"
+    },
+    "reviewer": {
+      "model": "gpt-6.1-sol",
+      "settings": {
+        "model_reasoning_effort": "low"
+      },
+      "policy": "read-only",
+      "instruction": "C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/codex/reviewer.md"
+    },
+    "director": {
+      "model": "gpt-6.1-sol",
+      "settings": {
+        "model_reasoning_effort": "low"
+      },
+      "policy": "read-only",
+      "instruction": "C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/codex/director.md"
+    }
+  },
+  "toolchains": {
+    "flutter-default": {
+      "language": "flutter",
+      "executable": "flutter",
+      "red_adapter": "flutter_machine",
+      "commands": {
+        "red": {
+          "argv": [
+            "flutter",
+            "test",
+            "--machine",
+            "{test_paths}"
+          ]
+        },
+        "test": {
+          "argv": [
+            "flutter",
+            "test"
+          ]
+        },
+        "analyze": {
+          "argv": [
+            "flutter",
+            "analyze"
+          ]
+        },
+        "format": {
+          "argv": [
+            "dart",
+            "format",
+            "--set-exit-if-changed",
+            "lib",
+            "test"
+          ]
+        }
+      }
+    }
+  },
+  "retention_days": 30,
+  "coder_cycle_limits": [
+    5,
+    3,
+    3
+  ],
+  "publication": "local",
+  "max_parallel": 1,
+  "dispatch_timeout_seconds": 1800,
+  "confirmation": {
+    "confirmed": true,
+    "configuration_hash": "4a91e45c1cf8dc498c83f222e8f02a13f1ad592aeaab180be580e6462abfe96f",
+    "provenance": "User explicitly selected pipeline, all roles gpt-6.1-sol/low, and authorized spec, plan and implementation without further approval."
+  }
+}
