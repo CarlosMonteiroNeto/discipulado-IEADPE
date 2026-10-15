@@ -15,14 +15,13 @@
     {
       "id": 1,
       "title": "Bootstrap the local application",
-      "summary": "Create Flutter web/Android scaffold, resolve and lock packages, initialize local Supabase and Git after checking parent instructions. Record Flutter, Java, Android SDK, Docker and CLI availability.",
+      "summary": "The deterministic Flutter scaffold, dependency lock and Git repository are already prepared. Implement the localized App and Configuration with a recoverable missing-backend screen, plus the local check script and Supabase config. Do not recreate platform scaffolds or change the locked dependency set.",
       "spec_refs": [
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#global-constraints",
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#architecture-and-dependencies",
         "docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md#free-tier-and-release-boundaries"
       ],
       "touches": [
-        "pubspec.yaml",
         "lib/main.dart",
         "lib/app.dart",
         "supabase/config.toml",
@@ -37,7 +36,7 @@
       ],
       "interfaces": {
         "produces": [
-          "App() -> Widget; local-only configuration through --dart-define."
+          "App() -> Widget; Configuration.fromEnvironment() -> Configuration. Read dart-defines SUPABASE_URL and SUPABASE_PUBLISHABLE_KEY; missing values show pt-BR setup guidance and never contact a fallback backend."
         ],
         "consumes": []
       },
