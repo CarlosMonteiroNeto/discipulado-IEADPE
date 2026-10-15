@@ -1,0 +1,13 @@
+# Project-scoped Codex execution settings. Example only; merge deliberately.
+# Preserve unrelated settings and inspect custom role files for overrides.
+model = "gpt-6.1-sol"
+model_reasoning_effort = "low"
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-6.1-sol"
+default_subagent_reasoning_effort = "low"
+
+# Concurrency is a ceiling, not a request to implement tasks in parallel.
+# This plan has one active implementation writer and one independent review per task.

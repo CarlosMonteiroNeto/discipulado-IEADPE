@@ -1,0 +1,9 @@
+.superpowers/
+.pipeline-preflight/
+.worktrees/
+.dart_tool/
+build/
+.env
+*.jks
+*.keystore
+android/local.properties

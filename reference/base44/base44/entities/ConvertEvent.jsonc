@@ -1,0 +1,42 @@
+{
+  "name": "ConvertEvent",
+  "type": "object",
+  "properties": {
+    "convert_id": {
+      "type": "string",
+      "description": "ID do convertido"
+    },
+    "convert_name": {
+      "type": "string",
+      "description": "Nome do convertido"
+    },
+    "congregation_id": {
+      "type": "string",
+      "description": "ID da congrega\u00e7\u00e3o"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "visit",
+        "discipleship_started",
+        "discipleship_completed",
+        "deviated"
+      ],
+      "description": "Tipo do evento"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data do evento"
+    },
+    "done_by_email": {
+      "type": "string",
+      "description": "Email de quem registrou"
+    }
+  },
+  "required": [
+    "convert_id",
+    "event_type",
+    "event_date"
+  ]
+}

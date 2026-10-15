@@ -1,0 +1,88 @@
+{
+  "name": "Convert",
+  "type": "object",
+  "properties": {
+    "congregation_id": {
+      "type": "string",
+      "description": "ID da congrega\u00e7\u00e3o"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "URL da foto do convertido"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nome completo"
+    },
+    "address": {
+      "type": "string",
+      "description": "Endere\u00e7o"
+    },
+    "landmark": {
+      "type": "string",
+      "description": "Ponto de refer\u00eancia"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Telefone"
+    },
+    "age": {
+      "type": "number",
+      "description": "Idade"
+    },
+    "gender": {
+      "type": "string",
+      "enum": [
+        "male",
+        "female"
+      ],
+      "description": "G\u00eanero"
+    },
+    "conversion_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da convers\u00e3o"
+    },
+    "worship_type": {
+      "type": "string",
+      "description": "Tipo de culto da decis\u00e3o"
+    },
+    "last_visit_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data da \u00faltima visita"
+    },
+    "was_visited_once": {
+      "type": "boolean",
+      "description": "Foi visitado pelo menos 1 vez"
+    },
+    "visit_count": {
+      "type": "number",
+      "description": "N\u00famero de visitas realizadas"
+    },
+    "is_in_discipleship": {
+      "type": "boolean",
+      "description": "Est\u00e1 em discipulado"
+    },
+    "discipleship_start_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Data de in\u00edcio do discipulado"
+    },
+    "is_discipleship_completed": {
+      "type": "boolean",
+      "description": "Concluiu o discipulado"
+    },
+    "is_deviated": {
+      "type": "boolean",
+      "description": "Se desviou"
+    }
+  },
+  "required": [
+    "name",
+    "landmark",
+    "gender",
+    "conversion_date",
+    "worship_type"
+  ]
+}
