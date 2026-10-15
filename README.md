@@ -1,17 +1,21 @@
-# ieadpe_converts
+# IEADPE Converts — Flutter conversion
 
-A new Flutter project.
+Target: Flutter web and Android, pt-BR UI, Supabase Free and Google OAuth. Source capture is immutable under reference/base44. Personal records have not been migrated.
 
-## Getting Started
+## Current state
 
-This project is a starting point for a Flutter application.
+Flutter scaffold, dependency lock and executable pipeline plan are prepared. Product implementation is pending; do not mistake the scaffold counter screen for the converted app.
 
-A few resources to get you started if this is your first Flutter project:
+## Execution
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+Use docs/superpowers/plans/2026-10-14-ieadpe-flutter-supabase-free-plan.json and ieadpe-pipeline-runtime.json through the installed two-model-sdd-pipeline Codex launcher. Every role is pinned to gpt-6.1-sol / low, local publication and one active task. The runbook describes the approved unattended workflow. Full evidence is retained in the ignored pipeline workspace.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Glossary
+
+- Script CEO: deterministic routing, dispatch, gates and ledger.
+- Operator: implementation and RED/GREEN evidence.
+- Reviewer: independent semantic and test-quality review.
+- Director: same-model corrections and closing assessment.
+- Local database profile: real loopback PostgreSQL with synthetic Auth/Storage schema fixtures; it does not certify live Supabase services.
+
+See docs/research/pipeline-runtime.md for the reviewed project hook adapter and local tooling decisions. No production backend, billing, publishing or signing credentials have been configured.

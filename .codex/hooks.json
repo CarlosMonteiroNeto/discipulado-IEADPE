@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/Carlos_Neto/AppData/Local/Programs/Python/Python312/python.exe\" \"C:/Users/Carlos_Neto/.codex/worktrees/ieadpe-supabase-pipeline/App discipulado/.codex/pipeline_hook.py\"",
+            "commandWindows": "\"C:/Users/Carlos_Neto/AppData/Local/Programs/Python/Python312/python.exe\" \"C:/Users/Carlos_Neto/.codex/worktrees/ieadpe-supabase-pipeline/App discipulado/.codex/pipeline_hook.py\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
