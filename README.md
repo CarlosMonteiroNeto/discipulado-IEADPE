@@ -1,31 +1,31 @@
-> Development workflow: standard Superpowers SDD, activated 2026-10-15 by user instruction. Custom pipeline runtime experiments are suspended and are not required to build or run the app.
+# IEADPE Converts
 
-# IEADPE Converts — Flutter conversion
+Flutter web and Android application with pt-BR UI, Supabase Free and Google OAuth. The immutable source capture is under `reference/base44`; personal records have not been migrated.
 
-Target: Flutter web and Android, pt-BR UI, Supabase Free and Google OAuth. Source capture is immutable under reference/base44. Personal records have not been migrated.
+## Bootstrap status
 
-## Current state
+The app starts in Brazilian Portuguese. Missing or invalid build configuration displays a recoverable unavailable screen. Valid public configuration displays an honest preparation state until authentication and routing are implemented in subsequent tasks. Bootstrap does not initialize a network client or contact a fallback backend.
 
-Flutter scaffold, dependency lock and executable pipeline plan are prepared. Product implementation is pending; do not mistake the scaffold counter screen for the converted app.
+## Local development
 
-## Execution
+Use the committed dependency lock with `flutter pub get`. Configure a local backend through build-time Dart defines:
 
-Use docs/superpowers/plans/2026-10-14-ieadpe-flutter-supabase-free-plan.json and ieadpe-pipeline-runtime.json through the installed two-model-sdd-pipeline Codex launcher. Every role is pinned to gpt-6.1-sol / low, local publication and one active task. The runbook describes the approved unattended workflow. Full evidence is retained in the ignored pipeline workspace.
+```powershell
+flutter run -d chrome --web-port 3000 --dart-define=SUPABASE_URL=http://127.0.0.1:54321 --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_LOCAL_PUBLIC_KEY
+```
 
-## Glossary
+`Configuration.fromEnvironment()` reads only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Use an HTTPS backend URL or HTTP on loopback (`localhost`, `127.0.0.1`, `::1`); Android emulator access to the host uses `10.0.2.2`. Use the public publishable key (`sb_publishable_…`), never secret/service-role credentials. Public build values are visible to app users. Correct missing configuration and restart/rebuild the app; retry rechecks the current build configuration.
 
-- Script CEO: deterministic routing, dispatch, gates and ledger.
-- Operator: implementation and RED/GREEN evidence.
-- Reviewer: independent semantic and test-quality review.
-- Director: same-model corrections and closing assessment.
-- Local database profile: real loopback PostgreSQL with synthetic Auth/Storage schema fixtures; it does not certify live Supabase services.
+The checked-in `supabase/config.toml` describes local CLI ports and disables email/SMS signup. Starting the full local stack requires Supabase CLI and Docker (`supabase start`). Neither is installed on the current host. Google provider configuration and real Auth/Storage verification remain separate integration work; no production credentials or services are used as a fallback. The native PostgreSQL verification profile is described in `docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md` and verifies SQL contracts only.
 
-See docs/research/pipeline-runtime.md for the reviewed project hook adapter and local tooling decisions. No production backend, billing, publishing or signing credentials have been configured.
+## Checks
 
-## Migration workspace and pipeline runtime
+```powershell
+./scripts/check.ps1
+```
 
-The immutable Base44 capture is in `reference/base44`; its manifest records 101 file checksums. Migration decisions and the executable 19-task plan are in `docs/superpowers`. This checkout currently contains the Flutter scaffold; product implementation completion is recorded only by the script-owned ledger and final verification report.
+This runs `flutter analyze` and `flutter test`, stopping on failure. Widget checks cover pt-BR locale, recovery keyboard interaction, narrow layouts, large text and reduced motion. They do not certify live Supabase, Google OAuth, Storage HTTP or real Android device behavior.
 
-The local runtime adapter is `.codex/codex_adapter.py`. It preserves gpt-6.1-sol / low, narrows native tools to read-only, and registers `.codex/scoped_tools.py` with the attempt policy supplied explicitly. The operator receives declared-path writes and closed scoped checks; reviewer and director receive read capabilities. Scoped checks invoke the installed `scoped-run` and `scripts/cmd`. Runtime regression checks: `python -B .codex/tests/test_scoped_tools.py`, invoked through the shared command runner.
+## Workflow
 
-Linked Codex worktrees discover project hook declarations in the primary checkout. The reviewed hook is registered there, but live controls show that nested Code Mode edits do not invoke its denial. The native read-only sandbox and task-bound MCP capabilities are the active runtime boundary; hooks are not claimed as complete enforcement. Authoritative scope checks, RED evidence checks, full gates and independent reviews remain mandatory.
+Use standard Superpowers SDD with direct project tools, TDD and independent task review. The 19-task plan and accepted design are under `docs/superpowers`. Custom pipeline runtime experiments are suspended. Production deployment, live access grants and private-record migration require separate release actions. No billing, publishing or signing credentials are configured.
