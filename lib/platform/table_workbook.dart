@@ -5,7 +5,11 @@ import 'package:archive/archive.dart';
 import 'package:xml/xml.dart';
 
 /// A minimal OOXML workbook. All values are strings, including formula-like text.
-Uint8List tableWorkbook(String sheet, List<List<String>> rows) {
+Uint8List tableWorkbook(
+  String sheet,
+  List<List<String>> rows, {
+  Map<String, String> definedNames = const {},
+}) {
   final archive = Archive();
   void add(String path, String text) {
     archive.addFile(ArchiveFile.bytes(path, utf8.encode(text)));
@@ -39,6 +43,18 @@ Uint8List tableWorkbook(String sheet, List<List<String>> rows) {
       ]),
     ]),
   );
+  if (definedNames.isNotEmpty) {
+    root.children.add(
+      XmlElement(XmlName.parts('definedNames'), [], [
+        for (final entry in definedNames.entries)
+          XmlElement(
+            XmlName.parts('definedName'),
+            [XmlAttribute(XmlName.parts('name'), entry.key)],
+            [XmlText(entry.value)],
+          ),
+      ]),
+    );
+  }
   add('xl/workbook.xml', root.toXmlString());
   add(
     'xl/_rels/workbook.xml.rels',
