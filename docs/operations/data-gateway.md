@@ -99,3 +99,35 @@ Admin reuses `AccessRepository.save/revoke`, including trusted verified-email bi
 A pending or recoverably failed write retains its exact closure snapshot and UUID until resolution. While uncertain, mutation editors and tab/refresh actions are disabled and a dedicated retry action resends the same snapshot. Equivalent scope snapshots preserve this owner. Confirmation panels live inside the protected subtree, so they disappear with permission loss. Applied commands clear displayed collections, invalidate the shared boundary synchronously, then request `SessionRouter.refresh`; Admin stays in an access-refresh state until the root supplies a fresh protected owner. Root invalidation must unmount the whole owner even when resulting role flags are equal. This component never treats a client scope flag as backend authorization.
 
 The existing convert RPC still rejects saving an archived congregation, including an unchanged archived reference. Existing convert/event records are retained and remain readable to authorized users. Editing such a record requires selecting an active replacement or clearing the congregation, subject to the existing old/new scope rule. Controller confirmed this established behavior is compatible with Task 13; no implicit unarchive operation was added.
+
+## Event and conversion reports (Task 14)
+
+The existing Admin builders accept the real protected panels; final root composition remains Task 19:
+
+```dart
+final reports = ReportsRepository(sharedGateway);
+final exporter = createFileExporter();
+AdminPage(
+  scope: guard.scope!,
+  gateway: sharedGateway,
+  onScopeRefresh: guard.refresh,
+  reportBuilder: (_) => ConversionPanel(
+    repository: reports, exporter: exporter, onScopeRefresh: guard.refresh),
+  eventsBuilder: (_) => EventsPanel(
+    repository: reports, exporter: exporter, onScopeRefresh: guard.refresh),
+);
+```
+
+Import the panels from `features/reports`, repository from `reports_repository.dart`, and the platform factory from `platform/file_exporter.dart`. Keep the whole Admin/report owner inside the protected root and synchronously unmount it on logout, identity change, guard revocation or shared-boundary invalidation, even when replacement scope flags compare equal. The panels capture request/context owners, suppress obsolete loads/sorts/save feedback, clear their row collections and overwrite retained XLSX bytes on clear/dispose. They do not persist report records. A disposed panel's save guard rejects even if the gateway generation itself has not changed. Production root mounting/clearing is Task 19.
+
+`ReportsRepository.events(EventQuery)` traverses bounded immutable UUID pages of `convert_events` through the same gateway. It validates page order, DTOs and captured context, filters inclusive optional business dates and requests the selected congregation as a narrowing filter. `conversions(DateRange)` traverses all non-deleted converts and groups their inclusive conversion dates by worship type, using `Não informado` for absent/empty type and descending counts. Neither traversal caps at 1,000 nor represents a database snapshot across concurrent edits. Permissions remain RLS authoritative. The only gateway change is the additive `convert_events` read allowlist; existing callers remain compatible.
+
+Events require `Aplicar`; editing a filter clears displayed/exportable results until the next application. Conversion report initially loads all dates and applies subsequent edits explicitly. Report tables sort textual columns with the existing actual platform pt-BR collation and dates/counts by their real values. The workbook is prepared from exactly the displayed headers/rows after each successful load or sort. `tableWorkbook(sheet, rows)` is a shared minimal OOXML ZIP writer for Task 15 reuse; every cell is an inline string, so names/accents and formula-like user text remain literal strings. It is not CSV and introduces no dependency changes.
+
+`FileExporter.save(filename, bytes, {ensureCurrent})` preserves the two positional arguments and adds an optional protected-owner callback. Callers holding protected data must supply it. The report panels do. Workbook bytes are prepared before a click, and the web picker is invoked before the first await, preserving user activation.
+
+- Web uses `showSaveFilePicker` in a supporting secure-context Chromium browser, then rechecks owner/context after the chooser and writable acquisition, writes bytes and waits for close. Only completed close returns `saved`; user picker AbortError returns `cancelled`; unavailable API, rejected permissions and write/close errors return `failed`. There is no anchor-download fallback or invented success. Firefox/Safari and insecure deployments without this API show a plain retry/compatible-platform failure; do not claim a downloaded file there.
+- Android uses the additive `br.org.ieadpe/export` channel. `choose` opens `ACTION_CREATE_DOCUMENT` with the XLSX MIME/name and retains no personal bytes. After selection, Dart rechecks its protected owner before sending bytes to `write`. Native code accepts only its selected URI, requires a real output stream and completes write/flush/close before `saved`; cancelled chooser returns `cancelled`. Provider failures and activity detachment return `failed`. No storage permission or inaccessible app-private destination is used. Existing collation setup and `super.configureFlutterEngine` remain intact.
+- Clearing/unmounting the report during a pending chooser overwrites its held bytes; the guard prevents a subsequent obsolete write. A write already handed to a browser/native provider can finish after invalidation and is an irreversible boundary, like any user-authorized save. Neither scope invalidation nor a failure result can revoke a file the user has already saved. A failed write may leave an empty or partial document in the chosen provider; no fallback success is reported.
+
+Evidence: host widget/repository/channel checks, actual SDK loopback pagination, actual JVM production stream writer and a production DartJS adapter running in local Chrome. The Chrome smoke uses explicit JS picker/writable fixtures and does **not** establish actual OS picker permissions, actual accessible filesystem saving, or cancellation on either platform. No Android device/emulator was connected. Before release, verify an actual user save/cancel/provider error on web and Android, retrieve/open the resulting accented XLSX, and exercise logout/user switch/revocation while the chooser is open and while a write is underway. Android APK compile evidence is tracked separately in the Task 14 report; compilation is not platform save verification.

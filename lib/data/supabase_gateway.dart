@@ -120,6 +120,7 @@ class SupabaseGateway implements ReadRpcGateway {
       'user_access',
       'photo_assets',
       'congregations',
+      'convert_events',
     }.contains(table)) {
       throw ArgumentError.value(table, 'table');
     }
