@@ -1,14 +1,31 @@
 """Synthetic HTTP contract checks; not a Supabase Storage service emulator."""
 import json
+import os
+import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 import unittest
+from unittest.mock import patch
 from urllib.error import HTTPError
 from cleanup_photos import cleanup
 
 
 class CleanupTest(unittest.TestCase):
-    def fixture(self, fail_delete=False):
+    def test_empty_key_fails_before_request(self):
+        with patch('urllib.request.urlopen') as request:
+            request.return_value.__enter__.return_value.read.return_value = b'[]'
+            with self.assertRaises(ValueError):
+                cleanup('https://synthetic.supabase.co', '')
+            request.assert_not_called()
+
+    def test_dry_run_reports_ids_without_paths(self):
+        url, calls = self.fixture()
+        with patch('builtins.print') as output:
+            self.assertEqual(cleanup(url, 'synthetic-key'), (1, 0))
+        self.assertIn('synthetic-id', str(output.call_args_list))
+        self.assertNotIn('synthetic-owner', str(output.call_args_list))
+
+    def fixture(self, fail_delete=False, partial=False):
         calls = []
         class Handler(BaseHTTPRequestHandler):
             def log_message(self, *_):
@@ -22,12 +39,23 @@ class CleanupTest(unittest.TestCase):
 
             def do_GET(self):
                 calls.append(("GET", self.path, None))
-                self.respond([{"id": "synthetic-id", "path": "synthetic-owner/synthetic-id.jpg"}])
+                # Model server eligibility: attached rows are never selected.
+                from urllib.parse import parse_qs, urlsplit
+                filters = parse_qs(urlsplit(self.path).query)
+                if filters.get('or', [''])[0].startswith('(status.eq.detached,and(status.eq.pending,expires_at.lte.'):
+                    rows = [{"id": "synthetic-id", "path": "synthetic-owner/synthetic-id.jpg"}]
+                    if partial:
+                        rows.append({"id": "second-id", "path": "synthetic-owner/second-id.jpg"})
+                    self.respond(rows)
+                else:
+                    self.respond([{"id": "attached-id", "path": "attached.jpg"}])
 
             def mutate(self):
                 body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
                 calls.append((self.command, self.path, body))
-                self.respond({}, 503 if fail_delete and self.command == "DELETE" else 200)
+                failed = fail_delete and self.command == "DELETE"
+                failed = failed or (partial and self.command == "DELETE" and 'second-id' in str(body))
+                self.respond({}, 503 if failed else 200)
 
             do_DELETE = mutate
             do_POST = mutate
@@ -59,6 +87,25 @@ class CleanupTest(unittest.TestCase):
         with self.assertRaises(HTTPError):
             cleanup(url, "synthetic-key", True)
         self.assertEqual([c[0] for c in calls], ["GET", "DELETE"])
+
+    def test_partial_failure_keeps_failed_asset_metadata_and_skips_attached(self):
+        url, calls = self.fixture(partial=True)
+        with self.assertRaises(HTTPError):
+            cleanup(url, 'synthetic-key', True)
+        self.assertEqual([c[0] for c in calls], ['GET', 'DELETE', 'POST', 'DELETE'])
+        self.assertEqual(calls[2][2], {'asset_id': 'synthetic-id'})
+        self.assertNotIn('attached-id', str(calls))
+
+    def test_powershell_wrapper_propagates_failure_without_metadata_delete(self):
+        url, calls = self.fixture(fail_delete=True)
+        result = subprocess.run(
+            ['pwsh', '-NoProfile', '-File', 'scripts/maintenance_photos.ps1', '-Apply'],
+            env={**os.environ, 'SUPABASE_URL': url, 'SUPABASE_SERVICE_ROLE_KEY': 'synthetic-key'},
+            capture_output=True, text=True, timeout=30,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual([c[0] for c in calls], ['GET', 'DELETE'])
+        self.assertNotIn('synthetic-key', result.stdout + result.stderr)
 
 
 if __name__ == "__main__":

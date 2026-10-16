@@ -12,6 +12,8 @@ import urllib.request
 
 
 def cleanup(url, key, execute=False):
+    if not url or not url.strip() or not key or not key.strip():
+        raise ValueError("Missing operator configuration")
     endpoint = urllib.parse.urlparse(url)
     if endpoint.scheme != "https" and not (
         endpoint.scheme == "http" and endpoint.hostname in ("localhost", "127.0.0.1", "::1")
@@ -39,6 +41,7 @@ def cleanup(url, key, execute=False):
     rows = request("GET", "/rest/v1/photo_assets?" + query)
     if not isinstance(rows, list):
         raise ValueError("Invalid cleanup response")
+    print(json.dumps({"eligible_ids": [row["id"] for row in rows], "count": len(rows)}))
     removed = 0
     for row in rows:
         if execute:
