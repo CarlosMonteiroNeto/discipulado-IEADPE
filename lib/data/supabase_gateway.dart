@@ -41,7 +41,16 @@ abstract interface class Gateway {
   );
 }
 
-class SupabaseGateway implements Gateway {
+/// Additive protected read-RPC contract; existing Gateway implementers remain valid.
+abstract interface class ReadRpcGateway implements Gateway {
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  });
+}
+
+class SupabaseGateway implements ReadRpcGateway {
   SupabaseGateway(
     this.client,
     this.boundary, {
@@ -129,6 +138,31 @@ class SupabaseGateway implements Gateway {
           .retry(enabled: false, requestTimeout: requestTimeout);
     });
     if (result.length > 100) throw const DataFailure('invalid_response');
+    return result;
+  }
+
+  @override
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  }) async {
+    if (rpc != 'weekly_overview' ||
+        parameters.keys.any(
+          (key) => !{'after_id', 'expected_week'}.contains(key),
+        )) {
+      throw const DataFailure('invalid');
+    }
+    final frozen = Map<String, Object?>.unmodifiable(parameters);
+    final result = await _run(
+      context,
+      () => client
+          .rpc('ieadpe_$rpc', params: frozen)
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    if (result is! Map<String, dynamic>) {
+      throw const DataFailure('invalid_response');
+    }
     return result;
   }
 

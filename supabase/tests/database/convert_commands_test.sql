@@ -1,4 +1,9 @@
 BEGIN;
+-- This predecessor command scenario needs an open reporting window on every host day.
+-- The dedicated weekly fixture separately proves closed-window rejection.
+CREATE OR REPLACE FUNCTION private.weekly_now() RETURNS timestamptz
+LANGUAGE sql STABLE SET search_path='' AS $$
+ SELECT CASE WHEN private.report_week(now()) IS NULL THEN now()-interval '1 day' ELSE now() END $$;
 CREATE FUNCTION pg_temp.assert_true(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'ASSERTION: %',label; END IF; END $$;
 INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
@@ -85,7 +90,7 @@ END $$;
 SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000002',true);
 RESET ROLE;
 SELECT pg_temp.assert_true(private.report_week('2026-10-19 00:00:00+00')='2026-10-12','Sunday after 20:00 Sao Paulo opens completed week');
-SELECT pg_temp.assert_true(private.report_week('2026-10-18 22:59:59+00')='2026-10-05','Sunday before 20:00 uses previous completed week');
+SELECT pg_temp.assert_true(private.report_week('2026-10-18 22:59:59+00') IS NULL,'Sunday before 20:00 closes fresh confirmation');
 SET LOCAL ROLE authenticated;
 SELECT public.ieadpe_delete_convert('52000000-0000-0000-0000-000000000003',(SELECT value FROM result));
 SELECT pg_temp.assert_true(public.ieadpe_delete_convert('52000000-0000-0000-0000-000000000003',(SELECT value FROM result))=(SELECT value FROM result),'delete replay returns original ID');
@@ -98,7 +103,7 @@ DO $$ BEGIN
  RAISE EXCEPTION 'ASSERTION: tombstone internal ID reused'; EXCEPTION WHEN unique_violation THEN NULL; END;
 END $$;
 -- Latest completed week comes from server time; clients cannot choose a week.
-DO $$ DECLARE report_a jsonb; report_b jsonb; created jsonb; wk date:=private.report_week(now());
+DO $$ DECLARE report_a jsonb; report_b jsonb; created jsonb; wk date:=private.report_week(private.weekly_now());
  payload jsonb; before_receipts bigint; BEGIN
  PERFORM set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000003',true);
  report_a:=public.ieadpe_confirm_zero('52000000-0000-0000-0000-000000000004',

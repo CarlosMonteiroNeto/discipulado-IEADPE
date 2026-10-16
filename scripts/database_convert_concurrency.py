@@ -70,7 +70,15 @@ def check_convert_concurrency(psql, connection):
         INSERT INTO private.admin_allowlist VALUES('{manager}');
         INSERT INTO public.congregations(id,name) VALUES('{scope}','Synthetic concurrent');
     """)
-    week = query("SELECT private.report_week(now())")
+    # Keep this real race scenario open even on Sunday before 20:00.
+    # Closed-window eligibility belongs to weekly_test.sql, not this lock fixture.
+    query("""
+        CREATE OR REPLACE FUNCTION private.weekly_now() RETURNS timestamptz
+        LANGUAGE sql STABLE SET search_path='' AS $$
+        SELECT CASE WHEN private.report_week(now()) IS NULL
+          THEN now()-interval '1 day' ELSE now() END $$;
+    """)
+    week = query("SELECT private.report_week(private.weekly_now())")
 
     def authenticated(actor):
         return ("BEGIN; SET LOCAL ROLE authenticated; "
