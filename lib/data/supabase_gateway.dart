@@ -115,7 +115,12 @@ class SupabaseGateway implements ReadRpcGateway {
     String? name,
     bool excludeDeleted = false,
   }) async {
-    if (!{'converts', 'user_access', 'photo_assets'}.contains(table)) {
+    if (!{
+      'converts',
+      'user_access',
+      'photo_assets',
+      'congregations',
+    }.contains(table)) {
       throw ArgumentError.value(table, 'table');
     }
     final result = await _run(context, () {
@@ -188,7 +193,8 @@ class SupabaseGateway implements ReadRpcGateway {
     final allowed = switch (command) {
       'create_convert' => editable,
       'edit_convert' => {...editable, 'id'},
-      'delete_convert' || 'revoke_access' => {'id'},
+      'delete_convert' || 'revoke_access' || 'archive_congregation' => {'id'},
+      'save_congregation' => {'id', 'name'},
       'transition_convert' => {'id', 'action'},
       'confirm_zero' => {'congregation_id'},
       'create_photo_draft' => <String>{},
