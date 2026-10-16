@@ -50,7 +50,14 @@ abstract interface class ReadRpcGateway implements Gateway {
   });
 }
 
-class SupabaseGateway implements ReadRpcGateway {
+abstract interface class ImportRpcGateway implements Gateway {
+  Future<Map<String, dynamic>> importRow(
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
+class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
   SupabaseGateway(
     this.client,
     this.boundary, {
@@ -170,6 +177,55 @@ class SupabaseGateway implements ReadRpcGateway {
       throw const DataFailure('invalid_response');
     }
     return result;
+  }
+
+  @override
+  Future<Map<String, dynamic>> importRow(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    const allowed = {
+      'internal_id',
+      'name',
+      'landmark',
+      'gender',
+      'conversion_date',
+      'worship_type',
+      'congregation_name',
+      'address',
+      'phone',
+      'age',
+      'last_visit_date',
+      'was_visited_once',
+      'visit_count',
+      'is_in_discipleship',
+      'discipleship_start_date',
+      'is_discipleship_completed',
+      'is_deviated',
+    };
+    if (payload.keys.any((key) => !allowed.contains(key))) {
+      throw const DataFailure('invalid');
+    }
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final result = await _run(
+      context,
+      () => client
+          .rpc(
+            'ieadpe_import_convert',
+            params: {'operation_id': operationId, 'payload': frozen},
+          )
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    if (result is! Map<String, dynamic> ||
+        !{'created', 'duplicate', 'tombstone'}.contains(result['status']) ||
+        result.keys.any((k) => !{'id', 'status', 'warning'}.contains(k)) ||
+        (result['warning'] != null &&
+            result['warning'] != 'unknown_congregation')) {
+      throw const DataFailure('invalid_response');
+    }
+    validateUuid(result['id']);
+    return Map.unmodifiable(result);
   }
 
   @override

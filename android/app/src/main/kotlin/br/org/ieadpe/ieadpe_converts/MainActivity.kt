@@ -28,6 +28,26 @@ class MainActivity : FlutterActivity() {
                     }
                 }
             }
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "br.org.ieadpe/import-progress")
+            .setMethodCallHandler { call, result ->
+                val key = call.argument<String>("key")
+                val value = call.argument<String>("value")
+                val uuid = "[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}"
+                if (key == null || !Regex("$uuid:$uuid").matches(key) ||
+                    (call.method == "write" && (value == null || !Regex(uuid).matches(value)))) {
+                    result.error("invalid", "Invalid progress identifier", null)
+                } else {
+                    val prefs = getSharedPreferences("ieadpe_import_progress_v1", MODE_PRIVATE)
+                    when (call.method) {
+                        "read" -> result.success(prefs.getString(key, null))
+                        "write" -> if (prefs.edit().putString(key, value).commit()) result.success(true)
+                            else result.error("unavailable", "Progress unavailable", null)
+                        "remove" -> if (prefs.edit().remove(key).commit()) result.success(true)
+                            else result.error("unavailable", "Progress unavailable", null)
+                        else -> result.notImplemented()
+                    }
+                }
+            }
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "br.org.ieadpe/export")
             .setMethodCallHandler { call, result ->
                 when (call.method) {

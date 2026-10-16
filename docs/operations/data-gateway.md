@@ -131,3 +131,28 @@ Events require `Aplicar`; editing a filter clears displayed/exportable results u
 - Clearing/unmounting the report during a pending chooser overwrites its held bytes; the guard prevents a subsequent obsolete write. A write already handed to a browser/native provider can finish after invalidation and is an irreversible boundary, like any user-authorized save. Neither scope invalidation nor a failure result can revoke a file the user has already saved. A failed write may leave an empty or partial document in the chosen provider; no fallback success is reported.
 
 Evidence: host widget/repository/channel checks, actual SDK loopback pagination, actual JVM production stream writer and a production DartJS adapter running in local Chrome. The Chrome smoke uses explicit JS picker/writable fixtures and does **not** establish actual OS picker permissions, actual accessible filesystem saving, or cancellation on either platform. No Android device/emulator was connected. Before release, verify an actual user save/cancel/provider error on web and Android, retrieve/open the resulting accented XLSX, and exercise logout/user switch/revocation while the chooser is open and while a write is underway. Android APK compile evidence is tracked separately in the Task 14 report; compilation is not platform save verification.
+
+## Resumable application backup (Task 16)
+
+Mount the protected Backup tab using the actual codec, gateway and platform adapters:
+
+```dart
+final backup = BackupRepository(sharedGateway, createImportProgressStore());
+// imports: features/backup/backup_repository.dart,
+// features/backup/backup_panel.dart, platform/import_progress_store.dart
+backupBuilder: (_) => BackupPanel(
+  repository: backup,
+  exporter: exporter,
+  onScopeRefresh: guard.refresh,
+),
+```
+
+Task 19 must synchronously unmount the entire Backup/Admin owner on shared-boundary invalidation, logout, revocation or identity change, even for equivalent replacement scopes. The panel clears its parsed preview, progress and confirmation and overwrites export bytes on disposal/replacement. It checks ownership after the picker, size lookup, every file-stream chunk, codec work, every import progress event, export preparation and save completion. The exporter receives the protected owner callback and is entered synchronously on the save press. A previously sent database mutation or provider write can finish remotely; invalidation prevents further traversal/publication and cannot undo it. Keep the same repository and owner across ordinary rebuilds so a pending action is not discarded.
+
+The additive `ImportRpcGateway.importRow(operationId, payload)` uses the shared real SDK timeout/retry/context protocol and validates the narrow response. Existing `Gateway.command` callers remain unchanged. The public `ieadpe_import_convert` RPC authorizes current global access before receipt replay, validates imported fields and date-only history, serializes the legacy key and active catalog, and updates the shared congregation/week guard and matching zero report atomically. It creates no lifecycle events. Duplicate and tombstone responses never update counters. Unknown active catalog names produce a warning and null congregation; multiple active matches reject that row. Archived catalog rows remain exportable by label but cannot be selected for new imports.
+
+Progress persistence contains only a key `<authenticated UID>:<normalized-preview UUID fingerprint>` and a random operation UUID seed. Each row derives a stable operation UUID from that seed and its workbook row number; server receipts reconcile created/duplicate/tombstone counts on retry. Web uses localStorage under `ieadpe.import.v1`; Android uses private SharedPreferences through `br.org.ieadpe/import-progress`. No filename, personal cell value, raw rows, workbook bytes, account token or exception text is stored. Each account has its own key namespace. Pending identifiers deliberately survive logout to support safe same-account resume, and are removed only after a complete traversal. They are not authentication or authority. Storage denial fails visibly before importing; there is no memory-only fallback.
+
+After interruption/reload, sign into the same account and reselect the same unchanged file. The codec recreates the normalized preview/fingerprint and reuses the pending seed; it replays already committed receipts rather than guessing the uncertain row outcome. Editing/reordering rows changes the fingerprint and starts a separate intent; database `internal_id` uniqueness still prevents duplicates. A finished import removes its seed, so a later fresh reimport reports existing IDs as skipped. Persisted counters are unnecessary because receipts reconstruct them without retaining personal rows. An old pending entry for a file that is never reselected contains identifiers only. These identifiers are not a full migration audit or backend backup.
+
+Host tests exercise the real SDK with synthetic loopback HTTP, the real codec with an injected picker platform and exporter, and the native progress method-channel envelope. Native PostgreSQL tests exercise current authorization, receipt/legacy-ID semantics, history/eligibility, rollback, both import/zero commit orders and competing users importing one legacy ID. Picker and method-channel fixtures do not prove actual OS picker/SharedPreferences behavior or device persistence. Before release, check real web/Android selection, reload/reselection/resume, storage denial, account switching and revocation during the chooser/import/save, and retrieve the saved accented XLSX. Application root mounting and production deployment remain Task 19/release work.
