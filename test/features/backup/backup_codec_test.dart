@@ -70,6 +70,48 @@ List<String> row() => [
   'Não',
 ];
 void main() {
+  for (final name in [
+    'central-crc',
+    'coherent-wrong-crc',
+    'local-crc',
+    'local-compressed-size',
+    'local-expanded-size',
+    for (final kind in ['signed', 'unsigned'])
+      for (final field in [
+        'compressed-size',
+        'expanded-size',
+        'central-crc',
+        'local-size',
+        'coherent-crc',
+      ])
+        'descriptor-$kind-$field',
+  ]) {
+    test('rejects independently patched ZIP metadata $name', () {
+      expect(
+        () => BackupCodec().decode(
+          File('test/features/backup/fixtures/$name.zip').readAsBytesSync(),
+        ),
+        throwsA(
+          isA<BackupFormatException>().having(
+            (e) => e.code,
+            'code',
+            'invalid_zip',
+          ),
+        ),
+      );
+    });
+  }
+  for (final kind in ['signed', 'unsigned']) {
+    test('accepts independent valid $kind data descriptors', () {
+      final p = BackupCodec().decode(
+        File('test/features/backup/fixtures/descriptor-$kind.xlsx')
+            .readAsBytesSync(),
+      );
+      expect(p.rows, hasLength(1));
+      expect(p.diagnostics, isEmpty);
+      expect(p.rows.single.record.age, 0);
+    });
+  }
   for (final relationship in [
     '<Relationships><Relationship Id="rId1" Target="../outside.xml"/></Relationships>',
     '<Relationships><Relationship Id="rId1" TargetMode="External" Target="https://invalid.example/file"/></Relationships>',

@@ -14,6 +14,7 @@ with zipfile.ZipFile(root/'expanded-bomb.zip','w',compression=zipfile.ZIP_DEFLAT
         for _ in range(51): f.write(b'0'*(1024*1024))
 data=bytearray((root/'expanded-bomb.zip').read_bytes())
 p=data.index(b'PK\x01\x02');struct.pack_into('<I',data,p+24,1)
+struct.pack_into('<I',data,22,1)  # Coherent local/central sizes; actual output is 51MiB.
 (root/'understated-bomb.zip').write_bytes(data)
 # central-directory size alone must be rejected before missing local bytes.
 data=bytearray((root/'expanded-bomb.zip').read_bytes());p=data.index(b'PK\x01\x02');struct.pack_into('<I',data,p+24,0xffffffff)

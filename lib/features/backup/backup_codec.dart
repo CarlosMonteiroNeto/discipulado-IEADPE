@@ -85,6 +85,17 @@ final class BackupCodec {
     final b = ByteData.sublistView(bytes);
     int u16(int p) => b.getUint16(p, Endian.little);
     int u32(int p) => b.getUint32(p, Endian.little);
+    void validateExtra(int offset, int length) {
+      final end = offset + length;
+      while (offset < end) {
+        if (offset + 4 > end) _bad('invalid_zip');
+        final id = u16(offset), size = u16(offset + 2);
+        // The locked reader selects 64-bit descriptor widths from this field.
+        if (id == 1 || offset + 4 + size > end) _bad('invalid_zip');
+        offset += 4 + size;
+      }
+    }
+
     var end = -1;
     for (var p = bytes.length - 22; p >= 0 && p >= bytes.length - 65557; p--) {
       if (u32(p) == 0x06054b50 && p + 22 + u16(p + 20) == bytes.length) {
@@ -108,6 +119,7 @@ final class BackupCodec {
       if (p + 46 > end || u32(p) != 0x02014b50) _bad('invalid_zip');
       final flags = u16(p + 8),
           method = u16(p + 10),
+          crc = u32(p + 16),
           compressed = u32(p + 20),
           expanded = u32(p + 24),
           n = u16(p + 28),
@@ -124,6 +136,7 @@ final class BackupCodec {
           local + 30 > start) {
         _bad('invalid_zip');
       }
+      validateExtra(p + 46 + n, extra);
       final name = utf8.decode(bytes.sublist(p + 46, p + 46 + n));
       if (!names.add(name) ||
           name.contains('..') ||
@@ -142,6 +155,33 @@ final class BackupCodec {
           (method == 0 && compressed != expanded)) {
         _bad('invalid_zip');
       }
+      validateExtra(local + 30 + ln, le);
+      final localCrc = u32(local + 14),
+          localCompressed = u32(local + 18),
+          localExpanded = u32(local + 22);
+      if (flags & 8 == 0) {
+        if (localCrc != crc ||
+            localCompressed != compressed ||
+            localExpanded != expanded) {
+          _bad('invalid_zip');
+        }
+      } else {
+        // Streamed members may leave zero placeholders or repeat known values.
+        if ((localCrc != 0 && localCrc != crc) ||
+            (localCompressed != 0 && localCompressed != compressed) ||
+            (localExpanded != 0 && localExpanded != expanded)) {
+          _bad('invalid_zip');
+        }
+        var descriptor = local + 30 + ln + le + compressed;
+        if (descriptor + 12 > start) _bad('invalid_zip');
+        if (u32(descriptor) == 0x08074b50) descriptor += 4;
+        if (descriptor + 12 > start ||
+            u32(descriptor) != crc ||
+            u32(descriptor + 4) != compressed ||
+            u32(descriptor + 8) != expanded) {
+          _bad('invalid_zip');
+        }
+      }
       p += 46 + n + extra + comment;
     }
     if (p != end) _bad('invalid_zip');
@@ -159,15 +199,15 @@ final class BackupCodec {
 
   ImportPreview _decode(Uint8List bytes) {
     _preflight(bytes);
-    final zip = ZipDecoder().decodeBytes(bytes);
+    final decoder = ZipDecoder()..decodeBytes(bytes);
     final documents = <String, XmlDocument>{};
-    for (final f in zip.files) {
-      if (f.isDirectory) continue;
-      final content = f.readBytes()!;
-      if (content.length != f.size || getCrc32(content) != f.crc32) {
+    for (final f in decoder.directory.fileHeaders) {
+      final content = f.file!.getStream().toUint8List();
+      if (content.length != f.uncompressedSize ||
+          getCrc32(content) != f.crc32) {
         _bad('invalid_zip');
       }
-      if (f.name.endsWith('.xml') || f.name.endsWith('.rels')) {
+      if (f.filename.endsWith('.xml') || f.filename.endsWith('.rels')) {
         final text = utf8.decode(content);
         if (text.contains('<!DOCTYPE') || text.contains('<!ENTITY')) {
           _bad('invalid_xml');
@@ -178,7 +218,7 @@ final class BackupCodec {
         )) {
           _bad('formula_cell');
         }
-        documents[f.name] = doc;
+        documents[f.filename] = doc;
       }
     }
     XmlDocument document(String path) =>
