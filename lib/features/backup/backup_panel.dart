@@ -350,6 +350,11 @@ class _BackupPanelState extends State<BackupPanel> {
                 '${progress.done ? 'Concluído. ' : ''}${progress.processed} linha(s) processada(s): ${progress.created} criada(s), ${progress.skipped} ignorada(s), ${progress.errors} com erro.',
               ),
             ),
+          if (progress != null)
+            for (final diagnostic in progress.diagnostics)
+              Text(
+                'Linha ${diagnostic.rowNumber}: registro recusado (${diagnostic.code}). Corrija no arquivo e selecione novamente.',
+              ),
           if (progress != null && progress.done && progress.errors > 0)
             const Text(
               'Corrija as linhas com erro no arquivo e selecione novamente. As linhas já importadas serão ignoradas.',

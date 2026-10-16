@@ -7,6 +7,30 @@ import 'package:ieadpe_converts/routing/router.dart';
 import '../features/auth/auth_flow_test.dart' show FakeAuth;
 
 void main() {
+  testWidgets('mobile current route exposes selected semantics', (t) async {
+    t.view.physicalSize = const Size(360, 800);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    await t.pumpWidget(
+      MaterialApp(
+        home: AppShell(
+          scope: AccessScope(isAdmin: true),
+          currentRoute: '/converts',
+          onNavigate: (_) {},
+          onSignOut: () {},
+          child: const Text('Conteúdo'),
+        ),
+      ),
+    );
+    final selected = find.byWidgetPredicate(
+      (w) => w is Semantics && w.properties.selected == true,
+    );
+    expect(
+      find.descendant(of: selected, matching: find.text('Convertidos')),
+      findsOneWidget,
+    );
+  });
   for (final width in [360.0, 768.0, 1280.0]) {
     testWidgets('navigation at $width with 200% text and reduced motion', (
       t,

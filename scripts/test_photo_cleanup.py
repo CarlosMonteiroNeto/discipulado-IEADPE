@@ -1,6 +1,7 @@
 """Synthetic HTTP contract checks; not a Supabase Storage service emulator."""
 import json
 import os
+import shutil
 import subprocess
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
@@ -8,6 +9,14 @@ import unittest
 from unittest.mock import patch
 from urllib.error import HTTPError
 from cleanup_photos import cleanup
+
+
+def powershell():
+    """Release docs prescribe pwsh; accept Windows PowerShell where Core is absent."""
+    host = shutil.which("pwsh") or shutil.which("powershell")
+    if host is None:
+        raise unittest.SkipTest("no PowerShell host available")
+    return host
 
 
 class CleanupTest(unittest.TestCase):
@@ -99,7 +108,7 @@ class CleanupTest(unittest.TestCase):
     def test_powershell_wrapper_propagates_failure_without_metadata_delete(self):
         url, calls = self.fixture(fail_delete=True)
         result = subprocess.run(
-            ['pwsh', '-NoProfile', '-File', 'scripts/maintenance_photos.ps1', '-Apply'],
+            [powershell(), '-NoProfile', '-File', 'scripts/maintenance_photos.ps1', '-Apply'],
             env={**os.environ, 'SUPABASE_URL': url, 'SUPABASE_SERVICE_ROLE_KEY': 'synthetic-key'},
             capture_output=True, text=True, timeout=30,
         )

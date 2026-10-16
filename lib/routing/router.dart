@@ -29,7 +29,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _subscription = auth.watchSession().listen(
       (_) {
-        unawaited(refresh());
+        unawaited(revalidate());
       },
       onError: (Object error, StackTrace stack) {
         _invalidate();
@@ -40,6 +40,11 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   final AuthGateway auth;
   final VoidCallback clearProtectedCaches;
   final String _intended;
+  String? _lastAuthorized;
+  String? _identity;
+  Future<void>? _validation;
+  int _refreshSequence = 0;
+  int refreshRevision = 0;
   late final StreamSubscription<Session?> _subscription;
   AccessScope? _scope;
   int _generation = 0;
@@ -63,29 +68,79 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
     if (!_disposed) notifyListeners();
   }
 
-  Future<void> refresh() async {
-    final previous = _route;
-    _invalidate();
-    final generation = _generation;
+  /// Permission failures and grant edits always destroy the previous owner.
+  Future<void> refresh() => _startValidation(invalidate: true);
+
+  /// Ordinary resume retains same-identity owners while the root hides them.
+  Future<void> revalidate() => _startValidation(invalidate: false);
+
+  Future<void> _startValidation({required bool invalidate}) {
+    final future = _validate(invalidate: invalidate);
+    _validation = future;
+    return future;
+  }
+
+  /// Chooser results wait for the newest lifecycle check before publication.
+  Future<void> ensureValidated() async {
+    while (true) {
+      final pending = _validation;
+      await pending;
+      if (identical(pending, _validation)) break;
+    }
+    if (_disposed ||
+        _scope == null ||
+        _checking ||
+        _identity != auth.currentSession?.user.id) {
+      throw const AuthException('Session unavailable');
+    }
+  }
+
+  bool _sameScope(AccessScope a, AccessScope b) =>
+      a.isAdmin == b.isAdmin &&
+      a.isSupervision == b.isSupervision &&
+      a.congregationIds.toSet().length == b.congregationIds.toSet().length &&
+      a.congregationIds.toSet().containsAll(b.congregationIds);
+
+  Future<void> _validate({required bool invalidate}) async {
+    final sequence = ++_refreshSequence;
     final session = auth.currentSession;
+    final previousScope = _scope;
+    if (invalidate || session == null || _identity != session.user.id) {
+      _invalidate();
+    }
+    final generation = _generation;
     if (session == null || _disposed || _signingOut) return;
+    _identity = session.user.id;
     _checking = true;
     _unavailable = false;
     notifyListeners();
     try {
       final loaded = await auth.loadScope();
       if (_disposed ||
+          sequence != _refreshSequence ||
           generation != _generation ||
           auth.currentSession?.user.id != session.user.id) {
         return;
       }
+      if (!invalidate &&
+          previousScope != null &&
+          !_sameScope(previousScope, loaded)) {
+        _invalidate();
+      }
       _scope = loaded;
-      final candidate = previous == '/login' ? _intended : previous;
+      final candidate = _lastAuthorized ?? _intended;
       _route = routesFor(loaded).contains(candidate) ? candidate : '/register';
+      _lastAuthorized = _route;
+      refreshRevision++;
     } catch (_) {
-      if (!_disposed && generation == _generation) _unavailable = true;
+      if (!_disposed &&
+          sequence == _refreshSequence &&
+          generation == _generation) {
+        _invalidate();
+        _unavailable = true;
+      }
     } finally {
-      if (!_disposed && generation == _generation) {
+      if (!_disposed && sequence == _refreshSequence) {
         _checking = false;
         notifyListeners();
       }
@@ -96,6 +151,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
     _route = allowedRoutes.contains(route)
         ? route
         : (_scope == null ? '/login' : '/register');
+    if (_route != '/login') _lastAuthorized = _route;
     notifyListeners();
   }
 
@@ -111,7 +167,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) unawaited(refresh());
+    if (state == AppLifecycleState.resumed) unawaited(revalidate());
   }
 
   @override

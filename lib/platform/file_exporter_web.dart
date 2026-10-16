@@ -26,6 +26,8 @@ extension type _Failure(JSObject _) implements JSObject {
 }
 
 class PlatformFileExporter implements FileExporter {
+  PlatformFileExporter({this.beforeWrite});
+  final Future<void> Function()? beforeWrite;
   @override
   Future<SaveOutcome> save(
     String filename,
@@ -42,6 +44,7 @@ class PlatformFileExporter implements FileExporter {
         ({'suggestedName': filename}).jsify()! as JSObject,
       ).toDart;
       destinationChosen = true;
+      await beforeWrite?.call();
       ensureCurrent?.call();
       stream = await handle.createWritable().toDart;
       ensureCurrent?.call();

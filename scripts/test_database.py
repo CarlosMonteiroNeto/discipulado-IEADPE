@@ -7,6 +7,7 @@ import subprocess
 from urllib.parse import urlparse, urlunparse
 import uuid
 
+from database_catalog_concurrency import check_catalog_concurrency
 from database_access_concurrency import check_access_concurrency
 from database_convert_concurrency import check_convert_concurrency
 from database_import_concurrency import check_import_concurrency
@@ -18,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", nargs="?", default="access_test.sql")
+    parser.add_argument("--catalog-concurrency", action="store_true")
     parser.add_argument("--access-concurrency", action="store_true")
     parser.add_argument("--convert-concurrency", action="store_true")
     parser.add_argument("--import-concurrency", action="store_true")
@@ -47,7 +49,9 @@ def main():
         run(target, "-f", str(ROOT / "supabase/tests/fixtures/local_auth_storage.sql"))
         for migration in sorted((ROOT / "supabase/migrations").glob("*.sql")):
             run(target, "-f", str(migration))
-        if args.import_concurrency:
+        if args.catalog_concurrency:
+            check_catalog_concurrency(psql, target)
+        elif args.import_concurrency:
             check_import_concurrency(psql, target)
         elif args.access_concurrency:
             check_access_concurrency(psql, target)

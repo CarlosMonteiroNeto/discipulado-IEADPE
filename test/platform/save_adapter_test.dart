@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/services.dart';
 import 'package:ieadpe_converts/platform/file_exporter.dart';
@@ -9,6 +11,21 @@ void main() {
   final messenger =
       TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   tearDown(() => messenger.setMockMethodCallHandler(channel, null));
+  test('native chooser waits for fresh scope before writing and retains original token', () async {
+    final validation = Completer<void>();
+    final writes = <String>[];
+    messenger.setMockMethodCallHandler(channel, (call) async {
+      writes.add(call.method);
+      return call.method == 'choose' ? 'content://documents/synthetic' : true;
+    });
+    final save = PlatformFileExporter(beforeWrite: () => validation.future)
+        .save('synthetic.xlsx', Uint8List.fromList([1]));
+    await Future<void>.delayed(Duration.zero);
+    expect(writes, ['choose']);
+    validation.complete();
+    expect(await save, SaveOutcome.saved);
+    expect(writes, ['choose', 'write']);
+  });
   test(
     'save separates chooser cancellation completed write and failure',
     () async {

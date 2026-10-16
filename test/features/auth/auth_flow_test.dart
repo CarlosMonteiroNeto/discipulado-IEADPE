@@ -128,6 +128,52 @@ void main() {
       await auth.events.close();
     },
   );
+  test(
+    'ordinary resume preserves authorized owner and latest destination',
+    () async {
+      final auth = FakeAuth();
+      var clears = 0;
+      final router = SessionRouter(auth, clearProtectedCaches: () => clears++);
+      await Future<void>.delayed(Duration.zero);
+      router.go('/admin');
+      final before = clears;
+      auth.pending = Completer<AccessScope>();
+      router.didChangeAppLifecycleState(AppLifecycleState.resumed);
+      expect(
+        clears,
+        before,
+        reason: 'ordinary resume must retain picker and weekly owner',
+      );
+      auth.pending!.complete(auth.access);
+      await Future<void>.delayed(Duration.zero);
+      expect(router.route, '/admin');
+      await router.refresh();
+      expect(
+        clears,
+        greaterThan(before),
+        reason: 'explicit permission refresh replaces owner',
+      );
+      router.dispose();
+      await auth.events.close();
+    },
+  );
+  test(
+    'overlapping explicit refresh retains last authorized destination',
+    () async {
+      final auth = FakeAuth();
+      final router = SessionRouter(auth, clearProtectedCaches: () {});
+      await Future<void>.delayed(Duration.zero);
+      router.go('/admin');
+      auth.pending = Completer<AccessScope>();
+      final first = router.refresh();
+      final second = router.refresh();
+      auth.pending!.complete(auth.access);
+      await Future.wait([first, second]);
+      expect(router.route, '/admin');
+      router.dispose();
+      await auth.events.close();
+    },
+  );
   testWidgets('cancelled login and browser return leave retry usable', (
     tester,
   ) async {

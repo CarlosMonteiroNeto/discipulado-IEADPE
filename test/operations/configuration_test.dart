@@ -35,8 +35,25 @@ void main() {
   test(
     'missing operator configuration fails before starting cleanup',
     () async {
+      String? shell;
+      for (final candidate in ['pwsh', 'powershell']) {
+        try {
+          final probe = await Process.run(candidate, [
+            '-NoProfile',
+            '-Command',
+            r'$true',
+          ]);
+          if (probe.exitCode == 0) {
+            shell = candidate;
+            break;
+          }
+        } on ProcessException {
+          continue;
+        }
+      }
+      expect(shell, isNotNull, reason: 'no PowerShell host available');
       final result = await Process.run(
-        'pwsh',
+        shell!,
         ['-NoProfile', '-File', 'scripts/maintenance_photos.ps1'],
         environment: {'SUPABASE_URL': '', 'SUPABASE_SERVICE_ROLE_KEY': ''},
       );

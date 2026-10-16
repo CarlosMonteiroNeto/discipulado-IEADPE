@@ -35,6 +35,14 @@ ConvertRecord record({
   deletedAt: deleted,
 );
 void main() {
+  test('independent sparse feedback wire defaults to pending', () {
+    final feedback = Feedback.fromJson({
+      'id': 'wire-feedback',
+      'message': 'Synthetic',
+    });
+    expect(feedback.status, FeedbackStatus.pending);
+    expect(feedback.toJson()['message'], 'Synthetic');
+  });
   final today = DateOnly(2026, 1, 1);
   test('business date follows Sao Paulo across UTC midnight', () {
     expect(

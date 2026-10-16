@@ -221,12 +221,28 @@ final class BackupCodec {
         documents[f.filename] = doc;
       }
     }
-    XmlDocument document(String path) =>
-        documents[path] ?? _bad('invalid_workbook');
+    const spreadsheet =
+        'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+    const relationships =
+        'http://schemas.openxmlformats.org/package/2006/relationships';
+    const officeRelationships =
+        'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
+    XmlDocument document(String path, String root, String namespace) {
+      final doc = documents[path] ?? _bad('invalid_workbook');
+      if (doc.rootElement.name.local != root ||
+          doc.rootElement.namespaceUri != namespace ||
+          doc.descendants.whereType<XmlElement>().any(
+            (e) => e.namespaceUri != namespace,
+          )) {
+        _bad('invalid_xml');
+      }
+      return doc;
+    }
+
     Iterable<XmlElement> elements(XmlNode d, String name) => d.descendants
         .whereType<XmlElement>()
         .where((e) => e.name.local == name);
-    final workbook = document('xl/workbook.xml');
+    final workbook = document('xl/workbook.xml', 'workbook', spreadsheet);
     final versions = elements(
       workbook,
       'definedName',
@@ -242,20 +258,27 @@ final class BackupCodec {
     ).where((e) => e.getAttribute('name') == 'Convertidos').toList();
     if (sheets.length != 1) _bad('missing_sheet');
     final id = sheets.single.attributes
-        .where((a) => a.name.local == 'id')
+        .where(
+          (a) => a.name.local == 'id' && a.namespaceUri == officeRelationships,
+        )
         .single
         .value;
     final rel = elements(
-      document('xl/_rels/workbook.xml.rels'),
+      document('xl/_rels/workbook.xml.rels', 'Relationships', relationships),
       'Relationship',
     ).where((e) => e.getAttribute('Id') == id).single;
+    if (rel.getAttribute('Type') != '$officeRelationships/worksheet') {
+      _bad('invalid_relationship');
+    }
     final target = rel.getAttribute('Target') ?? '';
     if (rel.getAttribute('TargetMode') == 'External' || target.contains('..')) {
       _bad('invalid_relationship');
     }
     final path = target.startsWith('/') ? target.substring(1) : 'xl/$target';
-    final sheet = document(path);
-    final strings = documents['xl/sharedStrings.xml'];
+    final sheet = document(path, 'worksheet', spreadsheet);
+    final strings = documents.containsKey('xl/sharedStrings.xml')
+        ? document('xl/sharedStrings.xml', 'sst', spreadsheet)
+        : null;
     final shared = strings == null
         ? <String>[]
         : elements(strings, 'si')

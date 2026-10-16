@@ -40,15 +40,15 @@ Uint8List fixture(
   add('[Content_Types].xml', '<Types/>');
   add(
     'xl/workbook.xml',
-    '<workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Convertidos" r:id="rId1"/></sheets>${version == null ? '' : '<definedNames><definedName name="ieadpe_backup_version">$version</definedName></definedNames>'}</workbook>',
+    '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Convertidos" r:id="rId1"/></sheets>${version == null ? '' : '<definedNames><definedName name="ieadpe_backup_version">$version</definedName></definedNames>'}</workbook>',
   );
   add(
     'xl/_rels/workbook.xml.rels',
-    '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
   );
   add(
     'xl/worksheets/sheet1.xml',
-    '<worksheet><sheetData>${rows.map((r) => '<row>${r.map((v) => '<c t="inlineStr"><is><t>${const HtmlEscape().convert(v)}</t></is></c>').join()}</row>').join()}${cell ?? ''}</sheetData></worksheet>',
+    '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows.map((r) => '<row>${r.map((v) => '<c t="inlineStr"><is><t>${const HtmlEscape().convert(v)}</t></is></c>').join()}</row>').join()}${cell ?? ''}</sheetData></worksheet>',
   );
   return Uint8List.fromList(ZipEncoder().encode(a));
 }
@@ -70,6 +70,41 @@ List<String> row() => [
   'Não',
 ];
 void main() {
+  test(
+    'rejects worksheet relationship with a foreign namespace or target type',
+    () {
+      final original = fixture([headers, row()]);
+      final archive = ZipDecoder().decodeBytes(original);
+      for (final mutation in ['namespace', 'type']) {
+        final patched = Archive();
+        for (final file in archive.files) {
+          var bytes = file.content;
+          if (file.name == 'xl/_rels/workbook.xml.rels') {
+            var text = utf8.decode(bytes);
+            if (mutation == 'namespace') {
+              text = text.replaceFirst(
+                'http://schemas.openxmlformats.org/package/2006/relationships',
+                'urn:foreign',
+              );
+            } else {
+              text = text.replaceFirst(
+                'http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet',
+                'urn:foreign',
+              );
+            }
+            bytes = utf8.encode(text);
+          }
+          patched.addFile(ArchiveFile.bytes(file.name, bytes));
+        }
+        expect(
+          () => BackupCodec().decode(
+            Uint8List.fromList(ZipEncoder().encode(patched)),
+          ),
+          throwsA(isA<BackupFormatException>()),
+        );
+      }
+    },
+  );
   for (final name in [
     'central-crc',
     'coherent-wrong-crc',
@@ -113,9 +148,9 @@ void main() {
     });
   }
   for (final relationship in [
-    '<Relationships><Relationship Id="rId1" Target="../outside.xml"/></Relationships>',
-    '<Relationships><Relationship Id="rId1" TargetMode="External" Target="https://invalid.example/file"/></Relationships>',
-    '<Relationships><Relationship Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Id="rId1" Target="../outside.xml"/></Relationships>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Id="rId1" TargetMode="External" Target="https://invalid.example/file"/></Relationships>',
+    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Id="rId1" Target="worksheets/sheet1.xml"/><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>',
   ]) {
     test(
       'malformed worksheet relationship rejects without following targets ${relationship.length}',

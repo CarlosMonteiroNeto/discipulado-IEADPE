@@ -14,4 +14,5 @@ abstract interface class FileExporter {
   });
 }
 
-FileExporter createFileExporter() => platform.PlatformFileExporter();
+FileExporter createFileExporter({Future<void> Function()? beforeWrite}) =>
+    platform.PlatformFileExporter(beforeWrite: beforeWrite);

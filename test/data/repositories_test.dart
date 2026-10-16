@@ -59,6 +59,13 @@ Future<SupabaseGateway> fixture(
 }
 
 void main() {
+  test('literal search sends asterisk and regex metacharacters without wildcard aliases', () async {
+    final gateway = await fixture((r) async {
+      expect(r.uri.queryParameters['name'], r'imatch.A\*%_\\\.\[\]');
+      await respond(r, <Object>[]);
+    });
+    await gateway.read('converts', context: gateway.context, name: r'A*%_\.[]');
+  });
   test(
     '1205 scoped rows cross bounded 100-row SDK pages exactly once',
     () async {

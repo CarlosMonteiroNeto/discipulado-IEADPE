@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/app.dart';
 import 'package:ieadpe_converts/configuration.dart';
@@ -21,7 +22,14 @@ void main() {
     expect(find.textContaining('SUPABASE'), findsNothing);
     await tester.sendKeyEvent(LogicalKeyboardKey.tab);
     await tester.pump();
-    expect(FocusManager.instance.primaryFocus?.hasFocus, isTrue);
+    final retry = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Tentar novamente'),
+    );
+    final focus = FocusManager.instance.primaryFocus;
+    expect(
+      focus?.context?.findAncestorWidgetOfExactType<FilledButton>(),
+      same(retry),
+    );
     await tester.sendKeyEvent(LogicalKeyboardKey.enter);
     await tester.pumpAndSettle();
     expect(find.text('Serviço indisponível'), findsOneWidget);
@@ -69,18 +77,31 @@ void main() {
       expect(find.text('Serviço indisponível'), findsOneWidget);
     }
   });
-
-  testWidgets('configured bootstrap does not claim an authenticated session', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      const App(
-        configuration: Configuration(
-          supabaseUrl: 'http://127.0.0.1:54321',
-          supabasePublishableKey: 'sb_publishable_synthetic',
-        ),
-      ),
-    );
-    expect(find.text('Aplicativo em preparação'), findsOneWidget);
+  testWidgets('configured App initializes actual SDK and stays unauthenticated', (tester) async {
+    const preferences = MethodChannel('plugins.flutter.io/shared_preferences');
+    const links = MethodChannel('com.llfbandit.app_links/messages');
+    const events = MethodChannel('com.llfbandit.app_links/events');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(preferences, (call) async => call.method == 'getAll' ? <String,Object>{} : true);
+    messenger.setMockMethodCallHandler(links, (_) async => null);
+    messenger.setMockMethodCallHandler(events, (_) async => null);
+    addTearDown(() { for (final channel in [preferences, links, events]) { messenger.setMockMethodCallHandler(channel, null); } });
+    await tester.pumpWidget(const App(configuration: Configuration(supabaseUrl: 'http://127.0.0.1:54321', supabasePublishableKey: 'sb_publishable_synthetic')));
+    await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pumpAndSettle();
+    expect(Supabase.instance.isInitialized, isTrue);
+    expect(Supabase.instance.client.auth.currentSession, isNull);
+    expect(find.text('Aplicativo em preparação'), findsNothing);
+    expect(find.text('Entrar com Google'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox());
+    var disposed = false;
+    final disposal = Supabase.instance.dispose().then((_) => disposed = true);
+    for (var i = 0; i < 30 && !disposed; i++) {
+      await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(disposed, isTrue, reason: 'SDK isolate and stream cleanup must complete');
+    await disposal;
+    await tester.pump();
   });
 }

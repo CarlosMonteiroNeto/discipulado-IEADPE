@@ -14,6 +14,7 @@ dependencies:
   file_saver: ^0.7.0
   flutter_riverpod: ^3.4.3
   go_router: ^18.1.0
+  http: ^1.6.0
   image: ^4.12.0
   image_picker: ^1.2.4
   intl: ^0.20.3

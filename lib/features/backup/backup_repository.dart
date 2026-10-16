@@ -25,10 +25,12 @@ final class ImportProgress {
     this.warning,
     this.errorCode,
     this.done = false,
+    this.diagnostics = const [],
   });
   final int processed, created, skipped, errors;
   final String? warning, errorCode;
   final bool done;
+  final List<ImportDiagnostic> diagnostics;
 }
 
 class BackupRepository {
@@ -92,6 +94,7 @@ class BackupRepository {
     }
     validateUuid(seed);
     String? warning;
+    final diagnostics = <ImportDiagnostic>[];
     final invalidRows = preview.diagnostics
         .where((d) => d.code != 'duplicate_id')
         .map((d) => d.rowNumber)
@@ -121,6 +124,7 @@ class BackupRepository {
           created: created,
           skipped: skipped,
           errors: errors,
+          diagnostics: List.unmodifiable(diagnostics),
           warning: warning,
         );
       } on DataFailure catch (error) {
@@ -128,11 +132,15 @@ class BackupRepository {
         if (error.code == 'invalid') {
           errors++;
           processed++;
+          diagnostics.add(
+            ImportDiagnostic(preview.rows[i].rowNumber, 'registro', error.code),
+          );
           yield ImportProgress(
             processed: processed,
             created: created,
             skipped: skipped,
             errors: errors,
+            diagnostics: List.unmodifiable(diagnostics),
             errorCode: 'invalid',
           );
           continue;
@@ -142,6 +150,7 @@ class BackupRepository {
           created: created,
           skipped: skipped,
           errors: errors,
+          diagnostics: List.unmodifiable(diagnostics),
           errorCode: error.code,
         );
         return;
@@ -155,6 +164,7 @@ class BackupRepository {
       created: created,
       skipped: skipped,
       errors: errors,
+      diagnostics: List.unmodifiable(diagnostics),
       warning: warning,
       done: true,
     );

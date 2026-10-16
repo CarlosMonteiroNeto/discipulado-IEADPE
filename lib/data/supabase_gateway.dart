@@ -144,7 +144,9 @@ class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
             .replaceAll(r'\', r'\\')
             .replaceAll('%', r'\%')
             .replaceAll('_', r'\_');
-        request = request.ilike('name', '%$escaped%');
+        request = name.contains('*')
+            ? request.filter('name', 'imatch', RegExp.escape(name))
+            : request.ilike('name', '%$escaped%');
       }
       return request
           .order('id', ascending: true)

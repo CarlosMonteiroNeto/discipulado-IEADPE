@@ -249,7 +249,7 @@ final class Feedback {
     message: json['message'] as String,
     userEmail: json['user_email'] as String?,
     userName: json['user_name'] as String?,
-    status: FeedbackStatus.fromWire(json['status'] as String),
+    status: FeedbackStatus.fromWire(json['status'] as String? ?? 'pending'),
   );
   Map<String, dynamic> toJson() => {
     'id': id,

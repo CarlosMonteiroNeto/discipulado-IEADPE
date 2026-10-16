@@ -148,11 +148,22 @@ class AppShell extends StatelessWidget {
                   alignment: WrapAlignment.spaceEvenly,
                   children: [
                     for (final route in routes)
-                      TextButton(
-                        onPressed: () => onNavigate(route),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [Icon(icons[route]), Text(labels[route]!)],
+                      Semantics(
+                        selected: route == currentRoute,
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: route == currentRoute
+                                ? const Color(0xffdbeafe)
+                                : null,
+                          ),
+                          onPressed: () => onNavigate(route),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(icons[route]),
+                              Text(labels[route]!),
+                            ],
+                          ),
                         ),
                       ),
                   ],

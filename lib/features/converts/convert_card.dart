@@ -85,6 +85,8 @@ class _ConvertCardState extends State<ConvertCard> {
 
   Future<void> _loadPhoto() async {
     final request = ++_photoRequest;
+    _loading = false;
+    _photoError = null;
     final id = widget.record.photoAssetId;
     if (id == null || widget.photos == null || widget.gateway == null) return;
     final token = widget.gateway!.context;

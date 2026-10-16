@@ -1,4 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+
+import 'convert_form.dart';
 
 import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
@@ -19,7 +23,9 @@ class ConvertsPage extends StatefulWidget {
     required this.photos,
     this.congregations = const [],
     this.onScopeRefresh,
+    this.pickPhoto = pickConvertPhoto,
   });
+  final Future<Uint8List?> Function() pickPhoto;
   final AccessScope scope;
   final ConvertRepository converts;
   final PhotoRepository photos;
@@ -174,6 +180,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
       return EditPage(
         key: ValueKey('edit:${_editing!.id}:$_context'),
         initial: _editing!,
+        pickPhoto: widget.pickPhoto,
         converts: widget.converts,
         photos: widget.photos,
         congregations: widget.congregations

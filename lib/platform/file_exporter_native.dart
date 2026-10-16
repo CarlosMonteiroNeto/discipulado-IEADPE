@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'file_exporter.dart';
 
 class PlatformFileExporter implements FileExporter {
+  PlatformFileExporter({this.beforeWrite});
+  final Future<void> Function()? beforeWrite;
   static const _channel = MethodChannel('br.org.ieadpe/export');
   @override
   Future<SaveOutcome> save(
@@ -15,6 +17,7 @@ class PlatformFileExporter implements FileExporter {
       final uri = await _channel.invokeMethod<String>('choose', {
         'filename': filename,
       });
+      if (uri != null) await beforeWrite?.call();
       ensureCurrent?.call();
       if (uri == null) return SaveOutcome.cancelled;
       final saved = await _channel.invokeMethod<bool>('write', {

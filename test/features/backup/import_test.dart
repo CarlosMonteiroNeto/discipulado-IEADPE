@@ -300,6 +300,11 @@ void main() {
         MemoryProgress(),
       ).importRows(sample()).toList();
       expect(result.last.errors, 1);
+      expect(
+        result.last.diagnostics.single.rowNumber,
+        sample().rows.single.rowNumber,
+      );
+      expect(result.last.diagnostics.single.code, 'invalid');
       expect(result.last.created, 0);
       expect(result.last.done, true);
     },

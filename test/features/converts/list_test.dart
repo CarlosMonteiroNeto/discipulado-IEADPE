@@ -91,6 +91,35 @@ class OrderedGateway extends TestGateway {
 }
 
 void main() {
+  testWidgets('removing a photo asset clears pending and failed photo state', (
+    t,
+  ) async {
+    final gateway = TestGateway();
+    for (final fail in [false, true]) {
+      final photos = PendingPhotos();
+      Widget card(String? photo) => MaterialApp(
+        home: Scaffold(
+          body: ConvertCard(
+            key: ValueKey('card-$fail'),
+            record: row('one', photo: photo),
+            today: DateOnly(2026, 10, 16),
+            gateway: gateway,
+            photos: photos,
+          ),
+        ),
+      );
+      await t.pumpWidget(card('asset'));
+      if (fail) {
+        photos.metadata.completeError(const DataFailure('backend'));
+        await t.pump();
+      }
+      await t.pumpWidget(card(null));
+      expect(find.text('Carregando foto…'), findsNothing);
+      expect(find.text('Não foi possível carregar a foto.'), findsNothing);
+      if (!fail) photos.metadata.completeError(const DataFailure('backend'));
+      await t.pump();
+    }
+  });
   final today = DateOnly(2026, 10, 15);
   test('Brazilian WhatsApp validates and prefixes domestic numbers', () {
     expect(
