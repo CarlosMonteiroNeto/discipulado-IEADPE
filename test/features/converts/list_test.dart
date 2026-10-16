@@ -13,6 +13,8 @@ import 'package:ieadpe_converts/features/converts/convert_actions.dart';
 import 'package:ieadpe_converts/features/converts/convert_card.dart';
 import 'package:ieadpe_converts/features/converts/converts_page.dart';
 
+import 'package:ieadpe_converts/features/converts/congregation_order.dart';
+
 import 'save_test.dart' show TestGateway, NoPhotos;
 
 ConvertRecord row(
@@ -76,6 +78,18 @@ class PendingPhotos implements PhotoRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
+class OrderedGateway extends TestGateway {
+  final commands = <String, Completer<MutationResult<String>>>{};
+  @override
+  Future<MutationResult<String>> command(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) {
+    return (commands[payload['id'] as String] = Completer()).future;
+  }
+}
+
 void main() {
   final today = DateOnly(2026, 10, 15);
   test('Brazilian WhatsApp validates and prefixes domestic numbers', () {
@@ -99,8 +113,8 @@ void main() {
     'active filters preserve newest order within congregation and unknown last',
     () {
       const congregations = [
-        Congregation(id: 'a', name: 'Água'),
         Congregation(id: 's', name: 'Sede'),
+        Congregation(id: 'a', name: 'Água'),
       ];
       final rows = [
         row('old', congregationId: 'a', created: DateTime(2026)),
@@ -382,6 +396,98 @@ void main() {
             .onPressed,
         isNull,
       );
+    },
+  );
+
+  test('accented names remain distinct and equal-name congregation IDs stay grouped', () async {
+    final ordered = await orderCongregations(const [
+      Congregation(id: 'accent', name: 'São'),
+      Congregation(id: 'plain', name: 'Sao'),
+    ], sortNames: (_) async => ['Sao', 'São']);
+    expect(ordered.map((c) => c.id), ['plain', 'accent']);
+    expect(
+      visibleConverts(
+        [
+          row('plain-old', congregationId: 'plain', created: DateTime(2026, 1)),
+          row(
+            'accent-new',
+            congregationId: 'accent',
+            created: DateTime(2026, 2),
+          ),
+        ],
+        ordered,
+        AccessScope(isAdmin: true),
+        today,
+      ).map((r) => r.id),
+      ['plain-old', 'accent-new'],
+    );
+    const congregations = [
+      Congregation(id: 'a', name: 'Mesmo'),
+      Congregation(id: 'b', name: 'Mesmo'),
+    ];
+    final rows = [
+      row('a-old', congregationId: 'a', created: DateTime(2026, 1)),
+      row('b-new', congregationId: 'b', created: DateTime(2026, 4)),
+      row('a-new', congregationId: 'a', created: DateTime(2026, 3)),
+      row('b-old', congregationId: 'b', created: DateTime(2026, 2)),
+    ];
+    expect(
+      visibleConverts(
+        rows,
+        congregations,
+        AccessScope(isAdmin: true),
+        today,
+      ).map((r) => r.id),
+      ['a-new', 'a-old', 'b-new', 'b-old'],
+    );
+  });
+  testWidgets(
+    'permission denial invalidates an outstanding mutation refresh before its next page',
+    (tester) async {
+      tester.view.physicalSize = const Size(800, 2000);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final gateway = OrderedGateway();
+      final repository = RowsRepository(gateway, [row('a'), row('b')]);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ConvertsPage(
+            scope: AccessScope(isAdmin: true),
+            converts: repository,
+            photos: NoPhotos(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final cards = tester
+          .widgetList<ConvertCard>(find.byType(ConvertCard))
+          .toList();
+      expect(cards.length, 2);
+      final a = cards[0].onAction!(ConvertAction.visit),
+          b = cards[1].onAction!(ConvertAction.visit);
+      repository.pending = Completer();
+      gateway.commands['a']!.complete(
+        const MutationResult.applied(operationId: 'a', value: 'a'),
+      );
+      await tester.pumpAndSettle();
+      expect(repository.requests, 2);
+      gateway.commands['b']!.complete(
+        const MutationResult.rejected(
+          operationId: 'b',
+          errorCode: 'permission',
+        ),
+      );
+      await tester.pumpAndSettle();
+      repository.pending!.complete(
+        Page(items: [row('obsolete')], nextCursor: '0'),
+      );
+      repository.pending = null;
+      await tester.pumpAndSettle();
+      await Future.wait([a, b]);
+      expect(repository.requests, 2);
+      expect(find.textContaining('Seu acesso mudou'), findsOneWidget);
+      expect(find.text('Pessoa'), findsNothing);
     },
   );
 }

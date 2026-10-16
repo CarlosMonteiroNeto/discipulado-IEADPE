@@ -18,44 +18,6 @@ Uri? brazilWhatsApp(String? phone) {
   return Uri.https('wa.me', '/55$digits');
 }
 
-String _alphabetical(String text) {
-  var result = text.toLowerCase();
-  const replacements = {
-    'á': 'a',
-    'à': 'a',
-    'â': 'a',
-    'ã': 'a',
-    'ä': 'a',
-    'é': 'e',
-    'ê': 'e',
-    'è': 'e',
-    'ë': 'e',
-    'í': 'i',
-    'ì': 'i',
-    'î': 'i',
-    'ï': 'i',
-    'ó': 'o',
-    'ô': 'o',
-    'õ': 'o',
-    'ò': 'o',
-    'ö': 'o',
-    'ú': 'u',
-    'ù': 'u',
-    'û': 'u',
-    'ü': 'u',
-    'ç': 'c',
-  };
-  replacements.forEach((key, value) => result = result.replaceAll(key, value));
-  return result;
-}
-
-int compareCongregations(Congregation a, Congregation b) {
-  final sedeA = a.name.toLowerCase().contains('sede'),
-      sedeB = b.name.toLowerCase().contains('sede');
-  if (sedeA != sedeB) return sedeA ? -1 : 1;
-  return _alphabetical(a.name).compareTo(_alphabetical(b.name));
-}
-
 String statusCode(ConvertRecord record, DateOnly today) =>
     switch (visitState(record, today)) {
       VisitState.urgent => 'red',
@@ -74,6 +36,11 @@ List<ConvertRecord> visibleConverts(
   final congregationsById = {
     for (final congregation in congregations) congregation.id: congregation,
   };
+  // Congregations arrive in prepared platform locale order. IDs, including
+  // equal-name congregations, form separate groups before recency sorting.
+  final groupRanks = {
+    for (final entry in congregations.indexed) entry.$2.id: entry.$1,
+  };
   final indexed = rows.indexed.where((entry) {
     final row = entry.$2;
     return !isTerminal(row) &&
@@ -87,7 +54,7 @@ List<ConvertRecord> visibleConverts(
         cb = congregationsById[b.$2.congregationId];
     var order = ca == null
         ? (cb == null ? 0 : 1)
-        : (cb == null ? -1 : compareCongregations(ca, cb));
+        : (cb == null ? -1 : groupRanks[ca.id]!.compareTo(groupRanks[cb.id]!));
     if (order != 0) return order;
     final da = a.$2.createdAt, db = b.$2.createdAt;
     if (da != null && db != null) {

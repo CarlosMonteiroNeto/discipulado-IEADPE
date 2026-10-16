@@ -6,6 +6,7 @@ import '../../data/convert_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../photos/photo_repository.dart';
 import 'convert_actions.dart';
+import 'congregation_order.dart';
 import 'convert_card.dart';
 import 'edit_page.dart';
 
@@ -35,7 +36,8 @@ class _ConvertsPageState extends State<ConvertsPage> {
   List<ConvertRecord> _rows = [];
   final _pending = <String>{};
   final _errors = <String, String>{};
-  bool _loading = true;
+  bool _loading = true, _accessDenied = false;
+  List<Congregation> _orderedCongregations = [];
   String? _error, _status, _congregation;
   ConvertRecord? _editing;
   int _request = 0;
@@ -58,7 +60,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
   }
 
   Future<void> _load() async {
-    if (!_current()) return;
+    if (!_current() || _accessDenied) return;
     if (!widget.scope.isGlobalManager && widget.scope.congregationIds.isEmpty) {
       setState(() => _loading = false);
       return;
@@ -70,6 +72,8 @@ class _ConvertsPageState extends State<ConvertsPage> {
       _rows = [];
     });
     try {
+      final ordered = await orderCongregations(widget.congregations);
+      if (!_current() || request != _request) return;
       final rows = <ConvertRecord>[];
       String? cursor;
       do {
@@ -78,7 +82,12 @@ class _ConvertsPageState extends State<ConvertsPage> {
         rows.addAll(page.items);
         cursor = page.nextCursor;
       } while (cursor != null);
-      if (_current() && request == _request) setState(() => _rows = rows);
+      if (_current() && request == _request) {
+        setState(() {
+          _rows = rows;
+          _orderedCongregations = ordered;
+        });
+      }
     } catch (error) {
       if (_current() && request == _request) {
         setState(
@@ -87,6 +96,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
               : 'Não foi possível carregar os convertidos. Tente novamente.',
         );
         if (error is DataFailure && error.code == 'permission') {
+          _denyAccess();
           await widget.onScopeRefresh?.call();
         }
       }
@@ -95,8 +105,20 @@ class _ConvertsPageState extends State<ConvertsPage> {
     }
   }
 
+  void _denyAccess() {
+    _request++;
+    setState(() {
+      _accessDenied = true;
+      _loading = false;
+      _rows = [];
+      _editing = null;
+      _errors.clear();
+      _error = 'Seu acesso mudou. Atualize seu acesso para continuar.';
+    });
+  }
+
   Future<void> _execute(ConvertAction action, ConvertRecord record) async {
-    if (!_current() || _pending.contains(record.id)) return;
+    if (!_current() || _accessDenied || _pending.contains(record.id)) return;
     final today = BusinessCalendar().today(DateTime.now());
     if (!widget.scope.canAccess(record.congregationId) ||
         !actionAllowed(action, record, today)) {
@@ -114,11 +136,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
       final code = error is DataFailure ? error.code : 'backend';
       if (code == 'stale') return;
       if (code == 'permission') {
-        setState(() {
-          _rows = [];
-          _editing = null;
-          _error = 'Seu acesso mudou. Atualize seu acesso para continuar.';
-        });
+        _denyAccess();
         await widget.onScopeRefresh?.call();
       } else {
         if (code == 'invalid') await _load();
@@ -139,6 +157,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
   void dispose() {
     _request++;
     _rows = [];
+    _orderedCongregations = [];
     _editing = null;
     _errors.clear();
     _pending.clear();
@@ -172,16 +191,16 @@ class _ConvertsPageState extends State<ConvertsPage> {
     final today = BusinessCalendar().today(DateTime.now());
     final rows = visibleConverts(
       _rows,
-      widget.congregations,
+      _orderedCongregations,
       widget.scope,
       today,
       name: _search.text,
       congregationId: _congregation,
       status: _status,
     );
-    final congregations =
-        widget.congregations.where((c) => widget.scope.canAccess(c.id)).toList()
-          ..sort(compareCongregations);
+    final congregations = _orderedCongregations
+        .where((c) => widget.scope.canAccess(c.id))
+        .toList();
     final allowed =
         widget.scope.isGlobalManager || widget.scope.congregationIds.isNotEmpty;
     final header = Column(
@@ -292,7 +311,10 @@ class _ConvertsPageState extends State<ConvertsPage> {
           ),
         if (_error != null) ...[
           Semantics(liveRegion: true, child: Text(_error!)),
-          TextButton(onPressed: _load, child: const Text('Tentar novamente')),
+          TextButton(
+            onPressed: _accessDenied ? widget.onScopeRefresh : _load,
+            child: const Text('Tentar novamente'),
+          ),
         ] else if (_loading && allowed)
           const Padding(padding: EdgeInsets.all(16), child: Text('Carregando…'))
         else if (rows.isEmpty && allowed)
