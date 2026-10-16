@@ -128,6 +128,7 @@ class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
       'photo_assets',
       'congregations',
       'convert_events',
+      'feedback',
     }.contains(table)) {
       throw ArgumentError.value(table, 'table');
     }
@@ -252,6 +253,8 @@ class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
       'edit_convert' => {...editable, 'id'},
       'delete_convert' || 'revoke_access' || 'archive_congregation' => {'id'},
       'save_congregation' => {'id', 'name'},
+      'submit_feedback' => {'message'},
+      'update_feedback' => {'id', 'status'},
       'transition_convert' => {'id', 'action'},
       'confirm_zero' => {'congregation_id'},
       'create_photo_draft' => <String>{},
