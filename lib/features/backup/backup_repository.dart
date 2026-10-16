@@ -73,7 +73,10 @@ class BackupRepository {
       Namespace.url.value,
       jsonEncode([
         preview.version,
-        payloads,
+        [
+          for (var i = 0; i < payloads.length; i++)
+            [preview.rows[i].rowNumber, payloads[i]],
+        ],
         preview.diagnostics
             .map((d) => [d.rowNumber, d.column, d.code])
             .toList(),

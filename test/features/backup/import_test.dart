@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:ieadpe_converts/features/backup/backup_codec.dart';
+import 'package:ieadpe_converts/platform/table_workbook.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/features/backup/backup_repository.dart';
 import 'package:ieadpe_converts/features/backup/backup_models.dart';
@@ -71,6 +75,73 @@ class ImportTransport implements ImportRpcGateway {
   ) async => throw UnimplementedError();
 }
 
+// Models only the receipt/uncertain-response transport boundary; authorization
+// remains covered by the real native PostgreSQL scenarios.
+class ReceiptTransport extends ImportTransport {
+  final receipts = <String, ({String payload, Map<String, dynamic> result})>{};
+  final records = <String>{};
+  bool uncertain = true;
+  int conflicts = 0;
+  @override
+  Future<Map<String, dynamic>> importRow(
+    String operation,
+    Map<String, Object?> payload,
+  ) async {
+    operations.add(operation);
+    final encoded = jsonEncode(payload), existing = receipts[operation];
+    if (existing != null && existing.payload != encoded) {
+      conflicts++;
+      throw const DataFailure('invalid');
+    }
+    final internalId = payload['internal_id'] as String;
+    final result =
+        existing?.result ??
+        {
+          'id': '22222222-2222-2222-2222-222222222222',
+          'status': records.add(internalId) ? 'created' : 'duplicate',
+        };
+    receipts[operation] = (payload: encoded, result: result);
+    if (uncertain && internalId == 'legacy-b') {
+      throw const DataFailure('unavailable');
+    }
+    return result;
+  }
+}
+
+ImportPreview workbook({bool blankBefore = false}) {
+  List<String> row(String id) => [
+    id,
+    'Synthetic $id',
+    '',
+    '',
+    'Square',
+    '',
+    '',
+    'Masculino',
+    '2020-01-01',
+    'Prayer',
+    '0',
+    'Não',
+    'Não',
+    'Não',
+    '2020-01-01',
+    '',
+    'Não',
+  ];
+  return BackupCodec().decode(
+    tableWorkbook(
+      'Convertidos',
+      [
+        BackupCodec.headers,
+        if (blankBefore) List.filled(17, ''),
+        row('legacy-a'),
+        row('legacy-b'),
+      ],
+      definedNames: const {'ieadpe_backup_version': '2'},
+    ),
+  );
+}
+
 ImportPreview sample() => ImportPreview(
   version: 2,
   rows: [
@@ -91,6 +162,63 @@ ImportPreview sample() => ImportPreview(
   diagnostics: [],
 );
 void main() {
+  test('blank row insertion after uncertain commit starts safe deduplicating intent', () async {
+    final transport = ReceiptTransport(), store = MemoryProgress();
+    final original = workbook(), shifted = workbook(blankBefore: true);
+    expect(original.rows.map((r) => r.rowNumber), [2, 3]);
+    expect(shifted.rows.map((r) => r.rowNumber), [3, 4]);
+    final interrupted = await BackupRepository(
+      transport,
+      store,
+    ).importRows(original).toList();
+    expect(interrupted.last.errorCode, 'unavailable');
+    expect(transport.records, {'legacy-a', 'legacy-b'});
+    final originalOperations = List<String>.of(transport.operations);
+    transport.uncertain = false;
+    final resumed = await BackupRepository(
+      transport,
+      store,
+    ).importRows(shifted).toList();
+    expect(
+      transport.conflicts,
+      0,
+      reason:
+          'changed row positions must not reuse a receipt for another payload',
+    );
+    expect(resumed.last.errors, 0);
+    expect(resumed.last.skipped, 2);
+    expect(resumed.last.created, 0);
+    expect(resumed.last.done, true);
+    expect(
+      transport.operations
+          .skip(2)
+          .toSet()
+          .intersection(originalOperations.toSet()),
+      isEmpty,
+    );
+    expect(transport.records, hasLength(2));
+  });
+  test(
+    'unchanged workbook after uncertain commit replays the same operations',
+    () async {
+      final transport = ReceiptTransport(), store = MemoryProgress();
+      await BackupRepository(transport, store).importRows(workbook()).toList();
+      final originalOperations = List<String>.of(transport.operations);
+      transport.uncertain = false;
+      final resumed = await BackupRepository(
+        transport,
+        store,
+      ).importRows(workbook()).toList();
+      expect(transport.operations.skip(2), originalOperations);
+      expect(transport.conflicts, 0);
+      expect(resumed.last.created, 2);
+      expect(resumed.last.errors, 0);
+      expect(resumed.last.done, true);
+      expect(store.values, isEmpty);
+      expect(transport.records, hasLength(2));
+    },
+  );
+
   test(
     'diagnostic rows count once and progress includes excluded rows',
     () async {
