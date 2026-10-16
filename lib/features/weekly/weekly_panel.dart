@@ -17,6 +17,8 @@ class WeeklyPanel extends StatefulWidget {
 class _WeeklyPanelState extends State<WeeklyPanel> {
   late String _token;
   WeeklyOverview? _overview;
+  // Loading failures must not erase the window that owns retained retry IDs.
+  ({bool visible, String? week})? _lastSuccessfulWindow;
   WeeklyEntry? _confirming;
   final _operations = <String, String>{};
   String? _error;
@@ -55,6 +57,7 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
   void _clear() {
     _request++;
     _overview = null;
+    _lastSuccessfulWindow = null;
     _confirming = null;
     _operations.clear();
     _error = null;
@@ -74,7 +77,6 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
   Future<void> _load() async {
     if (!_current || _denied) return;
     final request = ++_request;
-    final previousWeek = _overview?.weekStart;
     setState(() {
       _loading = true;
       _error = null;
@@ -84,7 +86,12 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
       final result = await widget.repository.overview();
       if (!_current || request != _request) return;
       setState(() {
-        if (previousWeek != result.weekStart) _operations.clear();
+        final window = (
+          visible: result.visible,
+          week: result.weekStart?.toString(),
+        );
+        if (_lastSuccessfulWindow != window) _operations.clear();
+        _lastSuccessfulWindow = window;
         _overview = result;
         _confirming = null;
       });

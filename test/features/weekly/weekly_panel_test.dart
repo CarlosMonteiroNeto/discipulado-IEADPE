@@ -22,6 +22,7 @@ class WeeklyGateway implements ReadRpcGateway {
 
   bool visible = true, global = false, confirmed = false;
   String? failure;
+  String? readFailure;
   String week = '2026-10-05';
   final operations = <String>[];
   Completer<MutationResult<String>>? pendingMutation;
@@ -34,6 +35,7 @@ class WeeklyGateway implements ReadRpcGateway {
   }) async {
     if (pending != null) return pending!.future;
     if (failure == 'permission') throw const DataFailure('permission');
+    if (readFailure != null) throw DataFailure(readFailure!);
     return {
       'visible': visible,
       'global': global,
@@ -125,6 +127,37 @@ void main() {
       await t.pumpAndSettle();
       expect(gateway.operations.length, 2);
       expect(gateway.operations.toSet(), hasLength(1));
+      expect(find.text('Relatório confirmado'), findsOneWidget);
+    },
+  );
+  testWidgets(
+    'uncertain confirmation retains its UUID through failed and successful same-week refreshes',
+    (t) async {
+      final gateway = WeeklyGateway()..failure = 'unavailable';
+      await mount(t, gateway);
+      await t.tap(find.text('Confirmar sem conversões'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Confirmar'));
+      await t.pumpAndSettle();
+      expect(find.textContaining('Não foi possível confirmar'), findsOneWidget);
+      gateway.readFailure = 'unavailable';
+      await t.tap(find.text('Atualizar relatório'));
+      await t.pumpAndSettle();
+      expect(
+        find.textContaining('Não foi possível carregar o relatório'),
+        findsOneWidget,
+      );
+      gateway.readFailure = null;
+      await t.tap(find.text('Tentar novamente'));
+      await t.pumpAndSettle();
+      expect(find.text('05/10/2026 a 11/10/2026'), findsOneWidget);
+      gateway.failure = null;
+      await t.tap(find.text('Confirmar sem conversões'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Confirmar'));
+      await t.pumpAndSettle();
+      expect(gateway.operations, hasLength(2));
+      expect(gateway.operations[1], gateway.operations[0]);
       expect(find.text('Relatório confirmado'), findsOneWidget);
     },
   );
