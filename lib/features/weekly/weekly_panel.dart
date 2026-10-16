@@ -7,14 +7,28 @@ import 'weekly_repository.dart';
 /// Task 19 must key/unmount this entire owner on boundary or identity changes.
 /// It retains protected records, inline confirmation and logical retry IDs.
 class WeeklyPanel extends StatefulWidget {
-  const WeeklyPanel({super.key, required this.repository, this.onScopeRefresh});
+  const WeeklyPanel({
+    super.key,
+    required this.repository,
+    this.onScopeRefresh,
+    this.refreshRevision = 0,
+  });
   final WeeklyRepository repository;
   final Future<void> Function()? onScopeRefresh;
+
+  /// Reload the server overview without replacing protected mutation ownership.
+  /// Requests during confirmation coalesce until its response has settled.
+  final int refreshRevision;
   @override
   State<WeeklyPanel> createState() => _WeeklyPanelState();
 }
 
-class _WeeklyPanelState extends State<WeeklyPanel> {
+class _WeeklyPanelState extends State<WeeklyPanel>
+    with AutomaticKeepAliveClientMixin {
+  // Scrolling or a loading-layout change must not dispose an uncertain write.
+  // The protected parent must still unmount this owner on invalidation.
+  @override
+  bool get wantKeepAlive => true;
   late String _token;
   WeeklyOverview? _overview;
   // Loading failures must not erase the window that owns retained retry IDs.
@@ -23,6 +37,7 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
   final _operations = <String, String>{};
   String? _error;
   bool _loading = true, _busy = false, _denied = false;
+  bool _refreshQueued = false;
   int _request = 0;
 
   @override
@@ -41,6 +56,12 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
       _token = widget.repository.gateway.context;
       _denied = false;
       _load();
+    } else if (oldWidget.refreshRevision != widget.refreshRevision) {
+      if (_busy) {
+        _refreshQueued = true;
+      } else {
+        _load();
+      }
     }
   }
 
@@ -62,6 +83,7 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
     _operations.clear();
     _error = null;
     _busy = false;
+    _refreshQueued = false;
   }
 
   Future<void> _deny() async {
@@ -76,6 +98,7 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
 
   Future<void> _load() async {
     if (!_current || _denied) return;
+    _refreshQueued = false;
     final request = ++_request;
     setState(() {
       _loading = true;
@@ -155,7 +178,10 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
             'Não foi possível confirmar. Tente novamente a mesma ação.',
       );
     }
-    if (ownsResult()) setState(() => _busy = false);
+    if (ownsResult()) {
+      setState(() => _busy = false);
+      if (_refreshQueued) await _load();
+    }
   }
 
   @override
@@ -171,6 +197,7 @@ class _WeeklyPanelState extends State<WeeklyPanel> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     if (!_current) return const SizedBox.shrink();
     final overview = _overview;
     if (_loading) {

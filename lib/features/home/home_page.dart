@@ -23,6 +23,8 @@ class HomePage extends StatefulWidget {
   final String name;
   final bool isAdmin;
   final Future<void> Function()? onScopeRefresh;
+
+  /// Refreshes summaries and the existing weekly owner, preserving write retries.
   final int refreshRevision;
   @override
   State<HomePage> createState() => _HomePageState();
@@ -228,8 +230,9 @@ class _HomePageState extends State<HomePage> {
             ),
             const SizedBox(height: 24),
             WeeklyPanel(
-              key: ValueKey('weekly:$_token:$_weeklyRevision'),
+              key: ValueKey('weekly:$_token'),
               repository: widget.weekly,
+              refreshRevision: _weeklyRevision,
               onScopeRefresh: _deny,
             ),
             const SizedBox(height: 24),
