@@ -2,6 +2,8 @@
 from pathlib import Path
 import argparse
 
+APPLICATION_ROUTES = {'/login', '/register', '/home', '/converts', '/admin', '/auth/callback'}
+
 
 def inspect(root):
     root = Path(root)
@@ -10,8 +12,14 @@ def inspect(root):
         if not (root / required).is_file():
             issues.append(f'Missing {required}; build the web artifact first.')
     redirects = root / '_redirects'
-    if redirects.is_file() and '/* /index.html 200' not in redirects.read_text().splitlines():
-        issues.append('Missing SPA rewrite /* /index.html 200.')
+    if redirects.is_file():
+        rules = [line.split() for line in redirects.read_text().splitlines()
+                 if line.strip() and not line.lstrip().startswith('#')]
+        expected = [[route, '/index.html', '200'] for route in APPLICATION_ROUTES]
+        if sorted(rules) != sorted(expected):
+            issues.append('Use only exact application-route proxies to /index.html 200: '
+                          + ', '.join(sorted(APPLICATION_ROUTES))
+                          + '. Wildcard proxies can replace JS/WASM/assets with HTML.')
     files = list(root.rglob('*')) if root.is_dir() else []
     count = 0
     for file in files:

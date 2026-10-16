@@ -1,1 +1,6 @@
-/* /index.html 200
+/login /index.html 200
+/register /index.html 200
+/home /index.html 200
+/converts /index.html 200
+/admin /index.html 200
+/auth/callback /index.html 200
