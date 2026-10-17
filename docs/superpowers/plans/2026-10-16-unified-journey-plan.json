@@ -1,0 +1,78 @@
+{
+  "feature": "One Flutter journey from convert registration to classroom attendance",
+  "execution_status": "local app composition implemented; integrated browser journey absent; human accessibility and hosted-browser evidence remain release work",
+  "evidence": ["docs/integration/handoff-contract.md", "docs/integration/handoff-sequence.md", "test/features/ministry/ui/ministry_journey_test.dart", "test/widgets/unified_navigation_test.dart", "test/workflows_test.dart"],
+  "spec_doc": "docs/superpowers/specs/2026-10-16-unified-journey-design.md",
+  "baseline": "completed convert app plus ministry Supabase port",
+  "global_constraints": [
+    "One Supabase Auth session, congregation identity, router and responsive Flutter shell.",
+    "Only server-enforced grants expose convert, student and referral data; UI checks are presentation only.",
+    "Conversion and classroom histories remain distinct; no automatic enrollment, baptism inference or name-only merge.",
+    "Apple-design governs UI feel, design-oo-ux adds structure, and a11y-ethics supplies privacy/POUR checks.",
+    "Pin and load the fork domain skills at origin/main@ace9e92 and route one stage skill plus applicable overlays; internal artifacts are English, UI copy pt-BR.",
+    "No private-record migration or production deployment."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Finalize handoff policy and shared field ownership",
+      "status": "complete_documented",
+      "summary": "Close the product choices needed for a safe one-to-one link before writing the promotion command.",
+      "spec_refs": ["requirements", "design-oo-ux", "a11y-ethics", "docs/superpowers/specs/2026-10-16-unified-journey-design.md"],
+      "touches": ["docs/integration/handoff-contract.md", "docs/integration/handoff-sequence.md"],
+      "depends_on": [],
+      "acceptance": [
+        "Role matrix states full conversion-history versus minimal-referral rights for ministry staff and specifies archived/terminal convert behavior.",
+        "Name, phone and address are initial provenance-labeled snapshots; conversion data stays convert-owned and education/baptism/enrollment stays student-owned; later edits do not silently synchronize.",
+        "One sequence diagram covers locks, authorization, existing-student review, one-to-one link, receipt replay and response loss.",
+        "An unassigned convert requires authorized congregation assignment before promotion; transfer after linking is excluded until an explicit safe rule exists."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Implement atomic convert-to-student linking",
+      "status": "complete_local_synthetic",
+      "summary": "Add one-to-one schema and idempotent server command with minimal scoped referral projection.",
+      "spec_refs": ["coding-standards", "verification-test", "quality-gate"],
+      "touches": ["supabase/migrations/202610140015_convert_student_link.sql", "supabase/tests/database/convert_student_link_test.sql", "test/database/convert_student_race_test.dart"],
+      "depends_on": [1],
+      "acceptance": [
+        "Unique nullable ministry_students.convert_id and ieadpe_promote_convert_to_student(operation_id uuid,payload jsonb) enforce one link under concurrent clients, replay and lost response.",
+        "Tests cover unassigned, archived/terminal, existing same-scope student, out-of-scope candidate, revoked grant, altered payload and both commit orders; no name-only auto-merge.",
+        "Authorized minimal referral contains only declared fields; unauthorized direct join/read is denied by RLS; no enrollment or historical rewrite occurs.",
+        "Existing convert and ministry SQL suites pass after the new migration."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Build linked journey and ministry screens",
+      "status": "complete_local_synthetic; human accessibility review open",
+      "summary": "Port IEADPE pages into feature-owned widgets and expose an explicit promotion/review flow.",
+      "spec_refs": ["design-oo-ux", "apple-design", "a11y-ethics", "verification-test"],
+      "touches": ["lib/features/ministry/ui/ministry_home_page.dart", "lib/features/ministry/ui/team_page.dart", "lib/features/ministry/ui/students_page.dart", "lib/features/ministry/ui/classes_page.dart", "lib/features/ministry/ui/attendance_page.dart", "lib/features/ministry/ui/convert_handoff_page.dart", "test/features/ministry/ui/ministry_journey_test.dart"],
+      "depends_on": [2],
+      "acceptance": [
+        "An authorized user can review a convert, create/link one student, then explicitly enroll and record attendance; denied users see neither hidden data nor an enabled action.",
+        "Duplicate review uses explicit scoped candidate selection; retry preserves the operation ID and drafts survive recoverable failures without false success.",
+        "Widget regressions assert representative 360/768/1440 layouts, 200% text, keyboard focus, semantic labels/outcomes, reduced-motion settings, error recovery and no page-wide horizontal overflow; human assistive-technology and visual review remains a separate release check.",
+        "WhatsApp and other contact actions require a deliberate tap and never prefill religious data."
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Compose one shell, theme and route guard",
+      "status": "complete_local_synthetic; hosted route verification open",
+      "summary": "Register ministry feature routes after dependencies land and retain convert session/cache protection.",
+      "spec_refs": ["apple-design", "design-oo-ux", "a11y-ethics", "quality-gate"],
+      "touches": ["lib/app.dart", "lib/routing/router.dart", "lib/widgets/app_shell.dart", "lib/ui/unified_theme.dart", "test/workflows_test.dart", "test/widgets/unified_navigation_test.dart"],
+      "depends_on": [3],
+      "acceptance": [
+        "One root MaterialApp/session guard serves campaign and ministry routes; logout, revocation, identity switch and direct URL refresh clear protected data across both modules.",
+        "Ministry supervisors without a fixed congregation choose one explicitly from the server directory; directory loading is page-bounded and user-driven, and the client selection never replaces server authorization.",
+        "A documented token comparison selects one semantic theme; existing convert branding and IEADPE accessibility behavior are preserved or intentionally reconciled.",
+        "Route and widget tests cover scoped navigation, forbidden/not-found, local browser-history back/forward, form draft handling and no PII in query strings; hosted deep-link refresh stays a release check.",
+        "Complete convert regression, ministry repository/widget tests and analyzer pass."
+      ]
+    }
+  ]
+}

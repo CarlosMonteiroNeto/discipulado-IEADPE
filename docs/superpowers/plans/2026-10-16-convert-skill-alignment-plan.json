@@ -1,0 +1,61 @@
+{
+  "feature": "Completed convert app alignment with new engineering skills",
+  "execution_status": "complete",
+  "evidence": ["docs/verification/convert-requirements-trace.md", "docs/verification/convert-ui-audit.md", "docs/verification/convert-alignment-results.md", "docs/operations/unified-responsibility.md"],
+  "spec_doc": "docs/superpowers/specs/2026-10-16-convert-skill-alignment-design.md",
+  "baseline": "implementation/supabase-free@642047f",
+  "global_constraints": [
+    "Execute against the completed convert worktree, never the older flutter-supabase planning checkout.",
+    "Preserve all 101 Base44 source hashes, existing behavior, Supabase Free boundary and pt-BR UI; internal artifacts are English.",
+    "Use the fork's origin/main@ace9e92 domain skills through project routing; apple-design has priority for UI feel.",
+    "No production deployment, live grants, private-record migration or claim that unrun release checks passed.",
+    "Each touches path has one owner within this plan; tests must demonstrate a concrete gap before code changes."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Trace convert requirements and quality evidence",
+      "status": "complete_documented",
+      "summary": "Audit completed code and report against the eight domain checklists; distinguish proven behavior from documentary or executable gaps.",
+      "spec_refs": ["requirements", "quality-gate", "agile-loop", "docs/superpowers/specs/2026-10-16-convert-skill-alignment-design.md"],
+      "touches": ["docs/verification/convert-requirements-trace.md", "docs/superpowers/skills-routing.md"],
+      "depends_on": [],
+      "acceptance": [
+        "Trace every convert domain rule, security invariant and NFR to an executed test, an explicit release prerequisite or a documented gap; rank security, integrity, availability, cost and maintainability with rationale.",
+        "Define blocking SQA and tracked SQC by ISO 25010 quality characteristic; record prevention, appraisal and failure cost rationale for the top risks.",
+        "Route process x domain skills by stage and overlays; list INVEST integration stories with DoR/DoD without requiring Scrum ceremonies for a solo agent.",
+        "Do not label existing unrun OAuth, Storage, hosted or device checks as passed."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Audit convert UI structure and ethics",
+      "status": "complete_documented; manual visual review remains release work",
+      "summary": "Inspect existing navigation, forms, reports and feedback; write actionable findings before changing presentation.",
+      "spec_refs": ["design-oo-ux", "apple-design", "a11y-ethics"],
+      "touches": ["docs/verification/convert-ui-audit.md"],
+      "depends_on": [1],
+      "acceptance": [
+        "Record one justified UML view and a composition-first port sketch for route, session and protected-cache boundaries.",
+        "Review 360/768/1440, 200% text, keyboard, focus, screen-reader names/outcomes, reduced motion and contrast with actual evidence or incomplete markers; classify Nielsen findings by severity.",
+        "Review WhatsApp consent and religious-data/phone exposure in URLs, logs and errors; preserve existing branding until unified-theme comparison.",
+        "Each proposed fix identifies its owning file and a behavior assertion; no speculative visual rewrite."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Publish convert gap disposition and operational responsibility",
+      "status": "complete_documented",
+      "summary": "Assign every verified finding to the journey or final gate plan and keep release-only checks honestly open.",
+      "spec_refs": ["coding-standards", "verification-test", "cloud-deploy", "quality-gate"],
+      "touches": ["docs/verification/convert-alignment-results.md", "docs/operations/unified-responsibility.md"],
+      "depends_on": [1, 2],
+      "acceptance": [
+        "Each finding from Tasks 1-2 is classified as already covered, journey-plan action, final-gate action, or release-only prerequisite, with an exact owner and checkable assertion for any code action; no production code changes in this task.",
+        "Document Supabase/static-host shared responsibility, IAM, encryption, monitoring, backups/restore and Free-tier limits; mark VM/serverless triad not applicable unless adopted.",
+        "Report existing actual analyzer, Flutter, SQL, web and Android evidence without rerunning broad suites for documentation alone; separate incomplete live OAuth/Storage/hosted/device checks.",
+        "Record Entry/Process/Exit and boundary validation for the future handoff function in the linked journey plan."
+      ]
+    }
+  ]
+}

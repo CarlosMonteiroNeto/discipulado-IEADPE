@@ -1,0 +1,91 @@
+{
+  "feature": "Port IEADPE ministry data and invariants into completed Supabase app",
+  "execution_status": "complete_for_local_synthetic_behavior; live provisioning and legacy migration remain release work",
+  "evidence": ["supabase/migrations/202610140011_ministry_schema.sql", "supabase/migrations/202610140018_ministry_congregation_directory.sql", "supabase/tests/database/ministry_congregations_test.sql", "docs/verification/unified-matrix.md"],
+  "spec_doc": "docs/superpowers/specs/2026-10-16-ministry-supabase-port-design.md",
+  "baseline": "implementation/supabase-free@642047f; IEADPE main@4acb563",
+  "global_constraints": [
+    "Implement in the completed convert app; treat IEADPE Firebase app and its three pending plans as behavioral evidence.",
+    "Append SQL migrations after 202610140010_feedback.sql; preserve convert RLS/RPC/receipt and congregation contracts.",
+    "All authorization and invariants are server enforced; no direct client business writes or second Firebase runtime.",
+    "Synthetic local fixtures only; no live record migration, deployment or credentials.",
+    "Pin and load the fork domain skills at origin/main@ace9e92 and route one stage skill plus applicable overlays; internal artifacts are English, UI copy pt-BR.",
+    "Each touches set is exclusive within this plan and every task uses TDD with narrow plus broader checks."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Fix role, ID and ministry domain contracts",
+      "status": "complete_local_contract",
+      "summary": "Inventory IEADPE models and define the shared authorization, congregation and source-ID mapping before schema work.",
+      "spec_refs": ["requirements", "design-oo-ux", "agile-loop", "docs/superpowers/specs/2026-10-16-ministry-supabase-port-design.md"],
+      "touches": ["docs/integration/ministry-contracts.md", "lib/features/ministry/domain/ministry_models.dart", "test/features/ministry/domain/ministry_models_test.dart"],
+      "depends_on": [],
+      "acceptance": [
+        "Role matrix separates campaign registrar/direction/supervision from ministry staff and explicitly defines module read/write rights, inactive/revoked behavior and unassigned converts.",
+        "Typed models preserve IEADPE contact/student/class/enrollment/session/attendance statuses, archive history and date-only values; legacy Firebase IDs are distinct from UUID primary keys.",
+        "An enrollment/attendance sequence diagram and composition-first port sketch show transaction and source ownership; one valid plus two invalid partitions cover key model boundaries.",
+        "Each story is INVEST and has acceptance and DoR/DoD; unresolved product choices are recorded before dependent implementation."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Create ministry schema, grants and scoped queries",
+      "status": "complete_local_synthetic",
+      "summary": "Add PostgreSQL tables, RLS and bounded reads while preserving existing convert authorization.",
+      "spec_refs": ["requirements", "cloud-deploy", "verification-test", "quality-gate"],
+      "touches": ["supabase/migrations/202610140011_ministry_schema.sql", "supabase/migrations/202610140012_ministry_access.sql", "supabase/tests/database/ministry_access_test.sql"],
+      "depends_on": [1],
+      "acceptance": [
+        "Every new table has RLS; anonymous, inactive, cross-congregation and forged direct writes are denied; authorized scoped reads use stable cursors and bounded pages.",
+        "Identity and congregation UUID mapping preserve unique source keys without name-based merging; no campaign grant silently becomes a ministry grant.",
+        "SQL tests exercise role matrix, revocation, empty/full page and unsupported filter combinations; existing convert access tests still pass.",
+        "Record expected Free-tier read/storage budget and Supabase shared-responsibility boundary."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Implement ministry registry commands",
+      "status": "complete_local_synthetic",
+      "summary": "Port congregation, team and student mutations into authorized RPCs.",
+      "spec_refs": ["coding-standards", "verification-test", "quality-gate"],
+      "touches": ["supabase/migrations/202610140013_ministry_registry_commands.sql", "supabase/tests/database/ministry_registry_test.sql"],
+      "depends_on": [2],
+      "acceptance": [
+        "Create/update/archive and role replacement enforce scope, uniqueness, revision and operation-ID replay; concurrent role claims and revoked access are tested in independent sessions.",
+        "Student records preserve nullable baptism answers, required congregation and historical archive state; invalid and cross-scope payloads are denied.",
+        "Functions validate at the boundary, use documented lock order and return safe minimal results; no PII appears in errors or receipts.",
+        "A genuine failing assertion precedes each behavior fix and the full convert SQL suite remains green."
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Implement academic and attendance commands",
+      "status": "complete_local_synthetic",
+      "summary": "Port class, enrollment, session, roster, attendance and progress invariants into authorized RPCs.",
+      "spec_refs": ["coding-standards", "verification-test", "quality-gate"],
+      "touches": ["supabase/migrations/202610140014_ministry_academic_commands.sql", "supabase/tests/database/ministry_academic_test.sql", "test/database/ministry_concurrency_test.dart"],
+      "depends_on": [3],
+      "acceptance": [
+        "RPCs enforce unique active enrollment, 100 total historical enrollments, frozen exact roster, finalized atomic attendance, revision and idempotent replay; 99/100/101 and both race orders are tested in independent sessions.",
+        "Progress is present/(present+absent) over finalized non-canceled sessions; excused/unmarked and zero denominator retain IEADPE semantics.",
+        "Invalid scope, stale revision, over-capacity, wrong roster and duplicate session cases roll back without partial writes.",
+        "Existing convert and registry SQL suites remain green."
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Add typed ministry gateway and parity tests",
+      "status": "complete_local_synthetic",
+      "summary": "Expose the new RPC/query contracts to Flutter without changing completed convert repository semantics.",
+      "spec_refs": ["coding-standards", "verification-test"],
+      "touches": ["lib/data/supabase_gateway.dart", "lib/features/ministry/data/ministry_repository.dart", "lib/features/ministry/data/ministry_codec.dart", "test/features/ministry/data/ministry_repository_test.dart"],
+      "depends_on": [4],
+      "acceptance": [
+        "Repository ports use the existing Supabase gateway and return typed scope-safe results with stable cursor and safe error mapping.",
+        "Synthetic parity fixtures cover create/archive/role replacement, student/class/enrollment/session/attendance and progress, including invalid/revoked inputs.",
+        "No Firebase package is added to the unified pubspec; flutter analyze and narrow/full Flutter tests pass."
+      ]
+    }
+  ]
+}

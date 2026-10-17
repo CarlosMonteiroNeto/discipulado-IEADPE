@@ -94,4 +94,4 @@ The following checks are not represented by the current unit/database suite and 
 - Supabase/static host responsibilities, least-privilege grants/IAM, encryption, monitoring and Free-tier budget, database **and Storage** backup, restore rehearsal, outage behavior, reviewed cutover and rollback.
 - A real legacy export/import remains separately authorized. Task 1 performs no export/import and never targets production data.
 
-`docs/verification/final-report.md` is historical baseline context, not a run of this gate. For a new run, use only the generated report and command log for results. A green process exit is possible only when every recorded required check ran and passed; unresolved Task 3 release prerequisites still prevent release approval.
+`docs/verification/final-report.md` is historical convert-only baseline context, not a run of this gate. The latest completed run is summarized in `docs/verification/unified-final-report.md`; for future runs, use the generated report and command log. A green process exit is possible only when every recorded required check ran and passed; unresolved Task 3 release prerequisites still prevent release approval.
