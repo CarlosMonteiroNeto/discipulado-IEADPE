@@ -1,35 +1,40 @@
-import 'dart:async';
-import 'dart:html' as html;
+import 'dart:js_interop';
+
+import 'package:web/web.dart' as web;
 
 import 'browser_route_history.dart';
 
 BrowserRouteHistory createBrowserRouteHistory() => _WebBrowserRouteHistory();
 
 class _WebBrowserRouteHistory implements BrowserRouteHistory {
-  StreamSubscription<html.PopStateEvent>? _subscription;
   void Function(String path)? _onPop;
+  web.EventListener? _listener;
 
   @override
-  String? get currentPath => html.window.location.pathname;
+  String? get currentPath => web.window.location.pathname;
 
   @override
   void listen(void Function(String path) onPop) {
     _onPop = onPop;
-    _subscription ??= html.window.onPopState.listen((_) {
-      _onPop?.call(html.window.location.pathname ?? '/');
-    });
+    _listener ??= ((web.Event _) {
+      _onPop?.call(web.window.location.pathname);
+    }).toJS;
+    web.window.addEventListener('popstate', _listener);
   }
 
   @override
-  void push(String path) => html.window.history.pushState(null, '', path);
+  void push(String path) => web.window.history.pushState(null, '', path);
 
   @override
-  void replace(String path) => html.window.history.replaceState(null, '', path);
+  void replace(String path) => web.window.history.replaceState(null, '', path);
 
   @override
   void dispose() {
+    final listener = _listener;
+    if (listener != null) {
+      web.window.removeEventListener('popstate', listener);
+    }
     _onPop = null;
-    _subscription?.cancel();
-    _subscription = null;
+    _listener = null;
   }
 }

@@ -48,7 +48,7 @@ class _AttendancePageState extends State<AttendancePage> {
         congregationId: widget.congregationId,
         cursor: cursor,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _page = cursor == null || _page == null
               ? page
@@ -58,12 +58,14 @@ class _AttendancePageState extends State<AttendancePage> {
                 );
           _loading = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar as chamadas. Tente novamente.';
         });
+      }
     }
   }
 
@@ -80,7 +82,7 @@ class _AttendancePageState extends State<AttendancePage> {
         congregationId: item.congregationId,
         sessionId: item.id,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _roster = roster;
           _loading = false;
@@ -88,12 +90,14 @@ class _AttendancePageState extends State<AttendancePage> {
             _marks[mark.enrollmentId] = mark.status;
           }
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível abrir a chamada. Tente novamente.';
         });
+      }
     }
   }
 
@@ -139,13 +143,14 @@ class _AttendancePageState extends State<AttendancePage> {
         ),
       );
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _saving = false;
           _error = error is DataFailure && error.code == 'permission'
               ? 'Seu acesso mudou. Atualize a sessão.'
               : 'Não foi possível salvar. As marcações e o código de operação foram mantidos; tente novamente.';
         });
+      }
     }
   }
 
@@ -250,10 +255,11 @@ class _AttendancePageState extends State<AttendancePage> {
                             onChanged: _saving
                                 ? null
                                 : (value) {
-                                    if (value != null)
+                                    if (value != null) {
                                       setState(
                                         () => _marks[mark.enrollmentId] = value,
                                       );
+                                    }
                                   },
                           ),
                         ],

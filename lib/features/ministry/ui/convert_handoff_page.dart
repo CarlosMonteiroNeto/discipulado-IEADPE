@@ -214,12 +214,13 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
         _retryAction = null;
       });
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _candidatesLoading = false;
           _candidatesMoreLoading = false;
           _error = 'Não foi possível buscar alunos. Revise a conexão e tente novamente.';
         });
+      }
     }
   }
 
@@ -291,19 +292,21 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
           'start_date': date,
         },
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _retryAction = null;
           _notice = 'Aluno vinculado e matriculado na turma selecionada.';
         });
+      }
     } catch (error) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _busy = false;
           _retryAction = _RetryAction.enrollment;
           _error = _friendly(error);
         });
+      }
     }
   }
 
@@ -318,7 +321,7 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.canPromote)
+    if (!widget.canPromote) {
       return const Scaffold(
         body: Center(
           child: Text(
@@ -327,6 +330,7 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
           ),
         ),
       );
+    }
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -534,19 +538,30 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
                 semanticsLabel: 'Buscando alunos',
               ),
             ),
-          for (final item in _candidates)
-            Card(
-              child: RadioListTile<String>(
-                value: item.studentId,
-                groupValue: _candidate?.studentId,
-                onChanged: _busy
-                    ? null
-                    : (value) => setState(() => _candidate = item),
-                title: Text(item.name),
-                subtitle: Text(_candidateDetails(item)),
-                secondary: const Icon(Icons.person_search_outlined),
-              ),
+          RadioGroup<String>(
+            groupValue: _candidate?.studentId,
+            onChanged: (value) {
+              if (_busy || value == null) return;
+              setState(() {
+                _candidate = _candidates.firstWhere(
+                  (item) => item.studentId == value,
+                );
+              });
+            },
+            child: Column(
+              children: [
+                for (final item in _candidates)
+                  Card(
+                    child: RadioListTile<String>(
+                      value: item.studentId,
+                      title: Text(item.name),
+                      subtitle: Text(_candidateDetails(item)),
+                      secondary: const Icon(Icons.person_search_outlined),
+                    ),
+                  ),
+              ],
             ),
+          ),
           if (_candidateCursor != null)
             Align(
               alignment: Alignment.centerRight,

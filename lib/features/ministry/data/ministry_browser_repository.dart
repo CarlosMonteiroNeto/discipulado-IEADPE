@@ -146,6 +146,7 @@ class MinistryBrowserRepository {
 
 /// Holds one directory page at a time and fetches adjacent pages on demand.
 class MinistryCongregationDirectoryPager {
+  static const pageSize = 99;
   MinistryCongregationDirectoryPager(this.repository);
   final MinistryBrowserRepository repository;
 
@@ -158,7 +159,7 @@ class MinistryCongregationDirectoryPager {
   int get pageNumber => _previousCursors.length + 1;
 
   Future<MinistryPage<MinistryCongregationChoice>> loadFirst() async {
-    final nextPage = await repository.listCongregations();
+    final nextPage = await repository.listCongregations(limit: pageSize);
     page = nextPage;
     _currentCursor = null;
     _previousCursors.clear();
@@ -168,7 +169,10 @@ class MinistryCongregationDirectoryPager {
   Future<MinistryPage<MinistryCongregationChoice>?> next() async {
     final cursor = page?.nextCursor;
     if (cursor == null) return null;
-    final nextPage = await repository.listCongregations(cursor: cursor);
+    final nextPage = await repository.listCongregations(
+      limit: pageSize,
+      cursor: cursor,
+    );
     _previousCursors.add(_currentCursor);
     _currentCursor = cursor;
     page = nextPage;
@@ -178,12 +182,32 @@ class MinistryCongregationDirectoryPager {
   Future<MinistryPage<MinistryCongregationChoice>?> previous() async {
     if (_previousCursors.isEmpty) return null;
     final cursor = _previousCursors.last;
-    final previousPage = await repository.listCongregations(cursor: cursor);
+    final previousPage = await repository.listCongregations(
+      limit: pageSize,
+      cursor: cursor,
+    );
     _previousCursors.removeLast();
     _currentCursor = cursor;
     page = previousPage;
     return previousPage;
   }
+}
+
+/// Adds the active option beside the current page without exceeding 100 items.
+List<MinistryCongregationChoice> visibleCongregationChoices({
+  required List<MinistryCongregationChoice> page,
+  required String? selectedId,
+  required String? selectedName,
+}) {
+  if (selectedId == null ||
+      selectedName == null ||
+      page.any((item) => item.id == selectedId)) {
+    return List.unmodifiable(page);
+  }
+  return List.unmodifiable([
+    MinistryCongregationChoice(id: selectedId, name: selectedName),
+    ...page,
+  ]);
 }
 
 MinistryPage<MinistryStudentSummary> _studentPage(Object? raw) {
@@ -200,10 +224,13 @@ MinistryPage<MinistryStudentSummary> _studentPage(Object? raw) {
           'revision',
         });
         final revision = row['revision'];
-        if (revision is! int || revision < 1) _invalid();
-        final phone = _optionalText(row['phone_e164']);
-        if (phone != null && !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phone))
+        if (revision is! int || revision < 1) {
           _invalid();
+        }
+        final phone = _optionalText(row['phone_e164']);
+        if (phone != null && !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phone)) {
+          _invalid();
+        }
         return MinistryStudentSummary(
           id: _uuidValue(row['id']),
           name: _text(row['name']),
@@ -234,7 +261,9 @@ MinistryPage<MinistryClassSummary> _classPage(Object? raw) {
           'revision',
         });
         final revision = row['revision'];
-        if (revision is! int || revision < 1) _invalid();
+        if (revision is! int || revision < 1) {
+          _invalid();
+        }
         final start = _date(row['start_date']);
         final end = row['end_date'] == null ? null : _date(row['end_date']);
         return MinistryClassSummary(
@@ -259,8 +288,9 @@ Map<String, Object?> _row(Object? raw, Set<String> keys) {
   if (raw is! Map) _invalid();
   final row = Map<String, Object?>.from(raw);
   if (row.keys.toSet().difference(keys).isNotEmpty ||
-      !row.keys.toSet().containsAll(keys))
+      !row.keys.toSet().containsAll(keys)) {
     _invalid();
+  }
   return row;
 }
 
@@ -291,8 +321,9 @@ String _date(Object? value) {
   if (parsed == null ||
       text.length != 10 ||
       '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}' !=
-          text)
+          text) {
     _invalid();
+  }
   return text;
 }
 
@@ -307,8 +338,9 @@ void _uuid(String value) {
 }
 
 void _validatePage(int limit, String? cursor) {
-  if (limit < 1 || limit > 100 || (cursor?.length ?? 0) > 4096)
+  if (limit < 1 || limit > 100 || (cursor?.length ?? 0) > 4096) {
     throw const DataFailure('invalid');
+  }
 }
 
 Never _invalid() =>

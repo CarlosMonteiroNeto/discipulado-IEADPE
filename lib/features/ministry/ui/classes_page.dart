@@ -40,17 +40,19 @@ class _ClassesPageState extends State<ClassesPage> {
         status: _status,
         cursor: cursor,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _page = page;
           _loading = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar as turmas. Tente novamente.';
         });
+      }
     }
   }
 

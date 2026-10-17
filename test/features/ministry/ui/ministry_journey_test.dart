@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
@@ -432,7 +431,8 @@ void main() {
                 )
                 .first,
           )
-          .hasFlag(SemanticsFlag.isLiveRegion),
+          .flagsCollection
+          .isLiveRegion,
       isTrue,
     );
     semantics.dispose();
@@ -516,7 +516,8 @@ void main() {
                 )
                 .first,
           )
-          .hasFlag(SemanticsFlag.isLiveRegion),
+          .flagsCollection
+          .isLiveRegion,
       isTrue,
     );
     semantics.dispose();

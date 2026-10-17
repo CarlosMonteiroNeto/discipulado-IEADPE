@@ -48,18 +48,20 @@ class _TeamPageState extends State<TeamPage> {
         limit: 50,
         cursor: cursor,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _page = page;
           _cursor = cursor;
           _loading = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar a equipe. Tente novamente.';
         });
+      }
     }
   }
 

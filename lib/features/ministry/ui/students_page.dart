@@ -46,17 +46,19 @@ class _StudentsPageState extends State<StudentsPage> {
         namePrefix: _search.text.trim().isEmpty ? null : _search.text.trim(),
         cursor: cursor,
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _page = result;
           _loading = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar os alunos. Tente novamente.';
         });
+      }
     }
   }
 

@@ -262,7 +262,7 @@ class Address {
 
 class Student extends MinistryRecord {
   const Student({
-    required CommonMetadata metadata,
+    required super.metadata,
     required this.name,
     required this.normalizedName,
     required this.phoneE164,
@@ -275,7 +275,7 @@ class Student extends MinistryRecord {
     required this.wantsBaptism,
     required this.archived,
     required this.convertId,
-  }) : super(metadata: metadata);
+  });
 
   final String name;
   final String normalizedName;
@@ -683,16 +683,18 @@ DateTime _timestamp(MinistryJson json, String key) {
     throw MinistryDataException('Invalid timestamp field: $key.');
   }
   final parsed = DateTime.tryParse(value);
-  if (parsed == null)
+  if (parsed == null) {
     throw MinistryDataException('Invalid timestamp field: $key.');
+  }
   return parsed.toUtc();
 }
 
 CalendarDate? _optionalDate(MinistryJson json, String key) {
   final value = json[key];
   if (value == null) return null;
-  if (value is! String)
+  if (value is! String) {
     throw MinistryDataException('Invalid date field: $key.');
+  }
   return CalendarDate.parse(value);
 }
 

@@ -148,4 +148,40 @@ void main() {
     await tester.tap(find.text('Tentar carregar novamente'));
     expect(retried, isTrue);
   });
+
+  testWidgets('paging keeps the selected congregation visible', (tester) async {
+    const selectedId = 'b2700000-0000-0000-0000-000000000001';
+    const pageTwoId = 'b2700000-0000-0000-0000-000000000002';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MinistryHomePage(
+            loadOverview: () async => const {},
+            scopeName: 'Congregação Central',
+            selectedCongregationId: selectedId,
+            availableCongregationIds: const [selectedId, pageTwoId],
+            congregationNames: const {
+              selectedId: 'Congregação Central',
+              pageTwoId: 'Congregação Norte',
+            },
+            congregationPageNumber: 2,
+            hasPreviousCongregationPage: true,
+            scopedActionsEnabled: true,
+            onOpenStudents: () {},
+            onOpenClasses: () {},
+            onOpenAttendance: () {},
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Congregação Central'), findsOneWidget);
+    expect(find.text('Página 2'), findsOneWidget);
+    final picker = tester.widget<DropdownButton<String>>(
+      find.byType(DropdownButton<String>),
+    );
+    expect(picker.value, selectedId);
+    expect(picker.items!.map((item) => item.value), [selectedId, pageTwoId]);
+    expect(find.text('Congregação Central'), findsOneWidget);
+  });
 }

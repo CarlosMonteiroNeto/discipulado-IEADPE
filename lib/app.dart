@@ -586,8 +586,11 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     // Until the server directory has loaded, expose no choices. In particular,
     // never turn a grant UUID into a user-facing name or enable a scoped query
     // from an unlabelled fallback entry.
-    final available =
-        _ministryCongregations ?? const <MinistryCongregationChoice>[];
+    final available = visibleCongregationChoices(
+      page: _ministryCongregations ?? const <MinistryCongregationChoice>[],
+      selectedId: _selectedMinistryCongregationId,
+      selectedName: _selectedMinistryCongregationName,
+    );
     final selectedId = _selectedMinistryCongregationId;
     final selectedOnPage = selectedId == null
         ? null

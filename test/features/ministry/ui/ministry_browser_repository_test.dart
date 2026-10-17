@@ -14,6 +14,7 @@ const _classId = '22222222-2222-4222-8222-222222222222';
 class _BrowserGateway implements ReadRpcGateway {
   _BrowserGateway(this.respond);
   final Map<String, dynamic> Function(String, Map<String, Object?>) respond;
+  @override
   final boundary = ProtectedDataBoundary();
   int reads = 0;
   @override
@@ -83,6 +84,7 @@ void main() {
     final cursors = <Object?>[];
     final gateway = _BrowserGateway((rpc, parameters) {
       expect(rpc, 'ministry_list_congregations');
+      expect(parameters['limit'], MinistryCongregationDirectoryPager.pageSize);
       cursors.add(parameters['cursor']);
       if (parameters['cursor'] == null) {
         return {
@@ -121,6 +123,20 @@ void main() {
     expect(cursors, [null, nextCursor, null]);
     expect(pager.hasPrevious, isFalse);
     expect(pager.hasNext, isTrue);
+  });
+  test('active congregation remains visible beside a bounded next page', () {
+    final page = [
+      for (var i = 0; i < MinistryCongregationDirectoryPager.pageSize; i++)
+        MinistryCongregationChoice(id: 'page-$i', name: 'Page $i'),
+    ];
+    final visible = visibleCongregationChoices(
+      page: page,
+      selectedId: 'active-id',
+      selectedName: 'Active congregation',
+    );
+    expect(visible.length, 100);
+    expect(visible.first.id, 'active-id');
+    expect(visible.first.name, 'Active congregation');
   });
   test('zero page limit is rejected before protected transport', () async {
     final client = SupabaseClient(
