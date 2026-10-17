@@ -9,6 +9,7 @@ sequenceDiagram
     participant UI as Flutter handoff screen
     participant Repo as MinistryRepository
     participant Referral as ieadpe_ministry_list_convert_referrals
+    participant Candidates as ieadpe_ministry_list_convert_student_candidates
     participant RPC as ieadpe_promote_convert_to_student
     participant Access as access_versions and active grants
     participant Congregation as congregations
@@ -28,7 +29,13 @@ sequenceDiagram
     Repo-->>UI: Typed minimal referral projection
     Staff->>UI: Review convert and choose create or an exact existing student
     opt Existing-student review
-        UI->>Repo: Search ministry students in C
+        UI->>Repo: Search by non-empty name prefix in C
+        Repo->>Candidates: congregation_id, name_prefix, limit, cursor
+        Candidates->>Access: Validate active ministry grant or trusted admin scope for C
+        Access-->>Candidates: Authorized congregation scope
+        Candidates->>Student: Filter same-scope, unlinked, non-archived students; page by normalized name and ID
+        Student-->>Candidates: Bounded candidate fields
+        Candidates-->>Repo: Candidate page; no archived or cross-scope students
         Repo-->>UI: Scoped ministry student candidates only
         Staff->>UI: Select exact candidate and confirm any field differences
     end
@@ -54,9 +61,10 @@ sequenceDiagram
             Note over RPC,Student: Preserve all candidate fields; do not synchronize or overwrite
         else No existing student selected
             RPC->>Student: Insert one student with name, phone and address initial snapshots
-            Note over RPC,Student: Address free text maps to address.street; student-owned fields remain null
+            Note over RPC,Student: Address free text maps to address.street; copy phone_e164 only if source already matches strict E.164, otherwise leave null
         end
-        RPC->>Link: Insert unique convert_id link + source convert ID/promotion-time provenance
+        RPC->>Link: Insert unique convert_id + server promoted_at + exact JSON source snapshot
+        Note over RPC,Link: Snapshot keys are name, phone, address; nullable phone/address are preserved as JSON null. Existing-student fields are never overwritten.
         RPC->>Receipt: Store canonical payload digest + safe result in same transaction
         RPC-->>Repo: convert_id, student_id, congregation_id, status=linked
         Repo-->>UI: Typed success only after committed RPC result
