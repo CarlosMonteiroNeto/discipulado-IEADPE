@@ -41,7 +41,7 @@ def check_ministry_registry_concurrency(psql, connection):
             return json.loads(raw) if raw else {}
 
         def finish(self):
-            self.process.stdin.write("COMMIT;\\q\n")
+            self.process.stdin.write("COMMIT;\n\\q\n")
             self.process.stdin.flush()
             self.process.wait(timeout=15)
             if self.process.returncode:
