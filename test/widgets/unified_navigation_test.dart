@@ -67,6 +67,7 @@ void main() {
     (tester) async {
       var selected = '';
       var openedStudents = false;
+      var requestedNextPage = false;
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
@@ -87,6 +88,9 @@ void main() {
                 'b2700000-0000-0000-0000-000000000002': 'Congregação Norte',
               },
               selectedCongregationId: null,
+              hasNextCongregationPage: true,
+              congregationPageNumber: 1,
+              onNextCongregationPage: () => requestedNextPage = true,
               onSelectCongregation: (value) => selected = value!,
               scopedActionsEnabled: false,
               onOpenStudents: () => openedStudents = true,
@@ -106,10 +110,16 @@ void main() {
       await tester.tap(find.byType(DropdownButtonFormField<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Congregação Central').last);
+      await tester.pumpAndSettle();
       expect(selected, 'b2700000-0000-0000-0000-000000000001');
       expect(find.text('Congregação Central'), findsOneWidget);
       expect(find.text('b2700000-0000-0000-0000-000000000001'), findsNothing);
       expect(openedStudents, isFalse);
+      expect(find.text('Página 1'), findsOneWidget);
+      final nextButton = find.widgetWithText(OutlinedButton, 'Próxima');
+      await tester.ensureVisible(nextButton);
+      await tester.tap(nextButton);
+      expect(requestedNextPage, isTrue);
     },
   );
 

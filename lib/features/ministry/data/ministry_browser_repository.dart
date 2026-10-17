@@ -144,6 +144,48 @@ class MinistryBrowserRepository {
   }
 }
 
+/// Holds one directory page at a time and fetches adjacent pages on demand.
+class MinistryCongregationDirectoryPager {
+  MinistryCongregationDirectoryPager(this.repository);
+  final MinistryBrowserRepository repository;
+
+  MinistryPage<MinistryCongregationChoice>? page;
+  String? _currentCursor;
+  final List<String?> _previousCursors = [];
+
+  bool get hasPrevious => _previousCursors.isNotEmpty;
+  bool get hasNext => page?.nextCursor != null;
+  int get pageNumber => _previousCursors.length + 1;
+
+  Future<MinistryPage<MinistryCongregationChoice>> loadFirst() async {
+    final nextPage = await repository.listCongregations();
+    page = nextPage;
+    _currentCursor = null;
+    _previousCursors.clear();
+    return nextPage;
+  }
+
+  Future<MinistryPage<MinistryCongregationChoice>?> next() async {
+    final cursor = page?.nextCursor;
+    if (cursor == null) return null;
+    final nextPage = await repository.listCongregations(cursor: cursor);
+    _previousCursors.add(_currentCursor);
+    _currentCursor = cursor;
+    page = nextPage;
+    return nextPage;
+  }
+
+  Future<MinistryPage<MinistryCongregationChoice>?> previous() async {
+    if (_previousCursors.isEmpty) return null;
+    final cursor = _previousCursors.last;
+    final previousPage = await repository.listCongregations(cursor: cursor);
+    _previousCursors.removeLast();
+    _currentCursor = cursor;
+    page = previousPage;
+    return previousPage;
+  }
+}
+
 MinistryPage<MinistryStudentSummary> _studentPage(Object? raw) {
   final page = _pageObject(raw);
   final items = page['items'];

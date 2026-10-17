@@ -42,6 +42,8 @@ import 'features/ministry/ui/students_page.dart';
 import 'features/ministry/ui/team_page.dart';
 import 'ui/unified_theme.dart';
 
+enum _DirectoryNavigation { first, next, previous }
+
 class App extends StatelessWidget {
   const App({super.key, this.configuration, this.auth});
 
@@ -335,8 +337,12 @@ class _ProtectedFeatures extends StatefulWidget {
 class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   List<Congregation>? _catalog;
   List<MinistryCongregationChoice>? _ministryCongregations;
+  MinistryCongregationDirectoryPager? _ministryDirectoryPager;
   String? _selectedMinistryCongregationId;
+  String? _selectedMinistryCongregationName;
   String? _ministryCatalogError;
+  _DirectoryNavigation _ministryCatalogRetryNavigation =
+      _DirectoryNavigation.first;
   bool _ministryCatalogLoading = false;
   bool _ministryCatalogRetryNeeded = false;
   bool _catalogLoading = false;
@@ -360,7 +366,9 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.scope != widget.scope) {
       _selectedMinistryCongregationId = null;
+      _selectedMinistryCongregationName = null;
       _ministryCongregations = null;
+      _ministryDirectoryPager = null;
       _ministryCatalogError = null;
       final ids = widget.scope.ministryCongregationIds.toList()..sort();
       if (!widget.scope.isMinistrySupervision && ids.length == 1) {
@@ -377,6 +385,10 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   }
 
   Future<void> _loadMinistryCongregations() async {
+    await _navigateMinistryCatalog(_DirectoryNavigation.first);
+  }
+
+  Future<void> _navigateMinistryCatalog(_DirectoryNavigation navigation) async {
     if (_ministryCatalogLoading) return;
     _ministryCatalogLoading = true;
     final token = widget.gateway.context;
@@ -384,20 +396,32 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
       setState(() {
         _ministryCatalogError = null;
         _ministryCatalogLoading = true;
+        _ministryCatalogRetryNavigation = navigation;
       });
     }
     try {
-      final repository = MinistryBrowserRepository(widget.gateway);
-      final items = <MinistryCongregationChoice>[];
-      String? cursor;
-      do {
-        final page = await repository.listCongregations(cursor: cursor);
-        widget.gateway.ensureCurrent(token);
-        items.addAll(page.items);
-        cursor = page.nextCursor;
-      } while (cursor != null);
+      final pager = _ministryDirectoryPager ??=
+          MinistryCongregationDirectoryPager(
+            MinistryBrowserRepository(widget.gateway),
+          );
+      final page = switch (navigation) {
+        _DirectoryNavigation.first => await pager.loadFirst(),
+        _DirectoryNavigation.next => await pager.next(),
+        _DirectoryNavigation.previous => await pager.previous(),
+      };
+      if (page == null) return;
+      widget.gateway.ensureCurrent(token);
       if (mounted) {
-        setState(() => _ministryCongregations = List.unmodifiable(items));
+        setState(() {
+          _ministryCongregations = page.items;
+          if (_selectedMinistryCongregationName == null &&
+              _selectedMinistryCongregationId != null) {
+            _selectedMinistryCongregationName = page.items
+                .where((item) => item.id == _selectedMinistryCongregationId)
+                .firstOrNull
+                ?.name;
+          }
+        });
       }
     } catch (error) {
       if (!mounted) return;
@@ -565,11 +589,14 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     final available =
         _ministryCongregations ?? const <MinistryCongregationChoice>[];
     final selectedId = _selectedMinistryCongregationId;
-    final selected = selectedId == null
+    final selectedOnPage = selectedId == null
         ? null
         : available.where((item) => item.id == selectedId).firstOrNull;
-    final congregationId = selected?.id;
-    final scopeName = selected?.name ?? 'Selecione uma congregação';
+    final congregationId = _selectedMinistryCongregationName == null
+        ? null
+        : selectedId;
+    final scopeName =
+        _selectedMinistryCongregationName ?? 'Selecione uma congregação';
     final scopedActionsEnabled =
         congregationId != null &&
         widget.scope.canAccessMinistry(congregationId);
@@ -601,12 +628,26 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         scopeName: scopeName,
         availableCongregationIds: [for (final item in available) item.id],
         congregationNames: {for (final item in available) item.id: item.name},
-        selectedCongregationId: congregationId,
+        selectedCongregationId: selectedOnPage?.id,
+        hasPreviousCongregationPage:
+            _ministryDirectoryPager?.hasPrevious ?? false,
+        hasNextCongregationPage: _ministryDirectoryPager?.hasNext ?? false,
+        congregationPageNumber: _ministryDirectoryPager?.pageNumber ?? 1,
+        onPreviousCongregationPage: _ministryCatalogLoading
+            ? null
+            : () => _navigateMinistryCatalog(_DirectoryNavigation.previous),
+        onNextCongregationPage: _ministryCatalogLoading
+            ? null
+            : () => _navigateMinistryCatalog(_DirectoryNavigation.next),
         scopeLoading: _ministryCatalogLoading,
         scopeError: _ministryCatalogError,
-        onRetryScope: _loadMinistryCongregations,
+        onRetryScope: () =>
+            _navigateMinistryCatalog(_ministryCatalogRetryNavigation),
         onSelectCongregation: (value) => setState(() {
           _selectedMinistryCongregationId = value;
+          _selectedMinistryCongregationName = value == null
+              ? null
+              : available.where((item) => item.id == value).firstOrNull?.name;
         }),
         scopedActionsEnabled: scopedActionsEnabled,
         scopeRequired:

@@ -77,6 +77,51 @@ void main() {
       expect(gateway.reads, 1);
     },
   );
+  test('directory pager loads its next page only when requested', () async {
+    const nextCursor = '55555555-5555-4555-8555-555555555555';
+    const secondScope = '66666666-6666-4666-8666-666666666666';
+    final cursors = <Object?>[];
+    final gateway = _BrowserGateway((rpc, parameters) {
+      expect(rpc, 'ministry_list_congregations');
+      cursors.add(parameters['cursor']);
+      if (parameters['cursor'] == null) {
+        return {
+          'items': [
+            {'id': _scope, 'name': 'Central'},
+          ],
+          'next_cursor': nextCursor,
+        };
+      }
+      return {
+        'items': [
+          {'id': secondScope, 'name': 'Norte'},
+        ],
+        'next_cursor': null,
+      };
+    });
+    final pager = MinistryCongregationDirectoryPager(
+      MinistryBrowserRepository(gateway),
+    );
+
+    final firstPage = await pager.loadFirst();
+    expect(firstPage.items.single.id, _scope);
+    expect(gateway.reads, 1);
+    expect(cursors, [null]);
+    expect(pager.hasNext, isTrue);
+
+    final secondPage = await pager.next();
+    expect(secondPage!.items.single.id, secondScope);
+    expect(gateway.reads, 2);
+    expect(cursors, [null, nextCursor]);
+    expect(pager.hasPrevious, isTrue);
+
+    final firstAgain = await pager.previous();
+    expect(firstAgain!.items.single.id, _scope);
+    expect(gateway.reads, 3);
+    expect(cursors, [null, nextCursor, null]);
+    expect(pager.hasPrevious, isFalse);
+    expect(pager.hasNext, isTrue);
+  });
   test('zero page limit is rejected before protected transport', () async {
     final client = SupabaseClient(
       'http://127.0.0.1:1',

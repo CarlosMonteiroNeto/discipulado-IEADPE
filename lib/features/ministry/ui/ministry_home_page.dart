@@ -17,6 +17,11 @@ class MinistryHomePage extends StatefulWidget {
     this.scopeError,
     this.onRetryScope,
     this.scopeLoading = false,
+    this.hasPreviousCongregationPage = false,
+    this.hasNextCongregationPage = false,
+    this.congregationPageNumber = 1,
+    this.onPreviousCongregationPage,
+    this.onNextCongregationPage,
   });
   final Future<Map<String, Object?>> Function() loadOverview;
   final String scopeName;
@@ -30,6 +35,11 @@ class MinistryHomePage extends StatefulWidget {
   final String? scopeError;
   final VoidCallback? onRetryScope;
   final bool scopeLoading;
+  final bool hasPreviousCongregationPage;
+  final bool hasNextCongregationPage;
+  final int congregationPageNumber;
+  final VoidCallback? onPreviousCongregationPage;
+  final VoidCallback? onNextCongregationPage;
   @override
   State<MinistryHomePage> createState() => _MinistryHomePageState();
 }
@@ -83,7 +93,9 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
               if (widget.availableCongregationIds.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  key: const Key('ministry-congregation-scope'),
+                  key: ValueKey(
+                    'ministry-congregation-scope:${widget.congregationPageNumber}:${widget.selectedCongregationId}',
+                  ),
                   initialValue: widget.selectedCongregationId,
                   decoration: const InputDecoration(labelText: 'Congregação'),
                   hint: const Text('Selecione uma congregação'),
@@ -95,6 +107,24 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                       ),
                   ],
                   onChanged: widget.onSelectCongregation,
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    OutlinedButton(
+                      onPressed: widget.hasPreviousCongregationPage
+                          ? widget.onPreviousCongregationPage
+                          : null,
+                      child: const Text('Anterior'),
+                    ),
+                    Text('Página ${widget.congregationPageNumber}'),
+                    OutlinedButton(
+                      onPressed: widget.hasNextCongregationPage
+                          ? widget.onNextCongregationPage
+                          : null,
+                      child: const Text('Próxima'),
+                    ),
+                  ],
                 ),
               ] else if (!widget.scopedActionsEnabled)
                 const Padding(
