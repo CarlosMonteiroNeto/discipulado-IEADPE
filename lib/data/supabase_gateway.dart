@@ -174,33 +174,35 @@ class SupabaseGateway
     required String context,
     Map<String, Object?> parameters = const {},
   }) async {
-    const ministryReads = {
-      'ministry_list_directory',
-      'ministry_list_class_students',
-      'ministry_get_session_attendance',
-      'ministry_get_enrollment_progress',
-      'ministry_get_overview',
-      'ministry_list_pending_sessions',
+    const ministryReadParameters = <String, Set<String>>{
+      'ministry_list_directory': {
+        'scope',
+        'congregation_id',
+        'role_code',
+        'name_prefix',
+        'limit',
+        'cursor',
+      },
+      'ministry_list_class_students': {
+        'congregation_id',
+        'class_id',
+        'limit',
+        'cursor',
+      },
+      'ministry_get_session_attendance': {'congregation_id', 'session_id'},
+      'ministry_get_enrollment_progress': {'congregation_id', 'enrollment_id'},
+      'ministry_get_overview': {'congregation_id'},
+      'ministry_list_pending_sessions': {'congregation_id', 'limit', 'cursor'},
     };
-    final ministryRead = ministryReads.contains(rpc);
-    if ((!ministryRead && rpc != 'weekly_overview') ||
-        parameters.keys.any(
-          (key) => ministryRead
-              ? !{
-                  'scope',
-                  'congregation_id',
-                  'role_code',
-                  'name_prefix',
-                  'limit',
-                  'cursor',
-                  'class_id',
-                  'session_id',
-                  'finalize',
-                  'marks',
-                  'enrollment_id',
-                }.contains(key)
-              : !{'after_id', 'expected_week'}.contains(key),
-        )) {
+    final ministryKeys = ministryReadParameters[rpc];
+    final ministryRead = ministryKeys != null;
+    final Set<String>? allowed =
+        ministryKeys ??
+        (rpc == 'weekly_overview'
+            ? <String>{'after_id', 'expected_week'}
+            : null);
+    if (allowed == null ||
+        parameters.keys.any((key) => !allowed.contains(key))) {
       throw const DataFailure('invalid');
     }
     final frozen = Map<String, Object?>.unmodifiable(parameters);
@@ -398,8 +400,9 @@ class SupabaseGateway
       'session_id',
       'previous_contact_id',
     ]) {
-      if (payload.containsKey(key) && payload[key] != null)
+      if (payload.containsKey(key) && payload[key] != null) {
         validateUuid(payload[key]);
+      }
     }
     final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
     final token = context;

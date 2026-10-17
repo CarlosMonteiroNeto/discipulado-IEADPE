@@ -130,6 +130,14 @@ void main() {
       gateway.readRpc('ministry_unbounded', context: gateway.context),
       throwsA(isA<DataFailure>()),
     );
+    await expectLater(
+      gateway.readRpc(
+        'ministry_get_overview',
+        context: gateway.context,
+        parameters: {'congregation_id': _scope, 'session_id': _id},
+      ),
+      throwsA(isA<DataFailure>()),
+    );
     expect(calls, 0);
   });
 
@@ -349,5 +357,96 @@ void main() {
     expect(value.session.id, _id);
     expect(value.marks.single.sessionId, _id);
     expect(value.marks.single.status.name, 'unmarked');
+  });
+
+  test(
+    'revoked ministry read remains a permission failure, never an empty page',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final serving = server.listen((request) async {
+        request.response.statusCode = 403;
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({'code': '42501', 'message': 'denied'}),
+        );
+        await request.response.close();
+      });
+      final client = SupabaseClient(
+        'http://127.0.0.1:${server.port}',
+        'test',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(() async {
+        await client.dispose();
+        await serving.cancel();
+        await server.close(force: true);
+      });
+      final repository = MinistryRepository(
+        SupabaseGateway(client, ProtectedDataBoundary()),
+      );
+      await expectLater(
+        repository.listDirectory(scope: 'supervision'),
+        throwsA(
+          isA<DataFailure>().having(
+            (error) => error.code,
+            'code',
+            'permission',
+          ),
+        ),
+      );
+    },
+  );
+
+  test('class roster preserves both active and archived student state', () {
+    Map<String, Object?> student(String? archivedAt) => {
+      'id': _id,
+      'congregation_id': _scope,
+      'name': 'Estudante',
+      'normalized_name': 'estudante',
+      'phone_e164': null,
+      'birth_date': null,
+      'address': null,
+      'education': null,
+      'marital_status': null,
+      'new_convert': null,
+      'water_baptized': null,
+      'wants_baptism': null,
+      'archived_at': archivedAt,
+      'revision': 1,
+      'created_at': '2026-01-01T00:00:00Z',
+      'updated_at': '2026-01-01T00:00:00Z',
+      'updated_by': _op,
+    };
+    Map<String, Object?> enrollment() => {
+      'id': _op,
+      'congregation_id': _scope,
+      'student_id': _id,
+      'class_id': _id,
+      'start_date': '2026-01-01',
+      'end_date': null,
+      'status': 'active',
+      'revision': 1,
+      'created_at': '2026-01-01T00:00:00Z',
+      'updated_at': '2026-01-01T00:00:00Z',
+      'updated_by': _op,
+    };
+    final active = decodeClassStudents({
+      'items': [
+        {'student': student(null), 'enrollment': enrollment()},
+      ],
+      'next_cursor': null,
+    }).items.single;
+    final archived = decodeClassStudents({
+      'items': [
+        {
+          'student': student('2026-02-01T00:00:00Z'),
+          'enrollment': enrollment(),
+        },
+      ],
+      'next_cursor': null,
+    }).items.single;
+    expect(active.student.archived, isFalse);
+    expect(archived.student.archived, isTrue);
+    expect(active.enrollment.status.name, 'active');
   });
 }

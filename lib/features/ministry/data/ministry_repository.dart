@@ -1,5 +1,4 @@
 import '../../../data/supabase_gateway.dart';
-import '../../../domain/models.dart' show DataFailure;
 import '../domain/ministry_models.dart';
 import 'ministry_codec.dart';
 
@@ -127,8 +126,9 @@ class MinistryRepository {
     const keys = {'students', 'classes', 'open_sessions', 'through_date'};
     if (result.keys.toSet().difference(keys).isNotEmpty ||
         !result.keys.toSet().containsAll(keys) ||
-        result.values.any((v) => v is! int && v is! String))
+        result.values.any((v) => v is! int && v is! String)) {
       throw const DataFailure('invalid_response');
+    }
     return Map.unmodifiable(result);
   }
 
@@ -158,8 +158,9 @@ class MinistryRepository {
   }) async {
     _uuid(operationId);
     final transport = gateway;
-    if (transport is! MinistryCommandGateway)
+    if (transport is! MinistryCommandGateway) {
       throw const DataFailure('unavailable');
+    }
     try {
       final commandGateway = transport as MinistryCommandGateway;
       final result = await commandGateway.ministryCommand(
@@ -190,28 +191,17 @@ class MinistryRepository {
     return result;
   }
 
-  Future<MinistryPage<Map<String, Object?>>> _pageRead(
-    String rpc,
-    Map<String, Object?> request,
-    Set<String> itemKeys,
-  ) async {
-    final result = await _read(rpc, request);
-    try {
-      return decodeObjectPage(result, itemKeys: itemKeys);
-    } on MinistryDataException {
-      throw const DataFailure('invalid_response');
-    }
-  }
-
   static void _uuid(String value) {
     if (!RegExp(
       r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-    ).hasMatch(value))
+    ).hasMatch(value)) {
       throw const DataFailure('invalid');
+    }
   }
 
   static void _page(int limit, String? cursor) {
-    if (limit < 1 || limit > 100 || (cursor?.length ?? 0) > 4096)
+    if (limit < 1 || limit > 100 || (cursor?.length ?? 0) > 4096) {
       throw const DataFailure('invalid');
+    }
   }
 }

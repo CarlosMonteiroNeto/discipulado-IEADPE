@@ -108,32 +108,11 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
   );
 }
 
-MinistryPage<Map<String, Object?>> decodeObjectPage(
-  Object? raw, {
-  required Set<String> itemKeys,
-}) {
-  final json = _object(raw);
-  _keys(json, {'items', 'next_cursor'});
-  final items = json['items'];
-  if (items is! List || items.length > 100) _invalid();
-  final decoded = items
-      .map((item) {
-        final row = _object(item);
-        _keys(row, itemKeys);
-        return Map<String, Object?>.unmodifiable(row);
-      })
-      .toList(growable: false);
-  return MinistryPage(
-    items: List.unmodifiable(decoded),
-    nextCursor: _optionalText(json['next_cursor']),
-  );
-}
-
 MinistryRoster decodeRoster(Object? raw) {
   final json = _object(raw);
   _keys(json, {'session', 'roster'});
   final sessionJson = _object(json['session']);
-  sessionJson['legacy_firebase_id'] ??= null;
+  sessionJson.putIfAbsent('legacy_firebase_id', () => null);
   final session = Session.fromJson(sessionJson);
   final roster = json['roster'];
   if (roster is! List || roster.length > 100) _invalid();
@@ -178,8 +157,9 @@ MinistryPage<ClassStudentEntry> decodeClassStudents(Object? raw) {
           'updated_at',
           'updated_by',
         });
-        studentJson['archived'] = studentJson.remove('archived_at') == null;
+        studentJson['archived'] = studentJson.remove('archived_at') != null;
         studentJson['legacy_firebase_id'] = null;
+        studentJson['convert_id'] = null;
         final enrollmentJson = _object(pair['enrollment']);
         enrollmentJson['legacy_firebase_id'] = null;
         return ClassStudentEntry(
@@ -236,13 +216,13 @@ MinistryCommandResult decodeCommandResult(
   required String expectedId,
 }) {
   final json = _object(raw);
-  if (json['id'] != expectedId ||
-      json['revision'] is! int ||
-      (json['revision'] as int) < 1)
+  final revision = json['revision'];
+  if (json['id'] != expectedId || revision is! int || revision < 1) {
     _invalid();
+  }
   return MinistryCommandResult(
     id: expectedId,
-    revision: json['revision'] as int,
+    revision: revision,
     fields: Map.unmodifiable(
       {...json}
         ..remove('id')
@@ -254,7 +234,7 @@ MinistryCommandResult decodeCommandResult(
 Map<String, Object?> _object(Object? raw) {
   if (raw is! Map) _invalid();
   try {
-    return Map<String, Object?>.from(raw as Map);
+    return Map<String, Object?>.from(raw);
   } catch (_) {
     _invalid();
   }
@@ -266,7 +246,7 @@ void _keys(Map<String, Object?> value, Set<String> allowed) {
 
 String _text(Object? value) {
   if (value is! String || value.trim().isEmpty) _invalid();
-  return value as String;
+  return value;
 }
 
 String? _optionalText(Object? value) {
@@ -278,8 +258,9 @@ String _uuid(Object? value) {
   final text = _text(value);
   if (!RegExp(
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  ).hasMatch(text))
+  ).hasMatch(text)) {
     _invalid();
+  }
   return text;
 }
 
