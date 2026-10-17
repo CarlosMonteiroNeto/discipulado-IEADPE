@@ -87,7 +87,7 @@ def check_ministry_academic_concurrency(psql, connection):
         second = Session("ministry_capacity_second", auth + f"""
           DO $$ BEGIN BEGIN PERFORM {enroll('97200000-0000-0000-0000-000000000002',cap_class,second_student)};
            RAISE EXCEPTION 'ASSERTION: capacity race allowed enrollment 101';
-           EXCEPTION WHEN invalid_parameter_value THEN NULL; END; END $$;
+           EXCEPTION WHEN check_violation OR invalid_parameter_value THEN NULL; END; END $$;
         """)
         wait_for("second capacity claim waits on class", lambda: pid in second.state().get("blockers", []))
         first.finish()
@@ -129,6 +129,16 @@ def check_ministry_academic_concurrency(psql, connection):
             second.finish()
             expected = "2" if enrollment_first else "1"
             assert query(f"SELECT count(*) FROM public.ministry_session_roster WHERE session_id='{session_id}'") == expected
+            assert query(f"SELECT status FROM public.ministry_sessions WHERE id='{session_id}'") == "finalized"
+            assert query(f"SELECT count(*) FROM public.ministry_attendance WHERE session_id='{session_id}'") == expected
+            if enrollment_first:
+                assert query(f"SELECT status FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{base_enrollment}'") == "present"
+                assert query(f"SELECT status FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{new_enrollment}'") == "absent"
+                assert query(f"SELECT count(*) FROM public.ministry_session_roster WHERE session_id='{session_id}' AND enrollment_id IN ('{base_enrollment}','{new_enrollment}')") == "2"
+            else:
+                assert query(f"SELECT status FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{base_enrollment}'") == "present"
+                assert query(f"SELECT count(*) FROM public.ministry_session_roster WHERE session_id='{session_id}' AND enrollment_id='{new_enrollment}'") == "0"
+                assert query(f"SELECT count(*) FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{new_enrollment}'") == "0"
         print("PASS: class cap race and both enrollment/roster-freeze serialization orders", flush=True)
     finally:
         for session in reversed(sessions):

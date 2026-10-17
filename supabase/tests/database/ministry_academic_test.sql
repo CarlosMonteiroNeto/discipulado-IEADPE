@@ -57,9 +57,18 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; BEGIN
  BEGIN PERFORM public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000018',
   '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":1,"marks":{"94000000-0000-0000-0000-000000000011":"present","94000000-0000-0000-0000-000000000014":"excused"},"finalize":true}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: stale attendance revision accepted'; EXCEPTION WHEN serialization_failure THEN NULL; END;
- PERFORM pg_temp.assert_true((public.ieadpe_ministry_get_enrollment_progress('{"congregation_id":"94000000-0000-0000-0000-000000000002","enrollment_id":"94000000-0000-0000-0000-000000000011"}'::jsonb)->>'percentage')::numeric=1,'present over eligible denominator');
+ BEGIN PERFORM public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000025',
+  '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":2,"marks":{"94000000-0000-0000-0000-000000000011":"absent","94000000-0000-0000-0000-000000000014":"excused"},"finalize":false}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: finalized session edited without finalize flag'; EXCEPTION WHEN check_violation OR invalid_parameter_value THEN NULL; END;
+ replay:=public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000026',
+  '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":2,"marks":{"94000000-0000-0000-0000-000000000011":"absent","94000000-0000-0000-0000-000000000014":"excused"},"finalize":true}'::jsonb);
+ PERFORM pg_temp.assert_true(replay->>'status'='finalized' AND replay->>'revision'='3' AND
+  (SELECT status='finalized' AND revision=3 FROM public.ministry_sessions WHERE id='94000000-0000-0000-0000-000000000012') AND
+  (SELECT status='absent' AND revision=2 FROM public.ministry_attendance WHERE session_id='94000000-0000-0000-0000-000000000012' AND enrollment_id='94000000-0000-0000-0000-000000000011'),
+  'finalized correction retains finalized state and increments revisions');
  PERFORM pg_temp.assert_true((public.ieadpe_ministry_get_enrollment_progress('{"congregation_id":"94000000-0000-0000-0000-000000000002","enrollment_id":"94000000-0000-0000-0000-000000000014"}'::jsonb)->>'denominator')::integer=0,'excused attendance excluded from denominator');
  PERFORM pg_temp.assert_true((public.ieadpe_ministry_get_enrollment_progress('{"congregation_id":"94000000-0000-0000-0000-000000000002","enrollment_id":"94000000-0000-0000-0000-000000000014"}'::jsonb)->'percentage')='null'::jsonb,'zero denominator returns null percentage');
+ PERFORM pg_temp.assert_true((public.ieadpe_ministry_get_enrollment_progress('{"congregation_id":"94000000-0000-0000-0000-000000000002","enrollment_id":"94000000-0000-0000-0000-000000000011"}'::jsonb)->>'percentage')::numeric=0,'corrected absent mark changes progress');
  result:=public.ieadpe_ministry_close_enrollment('94000000-0000-0000-0000-000000000019',
   '{"id":"94000000-0000-0000-0000-000000000014","congregation_id":"94000000-0000-0000-0000-000000000002","status":"completed","end_date":"2026-10-16","expected_revision":1}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'revision'='2','close enrollment increments revision');
@@ -72,8 +81,8 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; BEGIN
   '{"id":"94000000-0000-0000-0000-000000000023","congregation_id":"94000000-0000-0000-0000-000000000002","expected_revision":1}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'status'='canceled' AND (SELECT status='canceled' FROM public.ministry_sessions WHERE id='94000000-0000-0000-0000-000000000023'),'session cancellation is revisioned');
  BEGIN PERFORM public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000016',
-  '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":2,"marks":{"94000000-0000-0000-0000-000000000011":"present"},"finalize":true}'::jsonb);
+  '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":3,"marks":{"94000000-0000-0000-0000-000000000011":"present"},"finalize":true}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: wrong frozen roster accepted'; EXCEPTION WHEN check_violation OR invalid_parameter_value THEN NULL; END;
- PERFORM pg_temp.assert_true((SELECT revision=2 AND status='finalized' FROM public.ministry_sessions WHERE id='94000000-0000-0000-0000-000000000012'),'invalid attendance leaves session untouched');
+ PERFORM pg_temp.assert_true((SELECT revision=3 AND status='finalized' FROM public.ministry_sessions WHERE id='94000000-0000-0000-0000-000000000012'),'invalid attendance leaves session untouched');
 END $$;
 ROLLBACK;
