@@ -7,10 +7,12 @@ class TeamPage extends StatefulWidget {
   const TeamPage({
     super.key,
     required this.repository,
-    required this.congregationId,
+    this.congregationId,
+    this.supervision = false,
   });
   final MinistryRepository repository;
-  final String congregationId;
+  final String? congregationId;
+  final bool supervision;
   @override
   State<TeamPage> createState() => _TeamPageState();
 }
@@ -40,7 +42,7 @@ class _TeamPageState extends State<TeamPage> {
     });
     try {
       final page = await widget.repository.listDirectory(
-        scope: 'congregation',
+        scope: widget.supervision ? 'supervision' : 'congregation',
         congregationId: widget.congregationId,
         namePrefix: _search.text.trim().isEmpty ? null : _search.text.trim(),
         limit: 50,

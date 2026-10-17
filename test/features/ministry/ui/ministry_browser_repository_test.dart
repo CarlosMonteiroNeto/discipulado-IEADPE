@@ -4,11 +4,52 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
+import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
 
 const _scope = '33333333-3333-4333-8333-333333333333';
 const _student = '11111111-1111-4111-8111-111111111111';
 const _classId = '22222222-2222-4222-8222-222222222222';
+
+class _BrowserGateway implements ReadRpcGateway {
+  _BrowserGateway(this.respond);
+  final Map<String, dynamic> Function(String, Map<String, Object?>) respond;
+  final boundary = ProtectedDataBoundary();
+  int reads = 0;
+  @override
+  String get context => boundary.generation;
+  @override
+  void ensureCurrent(String token) {
+    if (token != context) throw const DataFailure('stale');
+  }
+
+  @override
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  }) async {
+    ensureCurrent(context);
+    reads++;
+    return respond(rpc, parameters);
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> read(
+    String table, {
+    required String context,
+    String? afterId,
+    Map<String, Object> equals = const {},
+    String? name,
+    bool excludeDeleted = false,
+  }) async => throw UnimplementedError();
+  @override
+  Future<MutationResult<String>> command(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => throw UnimplementedError();
+}
 
 Future<void> _respond(HttpRequest request, Object value) async {
   request.response.headers.contentType = ContentType.json;
@@ -17,6 +58,42 @@ Future<void> _respond(HttpRequest request, Object value) async {
 }
 
 void main() {
+  test(
+    'supervisor congregation picker uses its bounded server projection',
+    () async {
+      final gateway = _BrowserGateway((rpc, parameters) {
+        expect(rpc, 'ministry_list_congregations');
+        expect(parameters, {'limit': 100, 'cursor': null});
+        return {
+          'items': [
+            {'id': _scope, 'name': 'Central'},
+          ],
+          'next_cursor': null,
+        };
+      });
+      final page = await MinistryBrowserRepository(gateway).listCongregations();
+      expect(page.items.single.id, _scope);
+      expect(page.items.single.name, 'Central');
+      expect(gateway.reads, 1);
+    },
+  );
+  test('zero page limit is rejected before protected transport', () async {
+    final client = SupabaseClient(
+      'http://127.0.0.1:1',
+      'test',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+    addTearDown(client.dispose);
+    final repo = MinistryBrowserRepository(
+      SupabaseGateway(client, ProtectedDataBoundary()),
+    );
+
+    await expectLater(
+      repo.listStudents(congregationId: _scope, limit: 0),
+      throwsA(isA<DataFailure>()),
+    );
+  });
+
   test(
     'student page sends congregation scope and decodes linked provenance id',
     () async {

@@ -7,6 +7,7 @@ import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/auth/auth_repository.dart';
 import 'package:ieadpe_converts/features/auth/login_page.dart';
 import 'package:ieadpe_converts/routing/router.dart';
+import 'package:ieadpe_converts/routing/browser_route_history.dart';
 
 Session session(String id) => Session(
   accessToken: 'synthetic',
@@ -43,6 +44,45 @@ class FakeAuth implements AuthGateway {
     currentSession = null;
     events.add(null);
   }
+}
+
+class _FakeBrowserHistory implements BrowserRouteHistory {
+  final entries = <String>[];
+  int index = -1;
+  String? initialPath;
+  void Function(String path)? onPop;
+  @override
+  String? get currentPath =>
+      initialPath == null ? null : Uri.parse(initialPath!).path;
+  @override
+  void listen(void Function(String path) callback) => onPop = callback;
+  @override
+  void push(String path) {
+    entries.removeRange(index + 1, entries.length);
+    entries.add(path);
+    index = entries.length - 1;
+  }
+
+  @override
+  void replace(String path) {
+    if (index < 0) {
+      entries.add(path);
+      index = 0;
+    } else {
+      entries[index] = path;
+    }
+  }
+
+  void back() {
+    if (index > 0) onPop?.call(entries[--index]);
+  }
+
+  void forward() {
+    if (index + 1 < entries.length) onPop?.call(entries[++index]);
+  }
+
+  @override
+  void dispose() => onPop = null;
 }
 
 void main() {
@@ -133,6 +173,105 @@ void main() {
     expect(ministry, equals(equivalent));
     expect(ministry.hashCode, equivalent.hashCode);
   });
+  test('ministry routes require ministry grants and stay separate from campaign routes', () {
+    final campaign = AccessScope(congregationIds: ['campaign-id']);
+    final ministry = AccessScope(ministryCongregationIds: ['ministry-id']);
+    expect(routesFor(campaign), contains('/converts'));
+    expect(routesFor(campaign), isNot(contains('/ministry')));
+    expect(routesFor(ministry), contains('/ministry'));
+    expect(routesFor(ministry), isNot(contains('/converts')));
+  });
+  test('a campaign session cannot open a ministry deep link', () async {
+    final auth = FakeAuth()
+      ..access = AccessScope(congregationIds: ['campaign']);
+    final router = SessionRouter(
+      auth,
+      clearProtectedCaches: () {},
+      intendedRoute: '/ministry/students',
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(router.route, '/register');
+    router.go('/ministry/students');
+    expect(router.route, '/register');
+    router.dispose();
+    await auth.events.close();
+  });
+  test(
+    'browser back and forward restore only server authorized routes',
+    () async {
+      final auth = FakeAuth();
+      final history = _FakeBrowserHistory();
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        intendedRoute: '/home',
+        browserHistory: history,
+      );
+      await Future<void>.delayed(Duration.zero);
+      router.go('/converts');
+      expect(history.entries, ['/home', '/converts']);
+      expect(history.entries.every((entry) => !entry.contains('?')), isTrue);
+      history.back();
+      expect(router.route, '/home');
+      history.forward();
+      expect(router.route, '/converts');
+      router.dispose();
+      await auth.events.close();
+    },
+  );
+  test('browser refresh restores only a server authorized path', () async {
+    final auth = FakeAuth()
+      ..access = AccessScope(ministryCongregationIds: ['ministry-id']);
+    final history = _FakeBrowserHistory()
+      ..initialPath = '/ministry/students?campaign=ignored';
+    final router = SessionRouter(
+      auth,
+      clearProtectedCaches: () {},
+      browserHistory: history,
+    );
+    await Future<void>.delayed(Duration.zero);
+    expect(router.route, '/ministry/students');
+    expect(history.entries, ['/ministry/students']);
+    router.dispose();
+    await auth.events.close();
+  });
+  test(
+    'browser refresh rejects a path outside the current session scope',
+    () async {
+      final auth = FakeAuth()
+        ..access = AccessScope(congregationIds: ['campaign']);
+      final history = _FakeBrowserHistory()..initialPath = '/ministry/students';
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        browserHistory: history,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(router.route, '/register');
+      expect(history.entries, ['/register']);
+      router.dispose();
+      await auth.events.close();
+    },
+  );
+  test(
+    'revoking a ministry grant during resume clears the protected owner',
+    () async {
+      final auth = FakeAuth()
+        ..access = AccessScope(ministryCongregationIds: ['ministry-id']);
+      var clears = 0;
+      final router = SessionRouter(auth, clearProtectedCaches: () => clears++);
+      await Future<void>.delayed(Duration.zero);
+      expect(router.allowedRoutes, contains('/ministry'));
+      final before = clears;
+      auth.access = AccessScope();
+      await router.revalidate();
+      expect(clears, greaterThan(before));
+      expect(router.allowedRoutes, isNot(contains('/ministry')));
+      expect(router.route, '/register');
+      router.dispose();
+      await auth.events.close();
+    },
+  );
   test(
     'resume cannot reopen protected pages while signout is pending',
     () async {

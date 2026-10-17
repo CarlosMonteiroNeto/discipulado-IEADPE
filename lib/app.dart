@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -29,6 +31,16 @@ import 'platform/file_exporter.dart';
 import 'platform/import_progress_store.dart';
 import 'widgets/app_shell.dart';
 import 'features/auth/auth_repository.dart';
+import 'features/ministry/data/ministry_browser_repository.dart';
+import 'features/ministry/data/ministry_handoff_repository.dart';
+import 'features/ministry/data/ministry_repository.dart';
+import 'features/ministry/ui/attendance_page.dart';
+import 'features/ministry/ui/classes_page.dart';
+import 'features/ministry/ui/convert_handoff_page.dart';
+import 'features/ministry/ui/ministry_home_page.dart';
+import 'features/ministry/ui/students_page.dart';
+import 'features/ministry/ui/team_page.dart';
+import 'ui/unified_theme.dart';
 
 class App extends StatelessWidget {
   const App({super.key, this.configuration, this.auth});
@@ -43,13 +55,7 @@ class App extends StatelessWidget {
       locale: const Locale('pt', 'BR'),
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xff2563eb)),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xff1e3a5f),
-          foregroundColor: Colors.white,
-        ),
-      ),
+      theme: buildUnifiedTheme(),
       home: _BootstrapScreen(configuration: configuration, auth: auth),
     );
   }
@@ -328,17 +334,102 @@ class _ProtectedFeatures extends StatefulWidget {
 
 class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   List<Congregation>? _catalog;
+  List<MinistryCongregationChoice>? _ministryCongregations;
+  String? _selectedMinistryCongregationId;
+  String? _ministryCatalogError;
+  bool _ministryCatalogLoading = false;
+  bool _ministryCatalogRetryNeeded = false;
+  bool _catalogLoading = false;
   String? _error;
   String? _overlay;
   @override
   void initState() {
     super.initState();
-    _load();
+    final ids = widget.scope.ministryCongregationIds.toList()..sort();
+    if (!widget.scope.isMinistrySupervision && ids.length == 1) {
+      _selectedMinistryCongregationId = ids.single;
+    }
+    if (widget.scope.hasMinistryAccess) {
+      unawaited(_loadMinistryCongregations());
+    }
+    if (!widget.router.route.startsWith('/ministry')) _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ProtectedFeatures oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scope != widget.scope) {
+      _selectedMinistryCongregationId = null;
+      _ministryCongregations = null;
+      _ministryCatalogError = null;
+      final ids = widget.scope.ministryCongregationIds.toList()..sort();
+      if (!widget.scope.isMinistrySupervision && ids.length == 1) {
+        _selectedMinistryCongregationId = ids.single;
+      }
+      if (widget.scope.hasMinistryAccess) {
+        if (_ministryCatalogLoading) {
+          _ministryCatalogRetryNeeded = true;
+        } else {
+          unawaited(_loadMinistryCongregations());
+        }
+      }
+    }
+  }
+
+  Future<void> _loadMinistryCongregations() async {
+    if (_ministryCatalogLoading) return;
+    _ministryCatalogLoading = true;
+    final token = widget.gateway.context;
+    if (mounted) {
+      setState(() {
+        _ministryCatalogError = null;
+        _ministryCatalogLoading = true;
+      });
+    }
+    try {
+      final repository = MinistryBrowserRepository(widget.gateway);
+      final items = <MinistryCongregationChoice>[];
+      String? cursor;
+      do {
+        final page = await repository.listCongregations(cursor: cursor);
+        widget.gateway.ensureCurrent(token);
+        items.addAll(page.items);
+        cursor = page.nextCursor;
+      } while (cursor != null);
+      if (mounted) {
+        setState(() => _ministryCongregations = List.unmodifiable(items));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      try {
+        widget.gateway.ensureCurrent(token);
+      } catch (_) {
+        return;
+      }
+      if (error is DataFailure && error.code == 'permission') {
+        await widget.router.refresh();
+      } else {
+        setState(
+          () => _ministryCatalogError =
+              'Não foi possível carregar as congregações autorizadas.',
+        );
+      }
+    } finally {
+      _ministryCatalogLoading = false;
+      if (mounted) {
+        final retryNeeded = _ministryCatalogRetryNeeded;
+        _ministryCatalogRetryNeeded = false;
+        setState(() => _ministryCatalogLoading = false);
+        if (retryNeeded) unawaited(_loadMinistryCongregations());
+      }
+    }
   }
 
   Future<void> _load() async {
+    if (_catalogLoading) return;
+    _catalogLoading = true;
     final token = widget.gateway.context;
-    setState(() => _error = null);
+    if (mounted) setState(() => _error = null);
     try {
       final rows = await CongregationRepository(widget.gateway).list();
       widget.gateway.ensureCurrent(token);
@@ -358,6 +449,8 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
               'Não foi possível carregar as congregações. Tente novamente.',
         );
       }
+    } finally {
+      _catalogLoading = false;
     }
   }
 
@@ -371,7 +464,9 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   @override
   Widget build(BuildContext context) {
     Widget page;
-    if (_overlay == 'submit') {
+    if (widget.router.route.startsWith('/ministry')) {
+      page = _ministryPage();
+    } else if (_overlay == 'submit') {
       page = FeedbackDialog(
         repository: widget.feedback,
         onClose: () => setState(() => _overlay = null),
@@ -450,11 +545,122 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
       currentRoute: widget.router.route,
       onNavigate: (route) {
         setState(() => _overlay = null);
+        if (!route.startsWith('/ministry') && _catalog == null) _load();
         widget.router.go(route);
       },
       onSignOut: widget.router.signOut,
       onFeedback: () => setState(() => _overlay = 'submit'),
       child: page,
     );
+  }
+
+  Widget _ministryPage() {
+    final ministry = MinistryRepository(widget.gateway);
+    final browser = MinistryBrowserRepository(widget.gateway);
+    final handoff = MinistryHandoffRepository(widget.gateway);
+    final ids = widget.scope.ministryCongregationIds.toList()..sort();
+    // Until the server directory has loaded, expose no choices. In particular,
+    // never turn a grant UUID into a user-facing name or enable a scoped query
+    // from an unlabelled fallback entry.
+    final available =
+        _ministryCongregations ?? const <MinistryCongregationChoice>[];
+    final selectedId = _selectedMinistryCongregationId;
+    final selected = selectedId == null
+        ? null
+        : available.where((item) => item.id == selectedId).firstOrNull;
+    final congregationId = selected?.id;
+    final scopeName = selected?.name ?? 'Selecione uma congregação';
+    final scopedActionsEnabled =
+        congregationId != null &&
+        widget.scope.canAccessMinistry(congregationId);
+    if (!widget.scope.isMinistrySupervision &&
+        widget.router.route != '/ministry' &&
+        !scopedActionsEnabled) {
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                'Selecione uma congregação autorizada antes de continuar.',
+              ),
+              TextButton(
+                onPressed: () => widget.router.go('/ministry'),
+                child: const Text('Escolher congregação'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return switch (widget.router.route) {
+      '/ministry' => MinistryHomePage(
+        key: ValueKey('ministry-home:$congregationId'),
+        loadOverview: () =>
+            ministry.getOverview(congregationId: congregationId),
+        scopeName: scopeName,
+        availableCongregationIds: [for (final item in available) item.id],
+        congregationNames: {for (final item in available) item.id: item.name},
+        selectedCongregationId: congregationId,
+        scopeLoading: _ministryCatalogLoading,
+        scopeError: _ministryCatalogError,
+        onRetryScope: _loadMinistryCongregations,
+        onSelectCongregation: (value) => setState(() {
+          _selectedMinistryCongregationId = value;
+        }),
+        scopedActionsEnabled: scopedActionsEnabled,
+        scopeRequired:
+            !widget.scope.isMinistrySupervision &&
+            ids.length > 1 &&
+            congregationId == null,
+        onOpenStudents: scopedActionsEnabled
+            ? () => widget.router.go('/ministry/students')
+            : null,
+        onOpenClasses: scopedActionsEnabled
+            ? () => widget.router.go('/ministry/classes')
+            : null,
+        onOpenAttendance:
+            scopedActionsEnabled || widget.scope.isMinistrySupervision
+            ? () => widget.router.go('/ministry/attendance')
+            : null,
+      ),
+      '/ministry/team' => TeamPage(
+        key: ValueKey('ministry-team:$congregationId'),
+        repository: ministry,
+        congregationId: congregationId,
+        supervision:
+            widget.scope.isMinistrySupervision && congregationId == null,
+      ),
+      '/ministry/students' when scopedActionsEnabled => StudentsPage(
+        key: ValueKey('ministry-students:$congregationId'),
+        repository: browser,
+        congregationId: congregationId,
+        onOpenHandoff: () => widget.router.go('/ministry/handoff'),
+      ),
+      '/ministry/classes' when scopedActionsEnabled => ClassesPage(
+        key: ValueKey('ministry-classes:$congregationId'),
+        repository: browser,
+        congregationId: congregationId,
+        onOpenAttendance: () => widget.router.go('/ministry/attendance'),
+      ),
+      '/ministry/attendance' when scopedActionsEnabled => AttendancePage(
+        key: ValueKey('ministry-attendance:$congregationId'),
+        repository: ministry,
+        congregationId: congregationId,
+      ),
+      '/ministry/attendance' when widget.scope.isMinistrySupervision =>
+        AttendancePage(repository: ministry),
+      '/ministry/handoff' when scopedActionsEnabled => ConvertHandoffPage(
+        key: ValueKey('ministry-handoff:$congregationId'),
+        congregationId: congregationId,
+        canPromote: widget.scope.canAccessMinistry(congregationId),
+        handoff: handoff,
+        browser: browser,
+        ministry: ministry,
+      ),
+      _ => const Center(
+        child: Text('Selecione uma congregação autorizada antes de continuar.'),
+      ),
+    };
   }
 }

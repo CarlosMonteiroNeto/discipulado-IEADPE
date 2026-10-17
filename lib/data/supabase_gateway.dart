@@ -186,6 +186,7 @@ class SupabaseGateway
     Map<String, Object?> parameters = const {},
   }) async {
     const ministryReadParameters = <String, Set<String>>{
+      'ministry_list_congregations': {'limit', 'cursor'},
       'ministry_list_directory': {
         'scope',
         'congregation_id',

@@ -10,11 +10,11 @@ class AttendancePage extends StatefulWidget {
   const AttendancePage({
     super.key,
     required this.repository,
-    required this.congregationId,
+    this.congregationId,
     this.createOperationId,
   });
   final MinistryRepository repository;
-  final String congregationId;
+  final String? congregationId;
   final String Function()? createOperationId;
   @override
   State<AttendancePage> createState() => _AttendancePageState();
@@ -100,6 +100,8 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _save({required bool finalize}) async {
     final roster = _roster;
     if (roster == null) return;
+    final congregationId = roster.session.metadata.congregationId;
+    if (congregationId == null) return;
     final operation = _operationId ??= _newOperation();
     setState(() {
       _saving = true;
@@ -110,7 +112,7 @@ class _AttendancePageState extends State<AttendancePage> {
         name: 'save_attendance',
         operationId: operation,
         payload: {
-          'congregation_id': widget.congregationId,
+          'congregation_id': congregationId,
           'session_id': roster.session.id,
           'expected_revision': roster.session.metadata.revision,
           'marks': {
@@ -131,7 +133,7 @@ class _AttendancePageState extends State<AttendancePage> {
           id: roster.session.id,
           classId: roster.session.classId,
           className: roster.session.classId,
-          congregationId: widget.congregationId,
+          congregationId: congregationId,
           date: roster.session.date,
           topic: roster.session.topic,
         ),

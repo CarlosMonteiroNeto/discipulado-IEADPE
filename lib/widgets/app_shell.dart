@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../domain/models.dart';
 import '../routing/router.dart';
+import '../ui/unified_theme.dart';
 import 'brand_header.dart';
 
 /// Navigation is presentation only; SessionRouter must authorize every callback.
@@ -26,12 +27,24 @@ class AppShell extends StatelessWidget {
     '/register': 'Cadastrar',
     '/converts': 'Convertidos',
     '/admin': 'Admin',
+    '/ministry': 'Discipulado',
+    '/ministry/team': 'Equipe',
+    '/ministry/students': 'Alunos',
+    '/ministry/classes': 'Turmas',
+    '/ministry/attendance': 'Frequência',
+    '/ministry/handoff': 'Novos convertidos',
   };
   static const icons = {
     '/home': Icons.home,
     '/register': Icons.person_add,
     '/converts': Icons.people,
     '/admin': Icons.settings,
+    '/ministry': Icons.menu_book_outlined,
+    '/ministry/team': Icons.groups_outlined,
+    '/ministry/students': Icons.school_outlined,
+    '/ministry/classes': Icons.class_outlined,
+    '/ministry/attendance': Icons.fact_check_outlined,
+    '/ministry/handoff': Icons.move_to_inbox_outlined,
   };
   @override
   Widget build(BuildContext context) {
@@ -90,7 +103,7 @@ class AppShell extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xfff8fafc), Color(0xffeff6ff)],
+            colors: [UnifiedColors.page, UnifiedColors.pageTint],
           ),
         ),
         child: SafeArea(

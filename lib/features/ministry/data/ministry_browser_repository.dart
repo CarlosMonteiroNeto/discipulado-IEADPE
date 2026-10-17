@@ -34,10 +34,48 @@ class MinistryClassSummary {
   final int revision;
 }
 
+class MinistryCongregationChoice {
+  const MinistryCongregationChoice({required this.id, required this.name});
+  final String id;
+  final String name;
+}
+
 /// Bounded congregation-specific pages used by ministry browse and enrollment UI.
 class MinistryBrowserRepository {
   MinistryBrowserRepository(this.gateway);
   final ReadRpcGateway gateway;
+
+  Future<MinistryPage<MinistryCongregationChoice>> listCongregations({
+    int limit = 100,
+    String? cursor,
+  }) async {
+    if (limit < 1 || limit > 100 || (cursor?.length ?? 0) > 64) {
+      throw const DataFailure('invalid');
+    }
+    final raw = await _read('ministry_list_congregations', {
+      'limit': limit,
+      'cursor': cursor,
+    });
+    try {
+      final page = _pageObject(raw);
+      final items = page['items'];
+      if (items is! List || items.length > 100) _invalid();
+      final choices = items
+          .map((item) {
+            final row = _row(item, {'id', 'name'});
+            return MinistryCongregationChoice(
+              id: _uuidValue(row['id']),
+              name: _text(row['name']),
+            );
+          })
+          .toList(growable: false);
+      final next = _cursor(page['next_cursor']);
+      if (next != null) _uuid(next);
+      return MinistryPage(items: List.unmodifiable(choices), nextCursor: next);
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
 
   Future<MinistryPage<MinistryStudentSummary>> listStudents({
     required String congregationId,

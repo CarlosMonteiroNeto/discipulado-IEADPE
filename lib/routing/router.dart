@@ -5,8 +5,20 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../domain/models.dart';
 import '../features/auth/auth_repository.dart';
+import 'browser_route_history.dart';
 
-const _knownRoutes = {'/register', '/home', '/converts', '/admin'};
+const _knownRoutes = {
+  '/register',
+  '/home',
+  '/converts',
+  '/admin',
+  '/ministry',
+  '/ministry/team',
+  '/ministry/students',
+  '/ministry/classes',
+  '/ministry/attendance',
+  '/ministry/handoff',
+};
 bool isSafeRoute(String? value) => _knownRoutes.contains(value);
 String safeRoute(String? value) => isSafeRoute(value) ? value! : '/register';
 List<String> routesFor(AccessScope scope) => [
@@ -16,6 +28,17 @@ List<String> routesFor(AccessScope scope) => [
     '/converts',
   ],
   if (scope.isGlobalManager) '/admin',
+  if (scope.hasMinistryAccess) ...[
+    '/ministry',
+    '/ministry/team',
+    if (scope.ministryCongregationIds.isNotEmpty ||
+        scope.isMinistrySupervision) ...[
+      '/ministry/students',
+      '/ministry/classes',
+      '/ministry/attendance',
+      '/ministry/handoff',
+    ],
+  ],
 ];
 
 /// Root listens to this guard and supplies real feature pages for allowed paths.
@@ -25,7 +48,11 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
     this.auth, {
     required this.clearProtectedCaches,
     String? intendedRoute,
-  }) : _intended = safeRoute(intendedRoute) {
+    BrowserRouteHistory? browserHistory,
+  }) {
+    _browserHistory = browserHistory ?? createBrowserRouteHistory();
+    _intended = safeRoute(intendedRoute ?? _browserHistory.currentPath);
+    _browserHistory.listen(_browserPathChanged);
     WidgetsBinding.instance.addObserver(this);
     _subscription = auth.watchSession().listen(
       (_) {
@@ -39,7 +66,8 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   }
   final AuthGateway auth;
   final VoidCallback clearProtectedCaches;
-  final String _intended;
+  late final BrowserRouteHistory _browserHistory;
+  late final String _intended;
   String? _lastAuthorized;
   String? _identity;
   Future<void>? _validation;
@@ -95,11 +123,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
     }
   }
 
-  bool _sameScope(AccessScope a, AccessScope b) =>
-      a.isAdmin == b.isAdmin &&
-      a.isSupervision == b.isSupervision &&
-      a.congregationIds.toSet().length == b.congregationIds.toSet().length &&
-      a.congregationIds.toSet().containsAll(b.congregationIds);
+  bool _sameScope(AccessScope a, AccessScope b) => a == b;
 
   Future<void> _validate({required bool invalidate}) async {
     final sequence = ++_refreshSequence;
@@ -131,6 +155,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
       final candidate = _lastAuthorized ?? _intended;
       _route = routesFor(loaded).contains(candidate) ? candidate : '/register';
       _lastAuthorized = _route;
+      _browserHistory.replace(_route);
       refreshRevision++;
     } catch (_) {
       if (!_disposed &&
@@ -148,11 +173,24 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void go(String route) {
-    _route = allowedRoutes.contains(route)
+    final next = allowedRoutes.contains(route)
         ? route
         : (_scope == null ? '/login' : '/register');
+    if (next != _route && next != '/login') _browserHistory.push(next);
+    _route = next;
     if (_route != '/login') _lastAuthorized = _route;
     notifyListeners();
+  }
+
+  void _browserPathChanged(String path) {
+    final candidate = safeRoute(path);
+    if (_scope != null && allowedRoutes.contains(candidate)) {
+      _route = candidate;
+      _lastAuthorized = candidate;
+      notifyListeners();
+      return;
+    }
+    _browserHistory.replace(_scope == null ? '/login' : '/register');
   }
 
   Future<void> signOut() async {
@@ -174,6 +212,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   void dispose() {
     _disposed = true;
     _generation++;
+    _browserHistory.dispose();
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_subscription.cancel());
     clearProtectedCaches();

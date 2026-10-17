@@ -8,10 +8,28 @@ class MinistryHomePage extends StatefulWidget {
     required this.onOpenStudents,
     required this.onOpenClasses,
     required this.onOpenAttendance,
+    this.availableCongregationIds = const [],
+    this.selectedCongregationId,
+    this.onSelectCongregation,
+    this.scopedActionsEnabled = true,
+    this.scopeRequired = false,
+    this.congregationNames = const {},
+    this.scopeError,
+    this.onRetryScope,
+    this.scopeLoading = false,
   });
   final Future<Map<String, Object?>> Function() loadOverview;
   final String scopeName;
-  final VoidCallback onOpenStudents, onOpenClasses, onOpenAttendance;
+  final VoidCallback? onOpenStudents, onOpenClasses, onOpenAttendance;
+  final List<String> availableCongregationIds;
+  final String? selectedCongregationId;
+  final ValueChanged<String?>? onSelectCongregation;
+  final bool scopedActionsEnabled;
+  final bool scopeRequired;
+  final Map<String, String> congregationNames;
+  final String? scopeError;
+  final VoidCallback? onRetryScope;
+  final bool scopeLoading;
   @override
   State<MinistryHomePage> createState() => _MinistryHomePageState();
 }
@@ -21,10 +39,16 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
   @override
   void initState() {
     super.initState();
-    _overview = widget.loadOverview();
+    _overview = widget.scopeRequired
+        ? Future<Map<String, Object?>>.value(const {})
+        : widget.loadOverview();
   }
 
-  void _refresh() => setState(() => _overview = widget.loadOverview());
+  void _refresh() {
+    if (widget.scopeRequired) return;
+    setState(() => _overview = widget.loadOverview());
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     body: SafeArea(
@@ -38,12 +62,58 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                 'Discipulado · ${widget.scopeName}',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
+              if (widget.scopeError != null)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.scopeError!,
+                      semanticsLabel: 'Falha ao carregar congregações',
+                    ),
+                    TextButton(
+                      onPressed: widget.onRetryScope,
+                      child: const Text('Tentar carregar novamente'),
+                    ),
+                  ],
+                ),
+              if (widget.scopeLoading)
+                const LinearProgressIndicator(
+                  semanticsLabel: 'Carregando congregações autorizadas',
+                ),
+              if (widget.availableCongregationIds.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: const Key('ministry-congregation-scope'),
+                  initialValue: widget.selectedCongregationId,
+                  decoration: const InputDecoration(labelText: 'Congregação'),
+                  hint: const Text('Selecione uma congregação'),
+                  items: [
+                    for (final id in widget.availableCongregationIds)
+                      DropdownMenuItem(
+                        value: id,
+                        child: Text(widget.congregationNames[id] ?? id),
+                      ),
+                  ],
+                  onChanged: widget.onSelectCongregation,
+                ),
+              ] else if (!widget.scopedActionsEnabled)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'Nenhuma congregação autorizada está disponível para esta sessão.',
+                  ),
+                ),
               const SizedBox(height: 12),
               FutureBuilder<Map<String, Object?>>(
                 future: _overview,
                 builder: (context, snapshot) {
+                  if (widget.scopeRequired) {
+                    return const Text(
+                      'Selecione uma congregação para ver os dados.',
+                    );
+                  }
                   if (snapshot.hasError) return _ErrorRetry(onRetry: _refresh);
-                  if (!snapshot.hasData)
+                  if (!snapshot.hasData) {
                     return const Center(
                       child: Padding(
                         padding: EdgeInsets.all(24),
@@ -52,6 +122,7 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                         ),
                       ),
                     );
+                  }
                   final data = snapshot.data!;
                   return Wrap(
                     spacing: 12,
@@ -78,12 +149,16 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
               ),
               const SizedBox(height: 20),
               FilledButton.icon(
-                onPressed: widget.onOpenStudents,
+                onPressed: widget.scopedActionsEnabled
+                    ? widget.onOpenStudents
+                    : null,
                 icon: const Icon(Icons.school_outlined),
                 label: const Text('Alunos'),
               ),
               OutlinedButton.icon(
-                onPressed: widget.onOpenClasses,
+                onPressed: widget.scopedActionsEnabled
+                    ? widget.onOpenClasses
+                    : null,
                 icon: const Icon(Icons.groups_outlined),
                 label: const Text('Turmas'),
               ),
@@ -108,7 +183,7 @@ class _CountTile extends StatelessWidget {
   });
   final String label;
   final Object? value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   @override
   Widget build(BuildContext context) => SizedBox(
     width: 280,

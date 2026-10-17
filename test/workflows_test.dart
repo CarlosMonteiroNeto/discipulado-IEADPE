@@ -41,6 +41,8 @@ class RootFixture {
             'is_admin': admin,
             'is_supervision': false,
             'congregation_ids': <String>[],
+            'ministry_supervision': false,
+            'ministry_congregation_ids': <String>[],
           };
         }
       }
