@@ -50,6 +50,16 @@ abstract interface class ReadRpcGateway implements Gateway {
   });
 }
 
+/// Additive ministry command transport. Rich ministry results include revisions
+/// and status values, while the older convert command contract returns an ID.
+abstract interface class MinistryCommandGateway implements Gateway {
+  Future<Map<String, dynamic>> ministryCommand(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
 abstract interface class ImportRpcGateway implements Gateway {
   Future<Map<String, dynamic>> importRow(
     String operationId,
@@ -57,7 +67,8 @@ abstract interface class ImportRpcGateway implements Gateway {
   );
 }
 
-class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
+class SupabaseGateway
+    implements ReadRpcGateway, ImportRpcGateway, MinistryCommandGateway {
   SupabaseGateway(
     this.client,
     this.boundary, {
@@ -163,9 +174,32 @@ class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
     required String context,
     Map<String, Object?> parameters = const {},
   }) async {
-    if (rpc != 'weekly_overview' ||
+    const ministryReads = {
+      'ministry_list_directory',
+      'ministry_list_class_students',
+      'ministry_get_session_attendance',
+      'ministry_get_enrollment_progress',
+      'ministry_get_overview',
+      'ministry_list_pending_sessions',
+    };
+    final ministryRead = ministryReads.contains(rpc);
+    if ((!ministryRead && rpc != 'weekly_overview') ||
         parameters.keys.any(
-          (key) => !{'after_id', 'expected_week'}.contains(key),
+          (key) => ministryRead
+              ? !{
+                  'scope',
+                  'congregation_id',
+                  'role_code',
+                  'name_prefix',
+                  'limit',
+                  'cursor',
+                  'class_id',
+                  'session_id',
+                  'finalize',
+                  'marks',
+                  'enrollment_id',
+                }.contains(key)
+              : !{'after_id', 'expected_week'}.contains(key),
         )) {
       throw const DataFailure('invalid');
     }
@@ -173,13 +207,263 @@ class SupabaseGateway implements ReadRpcGateway, ImportRpcGateway {
     final result = await _run(
       context,
       () => client
-          .rpc('ieadpe_$rpc', params: frozen)
+          .rpc(
+            'ieadpe_$rpc',
+            params: ministryRead ? {'request': frozen} : frozen,
+          )
           .retry(enabled: false, requestTimeout: requestTimeout),
     );
     if (result is! Map<String, dynamic>) {
       throw const DataFailure('invalid_response');
     }
     return result;
+  }
+
+  @override
+  Future<Map<String, dynamic>> ministryCommand(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    const fields = <String, Set<String>>{
+      'save_contact': {
+        'id',
+        'scope',
+        'congregation_id',
+        'name',
+        'role_code',
+        'phone_e164',
+        'birth_date',
+        'expected_revision',
+      },
+      'replace_role_holder': {
+        'scope',
+        'congregation_id',
+        'role_code',
+        'previous_contact_id',
+        'previous_expected_revision',
+        'id',
+        'expected_revision',
+      },
+      'set_contact_archived': {
+        'id',
+        'scope',
+        'congregation_id',
+        'archived',
+        'expected_revision',
+      },
+      'save_student': {
+        'id',
+        'congregation_id',
+        'name',
+        'phone_e164',
+        'birth_date',
+        'address',
+        'education',
+        'marital_status',
+        'new_convert',
+        'water_baptized',
+        'wants_baptism',
+        'expected_revision',
+      },
+      'set_student_archived': {
+        'id',
+        'congregation_id',
+        'archived',
+        'expected_revision',
+      },
+      'save_class': {
+        'id',
+        'congregation_id',
+        'name',
+        'teacher_contact_id',
+        'start_date',
+        'end_date',
+        'expected_revision',
+      },
+      'set_class_status': {
+        'id',
+        'congregation_id',
+        'status',
+        'expected_revision',
+      },
+      'enroll_student': {
+        'id',
+        'congregation_id',
+        'class_id',
+        'student_id',
+        'start_date',
+      },
+      'close_enrollment': {
+        'id',
+        'congregation_id',
+        'status',
+        'end_date',
+        'expected_revision',
+      },
+      'create_session': {'id', 'congregation_id', 'class_id', 'date', 'topic'},
+      'cancel_session': {'id', 'congregation_id', 'expected_revision'},
+      'save_attendance': {
+        'congregation_id',
+        'session_id',
+        'expected_revision',
+        'marks',
+        'finalize',
+      },
+    };
+    final allowed = fields[command];
+    if (allowed == null || payload.keys.any((key) => !allowed.contains(key))) {
+      throw const DataFailure('invalid');
+    }
+    const required = <String, Set<String>>{
+      'save_contact': {
+        'id',
+        'scope',
+        'congregation_id',
+        'name',
+        'role_code',
+        'phone_e164',
+        'birth_date',
+      },
+      'replace_role_holder': {
+        'scope',
+        'congregation_id',
+        'role_code',
+        'previous_contact_id',
+        'previous_expected_revision',
+        'id',
+        'expected_revision',
+      },
+      'set_contact_archived': {
+        'id',
+        'scope',
+        'congregation_id',
+        'archived',
+        'expected_revision',
+      },
+      'save_student': {'id', 'congregation_id', 'name'},
+      'set_student_archived': {
+        'id',
+        'congregation_id',
+        'archived',
+        'expected_revision',
+      },
+      'save_class': {
+        'id',
+        'congregation_id',
+        'name',
+        'teacher_contact_id',
+        'start_date',
+        'end_date',
+      },
+      'set_class_status': {
+        'id',
+        'congregation_id',
+        'status',
+        'expected_revision',
+      },
+      'enroll_student': {
+        'id',
+        'congregation_id',
+        'class_id',
+        'student_id',
+        'start_date',
+      },
+      'close_enrollment': {
+        'id',
+        'congregation_id',
+        'status',
+        'end_date',
+        'expected_revision',
+      },
+      'create_session': {'id', 'congregation_id', 'class_id', 'date', 'topic'},
+      'cancel_session': {'id', 'congregation_id', 'expected_revision'},
+      'save_attendance': {
+        'congregation_id',
+        'session_id',
+        'expected_revision',
+        'marks',
+        'finalize',
+      },
+    };
+    if (!payload.keys.toSet().containsAll(required[command]!)) {
+      throw const DataFailure('invalid');
+    }
+    for (final key in [
+      'id',
+      'congregation_id',
+      'class_id',
+      'student_id',
+      'session_id',
+      'previous_contact_id',
+    ]) {
+      if (payload.containsKey(key) && payload[key] != null)
+        validateUuid(payload[key]);
+    }
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final token = context;
+    final value = await _run(
+      token,
+      () => client
+          .rpc(
+            'ieadpe_ministry_$command',
+            params: {'operation_id': operationId, 'payload': frozen},
+          )
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    const resultFields = <String, Set<String>>{
+      'replace_role_holder': {
+        'id',
+        'revision',
+        'previous_contact_id',
+        'previous_revision',
+      },
+      'create_session': {'id', 'revision', 'status'},
+      'cancel_session': {'id', 'revision', 'status'},
+      'save_attendance': {
+        'id',
+        'revision',
+        'status',
+        'roster_frozen',
+        'attendance_count',
+      },
+    };
+    final expectedFields = resultFields[command] ?? {'id', 'revision'};
+    if (value is! Map<String, dynamic> ||
+        value['id'] is! String ||
+        value.keys.any((key) => !expectedFields.contains(key)) ||
+        !value.keys.toSet().containsAll(expectedFields) ||
+        value['revision'] is! int ||
+        (value['revision'] as int) < 1) {
+      throw const DataFailure('invalid_response');
+    }
+    validateUuid(value['id']);
+    if (value.containsKey('previous_contact_id')) {
+      validateUuid(value['previous_contact_id']);
+      if (value['previous_revision'] is! int ||
+          (value['previous_revision'] as int) < 1) {
+        throw const DataFailure('invalid_response');
+      }
+    }
+    if (value.containsKey('status')) {
+      final statuses = switch (command) {
+        'create_session' => {'open'},
+        'cancel_session' => {'canceled'},
+        'save_attendance' => {'open', 'finalized'},
+        _ => <String>{},
+      };
+      if (!statuses.contains(value['status'])) {
+        throw const DataFailure('invalid_response');
+      }
+    }
+    if (command == 'save_attendance' &&
+        (value['roster_frozen'] != true ||
+            value['attendance_count'] is! int ||
+            (value['attendance_count'] as int) < 0)) {
+      throw const DataFailure('invalid_response');
+    }
+    return Map<String, dynamic>.unmodifiable(value);
   }
 
   @override
