@@ -30,6 +30,9 @@ DO $$ DECLARE created jsonb; updated jsonb; student jsonb; BEGIN
  updated:=public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000002',
   '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Teacher One Updated","role_code":"teacher","phone_e164":null,"birth_date":null,"expected_revision":1}'::jsonb);
  PERFORM pg_temp.assert_true(updated->>'revision'='2','contact update increments revision');
+ BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000009',
+  '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Stale Update","role_code":"teacher","phone_e164":null,"birth_date":null,"expected_revision":1}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: stale contact revision accepted'; EXCEPTION WHEN serialization_failure THEN NULL; END;
  PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000010',
   '{"id":"93000000-0000-0000-0000-000000000010","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Teacher Two","role_code":"teacher","phone_e164":null,"birth_date":null}'::jsonb);
  INSERT INTO public.ministry_role_slots(id,congregation_id,scope,role_code,contact_id,updated_by)
@@ -63,6 +66,9 @@ DO $$ DECLARE created jsonb; updated jsonb; student jsonb; BEGIN
  PERFORM public.ieadpe_ministry_set_contact_archived('93000000-0000-0000-0000-000000000004',
   '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","archived":true,"expected_revision":3}'::jsonb);
  PERFORM pg_temp.assert_true((SELECT archived_at IS NOT NULL AND revision=4 FROM public.ministry_contacts WHERE id='93000000-0000-0000-0000-000000000001'),'contact archive retains history and increments revision');
+ BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000035',
+  '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Cannot Edit Archived","role_code":"teacher","phone_e164":null,"birth_date":null,"expected_revision":4}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: archived contact edit accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 END $$;
 DO $$ BEGIN
  BEGIN PERFORM public.ieadpe_ministry_save_student('93000000-0000-0000-0000-000000000005',
@@ -76,6 +82,9 @@ DO $$ BEGIN
   RAISE EXCEPTION 'ASSERTION: unknown contact payload key accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
 END $$;
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.ministry_students),'invalid student transactions roll back');
+SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000002',true);
+SELECT pg_temp.assert_true(public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000036',
+ '{"id":"93000000-0000-0000-0000-000000000036","scope":"supervision","congregation_id":null,"name":"Supervisor Contact","role_code":"campaignSupervisor","phone_e164":null,"birth_date":null}'::jsonb)->>'revision'='1','supervision contact uses global supervisor authority');
 SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000003',true);
 DO $$ BEGIN
  BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000008',

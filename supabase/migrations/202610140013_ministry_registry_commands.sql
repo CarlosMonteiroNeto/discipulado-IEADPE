@@ -141,6 +141,7 @@ BEGIN
    IF contact.id IS NULL OR contact.scope<>scope_text OR contact.congregation_id IS DISTINCT FROM congregation THEN RAISE EXCEPTION 'contact_not_found' USING ERRCODE='22023'; END IF;
    IF contact.revision<>expected THEN RAISE EXCEPTION 'stale_revision' USING ERRCODE='40001'; END IF;
    IF command_name='save_contact' THEN
+    IF contact.archived_at IS NOT NULL THEN RAISE EXCEPTION 'contact_archived' USING ERRCODE='22023'; END IF;
     UPDATE public.ministry_contacts SET name=record_name,normalized_name=normalized,role_code=role_text,phone_e164=phone_text,birth_date=birth,
      revision=revision+1,updated_at=now(),updated_by=actor WHERE id=target RETURNING revision INTO revision_value;
    ELSE

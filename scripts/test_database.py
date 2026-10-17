@@ -12,6 +12,7 @@ from database_access_concurrency import check_access_concurrency
 from database_convert_concurrency import check_convert_concurrency
 from database_import_concurrency import check_import_concurrency
 from database_lifecycle_concurrency import check_lifecycle_concurrency
+from database_ministry_registry_concurrency import check_ministry_registry_concurrency
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,6 +25,7 @@ def main():
     parser.add_argument("--convert-concurrency", action="store_true")
     parser.add_argument("--import-concurrency", action="store_true")
     parser.add_argument("--lifecycle-concurrency", action="store_true")
+    parser.add_argument("--ministry-registry-concurrency", action="store_true")
     args = parser.parse_args()
     scenario = (ROOT / "supabase/tests/database" / args.scenario).resolve()
     if scenario.parent != (ROOT / "supabase/tests/database").resolve():
@@ -59,6 +61,8 @@ def main():
             check_convert_concurrency(psql, target)
         elif args.lifecycle_concurrency:
             check_lifecycle_concurrency(psql, target)
+        elif args.ministry_registry_concurrency:
+            check_ministry_registry_concurrency(psql, target)
         else:
             run(target, "-f", str(scenario))
             print("PASS: " + args.scenario, flush=True)
