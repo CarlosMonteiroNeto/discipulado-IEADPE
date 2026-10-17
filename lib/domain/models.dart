@@ -331,14 +331,46 @@ final class AccessScope {
     this.isAdmin = false,
     this.isSupervision = false,
     Iterable<String> congregationIds = const [],
-  }) : congregationIds = Set.unmodifiable(congregationIds);
+    this.isMinistrySupervision = false,
+    Iterable<String> ministryCongregationIds = const [],
+  }) : congregationIds = Set.unmodifiable(congregationIds),
+       ministryCongregationIds = Set.unmodifiable(ministryCongregationIds);
   final bool isAdmin, isSupervision;
   final Set<String> congregationIds;
+  final bool isMinistrySupervision;
+  final Set<String> ministryCongregationIds;
   bool get isGlobalManager => isAdmin || isSupervision;
+  bool get hasMinistryAccess =>
+      isMinistrySupervision || ministryCongregationIds.isNotEmpty;
   bool canAccess(String? congregationId) {
     if (isGlobalManager) return true;
     return congregationId != null && congregationIds.contains(congregationId);
   }
+
+  bool canAccessMinistry(String? congregationId) =>
+      isMinistrySupervision ||
+      (congregationId != null && ministryCongregationIds.contains(congregationId));
+
+  @override
+  bool operator ==(Object other) =>
+      other is AccessScope &&
+      isAdmin == other.isAdmin &&
+      isSupervision == other.isSupervision &&
+      isMinistrySupervision == other.isMinistrySupervision &&
+      _sameIds(congregationIds, other.congregationIds) &&
+      _sameIds(ministryCongregationIds, other.ministryCongregationIds);
+
+  @override
+  int get hashCode => Object.hash(
+    isAdmin,
+    isSupervision,
+    isMinistrySupervision,
+    Object.hashAll(congregationIds.toList()..sort()),
+    Object.hashAll(ministryCongregationIds.toList()..sort()),
+  );
+
+  static bool _sameIds(Set<String> a, Set<String> b) =>
+      a.length == b.length && a.containsAll(b);
 }
 
 enum MutationStatus { applied, rejected }

@@ -108,6 +108,31 @@ void main() {
     router.dispose();
     await auth.events.close();
   });
+
+  test('ministry grant changes alter scope equality', () {
+    final campaign = AccessScope(
+      isAdmin: true,
+      congregationIds: ['11111111-1111-1111-1111-111111111111'],
+    );
+    final ministry = AccessScope(
+      isAdmin: true,
+      congregationIds: ['11111111-1111-1111-1111-111111111111'],
+      ministryCongregationIds: ['22222222-2222-2222-2222-222222222222'],
+    );
+    final equivalent = AccessScope(
+      isAdmin: true,
+      congregationIds: ['11111111-1111-1111-1111-111111111111'],
+      ministryCongregationIds: ['22222222-2222-2222-2222-222222222222'],
+    );
+    final revoked = AccessScope(
+      isAdmin: true,
+      congregationIds: ['11111111-1111-1111-1111-111111111111'],
+    );
+    expect(ministry, isNot(campaign));
+    expect(ministry, isNot(revoked));
+    expect(ministry, equals(equivalent));
+    expect(ministry.hashCode, equivalent.hashCode);
+  });
   test(
     'resume cannot reopen protected pages while signout is pending',
     () async {

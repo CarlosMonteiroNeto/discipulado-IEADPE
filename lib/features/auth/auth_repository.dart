@@ -101,22 +101,30 @@ class AuthRepository implements AuthGateway {
     if (value is! Map ||
         value['is_admin'] is! bool ||
         value['is_supervision'] is! bool ||
-        value['congregation_ids'] is! List) {
+        value['congregation_ids'] is! List ||
+        value['ministry_supervision'] is! bool ||
+        value['ministry_congregation_ids'] is! List) {
       throw const FormatException('Invalid scope response');
     }
-    final ids = (value['congregation_ids'] as List).cast<String>();
-    if (ids.any(
-      (id) =>
-          !RegExp(r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$')
-              .hasMatch(id),
-    )) {
-      throw const FormatException('Invalid congregation ID');
-    }
+    final ids = _scopeIds(value['congregation_ids']);
+    final ministryIds = _scopeIds(value['ministry_congregation_ids']);
     return AccessScope(
       isAdmin: value['is_admin'] as bool,
       isSupervision: value['is_supervision'] as bool,
       congregationIds: ids,
+      isMinistrySupervision: value['ministry_supervision'] as bool,
+      ministryCongregationIds: ministryIds,
     );
+  }
+
+  static List<String> _scopeIds(Object? raw) {
+    final validId = RegExp(
+      r'^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$',
+    );
+    if (raw is! List || raw.any((id) => id is! String || !validId.hasMatch(id))) {
+      throw const FormatException('Invalid scope congregation IDs');
+    }
+    return raw.cast<String>();
   }
 
   @override
