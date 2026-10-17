@@ -60,6 +60,13 @@ abstract interface class MinistryCommandGateway implements Gateway {
   );
 }
 
+abstract interface class HandoffCommandGateway implements Gateway {
+  Future<Map<String, dynamic>> promoteConvertToStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
 abstract interface class ImportRpcGateway implements Gateway {
   Future<Map<String, dynamic>> importRow(
     String operationId,
@@ -68,7 +75,11 @@ abstract interface class ImportRpcGateway implements Gateway {
 }
 
 class SupabaseGateway
-    implements ReadRpcGateway, ImportRpcGateway, MinistryCommandGateway {
+    implements
+        ReadRpcGateway,
+        ImportRpcGateway,
+        MinistryCommandGateway,
+        HandoffCommandGateway {
   SupabaseGateway(
     this.client,
     this.boundary, {
@@ -193,6 +204,20 @@ class SupabaseGateway
       'ministry_get_enrollment_progress': {'congregation_id', 'enrollment_id'},
       'ministry_get_overview': {'congregation_id'},
       'ministry_list_pending_sessions': {'congregation_id', 'limit', 'cursor'},
+      'ministry_list_convert_referrals': {'congregation_id', 'limit', 'cursor'},
+      'ministry_list_convert_student_candidates': {
+        'congregation_id',
+        'name_prefix',
+        'limit',
+        'cursor',
+      },
+      'ministry_list_students': {
+        'congregation_id',
+        'name_prefix',
+        'limit',
+        'cursor',
+      },
+      'ministry_list_classes': {'congregation_id', 'status', 'limit', 'cursor'},
     };
     final ministryKeys = ministryReadParameters[rpc];
     final ministryRead = ministryKeys != null;
@@ -466,6 +491,45 @@ class SupabaseGateway
             (value['attendance_count'] as int) < 0)) {
       throw const DataFailure('invalid_response');
     }
+    return Map<String, dynamic>.unmodifiable(value);
+  }
+
+  @override
+  Future<Map<String, dynamic>> promoteConvertToStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    const required = {'convert_id', 'congregation_id', 'student_id'};
+    if (payload.keys.toSet().difference(required).isNotEmpty ||
+        !payload.keys.toSet().containsAll(required)) {
+      throw const DataFailure('invalid');
+    }
+    validateUuid(payload['convert_id']);
+    validateUuid(payload['congregation_id']);
+    if (payload['student_id'] != null) validateUuid(payload['student_id']);
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final token = context;
+    final value = await _run(
+      token,
+      () => client
+          .rpc(
+            'ieadpe_promote_convert_to_student',
+            params: {'operation_id': operationId, 'payload': frozen},
+          )
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    const expected = {'convert_id', 'student_id', 'congregation_id', 'status'};
+    if (value is! Map<String, dynamic> ||
+        value.keys.toSet().difference(expected).isNotEmpty ||
+        !value.keys.toSet().containsAll(expected) ||
+        value['convert_id'] != payload['convert_id'] ||
+        value['congregation_id'] != payload['congregation_id'] ||
+        value['student_id'] is! String ||
+        value['status'] != 'linked') {
+      throw const DataFailure('invalid_response');
+    }
+    validateUuid(value['student_id']);
     return Map<String, dynamic>.unmodifiable(value);
   }
 
