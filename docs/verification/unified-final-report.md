@@ -31,7 +31,7 @@ No command in this run had state `FAIL`. The generated gate result is `INCOMPLET
 ## Release checks still open
 
 - Supabase CLI, Docker and a local Auth/Storage stack were unavailable. Auth and Storage HTTP health are therefore `BLOCKED`; the workflow provisions local Supabase services in CI, but that hosted CI run has not been executed here.
-- A runnable integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance browser test is absent. The root workflow widget test uses an in-process synthetic HTTP server and does not prove real browser behavior, hosted service behavior, or the browser-specific authorization path.
+- A runnable integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance browser test is absent. A `flutter drive` attempt with Chrome 155/ChromeDriver 155 did not complete: the Chrome-device attempt returned `SessionNotCreatedException: chrome not reachable`; the web-server attempt served the test app but never completed the WebDriver journey, and the fixture recorded no requests. The root workflow widget test uses an in-process synthetic HTTP server and does not prove real browser behavior, hosted service behavior, or the browser-specific authorization path.
 - Firefox/WebKit, actual OS/browser file chooser behavior, Android install/OAuth/resume/signing, hosted deep-link/OAuth checks, and human accessibility/visual review remain incomplete.
 - Production backup/restore, operational capacity review, and any real Firebase/Base44 export/import or cutover were not performed.
 
