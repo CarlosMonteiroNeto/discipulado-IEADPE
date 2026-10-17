@@ -46,12 +46,12 @@
       "id": 3,
       "title": "Run integrated browser, accessibility and operations review",
       "status": "incomplete_release_evidence",
-      "summary": "Demonstrate registrar-to-attendance with denied paths and record release-only prerequisites honestly.",
+      "summary": "Exercise the local root workflow through synthetic HTTP and record the still-open real-browser, denied-path and release-only prerequisites honestly.",
       "spec_refs": ["verification-test", "quality-gate", "a11y-ethics", "apple-design", "cloud-deploy"],
       "touches": ["integration_test/unified_journey_test.dart", "docs/verification/unified-final-report.md", "docs/operations/unified-release.md"],
       "depends_on": [1, 2],
       "acceptance": [
-        "End-to-end synthetic path covers registrar create, authorized conversion follow-up, explicit student link, class enrollment, finalized attendance and progress; forged cross-scope read/write and revocation are denied server-side.",
+        "The root workflow widget regression covers registrar create, authorized conversion follow-up, explicit student link, class enrollment, roster and finalized attendance through a synthetic loopback HTTP fixture. This does not satisfy the Chromium browser acceptance. Forged cross-scope read/write and revocation are separately denied server-side by SQL scenarios.",
         "Record Chromium end-to-end and Firefox/WebKit smoke versions or incomplete markers; inspect 360/768/1440, 200% text, keyboard, screen reader, reduced motion and contrast with severity-ranked findings.",
         "Release runbook covers Supabase/static-host IAM, encryption, monitoring/Free-tier budget, database plus Storage backup and restore, hosted deep links, OAuth/Storage HTTP and Android device/signing checks.",
         "Whole-product review and actual gate outputs have no unclassified failures; incomplete live release checks remain explicitly incomplete."

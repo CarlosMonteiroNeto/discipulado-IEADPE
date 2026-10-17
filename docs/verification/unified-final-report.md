@@ -1,6 +1,6 @@
 # Unified App Verification — Final Local Run
 
-**Result: INCOMPLETE for release; no local gate failures.** The implementation and synthetic local checks passed. Release approval remains blocked by unavailable local Supabase Auth/Storage services and an integrated browser journey that has not yet been implemented. Device and human accessibility/visual reviews also remain unperformed.
+**Result: INCOMPLETE for release; no local gate failures.** The implementation and synthetic local checks passed. Release approval remains blocked by unavailable local Supabase Auth/Storage services and the missing real Chromium browser journey. Device and human accessibility/visual reviews also remain unperformed.
 
 ## Run identity
 
@@ -24,12 +24,14 @@
 | Browser adapter smokes | PASS | Chrome locale and export-protocol fixtures; no real file chooser was exercised. |
 | Static route/asset fixture | PASS | Five local host rewrite tests. |
 
+After the full gate above, the new root workflow regression was also verified independently: all 8 tests in `test/workflows_test.dart` pass, including a stateful loopback HTTP journey from the production registration form through scoped referral lookup, repository promotion, separate enrollment, session roster, and finalized attendance. `flutter analyze --no-pub` reports no issues. This synthetic widget/HTTP test proves cross-route identity continuity; it does not execute Chromium or replace the browser journey acceptance below.
+
 No command in this run had state `FAIL`. The generated gate result is `INCOMPLETE` (exit 2), not green.
 
 ## Release checks still open
 
 - Supabase CLI, Docker and a local Auth/Storage stack were unavailable. Auth and Storage HTTP health are therefore `BLOCKED`; the workflow provisions local Supabase services in CI, but that hosted CI run has not been executed here.
-- A runnable integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance browser test is absent. Existing widget/SQL tests cover constituent behavior, not this complete HTTP browser journey.
+- A runnable integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance browser test is absent. The root workflow widget test uses an in-process synthetic HTTP server and does not prove real browser behavior, hosted service behavior, or the browser-specific authorization path.
 - Firefox/WebKit, actual OS/browser file chooser behavior, Android install/OAuth/resume/signing, hosted deep-link/OAuth checks, and human accessibility/visual review remain incomplete.
 - Production backup/restore, operational capacity review, and any real Firebase/Base44 export/import or cutover were not performed.
 
