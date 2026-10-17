@@ -37,6 +37,7 @@ DO $$ DECLARE page jsonb; next_page jsonb; BEGIN
  BEGIN PERFORM public.ieadpe_ministry_list_classes('{"congregation_id":"92000000-0000-0000-0000-000000000002","status":null,"limit":10,"cursor":null}'::jsonb); RAISE EXCEPTION 'ASSERTION: cross-scope class read accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN PERFORM public.ieadpe_ministry_list_classes('{"congregation_id":"92000000-0000-0000-0000-000000000001","status":"unknown","limit":10,"cursor":null}'::jsonb); RAISE EXCEPTION 'ASSERTION: unknown class status accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM public.ieadpe_ministry_list_students('{"congregation_id":"92000000-0000-0000-0000-000000000001","name_prefix":null,"limit":101,"cursor":null}'::jsonb); RAISE EXCEPTION 'ASSERTION: oversized student page accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ BEGIN PERFORM public.ieadpe_ministry_list_students('{"congregation_id":"92000000-0000-0000-0000-000000000001","name_prefix":null,"limit":0,"cursor":null}'::jsonb); RAISE EXCEPTION 'ASSERTION: zero-sized student page accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM count(*) FROM public.ministry_students; RAISE EXCEPTION 'ASSERTION: direct student read accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
