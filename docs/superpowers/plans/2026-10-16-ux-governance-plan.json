@@ -1,0 +1,71 @@
+{
+  "feature": "UX governance for Discipulado IEADPE web app",
+  "spec_doc": "docs/superpowers/specs/2026-10-16-ux-governance-design.md",
+  "global_constraints": [
+    "User-facing copy uses pt-BR; identifiers, code, specifications, and technical documentation use English.",
+    "Design tokens are defined exactly once in lib/ui/app_theme.dart. Feature tasks consume primitives and never re-theme controls.",
+    "Body text is at least 16 logical pixels with a consistent 4/8 spacing scale and 44x44 minimum touch targets.",
+    "Text contrast is at least 4.5 to 1 and control boundary and focus indication at least 3 to 1 in light and dark modes.",
+    "Each touches entry is an exact path exclusively owned by that task. Tasks with overlapping touches never share a wave.",
+    "No expected_red field. No offline write queue, no persistent sensitive browser cache, no false success messages.",
+    "Do not deploy, push, import legacy data, or send messages. No legal-compliance claim."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Audit theme tokens and shared primitives",
+      "summary": "Consolidate the visual language into theme tokens and responsive primitives. Sole owner of the listed lib/ui files in this plan.",
+      "spec_refs": ["apple-design", "design-oo-ux"],
+      "touches": [
+        "lib/ui/app_theme.dart",
+        "lib/ui/responsive_scaffold.dart",
+        "lib/ui/async_content.dart",
+        "lib/ui/form_fields.dart",
+        "lib/ui/feedback.dart",
+        "lib/ui/confirmation_dialog.dart"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "Primary #002060, secondary #00A3E0, and accent #E31B23 ship in light and dark surfaces with measured contrast proof for every semantic text and focus token in both modes.",
+        "Layouts reflow at 360, 768, and 1440 widths with 200 percent text scaling and no page-wide horizontal scroll; tables scroll only inside a labeled region when content cannot reflow.",
+        "AsyncContent distinguishes loading, empty dataset, empty search, error with retry, forbidden, and not-found; forms focus the first invalid field and announce outcomes.",
+        "Reduced-motion removes positional animation and overshoot; translucent chrome has an opaque fallback. No feature file outside touches is modified."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Apply accessible scoped navigation and lists",
+      "summary": "Wire routes, scope handling, and feature lists through the audited primitives. Sole owner of the router and listed feature pages in this plan.",
+      "spec_refs": ["design-oo-ux", "a11y-ethics"],
+      "touches": [
+        "lib/app/router.dart",
+        "lib/features/team/team_page.dart",
+        "lib/features/students/students_page.dart",
+        "lib/features/classes/classes_page.dart",
+        "lib/features/attendance/attendance_page.dart",
+        "lib/features/overview/overview_page.dart"
+      ],
+      "depends_on": [1],
+      "acceptance": [
+        "Deep links, hard refresh, and back and forward restore validated scope, search text, and filters; pagination cursor stays session-local and resets on reload or scope change.",
+        "Every action works by keyboard with visible focus, dialog focus trap, Escape cancel, and focus restoration; attendance exposes Presente, Ausente, Justificado, and Nao marcado as text plus semantics, never color alone.",
+        "WhatsApp links use normalized digits only with an accessible copy-phone fallback and a labeled disabled state when no phone exists; no religious or student data is prefilled.",
+        "No lib/ui token file from task 1 is modified in this task."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Record privacy andWays of working governance",
+      "summary": "Publish LGPD handling notes, the accessibility sheet, and the agile backlog contract. Sole owner of the governance docs in this plan.",
+      "spec_refs": ["a11y-ethics", "agile-loop"],
+      "touches": ["docs/lgpd-notes.md", "docs/accessibility-sheet.md", "docs/backlog-contract.md"],
+      "depends_on": [2],
+      "acceptance": [
+        "docs/lgpd-notes.md states data minimization, no PII in logs, URLs, or analytics, noindex metadata, authenticated-only access, and that retention and backup belong to deployment administration with no invented schedule.",
+        "docs/accessibility-sheet.md records the manual matrix of widths, text scaling, keyboard-only flow, screen-reader names and outcomes, reduced motion, and contrast readings.",
+        "docs/backlog-contract.md defines INVEST slicing, DoR versus DoD, and plan.json wave ordering by depends_on with exclusive touches per task.",
+        "No code file from tasks 1-2 is modified in this task."
+      ]
+    }
+  ]
+}
