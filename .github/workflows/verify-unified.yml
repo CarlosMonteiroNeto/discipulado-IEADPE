@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:17
@@ -36,6 +36,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify runner Chrome and ChromeDriver
+        run: |
+          set -euo pipefail
+          test -n "${CHROMEWEBDRIVER:-}"
+          driver="$CHROMEWEBDRIVER/chromedriver"
+          test -x "$driver"
+          echo "$CHROMEWEBDRIVER" >> "$GITHUB_PATH"
+          chrome_major="$(google-chrome --version | sed -E 's/.* ([0-9]+)\..*/\1/')"
+          driver_major="$("$driver" --version | sed -E 's/.*ChromeDriver ([0-9]+)\..*/\1/')"
+          test "$chrome_major" = "$driver_major"
+          echo "Chrome/ChromeDriver major version $chrome_major is compatible."
       - uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -43,12 +54,20 @@ jobs:
         run: flutter pub get
       - name: Start local Supabase services
         run: |
-          supabase start --exclude studio,edge-runtime,logflare,vector,imgproxy,supavisor
-          eval "$(supabase status --output env)"
-          {
-            printf 'SUPABASE_URL=%s\n' "$API_URL"
-            printf 'SUPABASE_ANON_KEY=%s\n' "$ANON_KEY"
-          } >> "$GITHUB_ENV"
+          set -euo pipefail
+          supabase start --exclude studio,edge-runtime,logflare,vector,imgproxy,supavisor 2>&1 | python3 scripts/redact_supabase_start.py
+          supabase status --output json | python3 -c '
+          import json, os, sys
+          status = json.load(sys.stdin)
+          api_url = status.get("API_URL")
+          anon_key = status.get("ANON_KEY")
+          if not isinstance(api_url, str) or not api_url or "\n" in api_url or "\r" in api_url:
+              raise SystemExit("local Supabase status has no safe API_URL")
+          if not isinstance(anon_key, str) or not anon_key or "\n" in anon_key or "\r" in anon_key:
+              raise SystemExit("local Supabase status has no safe ANON_KEY")
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
+              env_file.write(f"SUPABASE_URL={api_url}\nSUPABASE_ANON_KEY={anon_key}\n")
+          '
       - name: Run the unified gate
         run: bash scripts/verify_unified.sh
       - name: Publish verification report

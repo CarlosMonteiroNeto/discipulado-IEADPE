@@ -9,11 +9,13 @@ try {
     $transcript = Join-Path $reportDir 'unified-commands.log'
     "Unified verification started $(Get-Date -Format o)" | Set-Content $transcript
 
-    function Invoke-Gate([string]$Name, [string]$File, [string[]]$Arguments, [bool]$Required = $true) {
+    function Invoke-Gate([string]$Name, [string]$File, [string[]]$Arguments, [bool]$Required = $true, [bool]$JourneyExitMapping = $false) {
+        $command = "$File $($Arguments -join ' ')"
+        if ($env:SUPABASE_ANON_KEY) { $command = $command.Replace($env:SUPABASE_ANON_KEY, '[redacted]') }
         $resolved = Get-Command $File -ErrorAction SilentlyContinue
         if (-not $resolved) {
             $state = if ($Required) { 'BLOCKED' } else { 'INCOMPLETE' }
-            $results.Add([pscustomobject]@{ Name=$Name; State=$state; Exit='n/a'; Command="$File $($Arguments -join ' ')"; Detail='executable unavailable' })
+            $results.Add([pscustomobject]@{ Name=$Name; State=$state; Exit='n/a'; Command=$command; Detail='executable unavailable' })
             Add-Content $transcript "$state [$Name] executable unavailable: $File"
             return
         }
@@ -31,9 +33,16 @@ try {
             $ErrorActionPreference = $previousErrorActionPreference
         }
         if ($null -eq $code) { $code = 0 }
-        $state = if ($code -eq 0) { 'PASS' } else { 'FAIL' }
-        $results.Add([pscustomobject]@{ Name=$Name; State=$state; Exit=$code; Command=$command; Detail='' })
+        $state = if ($code -eq 0) { 'PASS' } elseif ($JourneyExitMapping -and $code -eq 2) { 'BLOCKED' } else { 'FAIL' }
+        $detail = if ($JourneyExitMapping -and $code -eq 2) { 'local browser journey prerequisites are unavailable or unsafe' } else { '' }
+        $results.Add([pscustomobject]@{ Name=$Name; State=$state; Exit=$code; Command=$command; Detail=$detail })
         Add-Content $transcript "[$Name] exit=$code"
+    }
+
+    function Add-BlockedHealthChecks([string]$Detail) {
+        $results.Add([pscustomobject]@{ Name='Auth HTTP health'; State='BLOCKED'; Exit='n/a'; Command='GET SUPABASE_URL/auth/v1/health'; Detail=$Detail })
+        $results.Add([pscustomobject]@{ Name='Storage HTTP health'; State='BLOCKED'; Exit='n/a'; Command='GET SUPABASE_URL/storage/v1/status'; Detail=$Detail })
+        Add-Content $transcript "BLOCKED [Auth/Storage HTTP health] $Detail"
     }
 
     $psqlTool = 'psql'
@@ -60,11 +69,25 @@ try {
     }
 
     if (-not $env:SUPABASE_URL -or -not $env:SUPABASE_ANON_KEY) {
-        $results.Add([pscustomobject]@{ Name='Auth HTTP health'; State='BLOCKED'; Exit='n/a'; Command='GET SUPABASE_URL/auth/v1/health'; Detail='SUPABASE_URL or SUPABASE_ANON_KEY is unset' })
-        $results.Add([pscustomobject]@{ Name='Storage HTTP health'; State='BLOCKED'; Exit='n/a'; Command='GET SUPABASE_URL/storage/v1/status'; Detail='SUPABASE_URL or SUPABASE_ANON_KEY is unset' })
+        Add-BlockedHealthChecks 'SUPABASE_URL or SUPABASE_ANON_KEY is unset'
     } else {
-        Invoke-Gate 'Auth HTTP health' 'curl.exe' @('-fsS',"$($env:SUPABASE_URL.TrimEnd('/'))/auth/v1/health",'-H',"apikey: $($env:SUPABASE_ANON_KEY)")
-        Invoke-Gate 'Storage HTTP health' 'curl.exe' @('-fsS',"$($env:SUPABASE_URL.TrimEnd('/'))/storage/v1/status",'-H',"apikey: $($env:SUPABASE_ANON_KEY)")
+        $python = Get-Command python -ErrorAction SilentlyContinue
+        if (-not $python) {
+            Add-BlockedHealthChecks 'Python is unavailable to validate the local Supabase URL'
+        } else {
+            $guard = "import sys; sys.path.insert(0, 'scripts'); from local_supabase_guard import require_loopback_url; require_loopback_url(sys.argv[1])"
+            try {
+                & $python.Source -c $guard $env:SUPABASE_URL 1>$null 2>$null
+                $guardExit = $LASTEXITCODE
+            } catch { $guardExit = 1 }
+            if ($guardExit -ne 0) {
+                Add-BlockedHealthChecks 'SUPABASE_URL rejected: Auth and Storage probes require a loopback URL'
+            } else {
+                $healthBase = $env:SUPABASE_URL.TrimEnd('/')
+                Invoke-Gate 'Auth HTTP health' 'curl.exe' @('-q','--noproxy','*','-fsS','-o','NUL',"$healthBase/auth/v1/health",'-H',"apikey: $($env:SUPABASE_ANON_KEY)")
+                Invoke-Gate 'Storage HTTP health' 'curl.exe' @('-q','--noproxy','*','-fsS','-o','NUL',"$healthBase/storage/v1/status",'-H',"apikey: $($env:SUPABASE_ANON_KEY)")
+            }
+        }
     }
 
     $chrome = if ($env:CHROME_EXECUTABLE) { $env:CHROME_EXECUTABLE } elseif (Test-Path 'C:\Program Files\Google\Chrome\Application\chrome.exe') { 'C:\Program Files\Google\Chrome\Application\chrome.exe' } else { 'chrome' }
@@ -82,15 +105,13 @@ try {
     }
     Invoke-Gate 'Local routes and asset rewrite fixture' 'python' @('-m','unittest','discover','-s','scripts','-p','test_release_operations.py')
 
+    Invoke-Gate 'Integrated registrar-to-attendance browser journey' 'python' @('scripts/run_unified_journey.py') $true $true
     $failed = @($results | Where-Object State -eq 'FAIL').Count
-    $blocked = @($results | Where-Object State -in @('BLOCKED','INCOMPLETE')).Count
-    # The integrated journey is Task 3 release evidence and has no runnable driver yet.
-    $results.Add([pscustomobject]@{ Name='Integrated registrar-to-attendance browser journey'; State='INCOMPLETE'; Exit='n/a'; Command='integration_test/unified_journey_test.dart'; Detail='owned by Task 3; no runnable integrated driver exists' })
     $blocked = @($results | Where-Object State -in @('BLOCKED','INCOMPLETE')).Count
     $overall = if ($failed) { 'FAIL' } elseif ($blocked) { 'INCOMPLETE' } else { 'PASS' }
     $lines = @('# Unified verification report','',"- Overall: **$overall**","- Started: $(Get-Date -Format o)","- Branch: $(& git branch --show-current)","- Environment: $([System.Runtime.InteropServices.RuntimeInformation]::OSDescription)","- Command log: ``build/verification/unified-commands.log``",'', '| Gate | State | Exit | Command | Detail |','|---|---|---:|---|---|')
     foreach ($result in $results) { $lines += "| $($result.Name) | $($result.State) | $($result.Exit) | ``$($result.Command -replace '\|','/')`` | $($result.Detail) |" }
-    $lines += ''; $lines += 'The SQL fixture models Auth/Storage tables; the HTTP checks above only verify service health. No integrated registrar-to-attendance browser journey exists in this worktree and it remains a release prerequisite.'
+    $lines += ''; $lines += 'The SQL fixture models Auth/Storage tables; the HTTP checks above only verify service health. The integrated journey runs only against the local Supabase stack and records missing local prerequisites as BLOCKED.'
     $lines | Set-Content -Encoding utf8 $reportPath
     Get-Content $reportPath
     if ($overall -eq 'FAIL') { exit 1 }

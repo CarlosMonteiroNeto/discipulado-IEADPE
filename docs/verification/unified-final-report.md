@@ -1,10 +1,19 @@
 # Unified App Verification — Final Local Run
 
-**Result: INCOMPLETE for release; no local gate failures.** The implementation and synthetic local checks passed. Release approval remains blocked by unavailable local Supabase Auth/Storage services and the missing real Chromium browser journey. Device and human accessibility/visual reviews also remain unperformed.
+**Current result: INCOMPLETE for release.** The integrated Chromium journey and fail-closed gate are now implemented. The latest local attempt returned `UNIFIED_JOURNEY=BLOCKED` (exit 2) because the local Supabase API at `127.0.0.1:54321` was unavailable; no hosted Supabase endpoint was used. Device and human accessibility/visual reviews also remain unperformed.
+
+## Latest focused validation — 2026-10-18
+
+- The shared browser journey runner returned `UNIFIED_JOURNEY=BLOCKED` with exact child exit code 2. Its bounded preflight found the local API port 54321 closed; local PostgreSQL port 54329 was listening. It did not proceed to create fixture users/data or run the browser journey.
+- The shell contract suite passed in Bash and PowerShell: remote `SUPABASE_URL` values caused zero curl calls; runner exit 1 mapped to `FAIL`; exit 2 mapped to `BLOCKED` and overall `INCOMPLETE`.
+- Gate and CI changes were inspected to ensure local URL validation runs before HTTP probes, probe response bodies are discarded, and CI exports only local `API_URL` plus `ANON_KEY` to the gate process.
+- Docker's local Supabase services were unavailable. No Supabase HTTP/SQL request was made to the hosted project, and no real data was read or changed.
+
+The 2026-10-17 full local run below is retained as historical evidence; it predates the integrated Chromium runner and current gate contract tests.
 
 ## Run identity
 
-- Date: 2026-10-17
+- Date: 2026-10-17 (historical run)
 - Branch: `implementation/supabase-free`
 - Worktree: `App discipulado`
 - Environment: Windows 10.0.19045; Flutter 3.47.2; Dart 3.13.2; PostgreSQL 17.11; Chrome 155.0.8059.80
@@ -18,7 +27,7 @@
 | Static analysis | PASS | `flutter analyze`; no issues. |
 | Flutter tests | PASS | 296 tests passed. |
 | Web build and static preflight | PASS | `flutter build web`; routes/assets/size fixture passed. |
-| Database migrations and security scenarios | PASS | All 15 named SQL scenarios, including ministry directory authorization, applied all 18 migrations in disposable local PostgreSQL. |
+| Database migrations and security scenarios | PASS | All 15 named SQL scenarios, including ministry directory authorization, applied the checked-in migrations in disposable local PostgreSQL. |
 | Synthetic migration rehearsal | PASS | Four tests; repeatable IDs/counts and review handling. No live data was accessed. |
 | Independent-session concurrency | PASS | Eight race suites: catalog, access, convert, convert-student, import, lifecycle, ministry registry and academic attendance. |
 | Browser adapter smokes | PASS | Chrome locale and export-protocol fixtures; no real file chooser was exercised. |
@@ -30,8 +39,8 @@ No command in this run had state `FAIL`. The generated gate result is `INCOMPLET
 
 ## Release checks still open
 
-- Supabase CLI, Docker and a local Auth/Storage stack were unavailable. Auth and Storage HTTP health are therefore `BLOCKED`; the workflow provisions local Supabase services in CI, but that hosted CI run has not been executed here.
-- A runnable integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance browser test is absent. A `flutter drive` attempt with Chrome 155/ChromeDriver 155 did not complete: the Chrome-device attempt returned `SessionNotCreatedException: chrome not reachable`; the web-server attempt served the test app but never completed the WebDriver journey, and the fixture recorded no requests. The root workflow widget test uses an in-process synthetic HTTP server and does not prove real browser behavior, hosted service behavior, or the browser-specific authorization path.
+- Local Supabase Auth/Storage HTTP health and the integrated Chromium registrar → convert follow-up → student link → enrollment → finalized attendance journey remain unexecuted because the local API service is unavailable. The runner and test now exist, but this report does not claim the journey passed.
+- Earlier `flutter drive` experiments with Chrome 155/ChromeDriver 155 did not complete: the Chrome-device attempt returned `SessionNotCreatedException: chrome not reachable`; the web-server attempt served the test app but never completed the WebDriver journey, and the fixture recorded no requests. These experiments did not use the current runner and are retained only as historical diagnostics.
 - Firefox/WebKit, actual OS/browser file chooser behavior, Android install/OAuth/resume/signing, hosted deep-link/OAuth checks, and human accessibility/visual review remain incomplete.
 - Production backup/restore, operational capacity review, and any real Firebase/Base44 export/import or cutover were not performed.
 

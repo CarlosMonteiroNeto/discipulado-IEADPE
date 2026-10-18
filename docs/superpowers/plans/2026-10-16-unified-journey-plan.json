@@ -1,6 +1,6 @@
 {
   "feature": "One Flutter journey from convert registration to classroom attendance",
-  "execution_status": "local app composition implemented; integrated browser journey absent; human accessibility and hosted-browser evidence remain release work",
+  "execution_status": "local app composition and integrated Chromium journey implemented; local Supabase execution is blocked; human accessibility and hosted-browser evidence remain release work",
   "evidence": ["docs/integration/handoff-contract.md", "docs/integration/handoff-sequence.md", "test/features/ministry/ui/ministry_journey_test.dart", "test/widgets/unified_navigation_test.dart", "test/workflows_test.dart"],
   "spec_doc": "docs/superpowers/specs/2026-10-16-unified-journey-design.md",
   "baseline": "completed convert app plus ministry Supabase port",

@@ -29,6 +29,37 @@ run_gate() {
   printf '[%s] exit=%s\n' "$name" "$code" | tee -a "$LOG"
 }
 
+run_journey() {
+  local name='Integrated registrar-to-attendance browser journey'
+  local python_tool
+  python_tool="$(command -v python3 || command -v python || true)"
+  if [[ -z "$python_tool" ]]; then
+    RESULTS+=("$name|BLOCKED|n/a|python scripts/run_unified_journey.py|Python executable unavailable")
+    printf 'BLOCKED [%s] Python executable unavailable\n' "$name" >> "$LOG"
+    return
+  fi
+  local cmd="$python_tool scripts/run_unified_journey.py"
+  printf '\n[%s] %s\n' "$name" "$cmd" | tee -a "$LOG"
+  "$python_tool" scripts/run_unified_journey.py 2>&1 | tee -a "$LOG"
+  local code=${PIPESTATUS[0]}
+  local state=PASS; local detail=''
+  if (( code == 2 )); then
+    state=BLOCKED
+    detail='local browser journey prerequisites are unavailable or unsafe'
+  elif (( code != 0 )); then
+    state=FAIL
+  fi
+  RESULTS+=("$name|$state|$code|$cmd|$detail")
+  printf '[%s] exit=%s state=%s\n' "$name" "$code" "$state" | tee -a "$LOG"
+}
+
+block_health_probes() {
+  local detail="$1"
+  RESULTS+=("Auth HTTP health|BLOCKED|n/a|GET SUPABASE_URL/auth/v1/health|$detail")
+  RESULTS+=("Storage HTTP health|BLOCKED|n/a|GET SUPABASE_URL/storage/v1/status|$detail")
+  printf 'BLOCKED [Auth/Storage HTTP health] %s\n' "$detail" >> "$LOG"
+}
+
 run_gate 'Flutter version' optional flutter --version
 run_gate 'Dart version' optional dart --version
 run_gate 'Python version' optional python3 --version
@@ -50,11 +81,17 @@ for race in catalog access convert convert-student import lifecycle ministry-reg
 done
 
 if [[ -z "${SUPABASE_URL:-}" || -z "${SUPABASE_ANON_KEY:-}" ]]; then
-  RESULTS+=('Auth HTTP health|BLOCKED|n/a|GET SUPABASE_URL/auth/v1/health|SUPABASE_URL or SUPABASE_ANON_KEY is unset')
-  RESULTS+=('Storage HTTP health|BLOCKED|n/a|GET SUPABASE_URL/storage/v1/status|SUPABASE_URL or SUPABASE_ANON_KEY is unset')
+  block_health_probes 'SUPABASE_URL or SUPABASE_ANON_KEY is unset'
 else
-  run_gate 'Auth HTTP health' curl -fsS "${SUPABASE_URL%/}/auth/v1/health" -H "apikey: $SUPABASE_ANON_KEY"
-  run_gate 'Storage HTTP health' curl -fsS "${SUPABASE_URL%/}/storage/v1/status" -H "apikey: $SUPABASE_ANON_KEY"
+  guard_python="$(command -v python3 || command -v python || true)"
+  if [[ -z "$guard_python" ]]; then
+    block_health_probes 'Python is unavailable to validate the local Supabase URL'
+  elif ! "$guard_python" -c "import sys; sys.path.insert(0, 'scripts'); from local_supabase_guard import require_loopback_url; require_loopback_url(sys.argv[1])" "$SUPABASE_URL" >/dev/null 2>&1; then
+    block_health_probes 'SUPABASE_URL rejected: Auth and Storage probes require a loopback URL'
+  else
+    run_gate 'Auth HTTP health' curl -q --noproxy '*' -fsS -o /dev/null "${SUPABASE_URL%/}/auth/v1/health" -H "apikey: $SUPABASE_ANON_KEY"
+    run_gate 'Storage HTTP health' curl -q --noproxy '*' -fsS -o /dev/null "${SUPABASE_URL%/}/storage/v1/status" -H "apikey: $SUPABASE_ANON_KEY"
+  fi
 fi
 
 chrome="${CHROME_EXECUTABLE:-}"
@@ -68,7 +105,7 @@ else
   run_gate 'Browser file export smoke' python3 test/platform/run_export_browser.py
 fi
 run_gate 'Local routes and asset rewrite fixture' python3 -m unittest discover -s scripts -p test_release_operations.py
-RESULTS+=('Integrated registrar-to-attendance browser journey|INCOMPLETE|n/a|integration_test/unified_journey_test.dart|owned by Task 3; no runnable integrated driver exists')
+run_journey
 
 failed=0; blocked=0
 for item in "${RESULTS[@]}"; do
@@ -82,7 +119,7 @@ overall=PASS
 {
   printf '# Unified verification report\n\n- Overall: **%s**\n- Started: %s\n- Branch: %s\n- Environment: %s\n- Command log: `build/verification/unified-commands.log`\n\n| Gate | State | Exit | Command | Detail |\n|---|---|---:|---|---|\n' "$overall" "$(date --iso-8601=seconds 2>/dev/null || date -u)" "$(git branch --show-current)" "$(uname -a)"
   for item in "${RESULTS[@]}"; do IFS='|' read -r name state code cmd detail <<< "$item"; printf '| %s | %s | %s | `%s` | %s |\n' "$name" "$state" "$code" "${cmd//|//}" "$detail"; done
-  printf '\nThe SQL fixture models Auth/Storage tables; the HTTP checks above only verify service health. No integrated registrar-to-attendance browser journey exists in this worktree and it remains a release prerequisite.\n'
+  printf '\nThe SQL fixture models Auth/Storage tables; the HTTP checks above only verify service health. The integrated journey runs only against the local Supabase stack and records missing local prerequisites as BLOCKED.\n'
 } > "$REPORT"
 cat "$REPORT"
 if (( failed > 0 )); then exit 1; fi

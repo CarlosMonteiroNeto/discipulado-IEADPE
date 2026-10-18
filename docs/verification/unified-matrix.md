@@ -1,6 +1,6 @@
 # Unified verification matrix
 
-This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `scripts/verify_unified.sh` on macOS/Linux) and CI job (`.github/workflows/verify-unified.yml`). Both invoke the same Flutter, PostgreSQL harness, exact SQL inventory, concurrency checks, local HTTP health probes, and existing browser smoke programs. Each invocation writes `build/verification/unified-report.md` and `build/verification/unified-commands.log`.
+This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `scripts/verify_unified.sh` on macOS/Linux) and CI job (`.github/workflows/verify-unified.yml`). Both invoke the same Flutter, PostgreSQL harness, SQL scenarios, concurrency checks, guarded local HTTP health probes, browser adapter smokes, and `scripts/run_unified_journey.py`. Each invocation writes `build/verification/unified-report.md` and `build/verification/unified-commands.log`.
 
 ## Result contract
 
@@ -8,10 +8,10 @@ This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `sc
 |---|---|---|
 | PASS | Command ran and returned zero. | Can contribute to a green run. |
 | FAIL | Command ran and returned nonzero. | Blocking; process exits 1. |
-| BLOCKED | A required executable, local service, database, or browser prerequisite was absent. | Overall **INCOMPLETE**; process exits 2. |
+| BLOCKED | A required executable, local service, database, or browser prerequisite was absent; the integrated runner also returns exit 2 for this state. | Overall **INCOMPLETE**; process exits 2. |
 | INCOMPLETE | An optional tool/version probe was unavailable. | Overall **INCOMPLETE**; process exits 2. |
 
-The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local Supabase stack. Locally, the operator must start those services and export `IEADPE_DATABASE_URL`, `SUPABASE_URL`, and `SUPABASE_ANON_KEY`; the SQL harness itself rejects non-loopback database hosts. No cloud endpoint, production account, migration, or record is targeted. Missing local service prerequisites never become a successful release check.
+The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local Supabase stack. Locally, the operator must start those services and set `IEADPE_DATABASE_URL` to a loopback database. `SUPABASE_URL` and `SUPABASE_ANON_KEY` are not required to launch the scripts; if unset, the separate health probes are recorded as `BLOCKED`, so the overall result remains **INCOMPLETE**. When set, the shared Python guard accepts only localhost or a literal loopback address before either probe. The integrated runner reads API and database credentials from local `supabase status`, never from hosted environment fallbacks. CI exports only its local API URL and anon key to the gate process. No cloud endpoint, production account, migration, or record is targeted. Missing local service prerequisites never become a successful release check.
 
 ## Executed command inventory
 
@@ -21,17 +21,18 @@ The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local S
 | Unit/widget tests | `flutter test` | SQA | Exit code and test counts/output in command log. |
 | Web artifact | `flutter build web` | SQA | Exit code and build output in command log. |
 | Static artifact routing/size | `python scripts/web_preflight.py build/web` | SQA | Exact routes, symlinks, file size/count checks. |
-| Database scenarios | `python scripts/test_database.py <scenario>` for every SQL file below | SQA | Every invocation creates a uniquely named disposable loopback database, loads `local_auth_storage.sql` and **all 18 migrations in lexical order**, runs one exact SQL file, then drops the database. |
+| Database scenarios | `python scripts/test_database.py <scenario>` for every SQL file below | SQA | Every invocation creates a uniquely named disposable loopback database, loads `local_auth_storage.sql` and **all checked-in migration files in lexical order**, runs one exact SQL file, then drops the database. |
 | Synthetic migration rehearsal | `python -m unittest discover -s test/migration -p '*_test.py'` | SQA | Deterministic synthetic source rows only; no live export/import. |
-| Auth HTTP health | `GET $SUPABASE_URL/auth/v1/health` with local anon API key | SQA prerequisite | Service health only; this does not prove sign-in, grants, or policy enforcement through HTTP. |
-| Storage HTTP health | `GET $SUPABASE_URL/storage/v1/status` with local anon API key | SQA prerequisite | Service health only; SQL RLS fixtures are not an HTTP Storage emulator. |
+| Auth HTTP health | `GET $SUPABASE_URL/auth/v1/health` with local anon API key after `require_loopback_url` | SQA prerequisite | Unsafe or unset URLs are `BLOCKED` before curl runs; response bodies are discarded. Service health only; this does not prove sign-in, grants, or policy enforcement through HTTP. |
+| Storage HTTP health | `GET $SUPABASE_URL/storage/v1/status` with local anon API key after `require_loopback_url` | SQA prerequisite | Unsafe or unset URLs are `BLOCKED` before curl runs; response bodies are discarded. Service health only; SQL RLS fixtures are not an HTTP Storage emulator. |
+| Integrated Chromium journey | `python scripts/run_unified_journey.py` | SQA | Exit 0 is PASS, exit 1 is FAIL, and exit 2 is BLOCKED; blocked execution makes the overall gate INCOMPLETE. The runner reads local Supabase status and performs the app HTTP journey only with loopback services. |
 | Browser locale smoke | `python test/platform/run_collation_browser.py` | SQA for adapter contract | Compiles the production locale adapter and runs it in headless Chrome/Chromium. |
 | Browser export smoke | `python test/platform/run_export_browser.py` | SQA for adapter contract | Compiles the production export adapter and runs the synthetic browser protocol. It does not verify a real file chooser. |
 | Local route/asset fixture | `python -m unittest scripts.test_release_operations` | SQA for static rewrite behavior | Synthetic loopback routes, existing JS/WASM/image bytes, missing artifact, and size boundary. |
 
 Exact database files, one process each:
 
-`access_test.sql`, `catalog_test.sql`, `convert_commands_test.sql`, `convert_student_link_test.sql`, `feedback_test.sql`, `import_test.sql`, `lifecycle_test.sql`, `ministry_academic_test.sql`, `ministry_access_test.sql`, `ministry_congregations_test.sql`, `ministry_registry_test.sql`, `ministry_ui_reads_test.sql`, `photos_test.sql`, `unified_scope_test.sql`, and `weekly_test.sql`.
+`access_test.sql`, `base44_unified_access_test.sql`, `catalog_test.sql`, `convert_commands_test.sql`, `convert_student_link_test.sql`, `feedback_test.sql`, `import_test.sql`, `lifecycle_test.sql`, `ministry_academic_test.sql`, `ministry_access_test.sql`, `ministry_congregations_test.sql`, `ministry_registry_test.sql`, `ministry_ui_reads_test.sql`, `photos_test.sql`, `unified_scope_test.sql`, and `weekly_test.sql`.
 
 Exact independent-session race checks, one process each:
 
@@ -76,7 +77,7 @@ The bounded GQM set for the release report is:
 | Preserve retry safety | Number of idempotent handoff/mutation replays returning the same receipt/result. | Exact SQL plus concurrency assertions; numeric extraction is not yet automated. |
 | Enforce class capacity | Final active enrollment count and rejected attempt at 101. | Academic SQL and race script assert 100 and one loser. |
 | Bound list reads | Maximum rows returned by one page request. | **100 rows/RPC**; explicit 101 rejection. |
-| Complete the user journey | Synthetic registrar-to-attendance task success rate and error count. | Not measured: integrated browser journey is absent. |
+| Complete the user journey | Registrar-to-attendance browser result and error count. | Recorded only when the integrated runner completes; the current local run is BLOCKED until local Supabase is available. |
 | Protect build/test quality | Analyze/test/build pass and failure counts. | Unified command log and per-command exit code. |
 
 These metrics describe what the suite can evidence now. Missing numeric aggregation, application journey, HTTP policy checks, and performance measurements stay visible as open work; they are not scored as zero defects or 100% completion.
