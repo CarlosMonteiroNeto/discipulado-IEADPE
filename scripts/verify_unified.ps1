@@ -43,7 +43,7 @@ try {
         Invoke-Gate 'Static web preflight' 'python' @('scripts/web_preflight.py','build/web')
     } else { Invoke-Gate 'Flutter analyze' 'flutter' @('analyze') }
 
-    $sqlNames = @('access_test.sql','catalog_test.sql','convert_commands_test.sql','convert_student_link_test.sql','feedback_test.sql','import_test.sql','lifecycle_test.sql','ministry_academic_test.sql','ministry_access_test.sql','ministry_congregations_test.sql','ministry_registry_test.sql','ministry_ui_reads_test.sql','photos_test.sql','unified_scope_test.sql','weekly_test.sql')
+    $sqlNames = @('access_test.sql','base44_unified_access_test.sql','catalog_test.sql','convert_commands_test.sql','convert_student_link_test.sql','feedback_test.sql','import_test.sql','lifecycle_test.sql','ministry_academic_test.sql','ministry_access_test.sql','ministry_congregations_test.sql','ministry_registry_test.sql','ministry_ui_reads_test.sql','photos_test.sql','unified_scope_test.sql','weekly_test.sql')
     foreach ($scenario in $sqlNames) { Invoke-Gate "SQL $scenario" 'python' @('scripts/test_database.py',$scenario) }
     Invoke-Gate 'Synthetic migration rehearsal' 'python' @('-m','unittest','discover','-s','test/migration','-p','*_test.py')
     foreach ($race in @('catalog','access','convert','convert-student','import','lifecycle','ministry-registry','ministry-academic')) {

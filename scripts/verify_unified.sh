@@ -42,7 +42,7 @@ run_gate 'Flutter tests' flutter test
 run_gate 'Flutter web build' flutter build web
 run_gate 'Static web preflight' python3 scripts/web_preflight.py build/web
 
-sql=(access_test.sql catalog_test.sql convert_commands_test.sql convert_student_link_test.sql feedback_test.sql import_test.sql lifecycle_test.sql ministry_academic_test.sql ministry_access_test.sql ministry_congregations_test.sql ministry_registry_test.sql ministry_ui_reads_test.sql photos_test.sql unified_scope_test.sql weekly_test.sql)
+sql=(access_test.sql base44_unified_access_test.sql catalog_test.sql convert_commands_test.sql convert_student_link_test.sql feedback_test.sql import_test.sql lifecycle_test.sql ministry_academic_test.sql ministry_access_test.sql ministry_congregations_test.sql ministry_registry_test.sql ministry_ui_reads_test.sql photos_test.sql unified_scope_test.sql weekly_test.sql)
 for scenario in "${sql[@]}"; do run_gate "SQL $scenario" python3 scripts/test_database.py "$scenario"; done
 run_gate 'Synthetic migration rehearsal' python3 -m unittest discover -s test/migration -p '*_test.py'
 for race in catalog access convert convert-student import lifecycle ministry-registry ministry-academic; do
