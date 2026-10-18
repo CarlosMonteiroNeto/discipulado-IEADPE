@@ -1,9 +1,5 @@
-/// Application entry point (S01, S11). The executable composition lives in
-/// `lib/app/`.
-library;
+import 'package:flutter/material.dart';
 
-import 'app/bootstrap.dart';
+import 'app.dart';
 
-Future<void> main() async {
-  await bootstrap();
-}
+void main() => runApp(const App());

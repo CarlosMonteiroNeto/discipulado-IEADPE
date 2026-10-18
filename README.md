@@ -1,171 +1,31 @@
-# Discipulado IEADPE
+# IEADPE Converts
 
-Flutter web-first application for managing the discipleship ministry across
-IEADPE congregations: team contacts, students, classes, enrollment and
-attendance. User-facing copy is pt-BR; code, specs and technical documentation
-are English.
+Flutter web and Android application with pt-BR UI, Supabase Free and Google OAuth. The immutable source capture is under `reference/base44`; personal records have not been migrated.
 
-This repository is a locally runnable implementation, **not** a released
-product. It does **not deploy**, push, import legacy data or send messages.
+## Bootstrap status
 
-## Requirements
+The app starts in Brazilian Portuguese. Missing or invalid build configuration displays a recoverable unavailable screen. Valid public configuration displays an honest preparation state until authentication and routing are implemented in subsequent tasks. Bootstrap does not initialize a network client or contact a fallback backend.
 
-- Flutter stable on `PATH` with web support enabled (`flutter doctor`).
-- Node.js 20 and npm.
-- `firebase-tools` with the Java runtime installed for the Firestore emulator.
-- A Chromium-based browser for end-to-end runs; Firefox and WebKit for smoke
-  checks.
+## Local development
 
-Runtimes are locked by `pubspec.lock` and `functions/package-lock.json`.
+Use the committed dependency lock with `flutter pub get`. Configure a local backend through build-time Dart defines:
 
-## Dependency setup
-
-```bash
-flutter pub get
-( cd functions && npm ci )
+```powershell
+flutter run -d chrome --web-port 3000 --dart-define=SUPABASE_URL=http://127.0.0.1:54321 --dart-define=SUPABASE_PUBLISHABLE_KEY=sb_publishable_YOUR_LOCAL_PUBLIC_KEY
 ```
 
-## Synthetic fixtures and emulators
+`Configuration.fromEnvironment()` reads only `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Use an HTTPS backend URL or HTTP on loopback (`localhost`, `127.0.0.1`, `::1`); Android emulator access to the host uses `10.0.2.2`. Use the public publishable key (`sb_publishable_…`), never secret/service-role credentials. Public build values are visible to app users. Correct missing configuration and restart/rebuild the app; retry rechecks the current build configuration.
 
-All data is synthetic. Start the local emulators explicitly:
+The checked-in `supabase/config.toml` describes local CLI ports and disables email/SMS signup. Starting the full local stack requires Supabase CLI and Docker (`supabase start`). Neither is installed on the current host. Google provider configuration and real Auth/Storage verification remain separate integration work; no production credentials or services are used as a fallback. The native PostgreSQL verification profile is described in `docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md` and verifies SQL contracts only.
 
-```bash
-firebase emulators:start --only auth,firestore,functions --project demo-discipulado
+## Checks
+
+```powershell
+./scripts/check.ps1
 ```
 
-Seed the synthetic fixtures (one supervisor, two local staff in different
-congregations, one inactive profile, homonymous contacts and students, two
-teachers, a conflicting administrative role, one class per congregation and
-sessions covering every attendance state) with the trusted seeder
-`functions/tools/seed-emulators.ts`, invoked by the local/CI emulator harness.
-The seeder refuses to run unless the emulator environment variables are
-present; it never loads the legacy credential file. Seed UIDs are
-`emulator-supervisor`, `emulator-staff-central` and `emulator-staff-norte`.
+This runs `flutter analyze` and `flutter test`, stopping on failure. Widget checks cover pt-BR locale, recovery keyboard interaction, narrow layouts, large text and reduced motion. They do not certify live Supabase, Google OAuth, Storage HTTP or real Android device behavior.
 
-The Emulator UI at <http://localhost:4000> is used for dev login/reset:
-create or reset an Auth user, then bind it with the trusted provisioning
-utility.
+## Workflow
 
-### First supervisor and subsequent accounts
-
-The first supervisor is provisioned once by a trusted operator: create the Auth
-identity in the Auth administration interface, then run the trusted provisioning
-utility `functions/tools/provision-access.ts` (accepting the existing UID, role,
-active flag and congregation binding). Provisioning is never a callable
-endpoint, so no application client can grant an access role. Subsequent
-accounts use the same utility with `congregationStaff` and their congregation
-ID.
-
-## Running locally
-
-```bash
-bash tool/run-local.sh          # macOS/Linux
-pwsh tool/run-local.ps1         # Windows
-```
-
-The script compiles the backend, starts the emulators and serves the web app
-with explicit emulator configuration (`FIREBASE_USE_EMULATOR=true`). A missing
-configuration shows a setup error; it never falls back to a production project.
-
-## Internal mode (no billing)
-
-The app runs on the Firebase **Spark (free)** plan. There are no Cloud
-Functions: every mutation and projection is a direct client write handled by
-the direct transport (`lib/data/handlers/`) over Firestore, and **authorization
-lives in `firestore.rules`**. In-app role gating is user-experience only; it is
-not a security boundary, and the rules are the only thing that actually
-enforces the write matrix.
-
-### Trust model and bootstrap
-
-- Access profiles live in `users/{uid}` and are provisioned **out-of-band**: the
-  owner/supervisor profile is created in the Firebase (or Firestore) console with
-  `accessRole: supervisor`, and staff profiles with `accessRole:
-  congregationStaff` plus their `congregationId` (see `docs/verification.md`
-  "Allowlist bootstrap flow"). The shipped app has no screen that writes
-  `users/{uid}`.
-- The rules additionally let a signed-in user **self-create and self-update
-  their own** `users/{uid}` profile; the supervisor self-claim is granted only
-  when the authenticated token email equals the single allowlist credential in
-  `firestore.rules` (`allowlistedOwner()`). That allowance is defense-in-depth
-  for future tooling — keep the placeholder
-  `owner@discipulado-ieadpe.example` replaced with the real owner address before
-  deploying.
-- Writes of the congregation subtree (`contacts`, `students`, `classes`,
-  `enrollments`, class `roster`, `activeEnrollmentRefs`, `sessions`, session
-  `attendance`, session `roster`, `roleSlots`), the `directory` projection and
-  the parent `congregations` document are allowed for **supervisors anywhere**
-  and for **staff within their own `congregationId`**. `supervisionContacts`
-  and `supervisionRoleSlots` stay supervisor-only. Every other path is denied by
-  the catch-all.
-
-### Relaxed invariants
-
-Because there is no trusted server-side transaction layer, some invariants are
-deliberately relaxed and enforced as best-effort client checks:
-
-- **No reference counters.** Archive/restore no longer maintains scope
-  counters; counts are computed from scoped queries.
-- **No receipts or TTL documents.** Operations are plain, revisioned writes.
-- **Advisory uniqueness.** Name uniqueness (congregation, contact, student,
-  class) is a pre-write read, not a reservation; a concurrent double-submit is
-  possible and must be resolved by the operator.
-- **Best-effort enrollment cap.** The class capacity check runs before the
-  write but is not atomic; a simultaneous enroll can exceed it by a race.
-- **Client-side paging amplification.** Name-prefix and cursor pages read the
-  whole matching collection once per page (the direct transport pages in Dart),
-  so directory and global name searches multiply Firestore reads on Spark;
-  budget quota accordingly.
-
-### Re-tightening before broader use
-
-Before publishing the app for broader or untrusted use, the rule-critical
-invariants (uniqueness reservations, atomic enrollment cap, reference counters,
-and trusted role provisioning) must move back into **trusted server-side code**
-(Cloud Functions on a Blaze project) and `firestore.rules` must be re-tightened
-to deny the client writes it now allows.
-
-## Web build and hosting rewrite
-
-```bash
-flutter build web --release
-```
-
-The hosting configuration in `firebase.json` performs the SPA rewrite to
-`index.html`, so deep links and hard refreshes resolve through the router.
-`web/index.html` ships `noindex` metadata.
-
-## Domain semantics
-
-- **Archive and history.** Normal workflows archive instead of deleting.
-  Archived records stay available to authorized staff through an explicit
-  filter; historical attendance and enrollment records are never rewritten.
-- **Class capacity.** A class is capped at 100 total enrollment records,
-  including completed and withdrawn ones. Closing an enrollment does not free
-  this historical capacity; a new cohort needs a new class.
-- **Progress.** Progress is enrollment-specific: `present / (present + absent)`
-  over finalized, non-canceled sessions. Excused sessions are shown separately
-  and excluded from the denominator; a zero denominator displays
-  `Sem aulas contabilizadas`. Example: 3 present and 1 absent is 75%. Student
-  progress is authoritative backend data; there is no automatic graduation or
-  baptism inference.
-
-## Verification
-
-Run the same entry point locally and in CI:
-
-```bash
-bash tool/verify.sh            # macOS/Linux
-pwsh tool/verify.ps1           # Windows
-```
-
-It fails on Flutter analysis, tests or web build, and on backend compilation,
-unit tests or the emulator authorization suite. The executed commands, exit
-codes and environment-blocked checks are recorded in
-[`docs/verification.md`](docs/verification.md).
-
-## Non-goals
-
-No deployment, push, legacy import, automated messaging, Android packaging,
-public directory, user administration UI or legal-compliance claim. Completion
-of this implementation does not imply production readiness.
+Use standard Superpowers SDD with direct project tools, TDD and independent task review. The 19-task plan and accepted design are under `docs/superpowers`. Custom pipeline runtime experiments are suspended. Production deployment, live access grants and private-record migration require separate release actions. No billing, publishing or signing credentials are configured.

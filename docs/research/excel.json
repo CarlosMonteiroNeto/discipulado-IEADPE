@@ -1,0 +1,61 @@
+{
+  "package": "excel",
+  "criteria": {
+    "pub_points": 14.38,
+    "popularity": 0,
+    "recency": 0,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 0
+  },
+  "total": 34.4,
+  "verdict": "AUTO_REJECT",
+  "data": {
+    "package": "excel",
+    "version": "4.0.6",
+    "registry_source": "https://pub.dev/packages/excel",
+    "license": "MIT",
+    "granted_points": 115,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 456,
+    "open_issues": 128,
+    "closed_issues": 188
+  },
+  "research_record": {
+    "name": "excel",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/excel"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "4.0.6"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "MIT"
+    }
+  }
+}

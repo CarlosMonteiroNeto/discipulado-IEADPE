@@ -1,0 +1,66 @@
+name: Unified verification
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 54329:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      IEADPE_DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54329/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Start local Supabase services
+        run: |
+          supabase start --exclude studio,edge-runtime,logflare,vector,imgproxy,supavisor
+          eval "$(supabase status --output env)"
+          {
+            printf 'SUPABASE_URL=%s\n' "$API_URL"
+            printf 'SUPABASE_ANON_KEY=%s\n' "$ANON_KEY"
+          } >> "$GITHUB_ENV"
+      - name: Run the unified gate
+        run: bash scripts/verify_unified.sh
+      - name: Publish verification report
+        if: always()
+        run: |
+          if [ -f build/verification/unified-report.md ]; then
+            cat build/verification/unified-report.md >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload command evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unified-verification-${{ github.run_id }}
+          path: build/verification/
+          if-no-files-found: warn

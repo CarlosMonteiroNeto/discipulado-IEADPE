@@ -1,0 +1,61 @@
+{
+  "package": "flutter_riverpod",
+  "criteria": {
+    "pub_points": 17.5,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 15
+  },
+  "total": 72.5,
+  "verdict": "AUTO_APPROVE",
+  "data": {
+    "package": "flutter_riverpod",
+    "version": "3.4.3",
+    "registry_source": "https://pub.dev/packages/flutter_riverpod",
+    "license": "MIT",
+    "granted_points": 140,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 7,
+    "open_issues": 154,
+    "closed_issues": 2088
+  },
+  "research_record": {
+    "name": "flutter_riverpod",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/flutter_riverpod"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "3.4.3"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "MIT"
+    }
+  }
+}

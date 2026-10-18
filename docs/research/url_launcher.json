@@ -1,0 +1,61 @@
+{
+  "package": "url_launcher",
+  "criteria": {
+    "pub_points": 20.0,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 15
+  },
+  "total": 75.0,
+  "verdict": "AUTO_APPROVE",
+  "data": {
+    "package": "url_launcher",
+    "version": "6.3.3",
+    "registry_source": "https://pub.dev/packages/url_launcher",
+    "license": "BSD-3-Clause",
+    "granted_points": 160,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 0,
+    "open_issues": 0,
+    "closed_issues": 0
+  },
+  "research_record": {
+    "name": "url_launcher",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/url_launcher"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "6.3.3"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "BSD-3-Clause"
+    }
+  }
+}

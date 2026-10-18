@@ -1,35 +1,19 @@
 {
-    "name": "Discipulado IEADPE",
-    "short_name": "Discipulado IEADPE",
-    "start_url": ".",
-    "display": "standalone",
-    "background_color": "#002060",
-    "theme_color": "#002060",
-    "description": "Gestão do discipulado das congregações IEADPE.",
-    "orientation": "any",
-    "prefer_related_applications": false,
-    "icons": [
-        {
-            "src": "icons/Icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png"
-        },
-        {
-            "src": "icons/Icon-maskable-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "maskable"
-        },
-        {
-            "src": "icons/Icon-maskable-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "maskable"
-        }
-    ]
+  "name": "IEADPE — Novos Convertidos",
+  "short_name": "IEADPE",
+  "lang": "pt-BR",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#1e3a5f",
+  "description": "Gestão de Novos Convertidos da IEADPE.",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "icons/ieadpe.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }

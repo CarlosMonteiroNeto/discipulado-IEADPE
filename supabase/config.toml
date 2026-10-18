@@ -1,0 +1,45 @@
+project_id = "ieadpe-converts"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+
+[auth]
+enabled = true
+site_url = "http://localhost:3000"
+additional_redirect_urls = [
+  "http://localhost:3000/auth/callback",
+  "http://localhost:3000/auth/callback?next=%2Fregister",
+  "http://localhost:3000/auth/callback?next=%2Fhome",
+  "http://localhost:3000/auth/callback?next=%2Fconverts",
+  "http://localhost:3000/auth/callback?next=%2Fadmin",
+  "ieadpe://login/auth/callback",
+  "ieadpe://login/auth/callback?next=%2Fregister",
+  "ieadpe://login/auth/callback?next=%2Fhome",
+  "ieadpe://login/auth/callback?next=%2Fconverts",
+  "ieadpe://login/auth/callback?next=%2Fadmin",
+]
+enable_signup = true
+
+[auth.email]
+enable_signup = false
+
+[auth.sms]
+enable_signup = false
+
+[storage]
+enabled = true
+file_size_limit = "10MiB"

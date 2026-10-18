@@ -1,0 +1,61 @@
+{
+  "package": "file_picker",
+  "criteria": {
+    "pub_points": 20.0,
+    "popularity": 0,
+    "recency": 20,
+    "sdk": 20,
+    "dependents": 0,
+    "issue_ratio": 15
+  },
+  "total": 75.0,
+  "verdict": "AUTO_APPROVE",
+  "data": {
+    "package": "file_picker",
+    "version": "13.1.0",
+    "registry_source": "https://pub.dev/packages/file_picker",
+    "license": "MIT",
+    "granted_points": 160,
+    "max_points": 160,
+    "popularity": 0,
+    "sdk": "compatible",
+    "dependents": 0,
+    "recency_source": "github",
+    "recency_days": 0,
+    "open_issues": 14,
+    "closed_issues": 1683
+  },
+  "research_record": {
+    "name": "file_picker",
+    "source": {
+      "type": "pub.dev",
+      "uri": "https://pub.dev/packages/file_picker"
+    },
+    "evidence": {
+      "provider": "pub.dev",
+      "fields": [
+        "closed_issues",
+        "dependents",
+        "granted_points",
+        "license",
+        "max_points",
+        "open_issues",
+        "package",
+        "popularity",
+        "recency_days",
+        "recency_source",
+        "registry_source",
+        "sdk",
+        "version"
+      ],
+      "version": "13.1.0"
+    },
+    "compatibility": {
+      "flutter_sdk": "compatible"
+    },
+    "license": {
+      "status": "known",
+      "value": "MIT"
+    }
+  }
+}

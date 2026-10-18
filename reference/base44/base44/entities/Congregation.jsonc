@@ -1,0 +1,13 @@
+{
+  "name": "Congregation",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nome da congrega\u00e7\u00e3o"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

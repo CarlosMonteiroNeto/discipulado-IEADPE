@@ -1,0 +1,158 @@
+# Protected data gateway integration
+
+Task 7 supplies injectable repositories; Task 19 mounts them with the application root.
+
+```dart
+final boundary = ProtectedDataBoundary();
+final Gateway gateway = SupabaseGateway(auth.client, boundary);
+final converts = ConvertRepository(gateway);
+final accesses = AccessRepository(gateway);
+final router = SessionRouter(
+  auth,
+  clearProtectedCaches: () {
+    boundary.invalidate();
+    // Synchronously clear every feature record, photo, page and pending UI owner.
+    clearFeatureState();
+  },
+);
+```
+
+Use one boundary for all protected owners. `invalidate()` changes its generation synchronously. Each gateway attempt captures both generation and current SDK user ID, checks before sending, after receiving, after failure and before each retry. Changed context throws `DataFailure('stale')` for reads or returns a rejected mutation with `errorCode == 'stale'`. Requests already sent may finish on the server; invalidation suppresses their results and further retries, and does not undo a committed transaction. RLS and RPC authorization always remain authoritative.
+
+Feature state owners must capture `gateway.context` before an async load and call `gateway.ensureCurrent(capturedContext)` immediately before publishing its results, including after any additional async processing. Clear collection state and discard its cursors on invalidation. Never persist records or photos. Task 19 must register *all* protected owners in the router's required callback; clearing only displayed collections is insufficient. No repository cache is introduced here.
+
+## Reads and cursors
+
+`ConvertRepository.list(ConvertQuery query, String? cursor)` returns `Future<Page<ConvertRecord>>`. `ConvertQuery` supports `congregationId` and literal case-insensitive name substring (`name`, default empty). SQL applies RLS first; the congregation filter only narrows server-authorized rows. Soft-deleted records are excluded. No client access snapshot grants permissions. Terminal records remain available for source Home totals; feature policy determines active displays.
+
+`AccessRepository.list([String? cursor])` returns `Future<Page<UserAccess>>`. Access rows remain subject to server policies. `save(operationId, email: ..., role: ..., id: ..., congregationId: ...)` normalizes email and sends only editable access fields. `revoke(operationId, id)` sends only the ID. After a successful grant change, refresh the session guard and invalidate relevant feature state before loading current access.
+
+Pages contain at most 100 rows ordered by ascending immutable UUID. Request each `nextCursor` until null. Exact multiples of 100 require a final empty request. The opaque versioned cursor binds its last ID to the query, identity and invalidation generation; malformed or mismatched cursors fail before network access. Repositories reject duplicate, backwards or oversized pages. UUID keyset traversal avoids offset shifting on deletion and handles 1,205 fixed permitted rows exactly once. This is not a database snapshot across concurrent inserts/edits; restart traversal for a fresh view. Feature display sorting and derived visit/status filtering must operate over the complete relevant traversal rather than assume a single page contains all rows.
+
+## Commands and failures
+
+`Gateway.command(String command, String operationId, Map<String,Object?> payload)` returns `Future<MutationResult<String>>`; applied `value` is the server's minimal UUID ID. The caller creates one UUID operation ID per logical action and retains it when offering a retry. Never serialize a read DTO as an edit request. Current supported commands match existing migrations: `create_convert`, `edit_convert`, `delete_convert`, `transition_convert`, `confirm_zero`, `save_access`, `revoke_access`. Other commands must be added alongside their server contracts. The gateway rejects non-editable keys; SQL validates values and invariants. Lifecycle payload is exactly `{id, action}` with SQL actions `visit`, `start`, `stop`, `complete`, `deviate`. Server actor/time/event/counter fields are never sent. Mutations snapshot the payload before the first request.
+
+The installed SDK's built-in retries are disabled per request. The gateway makes at most three total attempts for timeouts, SQL serialization/deadlock (`40001`, `40P01`) and temporary HTTP gateway/service failures (`502`, `503`, `504`). Attempts use the same operation ID and payload, with short bounded backoff. Ordinary permission/validation/backend failures do not retry. Default timeout is 15 seconds per attempt. Failed mutations return rejected results; failed reads throw `DataFailure`. Local invalid inputs/unsupported commands fail before issuing requests. Failure codes contain no SQL/provider text:
+
+| Code | Feature action |
+| --- | --- |
+| `stale` | Silently discard the obsolete completion; current guard owns navigation. |
+| `permission` | Remove inaccessible state and refresh scope; show plain access guidance. |
+| `invalid` | Show a plain validation message and allow correction. |
+| `invalid_cursor` | Clear pages and restart the current query. |
+| `invalid_response` | Show a recoverable failure and retry action; never fabricate rows or success. |
+| `unavailable`, `backend` | Show a plain pt-BR retry state; preserve the logical operation ID for mutations. |
+
+A successful empty `Page` is distinct from a failure. Never catch a read failure and turn it into an empty list. Raw backend exception details must not reach ordinary UI. No mock transport or network fallback exists in production.
+
+## Evidence boundaries
+
+Loopback HTTP fixtures use the actual locked Supabase/PostgREST SDK and verify RPC envelopes, ordering/filters, bounded pagination, timeout behavior, same-operation retry and invalidation. Native PostgreSQL fixtures verify server RLS and transactional behavior separately. Neither establishes live PostgREST/Auth service integration. Before release, verify against operator-provisioned services: actual RLS with registrar/direction/global accounts, grant loss and user switching during requests, duplicate mutation delivery after timeout, Google OAuth/browser/Android behavior and private Storage HTTP enforcement. No production or external-provider checks were run for Task 7.
+
+## Private photo protocol (Task 8)
+
+Construct `PhotoRepository` with the same `SupabaseGateway` used by other protected repositories. `upload(Uint8List)` processes the first image frame, applies EXIF orientation, center crops to 192 square, composites transparency onto white, strips source metadata and emits JPEG quality 90. Inputs are bounded to 20 MiB encoded and 24 million decoded pixels. Native processing uses `compute`; web processing shares the same algorithm. Every completion and failure checks the shared context, including asynchronous processing. Output remains at most 1 MiB.
+
+Upload creates an owned pending draft through `create_photo_draft` with an empty payload. The standard gateway keeps the draft operation ID unchanged during its bounded transient RPC retries. The asset expires after one hour, at `<uid>/<photoId>.jpg`. Storage receives exactly one INSERT with `upsert: false`, zero SDK upload retries, JPEG content type and cache duration zero. The repository introduces no protected cache and never creates a public or signed URL. Storage SQL policies additionally restrict metadata MIME/size, while the bucket configuration enforces HTTP MIME/size. Client dimensions are not a server guarantee.
+
+A failed or timed-out upload throws a normalized `DataFailure`; it never edits the convert or reports fabricated success. The in-flight request can still finish remotely after a timeout/invalidation. A user upload retry calls `upload` again and receives a fresh draft/path; abandoned pending assets expire for operator cleanup. This avoids ambiguous duplicate INSERT/upsert behavior. Successful upload returns `PhotoAsset(id,path)` but does not attach it.
+
+For registration, include only `photo_asset_id: asset.id` with the ordinary editable fields in `gateway.command('create_convert', operationId, payload)`. For replacement use `edit_convert` with `{id: convertId, photo_asset_id: asset.id}` plus intended field edits. Preserve the logical convert operation ID/payload for retries. Attach validation and old-photo detach happen in the same SQL transaction; permission/validation/attachment failures preserve the old photo. Do not clear the displayed old photo until a successful edit result. `detach_photo` accepts exactly `{id: convertId}` and uses the same authorized edit transaction with a null photo reference; its receipt is the equivalent edit receipt. A new UI action always gets a new operation ID.
+
+Use `get(convert.photoAssetId)` to resolve metadata through current RLS, then `download(asset)` for authenticated bytes and render from memory. Attached reads follow the current non-deleted convert scope, even when the uploader loses access; draft ownership grants no attached read permission. A new cache nonce avoids reusing earlier download responses. No read DTO is serialized into a mutation.
+
+Task 19 must invalidate the shared boundary synchronously on logout, guard revocation and identity changes; clear each photo owner, pending selection and all retained byte buffers, and evict Flutter memory image entries (including live images). Configure bounded Flutter image caching (for example 100 entries / 16 MiB) and clear it in the same callback. Feature owners must check their captured context immediately before publishing image bytes. Repository context checks cannot erase bytes already held by UI or invalidate an already sent server transaction.
+
+## Explicit operator photo cleanup
+
+Run `python scripts/cleanup_photos.py` for a dry-run count, or add `--execute` to remove one batch of at most 100 eligible assets. Supply operator-only `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` through the process environment; never place this key in Flutter or checked-in configuration. Repeat batches until no eligible assets remain. No automated cron is configured.
+
+The command selects detached or expired pending assets, removes each object using the Storage HTTP API, then invokes service-role-only `ieadpe_purge_photo_asset`. SQL refuses metadata purge while an object exists, while an asset is active, or while a live convert references it. It clears a soft-deleted convert's reference before removing metadata. Never delete rows from `storage.objects` using SQL. Storage failure stops the command before metadata deletion; an interrupted run can safely repeat Storage removal, and the RPC verifies object absence. This command has only been checked against synthetic loopback HTTP fixtures; operator-provisioned Storage service verification remains a release check.
+
+## Weekly reports (Task 11)
+
+`WeeklyRepository(SupabaseGateway(...)).overview()` consumes the additive `ReadRpcGateway` contract. Existing `Gateway` implementations and commands remain compatible. The read allowlist accepts only `weekly_overview`, with `after_id` and `expected_week`; SDK retries are disabled and the shared bounded retry/context checks apply. No caller-provided instant exists. SQL checks current authorization, reads the São Paulo server window and returns at most 100 zero-conversion congregations in immutable UUID order. The repository traverses those bounded pages and validates order, size, dates, scope mode and payloads before publishing. `expected_week` detects rollover across requests; a failed traversal publishes no partial records. The collection is a traversal, not a cross-request database snapshot.
+
+`WeeklyPanel(repository: weekly, onScopeRefresh: refreshGuard)` owns its records, loading request sequence, inline confirmation and logical mutation operation IDs. It captures the gateway context before work and checks after RPCs and platform collation. Task 19 must key and synchronously unmount the entire panel on logout, identity change, guard revocation or boundary invalidation; clearing only a displayed list is insufficient. It must also refresh the overview on resume and on Home refresh so the server re-evaluates the reporting window. Do not derive visibility from the browser clock. The panel handles repository/gateway replacement, suppresses old load and mutation completions, clears permission failures and requests guard refresh. No weekly cache or persistence exists.
+
+For an ordinary overview refresh, keep the same protected owner and change `WeeklyPanel.refreshRevision` (default 0). Home forwards its refresh button, pull refresh and external `HomePage.refreshRevision` through this API; its weekly key changes only with the protected context. Do not remount the panel for ordinary refresh: an uncertain confirmation owns its UUID and overlap protection until resolved or invalidated. Refresh requests during a pending confirmation coalesce and run after its response settles; a successful/invalid confirmation's own overview read can satisfy that queued refresh. Failed and successful same-window overview reads preserve uncertain operation IDs; a successful changed reporting window clears the old IDs. The panel requests keep-alive in lazy scrolling containers so scrolling or loading layout changes do not discard this owner. Keep-alive does not replace Task 19's synchronous unmount on actual protected invalidation.
+
+Direction can confirm its own pending zero rows through the existing `confirm_zero` command. The panel retains a UUID per congregation/week logical operation across recoverable retries, avoids concurrent submission and refreshes after an applied or invalid result. Permission removes retained state. Global users see the source confirmed/waiting overview. Standard Material controls provide focus, pressed feedback and keyboard activation; the inline confirmation belongs to the protected subtree and creates no lingering Navigator dialog route.
+
+Fresh confirmation is closed throughout Sunday before 20:00; the server helper returns no reportable week then. Existing matching receipts still replay after current authorization and payload checks. Monday–Saturday uses the preceding Sunday. The private clock is inaccessible to authenticated/anonymous callers; owner-level SQL tests replace it inside rolled-back fixtures.
+
+### Task 16 import invariant handoff
+
+The overview consumes `private.congregation_week_guards.conversion_count`; do not insert imported converts without the same transactional guard protocol. Import must initialize affected guards from existing non-deleted records, lock affected congregation/week keys in deterministic order after access and convert/photo locks, increment counts for each committed new row and delete a matching zero report in the same transaction. Skipped duplicates/tombstones and failed rows must leave counts/reports unchanged. Every move/date change/delete must update both affected weeks. Reuse the existing command invariants and real create/zero race tests; add actual import SQL and concurrency regressions when that command is implemented. Task 11 cannot claim import command coverage before Task 16 exists.
+
+Predecessor command/race fixtures select an open reporting instant with owner-only `private.weekly_now()` replacement when the host is Sunday before 20:00. This keeps their lock/counter scenarios independent of the new closed-window rule. The dedicated weekly fixture covers the true closed-window command and receipt behavior; no production clock setting or public clock argument was added.
+
+## Admin catalog and access (Task 13)
+
+Construct `AdminPage(scope: guard.scope!, gateway: sharedGateway, onScopeRefresh: guard.refresh, ...)` inside `AppShell` for the existing `/admin` route. Its five selections are Congregações, Acessos, Relatório, Eventos and Backup. The root must inject real `reportBuilder`, `eventsBuilder`, `backupBuilder` and the separate `onFeedback` management action when those features are ready. Missing later panels show an explicit unavailable message; they do not report fabricated feature data. Final root wiring remains Task 19.
+
+`CongregationRepository.list()` traverses bounded UUID pages, validates records and calls the existing platform pt-BR ordering (sede first). It checks the captured gateway context after network reads and platform collation. Both active and archived rows are displayed for managers; archived rows cannot be edited or chosen for new direction grants. New commands are `save_congregation` with `{name, id?}` and `archive_congregation` with exactly `{id}`. Results contain only the UUID ID. SQL authorizes current managers after their UID access lock and before receipt replay; direct table writes and anonymous calls remain forbidden. Archival sets `archived_at` and retains converts, events and grants. Triggers serialize newly inserted/changed convert and grant congregation references with archive through the catalog row, after the caller's existing access locks. They acquire no grant-discovery or email mutex.
+
+Admin reuses `AccessRepository.save/revoke`, including trusted verified-email binding. It has no admin-allowlist mutation. Same email/role/congregation duplicates are caught locally; the database unique constraint remains authoritative. Different direction congregations create independent grants. Editing preserves the source email lock; changing identity requires removing the old grant and adding the intended one.
+
+A pending or recoverably failed write retains its exact closure snapshot and UUID until resolution. While uncertain, mutation editors and tab/refresh actions are disabled and a dedicated retry action resends the same snapshot. Equivalent scope snapshots preserve this owner. Confirmation panels live inside the protected subtree, so they disappear with permission loss. Applied commands clear displayed collections, invalidate the shared boundary synchronously, then request `SessionRouter.refresh`; Admin stays in an access-refresh state until the root supplies a fresh protected owner. Root invalidation must unmount the whole owner even when resulting role flags are equal. This component never treats a client scope flag as backend authorization.
+
+The existing convert RPC still rejects saving an archived congregation, including an unchanged archived reference. Existing convert/event records are retained and remain readable to authorized users. Editing such a record requires selecting an active replacement or clearing the congregation, subject to the existing old/new scope rule. Controller confirmed this established behavior is compatible with Task 13; no implicit unarchive operation was added.
+
+## Event and conversion reports (Task 14)
+
+The existing Admin builders accept the real protected panels; final root composition remains Task 19:
+
+```dart
+final reports = ReportsRepository(sharedGateway);
+final exporter = createFileExporter();
+AdminPage(
+  scope: guard.scope!,
+  gateway: sharedGateway,
+  onScopeRefresh: guard.refresh,
+  reportBuilder: (_) => ConversionPanel(
+    repository: reports, exporter: exporter, onScopeRefresh: guard.refresh),
+  eventsBuilder: (_) => EventsPanel(
+    repository: reports, exporter: exporter, onScopeRefresh: guard.refresh),
+);
+```
+
+Import the panels from `features/reports`, repository from `reports_repository.dart`, and the platform factory from `platform/file_exporter.dart`. Keep the whole Admin/report owner inside the protected root and synchronously unmount it on logout, identity change, guard revocation or shared-boundary invalidation, even when replacement scope flags compare equal. The panels capture request/context owners, suppress obsolete loads/sorts/save feedback, clear their row collections and overwrite retained XLSX bytes on clear/dispose. They do not persist report records. A disposed panel's save guard rejects even if the gateway generation itself has not changed. Production root mounting/clearing is Task 19.
+
+`ReportsRepository.events(EventQuery)` traverses bounded immutable UUID pages of `convert_events` through the same gateway. It validates page order, DTOs and captured context, filters inclusive optional business dates and requests the selected congregation as a narrowing filter. `conversions(DateRange)` traverses all non-deleted converts and groups their inclusive conversion dates by worship type, using `Não informado` for absent/empty type and descending counts. Neither traversal caps at 1,000 nor represents a database snapshot across concurrent edits. Permissions remain RLS authoritative. The only gateway change is the additive `convert_events` read allowlist; existing callers remain compatible.
+
+Events require `Aplicar`; editing a filter clears displayed/exportable results until the next application. Conversion report initially loads all dates and applies subsequent edits explicitly. Report tables sort textual columns with the existing actual platform pt-BR collation and dates/counts by their real values. The workbook is prepared from exactly the displayed headers/rows after each successful load or sort. `tableWorkbook(sheet, rows)` is a shared minimal OOXML ZIP writer for Task 15 reuse; every cell is an inline string, so names/accents and formula-like user text remain literal strings. It is not CSV and introduces no dependency changes.
+
+`FileExporter.save(filename, bytes, {ensureCurrent})` preserves the two positional arguments and adds an optional protected-owner callback. Callers holding protected data must supply it. The report panels do. Workbook bytes are prepared before a click, and the web picker is invoked before the first await, preserving user activation.
+
+- Web uses `showSaveFilePicker` in a supporting secure-context Chromium browser, then rechecks owner/context after the chooser and writable acquisition, writes bytes and waits for close. Only completed close returns `saved`; user picker AbortError returns `cancelled`; unavailable API, rejected permissions and write/close errors return `failed`. There is no anchor-download fallback or invented success. Firefox/Safari and insecure deployments without this API show a plain retry/compatible-platform failure; do not claim a downloaded file there.
+- Android uses the additive `br.org.ieadpe/export` channel. `choose` opens `ACTION_CREATE_DOCUMENT` with the XLSX MIME/name and retains no personal bytes. After selection, Dart rechecks its protected owner before sending bytes to `write`. Native code accepts only its selected URI, requires a real output stream and completes write/flush/close before `saved`; cancelled chooser returns `cancelled`. Provider failures and activity detachment return `failed`. No storage permission or inaccessible app-private destination is used. Existing collation setup and `super.configureFlutterEngine` remain intact.
+- Clearing/unmounting the report during a pending chooser overwrites its held bytes; the guard prevents a subsequent obsolete write. A write already handed to a browser/native provider can finish after invalidation and is an irreversible boundary, like any user-authorized save. Neither scope invalidation nor a failure result can revoke a file the user has already saved. A failed write may leave an empty or partial document in the chosen provider; no fallback success is reported.
+
+Evidence: host widget/repository/channel checks, actual SDK loopback pagination, actual JVM production stream writer and a production DartJS adapter running in local Chrome. The Chrome smoke uses explicit JS picker/writable fixtures and does **not** establish actual OS picker permissions, actual accessible filesystem saving, or cancellation on either platform. No Android device/emulator was connected. Before release, verify an actual user save/cancel/provider error on web and Android, retrieve/open the resulting accented XLSX, and exercise logout/user switch/revocation while the chooser is open and while a write is underway. Android APK compile evidence is tracked separately in the Task 14 report; compilation is not platform save verification.
+
+## Resumable application backup (Task 16)
+
+Mount the protected Backup tab using the actual codec, gateway and platform adapters:
+
+```dart
+final backup = BackupRepository(sharedGateway, createImportProgressStore());
+// imports: features/backup/backup_repository.dart,
+// features/backup/backup_panel.dart, platform/import_progress_store.dart
+backupBuilder: (_) => BackupPanel(
+  repository: backup,
+  exporter: exporter,
+  onScopeRefresh: guard.refresh,
+),
+```
+
+Task 19 must synchronously unmount the entire Backup/Admin owner on shared-boundary invalidation, logout, revocation or identity change, even for equivalent replacement scopes. The panel clears its parsed preview, progress and confirmation and overwrites export bytes on disposal/replacement. It checks ownership after the picker, size lookup, every file-stream chunk, codec work, every import progress event, export preparation and save completion. The exporter receives the protected owner callback and is entered synchronously on the save press. A previously sent database mutation or provider write can finish remotely; invalidation prevents further traversal/publication and cannot undo it. Keep the same repository and owner across ordinary rebuilds so a pending action is not discarded.
+
+The additive `ImportRpcGateway.importRow(operationId, payload)` uses the shared real SDK timeout/retry/context protocol and validates the narrow response. Existing `Gateway.command` callers remain unchanged. The public `ieadpe_import_convert` RPC authorizes current global access before receipt replay, validates imported fields and date-only history, serializes the legacy key and active catalog, and updates the shared congregation/week guard and matching zero report atomically. It creates no lifecycle events. Duplicate and tombstone responses never update counters. Unknown active catalog names produce a warning and null congregation; multiple active matches reject that row. Archived catalog rows remain exportable by label but cannot be selected for new imports.
+
+Progress persistence contains only a key `<authenticated UID>:<normalized-preview UUID fingerprint>` and a random operation UUID seed. The fingerprint includes each physical workbook row number alongside its payload, so inserting blank rows starts a separate intent safely. Each row derives a stable operation UUID from that seed and its workbook row number; server receipts reconcile created/duplicate/tombstone counts on retry. Web uses localStorage under `ieadpe.import.v1`; Android uses private SharedPreferences through `br.org.ieadpe/import-progress`. No filename, personal cell value, raw rows, workbook bytes, account token or exception text is stored. Each account has its own key namespace. Pending identifiers deliberately survive logout to support safe same-account resume, and are removed only after a complete traversal. They are not authentication or authority. Storage denial fails visibly before importing; there is no memory-only fallback.
+
+After interruption/reload, sign into the same account and reselect the same unchanged file. The codec recreates the normalized preview/fingerprint and reuses the pending seed; it replays already committed receipts rather than guessing the uncertain row outcome. Editing/reordering rows changes the fingerprint and starts a separate intent; database `internal_id` uniqueness still prevents duplicates. A finished import removes its seed, so a later fresh reimport reports existing IDs as skipped. Persisted counters are unnecessary because receipts reconstruct them without retaining personal rows. An old pending entry for a file that is never reselected contains identifiers only. These identifiers are not a full migration audit or backend backup.
+
+Host tests exercise the real SDK with synthetic loopback HTTP, the real codec with an injected picker platform and exporter, and the native progress method-channel envelope. Native PostgreSQL tests exercise current authorization, receipt/legacy-ID semantics, history/eligibility, rollback, both import/zero commit orders and competing users importing one legacy ID. Picker and method-channel fixtures do not prove actual OS picker/SharedPreferences behavior or device persistence. Before release, check real web/Android selection, reload/reselection/resume, storage denial, account switching and revocation during the chooser/import/save, and retrieve the saved accented XLSX. Application root mounting and production deployment remain Task 19/release work.

@@ -1,0 +1,61 @@
+{
+  "feature": "Unified app verification, migration rehearsal and release preparation",
+  "execution_status": "local implementation complete; release evidence incomplete",
+  "evidence": ["docs/verification/unified-matrix.md", "docs/verification/unified-final-report.md", "docs/operations/unified-migration.md", "docs/operations/unified-release.md"],
+  "spec_doc": "docs/superpowers/specs/2026-10-16-unified-quality-release-design.md",
+  "baseline": "unified journey plan complete",
+  "global_constraints": [
+    "Security and integrity suites are blocking SQA; executed evidence only can be marked passed.",
+    "Use synthetic data for migration rehearsal; real private-record export/import requires separate release authorization.",
+    "Do not deploy, activate billing, provision live accounts or create signing credentials.",
+    "Reports and technical artifacts are English; app UI is pt-BR.",
+    "Pin and load the fork domain skills at origin/main@ace9e92 and route one stage skill plus applicable overlays."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Build a fail-closed unified verification entry",
+      "status": "complete_local_gate",
+      "summary": "Run the same application, SQL/security and browser gates locally and in CI, recording real outcomes.",
+      "spec_refs": ["verification-test", "quality-gate", "cloud-deploy", "docs/superpowers/specs/2026-10-16-unified-quality-release-design.md"],
+      "touches": ["scripts/verify_unified.ps1", "scripts/verify_unified.sh", ".github/workflows/verify-unified.yml", "docs/verification/unified-matrix.md"],
+      "depends_on": [],
+      "acceptance": [
+        "Gate runs flutter analyze/test/build web, exact SQL migrations/RLS/concurrency, and local Auth/Storage HTTP plus browser checks when available; missing prerequisites fail or mark the overall result incomplete, never green.",
+        "Trace each blocking security/integrity requirement to a test; record valid/invalid partitions, boundary 0/1/99/100/101 and critical race paths.",
+        "CI and local scripts use equivalent commands and record tool versions, exit codes and environment-blocked conditions.",
+        "ISO 25010/GQM mapping distinguishes SQA release blockers from SQC findings and sets a bounded page-read budget."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Rehearse synthetic legacy migration and rollback",
+      "status": "complete_synthetic_only",
+      "summary": "Prepare deterministic import mapping and reconciliation without touching private production records.",
+      "spec_refs": ["requirements", "coding-standards", "verification-test", "cloud-deploy"],
+      "touches": ["scripts/rehearse_ministry_migration.py", "test/migration/ministry_rehearsal_test.py", "docs/operations/unified-migration.md"],
+      "depends_on": [1],
+      "acceptance": [
+        "Synthetic Firebase IDs and Base44 internal IDs map to separate stable source keys; repeat import yields unchanged counts and links.",
+        "Ambiguous congregation or existing-student matches stop affected rows for human review; no name-only merge or partial identity corruption.",
+        "Reconciliation compares congregation, contact, student, class, enrollment, session, attendance, convert and link counts and preserves historical states.",
+        "Runbook documents cutover, retained source data, restore rehearsal and rollback conditions; real export/import remains a separate authorized action."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Run integrated browser, accessibility and operations review",
+      "status": "incomplete_release_evidence",
+      "summary": "Exercise the local root workflow through synthetic HTTP and record the still-open real-browser, denied-path and release-only prerequisites honestly.",
+      "spec_refs": ["verification-test", "quality-gate", "a11y-ethics", "apple-design", "cloud-deploy"],
+      "touches": ["integration_test/unified_journey_test.dart", "docs/verification/unified-final-report.md", "docs/operations/unified-release.md"],
+      "depends_on": [1, 2],
+      "acceptance": [
+        "The root workflow widget regression covers registrar create, authorized conversion follow-up, explicit student link, class enrollment, roster and finalized attendance through a synthetic loopback HTTP fixture. This does not satisfy the Chromium browser acceptance. Forged cross-scope read/write and revocation are separately denied server-side by SQL scenarios.",
+        "Record Chromium end-to-end and Firefox/WebKit smoke versions or incomplete markers; inspect 360/768/1440, 200% text, keyboard, screen reader, reduced motion and contrast with severity-ranked findings.",
+        "Release runbook covers Supabase/static-host IAM, encryption, monitoring/Free-tier budget, database plus Storage backup and restore, hosted deep links, OAuth/Storage HTTP and Android device/signing checks.",
+        "Whole-product review and actual gate outputs have no unclassified failures; incomplete live release checks remain explicitly incomplete."
+      ]
+    }
+  ]
+}
