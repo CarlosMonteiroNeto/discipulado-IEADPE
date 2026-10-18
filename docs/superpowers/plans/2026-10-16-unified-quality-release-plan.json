@@ -46,12 +46,15 @@
       "id": 3,
       "title": "Run integrated browser, accessibility and operations review",
       "status": "incomplete_release_evidence",
-      "summary": "Exercise the local root workflow through synthetic HTTP and record the still-open real-browser, denied-path and release-only prerequisites honestly.",
+      "summary": "Exercise the root workflow in Chromium against local Supabase with synthetic identities; keep unrelated hosted and human release checks explicitly incomplete.",
       "spec_refs": ["verification-test", "quality-gate", "a11y-ethics", "apple-design", "cloud-deploy"],
       "touches": ["integration_test/unified_journey_test.dart", "docs/verification/unified-final-report.md", "docs/operations/unified-release.md"],
       "depends_on": [1, 2],
       "acceptance": [
-        "The root workflow widget regression covers registrar create, authorized conversion follow-up, explicit student link, class enrollment, roster and finalized attendance through a synthetic loopback HTTP fixture. This does not satisfy the Chromium browser acceptance. Forged cross-scope read/write and revocation are separately denied server-side by SQL scenarios.",
+        "The root workflow widget regression remains fast synthetic HTTP evidence. A separate real Chromium test against local Supabase covers registrar create, authorized congregation assignment and conversion follow-up, minimal referral, explicit student link, class enrollment, roster and finalized attendance. Forged cross-scope reads/writes and revocation of the authoritative user_access assignment are denied through the local app HTTP path with unchanged database state.",
+        "The browser runner reads local Supabase status, rejects any non-loopback API/database URL before network or SQL work, provisions unique synthetic identities/data, keeps service_role host-side, and cleans up only its own fixture IDs on success or failure.",
+        "The runner bypasses proxy environment settings and rejects HTTP redirects; database targets reject multi-host URLs, hostaddr and service-file/connection-option overrides. The local revocation control binds to loopback, requires an unpredictable per-run capability and exact Origin, and can revoke only the known fixture assignment; missing credentials, wrong Origin and arbitrary target IDs are denied.",
+        "After attendance is finalized, a freshly loaded progress view reads persisted state; an app HTTP edit-after-finalize request is denied and leaves stored attendance unchanged.",
         "Record Chromium end-to-end and Firefox/WebKit smoke versions or incomplete markers; inspect 360/768/1440, 200% text, keyboard, screen reader, reduced motion and contrast with severity-ranked findings.",
         "Release runbook covers Supabase/static-host IAM, encryption, monitoring/Free-tier budget, database plus Storage backup and restore, hosted deep links, OAuth/Storage HTTP and Android device/signing checks.",
         "Whole-product review and actual gate outputs have no unclassified failures; incomplete live release checks remain explicitly incomplete."
