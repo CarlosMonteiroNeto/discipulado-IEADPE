@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart' as domain;
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import 'feedback_repository.dart';
 import 'feedback_dialog.dart';
 
@@ -147,58 +149,151 @@ class _FeedbackManagerState extends State<FeedbackManager> {
 
   @override
   Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surface,
     child: SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 896),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                'Dúvidas e sugestões',
-                style: Theme.of(context).textTheme.headlineSmall,
+              const Base44PageHeading(
+                title: 'Dúvidas e sugestões',
+                icon: Icons.forum_outlined,
               ),
+              const SizedBox(height: 12),
               Wrap(
-                spacing: 12,
+                spacing: 8,
+                runSpacing: 8,
+                alignment: WrapAlignment.end,
                 children: [
-                  TextButton(
+                  TextButton.icon(
                     onPressed: _busy ? null : _refreshScope,
-                    child: const Text('Atualizar acesso'),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Atualizar acesso'),
                   ),
                   TextButton(
                     onPressed: widget.onClose,
                     child: const Text('Fechar'),
                   ),
-                  TextButton(
+                  OutlinedButton.icon(
                     onPressed: _busy ? null : _load,
-                    child: const Text('Atualizar'),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Atualizar'),
                   ),
                 ],
               ),
-              if (_busy) const Text('Carregando…'),
-              if (_notice != null) Text(_notice!),
+              if (_busy)
+                const Padding(
+                  padding: EdgeInsets.only(top: 12),
+                  child: Text('Carregando…'),
+                ),
+              if (_notice != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Semantics(
+                    liveRegion: true,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xfffff7f7),
+                        border: Border.all(color: const Color(0xfffecaca)),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        _notice!,
+                        style: const TextStyle(color: UnifiedColors.red),
+                      ),
+                    ),
+                  ),
+                ),
               if (_operation != null)
-                FilledButton(
-                  onPressed: _busy ? null : () => _update(_id!, _status!),
-                  child: const Text('Tentar novamente'),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : () => _update(_id!, _status!),
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Tentar novamente'),
+                    ),
+                  ),
                 ),
               if (_rows?.isEmpty ?? false)
-                const Text('Nenhum feedback recebido.'),
+                const Base44Panel(
+                  child: Text(
+                    'Nenhum feedback recebido.',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               for (final row in _rows ?? <domain.Feedback>[])
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
+                Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: Base44Panel(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        Text(row.userName ?? row.userEmail ?? 'Usuário'),
-                        Text(row.message),
-                        Text(switch (row.status) {
-                          domain.FeedbackStatus.pending => 'Novo',
-                          domain.FeedbackStatus.read => 'Lido',
-                          domain.FeedbackStatus.resolved => 'Resolvido',
-                        }),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(top: 2),
+                              child: Icon(
+                                Icons.account_circle_outlined,
+                                color: UnifiedColors.muted,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                row.userName ?? row.userEmail ?? 'Usuário',
+                                style: Theme.of(context).textTheme.titleMedium
+                                    ?.copyWith(color: UnifiedColors.brandNavy),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: UnifiedColors.page,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(row.message),
+                        ),
+                        const SizedBox(height: 8),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: Chip(
+                            avatar: Icon(switch (row.status) {
+                              domain.FeedbackStatus.pending =>
+                                Icons.fiber_new_outlined,
+                              domain.FeedbackStatus.read =>
+                                Icons.mark_email_read_outlined,
+                              domain.FeedbackStatus.resolved =>
+                                Icons.check_circle_outline,
+                            }, size: 18),
+                            label: Text(switch (row.status) {
+                              domain.FeedbackStatus.pending => 'Novo',
+                              domain.FeedbackStatus.read => 'Lido',
+                              domain.FeedbackStatus.resolved => 'Resolvido',
+                            }),
+                            backgroundColor: switch (row.status) {
+                              domain.FeedbackStatus.pending => const Color(
+                                0xfffff7ed,
+                              ),
+                              domain.FeedbackStatus.read =>
+                                UnifiedColors.pageTint,
+                              domain.FeedbackStatus.resolved => const Color(
+                                0xfff0fdf4,
+                              ),
+                            },
+                          ),
+                        ),
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,

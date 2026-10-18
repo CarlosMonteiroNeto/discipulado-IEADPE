@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../ui/base44_widgets.dart';
+import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 
@@ -67,73 +69,112 @@ class _TeamPageState extends State<TeamPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
     body: SafeArea(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 896),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                'Equipe de discipulado',
-                style: Theme.of(context).textTheme.headlineSmall,
+              Base44PageHeading(
+                title: 'Equipe de discipulado',
+                icon: Icons.groups_outlined,
+                subtitle: widget.supervision
+                    ? 'Diretório de supervisão'
+                    : 'Diretório da congregação',
               ),
-              TextField(
-                controller: _search,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(labelText: 'Buscar por nome'),
-                onSubmitted: (_) => _load(),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: _loading ? null : () => _load(),
-                    child: const Text('Buscar'),
-                  ),
-                  TextButton(
-                    onPressed: _loading ? null : () => _load(),
-                    child: const Text('Atualizar'),
-                  ),
-                ],
-              ),
-              if (_loading)
-                const Center(
-                  child: CircularProgressIndicator(
-                    semanticsLabel: 'Carregando equipe',
-                  ),
-                ),
-              if (_error != null)
-                Column(
+              const SizedBox(height: 16),
+              Base44Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(_error!),
-                    TextButton(
-                      onPressed: () => _load(cursor: _cursor),
-                      child: const Text('Tentar novamente'),
+                    TextField(
+                      controller: _search,
+                      textInputAction: TextInputAction.search,
+                      decoration: const InputDecoration(
+                        labelText: 'Buscar por nome',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onSubmitted: (_) => _load(),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : () => _load(),
+                          icon: const Icon(Icons.search),
+                          label: const Text('Buscar'),
+                        ),
+                        TextButton.icon(
+                          onPressed: _loading ? null : () => _load(),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Atualizar'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
+              ),
+              if (_loading)
+                const Base44Panel(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      semanticsLabel: 'Carregando equipe',
+                    ),
+                  ),
+                ),
+              if (_error != null)
+                Base44Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_error!),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () => _load(cursor: _cursor),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                ),
               if (!_loading && _error == null && _page?.items.isEmpty == true)
-                const Text('Nenhuma pessoa encontrada.'),
+                const Base44Panel(child: Text('Nenhuma pessoa encontrada.')),
               for (final item
                   in _page?.items ?? const <MinistryDirectoryEntry>[])
                 Card(
                   child: ListTile(
-                    title: Text(item.name),
-                    subtitle: Text(item.roleCode ?? 'Sem função atribuída'),
+                    title: Text(item.name, softWrap: true),
+                    subtitle: Text(
+                      item.roleCode ?? 'Sem função atribuída',
+                      softWrap: true,
+                    ),
                     leading: const CircleAvatar(
+                      backgroundColor: UnifiedColors.pageTint,
+                      foregroundColor: UnifiedColors.brandNavy,
                       child: Icon(Icons.person_outline),
                     ),
+                    minVerticalPadding: 12,
                   ),
                 ),
               if (_page?.nextCursor != null)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => _load(cursor: _page!.nextCursor),
-                    child: const Text('Próxima página'),
+                Base44Panel(
+                  padding: const EdgeInsets.all(8),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _loading
+                            ? null
+                            : () => _load(cursor: _page!.nextCursor),
+                        icon: const Icon(Icons.chevron_right),
+                        label: const Text('Próxima página'),
+                      ),
+                    ],
                   ),
                 ),
             ],

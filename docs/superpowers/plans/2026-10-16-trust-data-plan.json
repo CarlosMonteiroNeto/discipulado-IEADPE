@@ -1,0 +1,78 @@
+{
+  "feature": "Trust-data hardening for Discipulado IEADPE internal mode",
+  "spec_doc": "docs/superpowers/specs/2026-10-16-trust-data-design.md",
+  "global_constraints": [
+    "User-facing copy uses pt-BR; identifiers, code, specifications, and technical documentation use English.",
+    "The app runs on Firebase Spark with no Cloud Functions; authorization is enforced only by firestore.rules.",
+    "Do not deploy, push, import legacy data, or send messages. Emulator verification is the release evidence.",
+    "Use stable opaque IDs, ISO date-only strings for calendar dates, UTC server timestamps, integer revisions starting at 1.",
+    "Each touches entry is an exact production/configuration/documentation path exclusively owned by that task. Tasks with overlapping touches never share a wave.",
+    "No expected_red field. RED tests are authored just-in-time by the operator; acceptance and spec_refs travel with each task.",
+    "No Admin SDK keys or privileged credentials in browser-served code. No PII in logs, URLs, or error reports."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Lock NFR drivers and accepted-race runbook",
+      "summary": "Record security-first NFR drivers and the operator runbook for advisory uniqueness, enrollment-cap race, and paging cost. This is the sole owner of the trust-data NFR doc consumed by tasks 2-4.",
+      "spec_refs": ["requirements"],
+      "touches": ["docs/trust-data-nfr.md"],
+      "depends_on": [],
+      "acceptance": [
+        "docs/trust-data-nfr.md ranks security above availability above performance with one paragraph of rationale per driver tied to Spark client-write mode.",
+        "The doc lists each relaxed invariant (advisory name uniqueness, best-effort enrollment cap, no counters, client paging amplification) with accepted behavior plus numbered operator resolution steps.",
+        "No code, rules, or handler file is modified in this task."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Re-harden Firestore rules and indexes",
+      "summary": "Remove the hardcoded owner email, audit scoped grants for activeEnrollmentRefs and class/session roster paths, and pin required composite indexes. Sole owner of rules and indexes in this plan.",
+      "spec_refs": ["cloud-deploy", "requirements"],
+      "touches": ["firestore.rules", "firestore.indexes.json"],
+      "depends_on": [1],
+      "acceptance": [
+        "firestore.rules contains no hardcoded personal email; the allowlist credential is a clearly marked placeholder with a rotation procedure referenced from docs/trust-data-nfr.md.",
+        "congregations/{id}/activeEnrollmentRefs/{refId}, classes/{classId}/roster/{rosterId}, and sessions/{sessionId}/roster/{rosterId} are explicitly granted to supervisor plus own-congregation staff and covered by allow/deny cases; every other path falls to the deny catch-all.",
+        "firestore.indexes.json declares the shipped directory, student, class, session, and enrollment filter/order combinations; an unsupported combination is rejected in repository input, not silently scanned.",
+        "Backend unit compile passes; emulator security suites are updated but their execution evidence belongs to the verification-quality plan, not this task."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Align handler validation and safe errors",
+      "summary": "Mirror Dart and TypeScript validation semantics and centralize safe error mapping. Sole owner of the listed handler, validation, and error files in this plan.",
+      "spec_refs": ["coding-standards"],
+      "touches": [
+        "lib/data/error_mapper.dart",
+        "lib/data/handlers/enrollments.dart",
+        "lib/data/handlers/attendance.dart",
+        "functions/src/core/validation.ts"
+      ],
+      "depends_on": [2],
+      "acceptance": [
+        "Name normalization (lowercase, diacritics stripped), Brazilian phone to E.164, birth-date America/Recife range, and nullable baptism semantics behave identically in Dart and TypeScript against shared fixtures.",
+        "Mutations carry stable UUID plus expectedRevision and requestId; stale revision returns conflict without overwrite and timeout preserves draft plus retry identity.",
+        "SDK and rules denials map to AppFailure codes validation, unauthenticated, forbidden, notFound, conflict, unavailable, unknown with safe pt-BR messages and no stack traces, tokens, or raw payloads.",
+        "New unit tests cover accented homonyms, leap-day dates, contradictory baptism answers, stale revision, and idempotent replay with altered-payload rejection."
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Bound directory and prefix read cost",
+      "summary": "Measure reads per directory and name-prefix page and record the Spark budget. Sole owner of the codec, transport-support, and budget doc in this plan.",
+      "spec_refs": ["cloud-deploy", "coding-standards"],
+      "touches": [
+        "lib/data/query_codec.dart",
+        "lib/data/transport_support.dart",
+        "docs/read-budget.md"
+      ],
+      "depends_on": [2],
+      "acceptance": [
+        "docs/read-budget.md records measured Firestore reads for one directory page and one global prefix page at 50-record default and states the per-1000-page projection.",
+        "query_codec cursors bind scope, filter, and ordering identity and reject reuse after filter or scope change; cursors never appear in public URLs.",
+        "No rules or handler file from tasks 2-3 is modified in this task."
+      ]
+    }
+  ]
+}

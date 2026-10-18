@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../data/supabase_gateway.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import 'weekly_repository.dart';
 
 /// Task 19 must key/unmount this entire owner on boundary or identity changes.
@@ -235,109 +237,155 @@ class _WeeklyPanelState extends State<WeeklyPanel>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text(
-            'Sem Conversões na Última Semana',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xff1e3a5f),
-            ),
+          Base44PageHeading(
+            title: 'Sem Conversões na Última Semana',
+            icon: Icons.warning_amber_rounded,
+            subtitle:
+                '${_date(overview.weekStart!)} a ${_date(overview.weekStart!.addDays(6))}',
           ),
-          const SizedBox(height: 8),
-          Text(
-            '${_date(overview.weekStart!)} a ${_date(overview.weekStart!.addDays(6))}',
-          ),
+          const SizedBox(height: 12),
           if (_error != null)
             Semantics(
               liveRegion: true,
-              child: Text(
-                _error!,
-                style: const TextStyle(color: Color(0xff9a3412)),
-              ),
-            ),
-          for (final entry in overview.entries)
-            Card(
-              color: overview.isGlobal ? Colors.white : const Color(0xfffff7ed),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (overview.isGlobal) ...[
-                      Text(
-                        entry.name,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
-                      ),
-                      Text(
-                        entry.confirmed ? 'Confirmado' : 'Aguardando',
-                        style: TextStyle(
-                          color: entry.confirmed
-                              ? const Color(0xff2563eb)
-                              : const Color(0xff9a3412),
-                        ),
-                      ),
-                    ] else if (entry.confirmed) ...[
-                      const Text(
-                        'Relatório confirmado',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xff166534),
-                        ),
-                      ),
-                      Text(
-                        'Você confirmou que não houve conversões em ${entry.name} na última semana.',
-                      ),
-                    ] else ...[
-                      Text(
-                        'Não houve conversões em ${entry.name} na última semana',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xff9a3412),
-                        ),
-                      ),
-                      if (_confirming?.id != entry.id)
-                        OutlinedButton(
-                          onPressed: _busy
-                              ? null
-                              : () => setState(() {
-                                  _confirming = entry;
-                                  _error = null;
-                                }),
-                          child: const Text('Confirmar sem conversões'),
-                        )
-                      else ...[
-                        const SizedBox(height: 8),
-                        Text(
-                          'Você confirma que não houve conversões em ${entry.name} neste período?',
-                        ),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            TextButton(
-                              onPressed: _busy
-                                  ? null
-                                  : () => setState(() {
-                                      _confirming = null;
-                                      _error = null;
-                                    }),
-                              child: const Text('Cancelar'),
-                            ),
-                            FilledButton(
-                              onPressed: _busy ? null : _confirm,
-                              child: Text(_busy ? 'Confirmando…' : 'Confirmar'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ],
-                  ],
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xfffffbeb),
+                  border: Border.all(color: const Color(0xfffde68a)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Color(0xff92400e)),
                 ),
               ),
             ),
-          TextButton(
+          for (final entry in overview.entries)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Base44Panel(
+                padding: const EdgeInsets.all(12),
+                child: overview.isGlobal
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            entry.name,
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: UnifiedColors.brandNavy),
+                          ),
+                          const SizedBox(height: 4),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: Chip(
+                              avatar: Icon(
+                                entry.confirmed
+                                    ? Icons.check_circle_outline
+                                    : Icons.schedule_outlined,
+                                size: 18,
+                              ),
+                              label: Text(
+                                entry.confirmed ? 'Confirmado' : 'Aguardando',
+                              ),
+                              backgroundColor: entry.confirmed
+                                  ? UnifiedColors.pageTint
+                                  : const Color(0xfffffbeb),
+                              side: BorderSide(
+                                color: entry.confirmed
+                                    ? const Color(0xffbfdbfe)
+                                    : const Color(0xfffde68a),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xfffffbeb),
+                          border: Border.all(color: const Color(0xfffde68a)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (entry.confirmed) ...[
+                              const Text(
+                                'Relatório confirmado',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xff166534),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Você confirmou que não houve conversões em ${entry.name} na última semana.',
+                              ),
+                            ] else ...[
+                              Text(
+                                'Não houve conversões em ${entry.name} na última semana',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xff92400e),
+                                ),
+                              ),
+                              if (_confirming?.id != entry.id)
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: OutlinedButton.icon(
+                                    onPressed: _busy
+                                        ? null
+                                        : () => setState(() {
+                                            _confirming = entry;
+                                            _error = null;
+                                          }),
+                                    icon: const Icon(
+                                      Icons.check_circle_outline,
+                                    ),
+                                    label: const Text(
+                                      'Confirmar sem conversões',
+                                    ),
+                                  ),
+                                )
+                              else ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Você confirma que não houve conversões em ${entry.name} neste período?',
+                                ),
+                                const SizedBox(height: 4),
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    TextButton(
+                                      onPressed: _busy
+                                          ? null
+                                          : () => setState(() {
+                                              _confirming = null;
+                                              _error = null;
+                                            }),
+                                      child: const Text('Cancelar'),
+                                    ),
+                                    FilledButton(
+                                      onPressed: _busy ? null : _confirm,
+                                      child: Text(
+                                        _busy ? 'Confirmando…' : 'Confirmar',
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ],
+                          ],
+                        ),
+                      ),
+              ),
+            ),
+          TextButton.icon(
             onPressed: _busy ? null : _load,
-            child: const Text('Atualizar relatório'),
+            icon: const Icon(Icons.refresh),
+            label: const Text('Atualizar relatório'),
           ),
         ],
       ),

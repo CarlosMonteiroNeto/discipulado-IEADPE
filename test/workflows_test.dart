@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/app.dart';
+import 'package:ieadpe_converts/features/converts/convert_form.dart';
 import 'package:ieadpe_converts/features/converts/register_page.dart';
 import 'package:ieadpe_converts/features/feedback/feedback_dialog.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
@@ -310,10 +311,14 @@ void main() {
         find.byKey(const ValueKey('conversion_date')),
         '2026-10-15',
       );
-      await tester.ensureVisible(
-        find.byType(DropdownButtonFormField<String>).first,
-      );
-      await tester.tap(find.byType(DropdownButtonFormField<String>).first);
+      final congregationField = find
+          .descendant(
+            of: find.byType(ConvertForm),
+            matching: find.byType(DropdownButtonFormField<String>),
+          )
+          .first;
+      await tester.ensureVisible(congregationField);
+      await tester.tap(congregationField);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Congregação Sintética').last);
       await tester.pumpAndSettle();
@@ -381,6 +386,10 @@ void main() {
       expect(enrollment?.id, RootFixture.enrollmentRecordId);
       expect(fixture.promotionCount, 1);
 
+      await tester.tap(
+        find.byKey(const ValueKey('app-shell-ministry-selector')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.text('Frequência').last);
       await drain(tester);
       expect(find.text('Turma Sintética'), findsOneWidget);
@@ -439,6 +448,7 @@ void main() {
       final router = (rootContext
           .findAncestorWidgetOfExactType<ProtectedApplication>()!);
       expect(router.repository, same(fixture.auth));
+      await tester.ensureVisible(find.text('Escolher foto'));
       await tester.tap(find.text('Escolher foto'));
       await tester.pump();
       fixture.scopeGate = Completer<void>();
@@ -494,6 +504,7 @@ void main() {
         find.byKey(const ValueKey('name')),
         'Synthetic private draft',
       );
+      await tester.ensureVisible(find.text('Escolher foto'));
       await tester.tap(find.text('Escolher foto'));
       await tester.pump();
       await tester.runAsync(
@@ -531,6 +542,7 @@ void main() {
           find.byKey(const ValueKey('name')),
           'Synthetic private draft',
         );
+        await tester.ensureVisible(find.text('Escolher foto'));
         await tester.tap(find.text('Escolher foto'));
         await tester.pump();
         fixture.admin = false;

@@ -64,7 +64,8 @@ CREATE TABLE private.congregation_week_guards (
  conversion_count integer NOT NULL DEFAULT 0 CHECK(conversion_count>=0), PRIMARY KEY(congregation_id,week_start)
 );
 ALTER TABLE private.congregation_week_guards ENABLE ROW LEVEL SECURITY;
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- Supabase-managed Storage enables RLS on storage.objects; the project owner
+-- cannot alter that managed table's RLS flag on hosted projects.
 DO $$ DECLARE t text; BEGIN
  FOREACH t IN ARRAY ARRAY['congregations','user_access','converts','convert_events','weekly_reports','feedback','photo_assets'] LOOP
   EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY',t);

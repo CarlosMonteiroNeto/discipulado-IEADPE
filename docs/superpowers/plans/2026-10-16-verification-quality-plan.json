@@ -1,0 +1,64 @@
+{
+  "feature": "Verification-quality gate for Discipulado IEADPE",
+  "spec_doc": "docs/superpowers/specs/2026-10-16-verification-quality-design.md",
+  "global_constraints": [
+    "User-facing copy uses pt-BR; identifiers, code, specifications, and technical documentation use English.",
+    "The same entry points run locally and in CI: tool/verify.sh and tool/verify.ps1.",
+    "Environment-blocked checks are reported as incomplete, never as passed.",
+    "Each touches entry is an exact path exclusively owned by that task. Tasks with overlapping touches never share a wave.",
+    "No expected_red field. RED evidence is authored just-in-time by the operator.",
+    "Do not deploy, push, import legacy data, or send messages."
+  ],
+  "tasks": [
+    {
+      "id": 1,
+      "title": "Harden emulator gate and CI pins",
+      "summary": "Make the emulator security entry fail fast without hosts and pin CI runtimes. Sole owner of gate config and CI workflow in this plan.",
+      "spec_refs": ["verification-test", "quality-gate"],
+      "touches": [
+        "functions/package.json",
+        "functions/vitest.config.ts",
+        "tool/verify.sh",
+        "tool/verify.ps1",
+        ".github/workflows/verify.yml"
+      ],
+      "depends_on": [],
+      "acceptance": [
+        "npm run test:emulator exits non-zero when FIRESTORE_EMULATOR_HOST or FIREBASE_AUTH_EMULATOR_HOST is absent instead of silently skipping.",
+        "A sentinel test proves the security suite actually executed; a run that omits it cannot report green.",
+        "CI pins Flutter stable, Node 20, and the Java runtime for the Firestore emulator and invokes the same verify entry as local runs.",
+        "No test file content from other tasks is modified here."
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Execute authorization matrix and browser flow",
+      "summary": "Run the emulator-backed rules suites and the Chromium browser flow plus Firefox/WebKit smoke. Sole owner of the new proof test and the integration test in this plan.",
+      "spec_refs": ["verification-test"],
+      "touches": [
+        "functions/test/security/trust-matrix-proof.test.ts",
+        "integration_test/browser_flow_test.dart"
+      ],
+      "depends_on": [1],
+      "acceptance": [
+        "The proof suite asserts supervisor-allow, staff-own-allow, staff-other-deny, self-escalation-deny, allowlisted-owner self-claim, roster and activeEnrollmentRefs grants, and catch-all denial through firebase emulators:exec with project demo-discipulado.",
+        "The browser flow covers sign-in, contact homonym create and rename, role replacement, student and class creation, enrollment, attendance save and finalize, progress check, direct-URL reload, history, sign-out, and denied second-congregation access on Chromium with smoke on Firefox and WebKit.",
+        "Committed task-2 security tests stay byte-identical; all new assertions live in the proof file listed in touches.",
+        "Failures report exact command, exit code, and emulator host state; blocked runs are marked incomplete."
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Record executed evidence ledger",
+      "summary": "Write the executed versus blocked ledger with versions and responsive findings. Sole owner of docs/verification.md in this plan.",
+      "spec_refs": ["quality-gate"],
+      "touches": ["docs/verification.md"],
+      "depends_on": [2],
+      "acceptance": [
+        "docs/verification.md tables every gate command with exit code, actual browser and runtime versions, and the 360, 768, 1440 plus 200-percent-text, reduced-motion, keyboard-only, and screen-reader results.",
+        "The report separates executed checks from environment-blocked checks and states the release boundary of no push, deployment, message send, legacy import, or Android packaging.",
+        "No gate config or test file from tasks 1-2 is modified in this task."
+      ]
+    }
+  ]
+}

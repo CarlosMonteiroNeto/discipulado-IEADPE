@@ -8,6 +8,7 @@ import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_handoff_repository.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart';
+import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/features/ministry/ui/convert_handoff_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/attendance_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/classes_page.dart';
@@ -211,6 +212,35 @@ class _Gateway
         'next_cursor': 'sessions-2',
       };
     }
+    if (rpc == 'ministry_get_session_attendance') {
+      return {
+        'session': {
+          'id': parameters['session_id'],
+          'congregation_id': _scope,
+          'revision': 1,
+          'created_at': '2026-10-01T00:00:00Z',
+          'updated_at': '2026-10-01T00:00:00Z',
+          'updated_by': _student,
+          'class_id': _classId,
+          'date': '2026-10-01',
+          'topic': null,
+          'status': 'open',
+          'roster_frozen': true,
+          'lesson_index': null,
+          'lesson_part': null,
+          'lesson_finished': false,
+        },
+        'roster': [
+          {
+            'enrollment_id': _sessionId,
+            'student_id': _student,
+            'student_name':
+                'Alexandre dos Santos de Albuquerque da Silva e Oliveira',
+            'status': 'unmarked',
+          },
+        ],
+      };
+    }
     throw StateError('Unexpected read $rpc');
   }
 
@@ -327,7 +357,7 @@ void main() {
       await tester.scrollUntilVisible(
         create,
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
       await tester.tap(create);
@@ -344,7 +374,9 @@ void main() {
       expect(find.textContaining('Vínculo confirmado'), findsOneWidget);
       expect(gateway.enrollmentPayloads, isEmpty);
 
-      await tester.tap(find.byKey(const Key('handoff-class-select')));
+      final classSelect = find.byKey(const Key('handoff-class-select'));
+      await _dragPageUntilHitTestable(tester, classSelect);
+      await tester.tap(classSelect);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Fundamentos').last);
       await tester.pumpAndSettle();
@@ -352,7 +384,7 @@ void main() {
       await tester.scrollUntilVisible(
         enroll,
         300,
-        scrollable: find.byType(Scrollable).first,
+        scrollable: find.byType(Scrollable).last,
       );
       await tester.pumpAndSettle();
       await tester.tap(enroll);
@@ -458,7 +490,9 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Criar aluno a partir desta referência'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('handoff-class-select')));
+    final classSelect = find.byKey(const Key('handoff-class-select'));
+    await _dragPageUntilHitTestable(tester, classSelect);
+    await tester.tap(classSelect);
     await tester.pumpAndSettle();
     await tester.tap(find.text('Fundamentos').last);
     await tester.pumpAndSettle();
@@ -543,7 +577,9 @@ void main() {
     await tester.tap(find.text('Buscar possíveis alunos'));
     await tester.pumpAndSettle();
     expect(find.text('Ver mais alunos'), findsOneWidget);
-    await tester.tap(find.text('Ver mais alunos'));
+    final moreCandidates = find.text('Ver mais alunos');
+    await _dragPageUntilHitTestable(tester, moreCandidates);
+    await tester.tap(moreCandidates);
     await tester.pumpAndSettle();
     expect(gateway.candidateReads, 2);
     expect(find.text('Ana Maria Souza'), findsOneWidget);
@@ -722,6 +758,200 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Fundamentos avançados'), findsOneWidget);
   });
+
+  testWidgets(
+    'long congregation scope remains selectable across phone paging',
+    (tester) async {
+      const centralId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const northId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const centralName =
+          'Assembleia de Deus em Pernambuco - Congregação Central do Recife';
+      String? selectedId;
+      var pageNumber = 1;
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 800),
+              textScaler: TextScaler.linear(2),
+            ),
+            child: StatefulBuilder(
+              builder: (context, rebuild) => MinistryHomePage(
+                loadOverview: () async => const {
+                  'students': 1,
+                  'classes': 1,
+                  'open_sessions': 0,
+                  'through_date': '2026-10-17',
+                },
+                scopeName: selectedId == null
+                    ? 'Selecione uma congregação'
+                    : centralName,
+                availableCongregationIds: pageNumber == 1
+                    ? const [centralId]
+                    : selectedId == null
+                    ? const [northId]
+                    : [selectedId!, northId],
+                congregationNames: const {
+                  centralId: centralName,
+                  northId: 'Congregação Norte',
+                },
+                selectedCongregationId: selectedId,
+                onSelectCongregation: (value) => rebuild(() {
+                  selectedId = value;
+                }),
+                scopeRequired: selectedId == null,
+                scopedActionsEnabled: selectedId != null,
+                hasNextCongregationPage: pageNumber == 1,
+                congregationPageNumber: pageNumber,
+                onNextCongregationPage: pageNumber == 1
+                    ? () => rebuild(() => pageNumber = 2)
+                    : null,
+                onOpenStudents: () {},
+                onOpenClasses: () {},
+                onOpenAttendance: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+
+      final studentsAction = find.text('Alunos');
+      await tester.scrollUntilVisible(
+        studentsAction,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.ancestor(
+                of: studentsAction,
+                matching: find.byWidgetPredicate(
+                  (widget) => widget is ButtonStyleButton,
+                ),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<ButtonStyleButton>(
+              find.ancestor(
+                of: find.text('Turmas'),
+                matching: find.byWidgetPredicate(
+                  (widget) => widget is ButtonStyleButton,
+                ),
+              ),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('Página 1'), findsOneWidget);
+
+      final congregationPicker = find.byType(DropdownButtonFormField<String>);
+      await tester.scrollUntilVisible(
+        congregationPicker,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(congregationPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text(centralName).last);
+      await tester.pumpAndSettle();
+      expect(selectedId, centralId);
+      expect(tester.takeException(), isNull);
+
+      final nextPage = find.text('Próxima');
+      await tester.scrollUntilVisible(
+        nextPage,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.tap(nextPage);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Página 2'), findsOneWidget);
+      expect(find.text(centralName), findsAtLeastNWidgets(1));
+      await tester.scrollUntilVisible(
+        congregationPicker,
+        300,
+        scrollable: find.byType(Scrollable).first,
+      );
+      final picker = tester.widget<DropdownButton<String>>(
+        find.descendant(
+          of: find.byType(DropdownButtonFormField<String>),
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
+      expect(picker.value, centralId);
+      expect(picker.items!.map((item) => item.value), [centralId, northId]);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'attendance controls stay reachable at 200 percent text on phone',
+    (tester) async {
+      const studentName =
+          'Alexandre dos Santos de Albuquerque da Silva e Oliveira';
+      final gateway = _Gateway()..pagingEnabled = true;
+      await tester.binding.setSurfaceSize(const Size(320, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: const MediaQueryData(
+              size: Size(320, 800),
+              textScaler: TextScaler.linear(2),
+            ),
+            child: AttendancePage(
+              repository: MinistryRepository(gateway),
+              congregationId: _scope,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final session = find.text('Fundamentos');
+      await _dragPageUntilHitTestable(tester, session);
+      await tester.tap(session);
+      await tester.pumpAndSettle();
+
+      expect(find.text(studentName), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      final status = find.byType(DropdownButtonFormField<AttendanceStatus>);
+      await _dragPageUntilHitTestable(tester, status);
+      await tester.tap(status);
+      await tester.pumpAndSettle();
+      expect(find.text('Presente'), findsOneWidget);
+      await tester.tap(find.text('Presente'));
+      await tester.pumpAndSettle();
+
+      final save = find.text('Salvar e finalizar');
+      await _dragPageUntilHitTestable(tester, save);
+      expect(tester.getRect(save).bottom, lessThanOrEqualTo(800));
+      expect(tester.takeException(), isNull);
+    },
+  );
+}
+
+Future<void> _dragPageUntilHitTestable(
+  WidgetTester tester,
+  Finder target,
+) async {
+  final page = find.byType(ListView).last;
+  for (var i = 0; i < 8 && target.hitTestable().evaluate().isEmpty; i++) {
+    await tester.drag(page, const Offset(0, -300));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsOneWidget);
+  expect(target.hitTestable(), findsOneWidget);
 }
 
 bool _hasHorizontalOverflow(WidgetTester tester) {

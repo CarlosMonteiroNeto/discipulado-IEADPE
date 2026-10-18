@@ -46,7 +46,12 @@ class ReportsRepository {
       validatePageOrder(rows, after);
       for (final row in rows) {
         try {
-          validateUuid(row['convert_id']);
+          if (row['convert_id'] != null) validateUuid(row['convert_id']);
+          final legacyConvertId = row['legacy_convert_id'];
+          if (legacyConvertId != null &&
+              (legacyConvertId is! String || legacyConvertId.isEmpty)) {
+            throw const DataFailure('invalid_response');
+          }
           if (row['congregation_id'] != null) {
             validateUuid(row['congregation_id']);
           }

@@ -41,7 +41,7 @@ void main() {
   testWidgets(
     'manager can navigate five injected panels and feedback at 200 percent on narrow screen',
     (t) async {
-      t.view.physicalSize = const Size(360, 800);
+      t.view.physicalSize = const Size(320, 800);
       t.view.devicePixelRatio = 1;
       addTearDown(t.view.resetPhysicalSize);
       addTearDown(t.view.resetDevicePixelRatio);
@@ -69,7 +69,7 @@ void main() {
         ),
       );
       await t.pumpAndSettle();
-      expect(find.text('Congregações'), findsOneWidget);
+      expect(find.text('Congregações'), findsAtLeastNWidgets(1));
       await press(t, 'Relatório');
       expect(find.text('Relatório real'), findsOneWidget);
       await press(t, 'Eventos');
@@ -294,6 +294,59 @@ void main() {
       await t.pumpAndSettle();
       await press(t, 'Salvar acesso');
       expect(gateway.payloads.single['congregation_id'], isNull);
+      expect(t.takeException(), isNull);
+    },
+  );
+  testWidgets(
+    'narrow admin keeps uncertain retry reachable and mutation actions locked',
+    (t) async {
+      t.view.physicalSize = const Size(320, 800);
+      t.view.devicePixelRatio = 1;
+      addTearDown(t.view.resetPhysicalSize);
+      addTearDown(t.view.resetDevicePixelRatio);
+      final gateway = AdminGateway()..failure = 'unavailable';
+      await t.pumpWidget(app(gateway, scale: 2));
+      await t.pumpAndSettle();
+      await press(t, 'Acessos');
+      await press(t, 'Novo acesso');
+      await t.enterText(find.byType(TextFormField), 'supervision@example.test');
+      await t.ensureVisible(find.byType(DropdownButtonFormField<AccessRole>));
+      await t.tap(find.byType(DropdownButtonFormField<AccessRole>));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Membro da supervisão das campanhas').last);
+      await t.pumpAndSettle();
+      await press(t, 'Salvar acesso');
+
+      expect(
+        find.text(
+          'Não foi possível confirmar a alteração. Tente a mesma alteração novamente.',
+        ),
+        findsOneWidget,
+      );
+      await t.ensureVisible(find.text('Tentar a mesma alteração novamente'));
+      expect(
+        t
+            .widget<FilledButton>(
+              find.widgetWithText(FilledButton, 'Salvar acesso'),
+            )
+            .onPressed,
+        isNull,
+      );
+      expect(
+        t
+            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Eventos'))
+            .onSelected,
+        isNull,
+      );
+      expect(t.takeException(), isNull);
+
+      gateway.failure = null;
+      await press(t, 'Tentar a mesma alteração novamente');
+      expect(gateway.operations, [
+        gateway.operations.first,
+        gateway.operations.first,
+      ]);
+      expect(find.text('Novo acesso'), findsNothing);
       expect(t.takeException(), isNull);
     },
   );

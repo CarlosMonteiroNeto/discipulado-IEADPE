@@ -7,6 +7,7 @@ import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
 import '../../domain/worship_types.dart';
 import '../../data/supabase_gateway.dart';
+import '../../ui/unified_theme.dart';
 
 /// Only user-editable fields. Never serialize a read DTO into a command.
 class ConvertDraft {
@@ -208,7 +209,6 @@ class _ConvertFormState extends State<ConvertForm> {
     TextEditingController c, {
     String? Function(String?)? validator,
     TextInputType? keyboard,
-    bool optional = false,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: TextFormField(
@@ -219,8 +219,8 @@ class _ConvertFormState extends State<ConvertForm> {
       validator: validator,
       decoration: InputDecoration(
         labelText: label,
-        filled: optional && c.text.isEmpty,
-        fillColor: const Color(0xfffff7ed),
+        filled: true,
+        fillColor: Colors.white,
         border: const OutlineInputBorder(),
       ),
       onChanged: (_) => setState(() {}),
@@ -244,24 +244,62 @@ class _ConvertFormState extends State<ConvertForm> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (displayed != null)
-                Semantics(
-                  label: 'Foto do convertido',
-                  child: Image.memory(
-                    displayed,
-                    height: 96,
-                    width: 96,
-                    errorBuilder: (_, e, s) =>
-                        const Icon(Icons.person, size: 64),
+              Semantics(
+                label: displayed == null
+                    ? 'Sem foto do convertido'
+                    : 'Foto do convertido',
+                child: Center(
+                  child: Container(
+                    width: 104,
+                    height: 104,
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: UnifiedColors.border, width: 2),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x140f172a),
+                          blurRadius: 8,
+                          offset: Offset(0, 3),
+                        ),
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: displayed == null
+                          ? const ColoredBox(
+                              color: UnifiedColors.pageTint,
+                              child: Icon(
+                                Icons.person_outline,
+                                size: 52,
+                                color: UnifiedColors.muted,
+                              ),
+                            )
+                          : Image.memory(
+                              displayed,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, e, s) => const ColoredBox(
+                                color: UnifiedColors.pageTint,
+                                child: Icon(
+                                  Icons.person_outline,
+                                  size: 52,
+                                  color: UnifiedColors.muted,
+                                ),
+                              ),
+                            ),
+                    ),
                   ),
                 ),
+              ),
+              const SizedBox(height: 8),
               Wrap(
                 alignment: WrapAlignment.center,
                 spacing: 8,
+                runSpacing: 4,
                 children: [
                   TextButton.icon(
                     onPressed: _busy || _picking ? null : _pick,
-                    icon: const Icon(Icons.add_a_photo),
+                    icon: const Icon(Icons.add_a_photo_outlined),
                     label: Text(_picking ? 'Abrindo foto…' : 'Escolher foto'),
                   ),
                   if (_photo != null ||
@@ -289,7 +327,7 @@ class _ConvertFormState extends State<ConvertForm> {
                 decoration: const InputDecoration(
                   labelText: 'Congregação (opcional)',
                   filled: true,
-                  fillColor: Color(0xfffff7ed),
+                  fillColor: Colors.white,
                 ),
                 items: [
                   const DropdownMenuItem(
@@ -324,7 +362,6 @@ class _ConvertFormState extends State<ConvertForm> {
                 'phone',
                 'Telefone (opcional)',
                 _phone,
-                optional: true,
                 keyboard: TextInputType.phone,
               ),
               _field(
@@ -395,16 +432,17 @@ class _ConvertFormState extends State<ConvertForm> {
                 spacing: 12,
                 runSpacing: 8,
                 children: [
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: _busy ? null : widget.onCancel,
-                    child: const Text('Cancelar'),
+                    icon: const Icon(Icons.close),
+                    label: const Text('Cancelar'),
                   ),
-                  FilledButton(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xff1e3a5f),
-                    ),
+                  FilledButton.icon(
                     onPressed: _busy || _picking ? null : _submit,
-                    child: Text(
+                    icon: Icon(
+                      _busy ? Icons.hourglass_top : Icons.save_outlined,
+                    ),
+                    label: Text(
                       _busy
                           ? 'Salvando…'
                           : widget.initial == null

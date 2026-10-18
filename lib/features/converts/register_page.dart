@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../data/convert_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart';
+import '../../ui/unified_theme.dart';
 import '../photos/photo_repository.dart';
 import 'convert_form.dart';
 import 'convert_save_controller.dart';
@@ -99,7 +100,7 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('IEADPE • Novos Convertidos')),
+    backgroundColor: Colors.transparent,
     body: SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -108,35 +109,63 @@ class _RegisterPageState extends State<RegisterPage> {
             constraints: const BoxConstraints(maxWidth: 512),
             child: Card(
               clipBehavior: Clip.antiAlias,
+              shape: RoundedRectangleBorder(
+                side: const BorderSide(color: UnifiedColors.border),
+                borderRadius: BorderRadius.circular(14),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  const ColoredBox(
+                    color: UnifiedColors.brandNavy,
+                    child: SizedBox(height: 4),
+                  ),
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [Color(0xff1e3a5f), Color(0xff2563eb)],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          UnifiedColors.brandNavy,
+                          UnifiedColors.brandBlue,
+                        ],
                       ),
                     ),
                     child: Wrap(
                       crossAxisAlignment: WrapCrossAlignment.center,
                       spacing: 12,
+                      runSpacing: 8,
                       children: [
-                        const Icon(Icons.church, color: Colors.white),
-                        Text(
+                        Icon(
                           widget.initial == null
-                              ? 'Cadastrar Novo Convertido'
-                              : 'Editar Convertido',
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(color: Colors.white),
+                              ? Icons.person_add_alt_1
+                              : Icons.edit_outlined,
+                          color: Colors.white,
+                          size: 26,
+                        ),
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 400),
+                          child: Text(
+                            widget.initial == null
+                                ? 'Cadastrar Novo Convertido'
+                                : 'Editar Convertido',
+                            softWrap: true,
+                            style: Theme.of(context).textTheme.titleLarge
+                                ?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.all(20),
                     child: _success
                         ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
                               Semantics(
                                 liveRegion: true,
@@ -148,10 +177,11 @@ class _RegisterPageState extends State<RegisterPage> {
                               ),
                               const SizedBox(height: 16),
                               if (widget.initial == null)
-                                FilledButton(
+                                FilledButton.icon(
                                   onPressed: () =>
                                       setState(() => _success = false),
-                                  child: const Text(
+                                  icon: const Icon(Icons.person_add_alt_1),
+                                  label: const Text(
                                     'Cadastrar outro convertido',
                                   ),
                                 ),
@@ -163,18 +193,26 @@ class _RegisterPageState extends State<RegisterPage> {
                           )
                         : Column(
                             children: [
-                              if (_loadingPhoto) const Text('Carregando foto…'),
+                              if (_loadingPhoto)
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 12),
+                                  child: Text('Carregando foto…'),
+                                ),
                               if (_photoError != null)
-                                Column(
-                                  children: [
-                                    Text(_photoError!),
-                                    TextButton(
-                                      onPressed: _loadPhoto,
-                                      child: const Text(
-                                        'Tentar carregar foto novamente',
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: Column(
+                                    children: [
+                                      Text(_photoError!),
+                                      TextButton.icon(
+                                        onPressed: _loadPhoto,
+                                        icon: const Icon(Icons.refresh),
+                                        label: const Text(
+                                          'Tentar carregar foto novamente',
+                                        ),
                                       ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
                               ConvertForm(
                                 initial: widget.initial,

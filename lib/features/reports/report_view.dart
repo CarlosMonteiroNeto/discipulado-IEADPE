@@ -9,6 +9,8 @@ import '../../domain/models.dart';
 import '../../platform/file_exporter.dart';
 import '../../platform/portuguese_sort.dart';
 import '../../platform/table_workbook.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import '../admin/congregation_repository.dart';
 import 'reports_repository.dart';
 
@@ -356,164 +358,251 @@ class _ReportViewState extends State<ReportView> {
   @override
   Widget build(BuildContext context) {
     if (!_current) {
-      return TextButton(
-        onPressed: widget.onScopeRefresh,
-        child: const Text('Atualizar acesso'),
+      return Base44Panel(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: widget.onScopeRefresh,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Atualizar acesso'),
+          ),
+        ),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          widget.events ? 'Registro de Eventos' : 'Relatório por Tipo de Culto',
-          style: Theme.of(context).textTheme.titleLarge,
+        Base44PageHeading(
+          title: widget.events
+              ? 'Registro de Eventos'
+              : 'Relatório por Tipo de Culto',
+          icon: widget.events ? Icons.event_note_outlined : Icons.bar_chart,
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            SizedBox(
-              width: 210,
-              child: TextField(
-                controller: _start,
-                enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'Data inicial',
-                  hintText: 'AAAA-MM-DD',
-                ),
-                onChanged: (_) => _edited(),
-              ),
-            ),
-            SizedBox(
-              width: 210,
-              child: TextField(
-                controller: _end,
-                enabled: !_saving,
-                decoration: const InputDecoration(
-                  labelText: 'Data final',
-                  hintText: 'AAAA-MM-DD',
-                ),
-                onChanged: (_) => _edited(),
-              ),
-            ),
-            if (widget.events)
-              SizedBox(
-                width: 250,
-                child: DropdownButtonFormField<String>(
-                  key: ValueKey('$_token-$_congregation-${_catalog.length}'),
-                  initialValue: _congregation,
-                  decoration: const InputDecoration(labelText: 'Congregação'),
-                  isExpanded: true,
-                  items: [
-                    const DropdownMenuItem<String>(
-                      value: null,
-                      child: Text('Todas'),
-                    ),
-                    for (final c in _catalog)
-                      DropdownMenuItem(value: c.id, child: Text(c.name)),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (v) {
-                          _congregation = v;
-                          _edited();
-                        },
-                ),
-              ),
-            FilledButton(
-              onPressed: _busy || _saving ? null : _apply,
-              child: const Text('Aplicar'),
-            ),
-          ],
-        ),
-        if (_busy)
-          Semantics(
-            liveRegion: true,
-            child: const Text('Carregando relatório…'),
-          ),
-        if (_saving)
-          Semantics(
-            liveRegion: true,
-            child: const Text('Escolha onde salvar o arquivo…'),
-          ),
-        if (_message != null)
-          Semantics(liveRegion: true, child: Text(_message!)),
-        if (!_applied && !_busy)
-          const Text('Selecione os filtros e clique em Aplicar.'),
-        if (_applied) ...[
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 16,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
+        Base44Panel(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                widget.events
-                    ? '${_rows.length} evento(s) encontrado(s)'
-                    : '${_counts.fold<int>(0, (s, c) => s + c.count)} conversões no período',
-              ),
-              if (_bytes != null)
-                OutlinedButton(
-                  onPressed: _busy || _saving ? null : _export,
-                  child: const Text('Exportar XLSX'),
-                ),
-            ],
-          ),
-          if (_rows.isEmpty)
-            const Text('Nenhum registro no período selecionado.'),
-          if (!widget.events && _counts.isNotEmpty) ...[
-            const Text('Distribuição por Tipo de Culto'),
-            Semantics(
-              label: _counts.map((c) => '${c.name}: ${c.count}').join(', '),
-              child: SizedBox(
-                height: 220,
-                child: CustomPaint(painter: _Pie(_counts)),
-              ),
-            ),
-            Wrap(
-              spacing: 16,
-              runSpacing: 8,
-              children: [
-                for (final entry in _counts.indexed)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      ExcludeSemantics(
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          color: _Pie.colors[entry.$1 % _Pie.colors.length],
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: 210,
+                    child: TextField(
+                      controller: _start,
+                      enabled: !_saving,
+                      decoration: const InputDecoration(
+                        labelText: 'Data inicial',
+                        hintText: 'AAAA-MM-DD',
+                      ),
+                      onChanged: (_) => _edited(),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 210,
+                    child: TextField(
+                      controller: _end,
+                      enabled: !_saving,
+                      decoration: const InputDecoration(
+                        labelText: 'Data final',
+                        hintText: 'AAAA-MM-DD',
+                      ),
+                      onChanged: (_) => _edited(),
+                    ),
+                  ),
+                  if (widget.events)
+                    SizedBox(
+                      width: 250,
+                      child: DropdownButtonFormField<String>(
+                        key: ValueKey(
+                          '$_token-$_congregation-${_catalog.length}',
                         ),
+                        initialValue: _congregation,
+                        decoration: const InputDecoration(
+                          labelText: 'Congregação',
+                        ),
+                        isExpanded: true,
+                        items: [
+                          const DropdownMenuItem<String>(
+                            value: null,
+                            child: Text('Todas'),
+                          ),
+                          for (final c in _catalog)
+                            DropdownMenuItem(value: c.id, child: Text(c.name)),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (v) {
+                                _congregation = v;
+                                _edited();
+                              },
                       ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text('${entry.$2.name} (${entry.$2.count})'),
+                    ),
+                  FilledButton(
+                    onPressed: _busy || _saving ? null : _apply,
+                    child: const Text('Aplicar'),
+                  ),
+                ],
+              ),
+              if (_busy)
+                Semantics(
+                  liveRegion: true,
+                  child: const Text('Carregando relatório…'),
+                ),
+              if (_saving)
+                Semantics(
+                  liveRegion: true,
+                  child: const Text('Escolha onde salvar o arquivo…'),
+                ),
+              if (_message != null)
+                Semantics(
+                  liveRegion: true,
+                  child: Builder(
+                    builder: (context) {
+                      final isError =
+                          _message!.startsWith('Não foi possível') ||
+                          _message!.startsWith('Confira') ||
+                          _message!.startsWith('Seu acesso');
+                      final isSuccess = _message!.startsWith('Arquivo salvo');
+                      final foreground = isError
+                          ? UnifiedColors.red
+                          : isSuccess
+                          ? const Color(0xff166534)
+                          : UnifiedColors.muted;
+                      final background = isError
+                          ? const Color(0xfffff7f7)
+                          : isSuccess
+                          ? const Color(0xfff0fdf4)
+                          : UnifiedColors.page;
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: background,
+                          border: Border.all(
+                            color: isError
+                                ? const Color(0xfffecaca)
+                                : isSuccess
+                                ? const Color(0xffbbf7d0)
+                                : UnifiedColors.border,
+                          ),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          _message!,
+                          style: TextStyle(color: foreground),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              if (!_applied && !_busy)
+                const Text('Selecione os filtros e clique em Aplicar.'),
+              if (_applied) ...[
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 16,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(
+                      widget.events
+                          ? '${_rows.length} evento(s) encontrado(s)'
+                          : '${_counts.fold<int>(0, (s, c) => s + c.count)} conversões no período',
+                    ),
+                    if (_bytes != null)
+                      OutlinedButton(
+                        onPressed: _busy || _saving ? null : _export,
+                        child: const Text('Exportar XLSX'),
                       ),
+                  ],
+                ),
+                if (_rows.isEmpty)
+                  const Text('Nenhum registro no período selecionado.'),
+                if (!widget.events && _counts.isNotEmpty) ...[
+                  const Text('Distribuição por Tipo de Culto'),
+                  Semantics(
+                    label: _counts
+                        .map((c) => '${c.name}: ${c.count}')
+                        .join(', '),
+                    child: SizedBox(
+                      height: 220,
+                      child: CustomPaint(painter: _Pie(_counts)),
+                    ),
+                  ),
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [
+                      for (final entry in _counts.indexed)
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            ExcludeSemantics(
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                color:
+                                    _Pie.colors[entry.$1 % _Pie.colors.length],
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                '${entry.$2.name} (${entry.$2.count})',
+                              ),
+                            ),
+                          ],
+                        ),
                     ],
                   ),
-              ],
-            ),
-          ],
-          if (_rows.isNotEmpty)
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                sortColumnIndex: _sortColumn,
-                sortAscending: _ascending,
-                columns: [
-                  for (final h in _headers)
-                    DataColumn(label: Text(h), onSort: _sort),
                 ],
-                rows: [
-                  for (final row in _rows)
-                    DataRow(
-                      cells: [for (final value in row) DataCell(Text(value))],
+                if (_rows.isNotEmpty)
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: DataTableTheme(
+                      data: DataTableThemeData(
+                        headingRowColor: const WidgetStatePropertyAll(
+                          UnifiedColors.pageTint,
+                        ),
+                        headingTextStyle: Theme.of(context).textTheme.labelLarge
+                            ?.copyWith(
+                              color: UnifiedColors.brandNavy,
+                              fontWeight: FontWeight.w700,
+                            ),
+                        dataTextStyle: Theme.of(context).textTheme.bodyMedium,
+                        dividerThickness: 1,
+                      ),
+                      child: DataTable(
+                        sortColumnIndex: _sortColumn,
+                        sortAscending: _ascending,
+                        columns: [
+                          for (final h in _headers)
+                            DataColumn(label: Text(h), onSort: _sort),
+                        ],
+                        rows: [
+                          for (final entry in _rows.indexed)
+                            DataRow(
+                              color: WidgetStatePropertyAll(
+                                entry.$1.isOdd
+                                    ? UnifiedColors.page
+                                    : Colors.white,
+                              ),
+                              cells: [
+                                for (final value in entry.$2)
+                                  DataCell(Text(value)),
+                              ],
+                            ),
+                        ],
+                      ),
                     ),
-                ],
-              ),
-            ),
-        ],
+                  ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }

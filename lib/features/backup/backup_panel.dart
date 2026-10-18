@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 
 import '../../data/supabase_gateway.dart';
 import '../../platform/file_exporter.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import 'backup_codec.dart';
 import 'backup_models.dart';
 import 'backup_repository.dart';
@@ -227,151 +229,258 @@ class _BackupPanelState extends State<BackupPanel> {
     final preview = _preview, progress = _progress;
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('Backup', style: Theme.of(context).textTheme.headlineSmall),
-          const SizedBox(height: 12),
-          const Text(
-            'Exporte os convertidos em .xlsx. O arquivo não inclui fotos e não substitui o backup completo do banco de dados.',
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 896),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              FilledButton.icon(
-                onPressed: _busy ? null : _prepare,
-                icon: const Icon(Icons.inventory_2_outlined),
-                label: const Text('Preparar backup'),
+              const Base44PageHeading(
+                title: 'Backup',
+                icon: Icons.backup_outlined,
               ),
-              if (_bytes != null)
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : _save,
-                  icon: const Icon(Icons.download),
-                  label: const Text('Baixar backup'),
+              const SizedBox(height: 16),
+              Base44Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.download_outlined,
+                          color: UnifiedColors.brandNavy,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Exportar backup',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: UnifiedColors.brandNavy),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Exporte os convertidos em .xlsx. O arquivo não inclui fotos e não substitui o backup completo do banco de dados.',
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: _busy ? null : _prepare,
+                          icon: const Icon(Icons.inventory_2_outlined),
+                          label: const Text('Preparar backup'),
+                        ),
+                        if (_bytes != null)
+                          OutlinedButton.icon(
+                            onPressed: _busy ? null : _save,
+                            icon: const Icon(Icons.download_outlined),
+                            label: const Text('Baixar backup'),
+                          ),
+                      ],
+                    ),
+                  ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              Base44Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.upload_file_outlined,
+                          color: UnifiedColors.brandNavy,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Importar backup',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(color: UnifiedColors.brandNavy),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'IDs já existentes ou excluídos são ignorados. Cada linha é salva separadamente. Para retomar após uma interrupção, entre na mesma conta e selecione o mesmo arquivo, sem alterações.',
+                    ),
+                    const SizedBox(height: 12),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _busy ? null : _select,
+                        icon: const Icon(Icons.upload_file_outlined),
+                        label: const Text('Selecionar arquivo .xlsx'),
+                      ),
+                    ),
+                    if (preview != null) ...[
+                      const Divider(height: 28),
+                      Text(
+                        '${preview.rows.length} linha(s) válida(s) para conferência. ${preview.diagnostics.length} aviso(s) de validação.',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          color: UnifiedColors.brandNavy,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      for (final row in preview.rows.take(20))
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'Linha ${row.rowNumber}: ${row.record.name} • ${row.record.conversionDate} • ${row.congregationName.isEmpty ? 'Sem congregação' : row.congregationName}',
+                          ),
+                        ),
+                      if (preview.rows.length > 20)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Prévia das primeiras 20 linhas. A importação processará todas as linhas válidas.',
+                          ),
+                        ),
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Congregações serão conferidas ao importar: nomes desconhecidos ficam sem congregação; nomes ambíguos impedem a linha.',
+                        ),
+                      ),
+                      for (final diagnostic in preview.diagnostics.take(30))
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Linha ${diagnostic.rowNumber}, ${diagnostic.column}: ${diagnostic.code == 'duplicate_id' ? 'ID repetido; linha ignorada.' : 'Valor inválido; corrija no arquivo.'}',
+                          ),
+                        ),
+                      if (preview.diagnostics.length > 30)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Há mais avisos. Corrija o arquivo e selecione novamente.',
+                          ),
+                        ),
+                      const SizedBox(height: 12),
+                      if (_confirm) ...[
+                        const Text(
+                          'Confirmar a importação das linhas válidas? Os registros existentes serão preservados.',
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            FilledButton(
+                              onPressed: _busy ? null : _import,
+                              child: const Text('Confirmar importação'),
+                            ),
+                            TextButton(
+                              onPressed: _busy
+                                  ? null
+                                  : () => setState(() {
+                                      _confirm = false;
+                                    }),
+                              child: const Text('Cancelar'),
+                            ),
+                          ],
+                        ),
+                      ] else if (progress?.done != true)
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: FilledButton.icon(
+                            onPressed: _busy || preview.rows.isEmpty
+                                ? null
+                                : () => setState(() {
+                                    _confirm = true;
+                                  }),
+                            icon: const Icon(Icons.fact_check_outlined),
+                            label: Text(
+                              progress?.errorCode == null
+                                  ? 'Revisar e importar'
+                                  : 'Retomar importação',
+                            ),
+                          ),
+                        ),
+                    ],
+                    if (_busy)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: const Text('Processando…'),
+                        ),
+                      ),
+                    if (progress != null)
+                      Semantics(
+                        liveRegion: true,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Text(
+                            '${progress.done ? 'Concluído. ' : ''}${progress.processed} linha(s) processada(s): ${progress.created} criada(s), ${progress.skipped} ignorada(s), ${progress.errors} com erro.',
+                          ),
+                        ),
+                      ),
+                    if (progress != null)
+                      for (final diagnostic in progress.diagnostics)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            'Linha ${diagnostic.rowNumber}: registro recusado (${diagnostic.code}). Corrija no arquivo e selecione novamente.',
+                            style: const TextStyle(color: UnifiedColors.red),
+                          ),
+                        ),
+                    if (progress != null &&
+                        progress.done &&
+                        progress.errors > 0)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Corrija as linhas com erro no arquivo e selecione novamente. As linhas já importadas serão ignoradas.',
+                          style: TextStyle(color: UnifiedColors.red),
+                        ),
+                      ),
+                    if (progress?.warning != null)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'Uma ou mais congregações não foram encontradas. Os registros correspondentes ficaram sem congregação.',
+                        ),
+                      ),
+                    if (progress?.errorCode != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          progress?.errorCode == 'invalid'
+                              ? 'Uma linha não foi aceita. Confira os dados e tente novamente.'
+                              : _failure(const DataFailure('unavailable')),
+                          style: const TextStyle(color: UnifiedColors.red),
+                        ),
+                      ),
+                    if (_message != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _message!,
+                            style: TextStyle(
+                              color:
+                                  _message!.startsWith('Não foi possível') ||
+                                      _message!.startsWith('Seu acesso')
+                                  ? UnifiedColors.red
+                                  : UnifiedColors.brandNavy,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ],
           ),
-          const Divider(height: 32),
-          const Text('Importar backup'),
-          const SizedBox(height: 8),
-          const Text(
-            'IDs já existentes ou excluídos são ignorados. Cada linha é salva separadamente. Para retomar após uma interrupção, entre na mesma conta e selecione o mesmo arquivo, sem alterações.',
-          ),
-          const SizedBox(height: 12),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: OutlinedButton.icon(
-              onPressed: _busy ? null : _select,
-              icon: const Icon(Icons.upload_file),
-              label: const Text('Selecionar arquivo .xlsx'),
-            ),
-          ),
-          if (preview != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              '${preview.rows.length} linha(s) válida(s) para conferência. ${preview.diagnostics.length} aviso(s) de validação.',
-            ),
-            for (final row in preview.rows.take(20))
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Text(
-                  'Linha ${row.rowNumber}: ${row.record.name} • ${row.record.conversionDate} • ${row.congregationName.isEmpty ? 'Sem congregação' : row.congregationName}',
-                ),
-              ),
-            if (preview.rows.length > 20)
-              const Text(
-                'Prévia das primeiras 20 linhas. A importação processará todas as linhas válidas.',
-              ),
-            const Text(
-              'Congregações serão conferidas ao importar: nomes desconhecidos ficam sem congregação; nomes ambíguos impedem a linha.',
-            ),
-            for (final diagnostic in preview.diagnostics.take(30))
-              Text(
-                'Linha ${diagnostic.rowNumber}, ${diagnostic.column}: ${diagnostic.code == 'duplicate_id' ? 'ID repetido; linha ignorada.' : 'Valor inválido; corrija no arquivo.'}',
-              ),
-            if (preview.diagnostics.length > 30)
-              const Text(
-                'Há mais avisos. Corrija o arquivo e selecione novamente.',
-              ),
-            const SizedBox(height: 12),
-            if (_confirm) ...[
-              const Text(
-                'Confirmar a importação das linhas válidas? Os registros existentes serão preservados.',
-              ),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  FilledButton(
-                    onPressed: _busy ? null : _import,
-                    child: const Text('Confirmar importação'),
-                  ),
-                  TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () => setState(() {
-                            _confirm = false;
-                          }),
-                    child: const Text('Cancelar'),
-                  ),
-                ],
-              ),
-            ] else if (progress?.done != true)
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton(
-                  onPressed: _busy || preview.rows.isEmpty
-                      ? null
-                      : () => setState(() {
-                          _confirm = true;
-                        }),
-                  child: Text(
-                    progress?.errorCode == null
-                        ? 'Revisar e importar'
-                        : 'Retomar importação',
-                  ),
-                ),
-              ),
-          ],
-          if (_busy)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Semantics(
-                liveRegion: true,
-                child: const Text('Processando…'),
-              ),
-            ),
-          if (progress != null)
-            Semantics(
-              liveRegion: true,
-              child: Text(
-                '${progress.done ? 'Concluído. ' : ''}${progress.processed} linha(s) processada(s): ${progress.created} criada(s), ${progress.skipped} ignorada(s), ${progress.errors} com erro.',
-              ),
-            ),
-          if (progress != null)
-            for (final diagnostic in progress.diagnostics)
-              Text(
-                'Linha ${diagnostic.rowNumber}: registro recusado (${diagnostic.code}). Corrija no arquivo e selecione novamente.',
-              ),
-          if (progress != null && progress.done && progress.errors > 0)
-            const Text(
-              'Corrija as linhas com erro no arquivo e selecione novamente. As linhas já importadas serão ignoradas.',
-            ),
-          if (progress?.warning != null)
-            const Text(
-              'Uma ou mais congregações não foram encontradas. Os registros correspondentes ficaram sem congregação.',
-            ),
-          if (progress?.errorCode != null)
-            Text(
-              progress?.errorCode == 'invalid'
-                  ? 'Uma linha não foi aceita. Confira os dados e tente novamente.'
-                  : _failure(const DataFailure('unavailable')),
-            ),
-          if (_message != null)
-            Semantics(liveRegion: true, child: Text(_message!)),
-        ],
+        ),
       ),
     );
   }

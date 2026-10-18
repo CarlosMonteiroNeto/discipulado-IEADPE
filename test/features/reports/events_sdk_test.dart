@@ -4,6 +4,30 @@ import 'package:ieadpe_converts/features/reports/reports_repository.dart';
 import '../../data/repositories_test.dart' show fixture, respond, id;
 
 void main() {
+  test('legacy event with no surviving convert keeps its source reference', () async {
+    final gateway = await fixture((r) async {
+      expect(r.uri.path, '/rest/v1/convert_events');
+      await respond(r, [
+        {
+          'id': id(1),
+          'convert_id': null,
+          'legacy_convert_id': 'base44-deleted-convert',
+          'convert_name': 'Pessoa removida',
+          'congregation_id': id(2),
+          'event_type': 'visit',
+          'event_date': '2024-02-12',
+          'done_by_email': null,
+        },
+      ]);
+    });
+
+    final events = await ReportsRepository(gateway).events(const EventQuery());
+
+    expect(events, hasLength(1));
+    expect(events.single.convertId, isNull);
+    expect(events.single.legacyConvertId, 'base44-deleted-convert');
+  });
+
   test(
     'actual SDK events allowlist traverses 1205 ordered immutable rows',
     () async {

@@ -10,9 +10,18 @@ class BrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(
     children: [
-      const Padding(
-        padding: EdgeInsets.only(right: 12),
-        child: Icon(Icons.church, color: Colors.white),
+      Container(
+        width: 40,
+        height: 40,
+        margin: const EdgeInsets.only(right: 10),
+        decoration: const BoxDecoration(
+          color: Color(0x33ffffff),
+          shape: BoxShape.circle,
+        ),
+        alignment: Alignment.center,
+        child: const ExcludeSemantics(
+          child: Icon(Icons.church, color: Colors.white, size: 20),
+        ),
       ),
       Expanded(
         child: Column(
@@ -24,10 +33,13 @@ class BrandHeader extends StatelessWidget {
               style: TextStyle(
                 color: Colors.white,
                 fontWeight: FontWeight.bold,
-                fontSize: 20,
+                fontSize: 18,
               ),
             ),
-            Text(subtitle, style: const TextStyle(color: Colors.white)),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Color(0xffdbeafe), fontSize: 12),
+            ),
           ],
         ),
       ),

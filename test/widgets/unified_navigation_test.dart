@@ -44,23 +44,33 @@ void main() {
           ),
         ),
       );
-      expect(find.text('Discipulado'), findsOneWidget);
-      expect(find.text('Alunos'), findsOneWidget);
-      await tester.tap(find.text('Alunos').first);
+      expect(find.text('Discipulado'), findsNWidgets(2));
+      expect(
+        find.byKey(const ValueKey('app-shell-ministry-selector')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('app-shell-ministry-selector')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alunos').last);
       expect(opened, contains('/ministry/students'));
       expect(find.text('Área protegida'), findsOneWidget);
     },
   );
 
-  test('unified theme retains campaign brand colors and shared surfaces', () {
-    final theme = buildUnifiedTheme();
-    expect(theme.appBarTheme.backgroundColor, UnifiedColors.brandNavy);
-    expect(
-      theme.colorScheme.primary,
-      ColorScheme.fromSeed(seedColor: UnifiedColors.brandBlue).primary,
-    );
-    expect(theme.scaffoldBackgroundColor, UnifiedColors.page);
-  });
+  test(
+    'unified theme uses the readable campaign palette and shared surfaces',
+    () {
+      final theme = buildUnifiedTheme();
+      expect(theme.appBarTheme.backgroundColor, UnifiedColors.brandNavy);
+      expect(theme.colorScheme.primary, UnifiedColors.brandNavy);
+      expect(theme.colorScheme.secondary, UnifiedColors.brandBlue);
+      expect(theme.colorScheme.onSurface, UnifiedColors.text);
+      expect(theme.inputDecorationTheme.fillColor, Colors.white);
+      expect(theme.scaffoldBackgroundColor, UnifiedColors.page);
+    },
+  );
 
   testWidgets(
     'ministry supervisor must choose one of the server granted scopes',
@@ -112,7 +122,7 @@ void main() {
       await tester.tap(find.text('Congregação Central').last);
       await tester.pumpAndSettle();
       expect(selected, 'b2700000-0000-0000-0000-000000000001');
-      expect(find.text('Congregação Central'), findsOneWidget);
+      expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
       expect(find.text('b2700000-0000-0000-0000-000000000001'), findsNothing);
       expect(openedStudents, isFalse);
       expect(find.text('Página 1'), findsOneWidget);
@@ -175,13 +185,13 @@ void main() {
       ),
     );
 
-    expect(find.text('Congregação Central'), findsOneWidget);
+    expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
     expect(find.text('Página 2'), findsOneWidget);
     final picker = tester.widget<DropdownButton<String>>(
       find.byType(DropdownButton<String>),
     );
     expect(picker.value, selectedId);
     expect(picker.items!.map((item) => item.value), [selectedId, pageTwoId]);
-    expect(find.text('Congregação Central'), findsOneWidget);
+    expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
   });
 }

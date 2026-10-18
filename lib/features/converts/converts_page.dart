@@ -9,6 +9,8 @@ import '../../domain/business_calendar.dart';
 import '../../data/convert_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../photos/photo_repository.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import 'convert_actions.dart';
 import 'congregation_order.dart';
 import 'convert_card.dart';
@@ -210,129 +212,155 @@ class _ConvertsPageState extends State<ConvertsPage> {
         .toList();
     final allowed =
         widget.scope.isGlobalManager || widget.scope.congregationIds.isNotEmpty;
+    final statusFilters =
+        <({String code, String label, Color color, Color tint, IconData icon})>[
+          (
+            code: 'red',
+            label: 'Visita Urgente',
+            color: UnifiedColors.red,
+            tint: const Color(0xfffef2f2),
+            icon: Icons.warning_amber_outlined,
+          ),
+          (
+            code: 'yellow',
+            label: 'Atenção',
+            color: const Color(0xffa16207),
+            tint: const Color(0xfffffbeb),
+            icon: Icons.schedule_outlined,
+          ),
+          (
+            code: 'green',
+            label: 'Em dia',
+            color: const Color(0xff166534),
+            tint: const Color(0xfff0fdf4),
+            icon: Icons.check_circle_outline,
+          ),
+        ];
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xff1e3a5f), Color(0xff2563eb)],
-            ),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(Icons.church, color: Colors.white),
-              Text(
-                'Novos Convertidos',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ],
+        Base44PageHeading(
+          title: 'Novos Convertidos',
+          icon: Icons.people_outline,
+          subtitle: _loading
+              ? 'Carregando convertidos…'
+              : _error != null
+              ? 'Consulta indisponível'
+              : '${rows.length} convertidos encontrados',
+          trailing: IconButton(
+            tooltip: 'Atualizar',
+            onPressed: _loading || _pending.isNotEmpty ? null : _load,
+            icon: const Icon(Icons.refresh),
           ),
         ),
-        if (allowed) ...[
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  _loading
-                      ? 'Carregando convertidos…'
-                      : _error != null
-                      ? 'Consulta indisponível'
-                      : '${rows.length} convertidos encontrados',
+        const SizedBox(height: 16),
+        if (allowed)
+          Base44Panel(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final item in statusFilters)
+                      FilterChip(
+                        avatar: Icon(item.icon, size: 18, color: item.color),
+                        label: Text(
+                          _loading || _error != null
+                              ? item.label
+                              : '${item.label} (${rows.where((r) => statusCode(r, today) == item.code).length})',
+                        ),
+                        labelStyle: TextStyle(color: item.color),
+                        selected: _status == item.code,
+                        backgroundColor: item.tint,
+                        selectedColor: item.tint,
+                        side: BorderSide(
+                          color: _status == item.code
+                              ? item.color
+                              : item.color.withValues(alpha: .25),
+                        ),
+                        onSelected: (selected) => setState(
+                          () => _status = selected ? item.code : null,
+                        ),
+                      ),
+                  ],
                 ),
-              ),
-              IconButton(
-                tooltip: 'Atualizar',
-                onPressed: _loading || _pending.isNotEmpty ? null : _load,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          TextField(
-            controller: _search,
-            decoration: const InputDecoration(
-              labelText: 'Buscar por nome',
-              prefixIcon: Icon(Icons.search),
-            ),
-            onChanged: (_) => setState(() {}),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            key: ValueKey(_congregation),
-            initialValue: _congregation ?? '',
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Congregação'),
-            items: [
-              const DropdownMenuItem(
-                value: '',
-                child: Text('Todas as congregações'),
-              ),
-              ...congregations.map(
-                (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-              ),
-            ],
-            onChanged: (value) =>
-                setState(() => _congregation = value == '' ? null : value),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              for (final entry in const {
-                'red': 'Visita Urgente',
-                'yellow': 'Atenção',
-                'green': 'Em dia',
-              }.entries)
-                FilterChip(
-                  label: Text(
-                    _loading || _error != null
-                        ? entry.value
-                        : '${entry.value} (${rows.where((r) => statusCode(r, today) == entry.key).length})',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _search,
+                  decoration: const InputDecoration(
+                    labelText: 'Buscar por nome',
+                    prefixIcon: Icon(Icons.search),
                   ),
-                  selected: _status == entry.key,
-                  onSelected: (selected) =>
-                      setState(() => _status = selected ? entry.key : null),
+                  onChanged: (_) => setState(() {}),
                 ),
-              TextButton(
-                onPressed: () {
-                  setState(() {
-                    _status = null;
-                    _congregation = null;
-                  });
-                },
-                child: const Text('Limpar filtros'),
-              ),
-            ],
-          ),
-        ],
-        if (!allowed)
-          const Text(
-            'Você precisa de acesso a uma congregação para consultar convertidos.',
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  key: ValueKey(_congregation),
+                  initialValue: _congregation ?? '',
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Congregação',
+                    prefixIcon: Icon(Icons.church_outlined),
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: '',
+                      child: Text('Todas as congregações'),
+                    ),
+                    ...congregations.map(
+                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
+                    ),
+                  ],
+                  onChanged: (value) => setState(
+                    () => _congregation = value == '' ? null : value,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _status = null;
+                        _congregation = null;
+                      });
+                    },
+                    icon: const Icon(Icons.filter_alt_off_outlined),
+                    label: const Text('Limpar filtros'),
+                  ),
+                ),
+              ],
+            ),
+          )
+        else
+          const Base44Panel(
+            child: Text(
+              'Você precisa de acesso a uma congregação para consultar convertidos.',
+            ),
           ),
         if (_error != null) ...[
+          const SizedBox(height: 12),
           Semantics(liveRegion: true, child: Text(_error!)),
           TextButton(
             onPressed: _accessDenied ? widget.onScopeRefresh : _load,
             child: const Text('Tentar novamente'),
           ),
         ] else if (_loading && allowed)
-          const Padding(padding: EdgeInsets.all(16), child: Text('Carregando…'))
+          const Padding(
+            padding: EdgeInsets.only(top: 16),
+            child: Base44Panel(child: Text('Carregando…')),
+          )
         else if (rows.isEmpty && allowed)
           const Padding(
-            padding: EdgeInsets.all(24),
-            child: Text('Nenhum convertido encontrado'),
+            padding: EdgeInsets.only(top: 16),
+            child: Base44Panel(child: Text('Nenhum convertido encontrado')),
           ),
       ],
     );
     return Scaffold(
-      backgroundColor: const Color(0xfff1f5f9),
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(

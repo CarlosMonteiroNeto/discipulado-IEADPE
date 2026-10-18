@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/models.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 
 class AccessPanel extends StatefulWidget {
   const AccessPanel({
@@ -77,21 +79,73 @@ class _AccessPanelState extends State<AccessPanel> {
   @override
   Widget build(BuildContext context) {
     final names = {for (final c in widget.congregations) c.id: c.name};
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (_error != null) Semantics(liveRegion: true, child: Text(_error!)),
-        if (_confirmRevoke != null)
-          Card(
-            child: Padding(
+    return Base44Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Base44PageHeading(
+            title: 'Gerenciar acessos',
+            icon: Icons.people_outline,
+            trailing: !_show
+                ? FilledButton.icon(
+                    onPressed: widget.busy ? null : () => _edit(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Novo acesso'),
+                  )
+                : null,
+          ),
+          const SizedBox(height: 16),
+          if (_error != null)
+            Semantics(
+              liveRegion: true,
+              child: Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xfffff7f7),
+                  border: Border.all(color: const Color(0xfffecaca)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: UnifiedColors.red),
+                ),
+              ),
+            ),
+          if (_confirmRevoke != null)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xfffff7f7),
+                border: Border.all(color: const Color(0xfffecaca)),
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Remover acesso?'),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person_remove_outlined,
+                        size: 20,
+                        color: UnifiedColors.red,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Remover acesso?',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
                   Text('Remover este acesso de ${_confirmRevoke!.userEmail}?'),
+                  const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
+                    runSpacing: 8,
                     children: [
                       TextButton(
                         onPressed: widget.busy
@@ -110,146 +164,171 @@ class _AccessPanelState extends State<AccessPanel> {
                 ],
               ),
             ),
-          ),
-        if (!_show)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilledButton.icon(
-              onPressed: widget.busy ? null : () => _edit(),
-              icon: const Icon(Icons.add),
-              label: const Text('Novo acesso'),
-            ),
-          ),
-        if (_show)
-          Form(
-            key: _form,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                TextFormField(
-                  controller: _email,
-                  enabled: !widget.busy && _editing == null,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'Email do usuário',
-                  ),
-                  validator: (value) =>
-                      value == null ||
-                          !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                              .hasMatch(value.trim())
-                      ? 'Informe um email válido.'
-                      : null,
-                ),
-                DropdownButtonFormField<AccessRole>(
-                  key: ValueKey('role-$_editing'),
-                  initialValue: _role,
-                  isExpanded: true,
-                  itemHeight: null,
-                  decoration: const InputDecoration(labelText: 'Cargo'),
-                  items: [
-                    for (final role in AccessRole.values)
-                      DropdownMenuItem(
-                        value: role,
-                        child: Text(role.wireValue),
-                      ),
-                  ],
-                  onChanged: widget.busy
-                      ? null
-                      : (role) => setState(() {
-                          _role = role!;
-                          _congregation = null;
-                        }),
-                ),
-                if (_role == AccessRole.direction)
-                  DropdownButtonFormField<String>(
-                    key: ValueKey('congregation-$_editing-$_role'),
-                    initialValue: _congregation,
-                    isExpanded: true,
-                    itemHeight: null,
-                    decoration: const InputDecoration(labelText: 'Congregação'),
-                    items: [
-                      for (final c in widget.congregations.where(
-                        (c) => c.archivedAt == null,
-                      ))
-                        DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    ],
-                    onChanged: widget.busy
-                        ? null
-                        : (value) => setState(() => _congregation = value),
-                    validator: (value) => value == null
-                        ? 'Selecione uma congregação ativa.'
-                        : null,
-                  ),
-                if (_role == AccessRole.direction &&
-                    !widget.congregations.any((c) => c.archivedAt == null))
-                  const Text('Cadastre uma congregação ativa primeiro.'),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    FilledButton(
-                      onPressed: widget.busy ? null : _save,
-                      child: const Text('Salvar acesso'),
-                    ),
-                    TextButton(
-                      onPressed: widget.busy
-                          ? null
-                          : () => setState(() => _show = false),
-                      child: const Text('Cancelar'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        if (widget.items.isEmpty)
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Nenhum acesso configurado.'),
-          ),
-        for (final item in widget.items)
-          Card(
-            child: Padding(
+          if (_show)
+            Container(
+              margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.userEmail,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  Text(item.role.wireValue),
-                  Text(
-                    item.congregationId == null
-                        ? 'Todas as congregações'
-                        : names[item.congregationId] ?? 'Congregação anterior',
-                  ),
-                  Text(
-                    item.userId == null
-                        ? 'Aguardando email verificado'
-                        : 'Acesso vinculado',
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: widget.busy ? null : () => _edit(item),
-                        icon: const Icon(Icons.edit),
-                        label: const Text('Editar'),
+              decoration: BoxDecoration(
+                color: UnifiedColors.page,
+                border: Border.all(color: UnifiedColors.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Form(
+                key: _form,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _email,
+                      enabled: !widget.busy && _editing == null,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(
+                        labelText: 'Email do usuário',
                       ),
-                      TextButton.icon(
-                        onPressed: widget.busy
+                      validator: (value) =>
+                          value == null ||
+                              !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                  .hasMatch(value.trim())
+                          ? 'Informe um email válido.'
+                          : null,
+                    ),
+                    DropdownButtonFormField<AccessRole>(
+                      key: ValueKey('role-$_editing'),
+                      initialValue: _role,
+                      isExpanded: true,
+                      itemHeight: null,
+                      decoration: const InputDecoration(labelText: 'Cargo'),
+                      items: [
+                        for (final role in AccessRole.values)
+                          DropdownMenuItem(
+                            value: role,
+                            child: Text(role.wireValue),
+                          ),
+                      ],
+                      onChanged: widget.busy
+                          ? null
+                          : (role) => setState(() {
+                              _role = role!;
+                              _congregation = null;
+                            }),
+                    ),
+                    if (_role == AccessRole.direction)
+                      DropdownButtonFormField<String>(
+                        key: ValueKey('congregation-$_editing-$_role'),
+                        initialValue: _congregation,
+                        isExpanded: true,
+                        itemHeight: null,
+                        decoration: const InputDecoration(
+                          labelText: 'Congregação',
+                        ),
+                        items: [
+                          for (final c in widget.congregations.where(
+                            (c) => c.archivedAt == null,
+                          ))
+                            DropdownMenuItem(value: c.id, child: Text(c.name)),
+                        ],
+                        onChanged: widget.busy
                             ? null
-                            : () => setState(() => _confirmRevoke = item),
-                        icon: const Icon(Icons.person_remove_outlined),
-                        label: const Text('Remover'),
+                            : (value) => setState(() => _congregation = value),
+                        validator: (value) => value == null
+                            ? 'Selecione uma congregação ativa.'
+                            : null,
                       ),
-                    ],
-                  ),
-                ],
+                    if (_role == AccessRole.direction &&
+                        !widget.congregations.any((c) => c.archivedAt == null))
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text('Cadastre uma congregação ativa primeiro.'),
+                      ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          onPressed: widget.busy ? null : _save,
+                          icon: const Icon(Icons.save_outlined),
+                          label: const Text('Salvar acesso'),
+                        ),
+                        TextButton(
+                          onPressed: widget.busy
+                              ? null
+                              : () => setState(() => _show = false),
+                          child: const Text('Cancelar'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-      ],
+          if (widget.items.isEmpty)
+            const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text(
+                'Nenhum acesso configurado.',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          for (final item in widget.items)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: UnifiedColors.page,
+                  border: Border.all(color: UnifiedColors.border),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        item.userEmail,
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(color: UnifiedColors.brandNavy),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(item.role.wireValue),
+                      Text(
+                        item.congregationId == null
+                            ? 'Todas as congregações'
+                            : names[item.congregationId] ??
+                                  'Congregação anterior',
+                      ),
+                      Text(
+                        item.userId == null
+                            ? 'Aguardando email verificado'
+                            : 'Acesso vinculado',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          TextButton.icon(
+                            onPressed: widget.busy ? null : () => _edit(item),
+                            icon: const Icon(Icons.edit_outlined),
+                            label: const Text('Editar'),
+                          ),
+                          TextButton.icon(
+                            onPressed: widget.busy
+                                ? null
+                                : () => setState(() => _confirmRevoke = item),
+                            icon: const Icon(Icons.person_remove_outlined),
+                            label: const Text('Remover'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

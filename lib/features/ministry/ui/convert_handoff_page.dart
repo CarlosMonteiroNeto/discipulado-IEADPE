@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
+import '../../../ui/base44_widgets.dart';
+import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 import '../data/ministry_handoff_repository.dart';
 import '../data/ministry_repository.dart';
@@ -322,32 +324,57 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
   @override
   Widget build(BuildContext context) {
     if (!widget.canPromote) {
-      return const Scaffold(
-        body: Center(
-          child: Text(
-            'Você não tem acesso ao encaminhamento de convertidos nesta congregação.',
-            textAlign: TextAlign.center,
+      return Scaffold(
+        backgroundColor: Colors.transparent,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 512),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Base44Panel(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.lock_outline,
+                        color: UnifiedColors.muted,
+                        size: 32,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Você não tem acesso ao encaminhamento de convertidos nesta congregação.',
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       );
     }
     return Scaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Center(
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 900),
+            constraints: const BoxConstraints(maxWidth: 896),
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(
-                  'Encaminhar para o discipulado',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  'Revise os dados de referência e escolha criar um aluno ou vincular um aluno existente. Nenhuma matrícula é feita automaticamente.',
+                const Base44PageHeading(
+                  title: 'Encaminhar para o discipulado',
+                  icon: Icons.move_to_inbox_outlined,
                 ),
                 const SizedBox(height: 16),
+                const Base44Panel(
+                  child: Text(
+                    'Revise os dados de referência e escolha criar um aluno ou vincular um aluno existente. Nenhuma matrícula é feita automaticamente.',
+                  ),
+                ),
+                const SizedBox(height: 12),
                 _errorBanner(),
                 _noticeBanner(),
                 _referralList(),
@@ -368,41 +395,61 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
   Widget _errorBanner() => _error == null
       ? const SizedBox.shrink()
       : Semantics(
+          container: true,
+          explicitChildNodes: true,
           liveRegion: true,
           label: _error,
-          child: Card(
-            color: Theme.of(context).colorScheme.errorContainer,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(_error!),
-                  if (_retryAction != null)
-                    TextButton(
-                      onPressed: _busy ? null : _retry,
-                      child: const Text('Tentar novamente'),
+          child: Base44Panel(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      color: Theme.of(context).colorScheme.error,
                     ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(_error!)),
+                  ],
+                ),
+                if (_retryAction != null) ...[
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: _busy ? null : _retry,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Tentar novamente'),
+                  ),
                 ],
-              ),
+              ],
             ),
           ),
         );
   Widget _noticeBanner() => _notice == null
       ? const SizedBox.shrink()
       : Semantics(
+          container: true,
+          explicitChildNodes: true,
           liveRegion: true,
           label: _notice,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(_notice!),
+          child: Base44Panel(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.check_circle_outline,
+                  color: Color(0xff15803d),
+                ),
+                const SizedBox(width: 8),
+                Expanded(child: Text(_notice!)),
+              ],
             ),
           ),
         );
   Widget _referralList() {
     if (_referralsLoading) {
-      return const Padding(
+      return const Base44Panel(
         padding: EdgeInsets.all(24),
         child: Center(
           child: CircularProgressIndicator(
@@ -413,19 +460,19 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
     }
     if (!_referralsLoaded) return const SizedBox.shrink();
     if (_referrals.isEmpty) {
-      return const Card(
-        child: Padding(
-          padding: EdgeInsets.all(16),
-          child: Text('Não há novos encaminhamentos para esta congregação.'),
-        ),
+      return const Base44Panel(
+        child: Text('Não há novos encaminhamentos para esta congregação.'),
       );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Novos convertidos',
-          style: Theme.of(context).textTheme.titleMedium,
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Base44PageHeading(
+            title: 'Novos convertidos',
+            icon: Icons.people_outline,
+          ),
         ),
         for (final item in _referrals)
           Card(
@@ -434,8 +481,11 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
               label: 'Revisar ${item.name}',
               child: ListTile(
                 key: Key('handoff-referral-${item.convertId}'),
-                title: Text(item.name),
-                subtitle: Text('Conversão: ${item.conversionDate}'),
+                title: Text(item.name, softWrap: true),
+                subtitle: Text(
+                  'Conversão: ${item.conversionDate}',
+                  softWrap: true,
+                ),
                 selected: _selected?.convertId == item.convertId,
                 onTap: _selectionLocked
                     ? null
@@ -450,17 +500,19 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
                         _candidatePrefix = null;
                         _candidateCursor = null;
                       }),
+                minVerticalPadding: 12,
               ),
             ),
           ),
         if (_referralCursor != null)
           Align(
             alignment: Alignment.centerRight,
-            child: TextButton(
+            child: TextButton.icon(
               onPressed: _busy || _referralsMoreLoading
                   ? null
                   : () => _loadReferrals(cursor: _referralCursor),
-              child: Text(
+              icon: const Icon(Icons.expand_more),
+              label: Text(
                 _referralsMoreLoading
                     ? 'Carregando convertidos…'
                     : 'Carregar mais convertidos',
@@ -473,129 +525,132 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
 
   Widget _reviewCard() {
     final referral = _selected!;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Referência do convertido',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            Text(referral.name, style: Theme.of(context).textTheme.titleLarge),
-            Text(
-              'Telefone de referência: ${referral.phone ?? 'Não informado'}',
-            ),
-            Text(
-              'Endereço de referência: ${referral.address ?? 'Não informado'}',
-            ),
-            Text('Data da conversão: ${referral.conversionDate}'),
-            const SizedBox(height: 8),
-            const Text(
-              'Nome, telefone e endereço serão copiados como referência inicial. Alterações futuras ficam em cada módulo.',
-            ),
-          ],
-        ),
+    return Base44Panel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Referência do convertido',
+            style: Theme.of(context).textTheme.titleMedium
+                ?.copyWith(color: UnifiedColors.brandNavy),
+          ),
+          const SizedBox(height: 4),
+          Text(referral.name, style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            'Telefone de referência: ${referral.phone ?? 'Não informado'}',
+            softWrap: true,
+          ),
+          Text(
+            'Endereço de referência: ${referral.address ?? 'Não informado'}',
+            softWrap: true,
+          ),
+          Text('Data da conversão: ${referral.conversionDate}'),
+          const SizedBox(height: 8),
+          const Text(
+            'Nome, telefone e endereço serão copiados como referência inicial. Alterações futuras ficam em cada módulo.',
+          ),
+        ],
       ),
     );
   }
 
-  Widget _candidateReview() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Revisar aluno existente',
-            style: Theme.of(context).textTheme.titleMedium,
+  Widget _candidateReview() => Base44Panel(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Revisar aluno existente',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(color: UnifiedColors.brandNavy),
+        ),
+        TextField(
+          controller: _search,
+          enabled:
+              !_busy &&
+              !_candidatesLoading &&
+              !_candidatesMoreLoading &&
+              _linked == null,
+          textInputAction: TextInputAction.search,
+          decoration: const InputDecoration(
+            labelText: 'Buscar aluno pelo nome',
+            helperText:
+                'A busca mostra somente alunos ativos desta congregação.',
           ),
-          TextField(
-            controller: _search,
-            enabled:
-                !_busy &&
-                !_candidatesLoading &&
-                !_candidatesMoreLoading &&
-                _linked == null,
-            textInputAction: TextInputAction.search,
-            decoration: const InputDecoration(
-              labelText: 'Buscar aluno pelo nome',
-              helperText:
-                  'A busca mostra somente alunos ativos desta congregação.',
-            ),
-            onSubmitted: (_) => _findCandidates(),
+          onSubmitted: (_) => _findCandidates(),
+        ),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: _busy || _candidatesLoading ? null : _findCandidates,
+          icon: const Icon(Icons.search),
+          label: const Text('Buscar possíveis alunos'),
+        ),
+        if (_candidatesLoading)
+          const Center(
+            child: CircularProgressIndicator(semanticsLabel: 'Buscando alunos'),
           ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _busy || _candidatesLoading ? null : _findCandidates,
-            icon: const Icon(Icons.search),
-            label: const Text('Buscar possíveis alunos'),
-          ),
-          if (_candidatesLoading)
-            const Center(
-              child: CircularProgressIndicator(
-                semanticsLabel: 'Buscando alunos',
-              ),
-            ),
-          RadioGroup<String>(
-            groupValue: _candidate?.studentId,
-            onChanged: (value) {
-              if (_busy || value == null) return;
-              setState(() {
-                _candidate = _candidates.firstWhere(
-                  (item) => item.studentId == value,
-                );
-              });
-            },
-            child: Column(
-              children: [
-                for (final item in _candidates)
-                  Card(
-                    child: RadioListTile<String>(
-                      value: item.studentId,
-                      title: Text(item.name),
-                      subtitle: Text(_candidateDetails(item)),
-                      secondary: const Icon(Icons.person_search_outlined),
-                    ),
+        RadioGroup<String>(
+          groupValue: _candidate?.studentId,
+          onChanged: (value) {
+            if (_busy || value == null) return;
+            setState(() {
+              _candidate = _candidates.firstWhere(
+                (item) => item.studentId == value,
+              );
+            });
+          },
+          child: Column(
+            children: [
+              for (final item in _candidates)
+                Card(
+                  child: RadioListTile<String>(
+                    value: item.studentId,
+                    title: Text(item.name, softWrap: true),
+                    subtitle: Text(_candidateDetails(item), softWrap: true),
+                    secondary: const Icon(Icons.person_search_outlined),
                   ),
-              ],
-            ),
-          ),
-          if (_candidateCursor != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _busy || _candidatesMoreLoading
-                    ? null
-                    : () => _findCandidates(cursor: _candidateCursor),
-                child: Text(
-                  _candidatesMoreLoading
-                      ? 'Carregando alunos…'
-                      : 'Ver mais alunos',
                 ),
+            ],
+          ),
+        ),
+        if (_candidateCursor != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _busy || _candidatesMoreLoading
+                  ? null
+                  : () => _findCandidates(cursor: _candidateCursor),
+              icon: const Icon(Icons.expand_more),
+              label: Text(
+                _candidatesMoreLoading
+                    ? 'Carregando alunos…'
+                    : 'Ver mais alunos',
               ),
-            ),
-          if (_candidate != null)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Você selecionou ${_candidate!.name}. Os dados atuais do aluno serão preservados; apenas a origem deste vínculo ficará registrada.',
-              ),
-            ),
-          const SizedBox(height: 8),
-          FilledButton(
-            onPressed: _busy
-                ? null
-                : () => _promote(studentId: _candidate?.studentId),
-            child: Text(
-              _candidate == null
-                  ? 'Criar aluno a partir desta referência'
-                  : 'Vincular ao aluno selecionado',
             ),
           ),
-        ],
-      ),
+        if (_candidate != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Você selecionou ${_candidate!.name}. Os dados atuais do aluno serão preservados; apenas a origem deste vínculo ficará registrada.',
+            ),
+          ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _busy
+              ? null
+              : () => _promote(studentId: _candidate?.studentId),
+          icon: Icon(
+            _candidate == null
+                ? Icons.person_add_alt_1_outlined
+                : Icons.link_outlined,
+          ),
+          label: Text(
+            _candidate == null
+                ? 'Criar aluno a partir desta referência'
+                : 'Vincular ao aluno selecionado',
+          ),
+        ),
+      ],
     ),
   );
   String _candidateDetails(HandoffStudentCandidate item) {
@@ -616,65 +671,66 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
     return 'Telefone atual: $phone · Endereço atual: $address. $comparison';
   }
 
-  Widget _enrollmentCard() => Card(
-    child: Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            'Matrícula separada',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const Text(
-            'O aluno já está vinculado ao convertido. Escolha uma turma ativa para fazer a matrícula explicitamente.',
-          ),
-          if (_classesLoading || (!_classesLoaded && _error == null))
-            const Padding(
-              padding: EdgeInsets.all(12),
-              child: Center(
-                child: CircularProgressIndicator(
-                  semanticsLabel: 'Carregando turmas',
-                ),
-              ),
-            )
-          else if (!_classesLoaded)
-            const SizedBox.shrink()
-          else if (_classes.isEmpty)
-            const Text('Não há turmas ativas para matrícula.')
-          else
-            DropdownButtonFormField<String>(
-              key: const Key('handoff-class-select'),
-              initialValue: _selectedClassId,
-              decoration: const InputDecoration(labelText: 'Turma'),
-              items: [
-                for (final item in _classes)
-                  DropdownMenuItem(value: item.id, child: Text(item.name)),
-              ],
-              onChanged: (value) => setState(() => _selectedClassId = value),
-            ),
-          if (_classCursor != null)
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _busy || _classesMoreLoading
-                    ? null
-                    : () => _loadClasses(cursor: _classCursor),
-                child: Text(
-                  _classesMoreLoading
-                      ? 'Carregando turmas…'
-                      : 'Ver mais turmas',
-                ),
+  Widget _enrollmentCard() => Base44Panel(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          'Matrícula separada',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(color: UnifiedColors.brandNavy),
+        ),
+        const Text(
+          'O aluno já está vinculado ao convertido. Escolha uma turma ativa para fazer a matrícula explicitamente.',
+        ),
+        if (_classesLoading || (!_classesLoaded && _error == null))
+          const Padding(
+            padding: EdgeInsets.all(12),
+            child: Center(
+              child: CircularProgressIndicator(
+                semanticsLabel: 'Carregando turmas',
               ),
             ),
-          const SizedBox(height: 8),
-          FilledButton.icon(
-            onPressed: _busy || _selectedClassId == null ? null : _enroll,
-            icon: const Icon(Icons.how_to_reg),
-            label: const Text('Matricular aluno'),
+          )
+        else if (!_classesLoaded)
+          const SizedBox.shrink()
+        else if (_classes.isEmpty)
+          const Text('Não há turmas ativas para matrícula.')
+        else
+          DropdownButtonFormField<String>(
+            key: const Key('handoff-class-select'),
+            initialValue: _selectedClassId,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Turma'),
+            items: [
+              for (final item in _classes)
+                DropdownMenuItem(
+                  value: item.id,
+                  child: Text(item.name, softWrap: true),
+                ),
+            ],
+            onChanged: (value) => setState(() => _selectedClassId = value),
           ),
-        ],
-      ),
+        if (_classCursor != null)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: _busy || _classesMoreLoading
+                  ? null
+                  : () => _loadClasses(cursor: _classCursor),
+              icon: const Icon(Icons.expand_more),
+              label: Text(
+                _classesMoreLoading ? 'Carregando turmas…' : 'Ver mais turmas',
+              ),
+            ),
+          ),
+        const SizedBox(height: 8),
+        FilledButton.icon(
+          onPressed: _busy || _selectedClassId == null ? null : _enroll,
+          icon: const Icon(Icons.how_to_reg),
+          label: const Text('Matricular aluno'),
+        ),
+      ],
     ),
   );
 }

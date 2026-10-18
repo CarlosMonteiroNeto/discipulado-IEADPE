@@ -4,6 +4,8 @@ import '../weekly/weekly_repository.dart';
 import 'home_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../../widgets/brand_header.dart';
+import '../../ui/base44_widgets.dart';
+import '../../ui/unified_theme.dart';
 import '../weekly/weekly_panel.dart';
 
 class HomePage extends StatefulWidget {
@@ -121,152 +123,244 @@ class _HomePageState extends State<HomePage> {
     final summary = _summary;
     return RefreshIndicator(
       onRefresh: _refresh,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        physics: const AlwaysScrollableScrollPhysics(),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: brandGradient,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const BrandHeader(subtitle: 'Gestão de Novos Convertidos'),
-                const SizedBox(height: 16),
-                Text(
-                  'Olá, ${widget.name}!',
-                  style: const TextStyle(color: Colors.white),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 896),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: [
+              Base44Hero(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const BrandHeader(subtitle: 'Gestão de Novos Convertidos'),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Olá, ${widget.name}!',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Base44PageHeading(
+                title: 'Visão Geral',
+                icon: Icons.dashboard_outlined,
+                trailing: IconButton(
+                  tooltip: 'Atualizar início',
+                  onPressed: _denied ? null : _refresh,
+                  icon: const Icon(Icons.refresh),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_error != null) ...[
+                Base44Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Semantics(liveRegion: true, child: Text(_error!)),
+                      TextButton.icon(
+                        onPressed: _denied ? widget.onScopeRefresh : _refresh,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(
+                          _denied ? 'Atualizar acesso' : 'Tentar novamente',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ] else if (summary == null)
+                const Base44Panel(
+                  child: Center(child: Text('Carregando início…')),
+                )
+              else ...[
+                LayoutBuilder(
+                  builder: (context, constraints) => Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      for (final metric in [
+                        (
+                          label: 'Total',
+                          value: summary.total,
+                          color: UnifiedColors.brandNavy,
+                          icon: Icons.people_outline,
+                        ),
+                        (
+                          label: 'Visitas Urgentes',
+                          value: summary.urgentVisits,
+                          color: UnifiedColors.red,
+                          icon: Icons.warning_amber_outlined,
+                        ),
+                        (
+                          label: 'Em Discipulado',
+                          value: summary.inDiscipleship,
+                          color: UnifiedColors.green,
+                          icon: Icons.menu_book_outlined,
+                        ),
+                      ])
+                        SizedBox(
+                          width:
+                              constraints.maxWidth < 500 ||
+                                  MediaQuery.textScalerOf(context).scale(16) >
+                                      24
+                              ? constraints.maxWidth
+                              : (constraints.maxWidth - 24) / 3,
+                          child: Base44Panel(
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 48,
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: metric.color.withValues(alpha: .1),
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: Icon(metric.icon, color: metric.color),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '${metric.value}',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .headlineSmall
+                                            ?.copyWith(
+                                              color: metric.color,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                      Text(metric.label),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
-            ),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: IconButton(
-              tooltip: 'Atualizar início',
-              onPressed: _denied ? null : _refresh,
-              icon: const Icon(Icons.refresh),
-            ),
-          ),
-          if (_error != null) ...[
-            Semantics(liveRegion: true, child: Text(_error!)),
-            TextButton(
-              onPressed: _denied ? widget.onScopeRefresh : _refresh,
-              child: Text(_denied ? 'Atualizar acesso' : 'Tentar novamente'),
-            ),
-          ] else if (summary == null)
-            const Text('Carregando início…')
-          else ...[
-            LayoutBuilder(
-              builder: (context, constraints) => Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  for (final metric in [
-                    (
-                      label: 'Total',
-                      value: summary.total,
-                      color: const Color(0xff1e3a5f),
+              if (!_denied) ...[
+                const SizedBox(height: 16),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [
+                            UnifiedColors.brandNavy,
+                            UnifiedColors.brandBlue,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: FilledButton.icon(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: Colors.transparent,
+                          foregroundColor: Colors.white,
+                          shadowColor: Colors.transparent,
+                        ),
+                        onPressed: () => widget.onNavigate('/register'),
+                        icon: const Icon(Icons.person_add_alt_1),
+                        label: const Text('Novo Cadastro'),
+                      ),
                     ),
-                    (
-                      label: 'Visitas Urgentes',
-                      value: summary.urgentVisits,
-                      color: const Color(0xffb91c1c),
+                    OutlinedButton.icon(
+                      onPressed: () => widget.onNavigate('/converts'),
+                      icon: const Icon(Icons.people_outline),
+                      label: const Text('Ver Convertidos'),
                     ),
-                    (
-                      label: 'Em Discipulado',
-                      value: summary.inDiscipleship,
-                      color: const Color(0xff166534),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                WeeklyPanel(
+                  key: ValueKey('weekly:$_token'),
+                  repository: widget.weekly,
+                  refreshRevision: _weeklyRevision,
+                  onScopeRefresh: _deny,
+                ),
+                const SizedBox(height: 24),
+                if (summary != null) ...[
+                  const Base44PageHeading(
+                    title: 'Convertidos Recentes',
+                    icon: Icons.trending_up,
+                  ),
+                  const SizedBox(height: 8),
+                  if (summary.recent.isEmpty)
+                    const Base44Panel(
+                      child: Text('Nenhuma conversão nos últimos sete dias.'),
                     ),
-                  ])
-                    SizedBox(
-                      width:
-                          constraints.maxWidth < 500 ||
-                              MediaQuery.textScalerOf(context).scale(16) > 24
-                          ? constraints.maxWidth
-                          : (constraints.maxWidth - 24) / 3,
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            children: [
-                              Text(
-                                '${metric.value}',
-                                style: TextStyle(
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                  color: metric.color,
-                                ),
+                  for (final row in summary.recent)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Base44Panel(
+                        padding: const EdgeInsets.all(12),
+                        child: Row(
+                          children: [
+                            const CircleAvatar(
+                              backgroundColor: UnifiedColors.selected,
+                              foregroundColor: UnifiedColors.brandNavy,
+                              child: Icon(Icons.person_outline),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    row.name,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium,
+                                  ),
+                                  Text(
+                                    '${row.conversionDate.day.toString().padLeft(2, '0')}/${row.conversionDate.month.toString().padLeft(2, '0')}/${row.conversionDate.year}',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall,
+                                  ),
+                                ],
                               ),
-                              Text(metric.label),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
                 ],
-              ),
-            ),
-          ],
-          if (!_denied) ...[
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => widget.onNavigate('/register'),
-                  icon: const Icon(Icons.person_add),
-                  label: const Text('Novo Cadastro'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: () => widget.onNavigate('/converts'),
-                  icon: const Icon(Icons.people),
-                  label: const Text('Ver Convertidos'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-            WeeklyPanel(
-              key: ValueKey('weekly:$_token'),
-              repository: widget.weekly,
-              refreshRevision: _weeklyRevision,
-              onScopeRefresh: _deny,
-            ),
-            const SizedBox(height: 24),
-            if (summary != null) ...[
-              const Text(
-                'Convertidos Recentes',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xff1e3a5f),
-                ),
-              ),
-              if (summary.recent.isEmpty)
-                const Text('Nenhuma conversão nos últimos sete dias.'),
-              for (final row in summary.recent)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: Text(row.name),
-                    subtitle: Text(
-                      '${row.conversionDate.day.toString().padLeft(2, '0')}/${row.conversionDate.month.toString().padLeft(2, '0')}/${row.conversionDate.year}',
+                if (widget.isAdmin)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
+                    child: Base44Panel(
+                      padding: EdgeInsets.zero,
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.settings_outlined,
+                          color: UnifiedColors.brandNavy,
+                        ),
+                        title: const Text('Administração'),
+                        subtitle: const Text('Congregações e acessos'),
+                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                        onTap: () => widget.onNavigate('/admin'),
+                      ),
                     ),
                   ),
-                ),
+              ],
+              const SizedBox(height: 80),
             ],
-            if (widget.isAdmin)
-              TextButton.icon(
-                onPressed: () => widget.onNavigate('/admin'),
-                icon: const Icon(Icons.settings),
-                label: const Text('Administração'),
-              ),
-          ],
-          const SizedBox(height: 80),
-        ],
+          ),
+        ),
       ),
     );
   }

@@ -2,6 +2,8 @@ import '../data/ministry_codec.dart';
 
 import 'package:flutter/material.dart';
 
+import '../../../ui/base44_widgets.dart';
+import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 
 class StudentsPage extends StatefulWidget {
@@ -64,76 +66,111 @@ class _StudentsPageState extends State<StudentsPage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
     body: SafeArea(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 896),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text('Alunos', style: Theme.of(context).textTheme.headlineSmall),
-              const Text(
-                'Os dados escolares pertencem ao cadastro do aluno. O vínculo com o convertido mantém a referência de origem separada.',
+              const Base44PageHeading(
+                title: 'Alunos',
+                icon: Icons.school_outlined,
               ),
-              const SizedBox(height: 12),
-              FilledButton.icon(
-                onPressed: widget.onOpenHandoff,
-                icon: const Icon(Icons.move_to_inbox_outlined),
-                label: const Text('Revisar novos convertidos'),
-              ),
-              TextField(
-                controller: _search,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  labelText: 'Buscar aluno pelo nome',
-                ),
-                onSubmitted: (_) => _load(),
-              ),
-              Wrap(
-                spacing: 8,
-                children: [
-                  OutlinedButton(
-                    onPressed: _loading ? null : () => _load(),
-                    child: const Text('Buscar'),
-                  ),
-                  TextButton(
-                    onPressed: _loading ? null : () => _load(),
-                    child: const Text('Atualizar'),
-                  ),
-                ],
-              ),
-              if (_loading)
-                const Center(
-                  child: CircularProgressIndicator(
-                    semanticsLabel: 'Carregando alunos',
-                  ),
-                ),
-              if (_error != null)
-                Column(
+              const SizedBox(height: 16),
+              Base44Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Text(_error!, semanticsLabel: 'Falha ao carregar alunos'),
-                    TextButton(
-                      onPressed: () => _load(),
-                      child: const Text('Tentar novamente'),
+                    const Text(
+                      'Os dados escolares pertencem ao cadastro do aluno. O vínculo com o convertido mantém a referência de origem separada.',
+                    ),
+                    const SizedBox(height: 12),
+                    FilledButton.icon(
+                      onPressed: widget.onOpenHandoff,
+                      icon: const Icon(Icons.move_to_inbox_outlined),
+                      label: const Text('Revisar novos convertidos'),
                     ),
                   ],
                 ),
+              ),
+              const SizedBox(height: 12),
+              Base44Panel(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _search,
+                      textInputAction: TextInputAction.search,
+                      decoration: const InputDecoration(
+                        labelText: 'Buscar aluno pelo nome',
+                        prefixIcon: Icon(Icons.search),
+                      ),
+                      onSubmitted: (_) => _load(),
+                    ),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
+                          onPressed: _loading ? null : () => _load(),
+                          icon: const Icon(Icons.search),
+                          label: const Text('Buscar'),
+                        ),
+                        TextButton.icon(
+                          onPressed: _loading ? null : () => _load(),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Atualizar'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (_loading)
+                const Base44Panel(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      semanticsLabel: 'Carregando alunos',
+                    ),
+                  ),
+                ),
+              if (_error != null)
+                Base44Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(_error!, semanticsLabel: 'Falha ao carregar alunos'),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () => _load(),
+                        icon: const Icon(Icons.refresh),
+                        label: const Text('Tentar novamente'),
+                      ),
+                    ],
+                  ),
+                ),
               if (!_loading && _error == null && _page?.items.isEmpty == true)
-                const Text('Nenhum aluno encontrado.'),
+                const Base44Panel(child: Text('Nenhum aluno encontrado.')),
               for (final student
                   in _page?.items ?? const <MinistryStudentSummary>[])
                 Card(
                   child: ListTile(
-                    title: Text(student.name),
+                    title: Text(student.name, softWrap: true),
                     subtitle: Text(
                       student.convertId == null
                           ? 'Cadastro do discipulado'
                           : 'Vinculado ao cadastro de convertidos',
+                      softWrap: true,
                     ),
                     leading: Icon(
                       student.convertId == null
                           ? Icons.school_outlined
                           : Icons.link,
+                      color: UnifiedColors.brandNavy,
                     ),
                     trailing: student.phoneE164 == null
                         ? null
@@ -141,16 +178,23 @@ class _StudentsPageState extends State<StudentsPage> {
                             message: 'Telefone cadastrado',
                             child: Icon(Icons.phone_outlined),
                           ),
+                    minVerticalPadding: 12,
                   ),
                 ),
               if (_page?.nextCursor != null)
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => _load(cursor: _page!.nextCursor),
-                    child: const Text('Próxima página'),
+                Base44Panel(
+                  padding: const EdgeInsets.all(8),
+                  child: Wrap(
+                    alignment: WrapAlignment.end,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: _loading
+                            ? null
+                            : () => _load(cursor: _page!.nextCursor),
+                        icon: const Icon(Icons.chevron_right),
+                        label: const Text('Próxima página'),
+                      ),
+                    ],
                   ),
                 ),
             ],

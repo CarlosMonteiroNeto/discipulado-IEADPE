@@ -197,7 +197,8 @@ final class Congregation {
 final class ConvertEvent {
   const ConvertEvent({
     required this.id,
-    required this.convertId,
+    this.convertId,
+    this.legacyConvertId,
     this.convertName,
     this.congregationId,
     required this.eventType,
@@ -205,7 +206,8 @@ final class ConvertEvent {
     this.doneByEmail,
   });
   final String id;
-  final String convertId;
+  final String? convertId;
+  final String? legacyConvertId;
   final String? convertName;
   final String? congregationId;
   final ConvertEventType eventType;
@@ -213,7 +215,8 @@ final class ConvertEvent {
   final String? doneByEmail;
   factory ConvertEvent.fromJson(Map<String, dynamic> json) => ConvertEvent(
     id: json['id'] as String,
-    convertId: json['convert_id'] as String,
+    convertId: json['convert_id'] as String?,
+    legacyConvertId: json['legacy_convert_id'] as String?,
     convertName: json['convert_name'] as String?,
     congregationId: json['congregation_id'] as String?,
     eventType: ConvertEventType.fromWire(json['event_type'] as String),
@@ -223,6 +226,7 @@ final class ConvertEvent {
   Map<String, dynamic> toJson() => {
     'id': id,
     'convert_id': convertId,
+    'legacy_convert_id': legacyConvertId,
     'convert_name': convertName,
     'congregation_id': congregationId,
     'event_type': eventType.wireValue,

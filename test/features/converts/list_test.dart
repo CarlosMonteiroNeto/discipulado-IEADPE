@@ -99,12 +99,14 @@ void main() {
       final photos = PendingPhotos();
       Widget card(String? photo) => MaterialApp(
         home: Scaffold(
-          body: ConvertCard(
-            key: ValueKey('card-$fail'),
-            record: row('one', photo: photo),
-            today: DateOnly(2026, 10, 16),
-            gateway: gateway,
-            photos: photos,
+          body: SingleChildScrollView(
+            child: ConvertCard(
+              key: ValueKey('card-$fail'),
+              record: row('one', photo: photo),
+              today: DateOnly(2026, 10, 16),
+              gateway: gateway,
+              photos: photos,
+            ),
           ),
         ),
       );
@@ -245,8 +247,8 @@ void main() {
       expect(find.text('Atenção'), findsOneWidget);
       expect(find.text('0 anos'), findsOneWidget);
       expect(find.text('Culto legado'), findsOneWidget);
-      final whatsapp = tester.widget<OutlinedButton>(
-        find.widgetWithText(OutlinedButton, 'WhatsApp'),
+      final whatsapp = tester.widget<FilledButton>(
+        find.widgetWithIcon(FilledButton, Icons.chat_bubble_outline),
       );
       expect(whatsapp.onPressed, isNull);
       expect(tester.takeException(), isNull);
@@ -349,11 +351,13 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: ConvertCard(
-              record: row('id', photo: 'asset'),
-              today: today,
-              gateway: gateway,
-              photos: photos,
+            body: SingleChildScrollView(
+              child: ConvertCard(
+                record: row('id', photo: 'asset'),
+                today: today,
+                gateway: gateway,
+                photos: photos,
+              ),
             ),
           ),
         ),

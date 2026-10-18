@@ -11,6 +11,23 @@ This routing applies to post-implementation convert alignment and the unified in
 | Release/operations: `cloud-deploy` | Plan hosting, shared responsibility, IAM, encryption, monitoring, backup/restore, quotas, outage and cutover. | `quality-gate` sets release blockers; `verification-test` owns proof. | Operator checklist with boundaries and actual evidence, without provisioning during local implementation. |
 | Backlog loop: `agile-loop` | Order integration work as INVEST slices with explicit dependencies and entry/exit criteria. | Each slice routes to its stage skill and overlays above. | DoR/DoD stated without requiring solo-agent Scrum ceremonies. |
 
+## Domain keyword routing
+
+Use one process skill for the current stage and the matching domain skill. Apply overlays only when the work invokes their concern; do not load every domain skill for every task.
+
+| Keyword or concern | Domain skill | Overlays |
+|---|---|---|
+| Requirement, role, scope, business rule, NFR | `requirements` | `quality-gate` when defining Done. |
+| Data model, person link, port, architecture, UML, prototype | `design-oo-ux` | `apple-design` for UI decisions; `a11y-ethics` for access and privacy. |
+| Screen, gesture, motion, typography, theme | `apple-design` | `design-oo-ux` for structure; `a11y-ethics`. |
+| Handler, validator, pure function, module boundary | `coding-standards` | `verification-test` for case design. |
+| Test, TDD, regression, emulator, RLS proof | `verification-test` | `quality-gate` for release gates. |
+| Backend, hosting, deployment, backup, IAM, monitoring | `cloud-deploy` | `quality-gate` for operational Done. |
+| Backlog, story, dependency, DoR, DoD, sprint | `agile-loop` | `requirements` and `quality-gate` as applicable. |
+| Accessibility, WCAG, privacy, consent, usability | `a11y-ethics` | `apple-design` for UI execution. |
+
+The IEADPE skill-coverage spec records how the earlier Firebase plans map to the unified Supabase app and which acceptance criteria must change before implementation: `specs/2026-10-16-engineering-skills-extension.md`. Do not infer that a skill is available just because this table names it; pin and load the fork version before claiming compliance.
+
 ## Plan mapping
 
 | Plan | Primary stage | Domain and overlay routing |

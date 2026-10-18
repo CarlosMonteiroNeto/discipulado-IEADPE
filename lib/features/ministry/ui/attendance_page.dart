@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
+import '../../../ui/base44_widgets.dart';
+import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
@@ -156,44 +158,51 @@ class _AttendancePageState extends State<AttendancePage> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
+    backgroundColor: Colors.transparent,
     body: SafeArea(
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 900),
+          constraints: const BoxConstraints(maxWidth: 896),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              Text(
-                'Frequência',
-                style: Theme.of(context).textTheme.headlineSmall,
+              const Base44PageHeading(
+                title: 'Frequência',
+                icon: Icons.fact_check_outlined,
               ),
-              const Text(
-                'A chamada preserva a lista de alunos registrada no início da sessão.',
+              const SizedBox(height: 16),
+              const Base44Panel(
+                child: Text(
+                  'A chamada preserva a lista de alunos registrada no início da sessão.',
+                ),
               ),
               if (_error != null)
                 Semantics(
                   liveRegion: true,
-                  child: Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        children: [
-                          Text(_error!),
-                          TextButton(
-                            onPressed: _roster == null
-                                ? () => _load(cursor: _retryCursor)
-                                : () => _save(finalize: false),
-                            child: const Text('Tentar novamente'),
-                          ),
-                        ],
-                      ),
+                  child: Base44Panel(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(_error!),
+                        const SizedBox(height: 8),
+                        TextButton.icon(
+                          onPressed: _roster == null
+                              ? () => _load(cursor: _retryCursor)
+                              : () => _save(finalize: false),
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               if (_loading)
-                const Center(
-                  child: CircularProgressIndicator(
-                    semanticsLabel: 'Carregando frequência',
+                const Base44Panel(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: CircularProgressIndicator(
+                      semanticsLabel: 'Carregando frequência',
+                    ),
                   ),
                 ),
               if (_roster == null) ...[
@@ -201,25 +210,34 @@ class _AttendancePageState extends State<AttendancePage> {
                     in _page?.items ?? const <PendingMinistrySession>[])
                   Card(
                     child: ListTile(
-                      title: Text(item.className),
+                      title: Text(item.className, softWrap: true),
                       subtitle: Text(
                         '${item.date.year}-${item.date.month.toString().padLeft(2, '0')}-${item.date.day.toString().padLeft(2, '0')}',
+                        softWrap: true,
                       ),
-                      trailing: const Icon(Icons.chevron_right),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: UnifiedColors.brandNavy,
+                      ),
                       onTap: _loading ? null : () => _open(item),
+                      minVerticalPadding: 12,
                     ),
                   ),
                 if (!_loading && _page?.items.isEmpty == true)
-                  const Text('Não há chamadas pendentes.'),
+                  const Base44Panel(child: Text('Não há chamadas pendentes.')),
                 if (_page?.nextCursor != null)
-                  TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => _load(cursor: _page!.nextCursor),
-                    child: Text(
-                      _loading
-                          ? 'Carregando chamadas…'
-                          : 'Carregar mais chamadas',
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: OutlinedButton.icon(
+                      onPressed: _loading
+                          ? null
+                          : () => _load(cursor: _page!.nextCursor),
+                      icon: const Icon(Icons.expand_more),
+                      label: Text(
+                        _loading
+                            ? 'Carregando chamadas…'
+                            : 'Carregar mais chamadas',
+                      ),
                     ),
                   ),
               ] else ...[
@@ -228,55 +246,79 @@ class _AttendancePageState extends State<AttendancePage> {
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 for (final mark in _roster!.marks)
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              mark.studentName,
-                              semanticsLabel: 'Aluno ${mark.studentName}',
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          DropdownButton<AttendanceStatus>(
-                            value: _marks[mark.enrollmentId] ?? mark.status,
-                            items: [
-                              for (final status in AttendanceStatus.values)
-                                DropdownMenuItem(
-                                  value: status,
-                                  child: Text(_label(status)),
-                                ),
+                  Base44Panel(
+                    padding: const EdgeInsets.all(12),
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact =
+                            constraints.maxWidth < 480 ||
+                            MediaQuery.textScalerOf(context).scale(14) > 18;
+                        final statusField =
+                            DropdownButtonFormField<AttendanceStatus>(
+                              initialValue:
+                                  _marks[mark.enrollmentId] ?? mark.status,
+                              isExpanded: true,
+                              decoration: const InputDecoration(
+                                labelText: 'Frequência',
+                                prefixIcon: Icon(Icons.check_circle_outline),
+                              ),
+                              items: [
+                                for (final status in AttendanceStatus.values)
+                                  DropdownMenuItem(
+                                    value: status,
+                                    child: Text(_label(status), softWrap: true),
+                                  ),
+                              ],
+                              onChanged: _saving
+                                  ? null
+                                  : (value) {
+                                      if (value != null) {
+                                        setState(
+                                          () =>
+                                              _marks[mark.enrollmentId] = value,
+                                        );
+                                      }
+                                    },
+                            );
+                        final studentName = Text(
+                          mark.studentName,
+                          semanticsLabel: 'Aluno ${mark.studentName}',
+                          softWrap: true,
+                        );
+                        if (compact) {
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              studentName,
+                              const SizedBox(height: 8),
+                              statusField,
                             ],
-                            onChanged: _saving
-                                ? null
-                                : (value) {
-                                    if (value != null) {
-                                      setState(
-                                        () => _marks[mark.enrollmentId] = value,
-                                      );
-                                    }
-                                  },
-                          ),
-                        ],
-                      ),
+                          );
+                        }
+                        return Row(
+                          children: [
+                            Expanded(child: studentName),
+                            const SizedBox(width: 16),
+                            SizedBox(width: 240, child: statusField),
+                          ],
+                        );
+                      },
                     ),
                   ),
+                const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    OutlinedButton(
+                    OutlinedButton.icon(
                       onPressed: _saving ? null : () => _save(finalize: false),
-                      child: const Text('Salvar chamada'),
+                      icon: const Icon(Icons.save_outlined),
+                      label: const Text('Salvar chamada'),
                     ),
-                    FilledButton(
+                    FilledButton.icon(
                       onPressed: _saving ? null : () => _save(finalize: true),
-                      child: const Text('Salvar e finalizar'),
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Salvar e finalizar'),
                     ),
                   ],
                 ),
