@@ -291,10 +291,11 @@ void main() {
     );
     final studentRow = await client
         .from('ministry_students')
-        .select('id, convert_id')
+        .select('id, name, convert_id')
         .eq('convert_id', convertId)
         .single();
     final studentId = studentRow['id'] as String;
+    final studentName = studentRow['name'] as String;
     expect(studentRow['convert_id'], convertId);
     expect(
       await client
@@ -327,6 +328,19 @@ void main() {
     final enrollmentId = enrollmentRow['id'] as String;
     expect(enrollmentRow['status'], 'active');
     expect(enrollmentRow['student_id'], studentId);
+
+    // The student's protected summary is visible on the production students
+    // route before the journey later verifies revocation removes it.
+    await _selectDropdown(
+      tester,
+      find.byKey(const ValueKey('app-shell-ministry-selector')),
+      'Alunos',
+    );
+    await _waitFor(
+      tester,
+      () => find.text(studentName).evaluate().isNotEmpty,
+      'linked student in students route',
+    );
 
     // The attendance route finalizes through its existing production UI. Its
     // save path immediately calls _open() again and renders the frozen roster.
@@ -428,6 +442,12 @@ void main() {
     expect(sessionAfter['revision'], sessionBefore['revision']);
     expect(attendanceAfter['status'], 'present');
 
+    // The linked student's name is the attendance roster label too. Keep the
+    // attendance content visible immediately before revoking the assignment.
+    expect(find.textContaining('Lista congelada'), findsOneWidget);
+    expect(find.text(_convertName), findsOneWidget);
+    expect(find.text(studentName), findsOneWidget);
+
     // The browser supplies Origin; only the runner-held, unpredictable
     // capability is added by this test for the fixed assignment endpoint.
     final revokeResponse = await http.post(
@@ -448,18 +468,30 @@ void main() {
       ),
     );
 
-    // Rebuild the real app root with the still-active Auth token. Scope is
-    // reloaded over HTTP and the protected ministry routes are removed.
-    await tester.pumpWidget(const SizedBox.shrink());
+    // Keep the same root and Auth session mounted. Production SessionRouter
+    // revalidates the changed scope when the app resumes.
+    expect(client.auth.currentSession, isNotNull);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
     await tester.pump();
-    await tester.pumpWidget(App(auth: auth));
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
     await _waitFor(
       tester,
       () => find.text('Cadastrar Novo Convertido').evaluate().isNotEmpty,
-      'reloaded route after grant revocation',
+      'authorized registration route after grant revocation',
     );
+    expect(client.auth.currentSession, isNotNull);
+    expect(find.text(studentName), findsNothing);
+    expect(find.text(_convertName), findsNothing);
+    expect(find.textContaining('Lista congelada'), findsNothing);
     expect(find.byKey(const ValueKey('app-shell-nav-/ministry')), findsNothing);
-    expect(find.byKey(const ValueKey('app-shell-nav-/converts')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('app-shell-ministry-selector')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('app-shell-nav-/register')),
+      findsOneWidget,
+    );
     await tester.pumpWidget(const SizedBox.shrink());
   }, timeout: const Timeout(Duration(minutes: 15)));
 }

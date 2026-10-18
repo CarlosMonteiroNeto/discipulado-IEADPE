@@ -122,6 +122,23 @@ class LocalSupabaseGuardTests(unittest.TestCase):
         self.assertEqual(accepted.host, "127.0.0.1")
         self.assertEqual(accepted.port, 54322)
 
+    def test_rejects_database_name_conninfo_overrides(self):
+        self.require_guard()
+        unsafe_urls = (
+            "postgresql://postgres:pw@127.0.0.1:54322/host=hosted.example",
+            "postgresql://postgres:pw@127.0.0.1:54322/"
+            "host%3Dhosted.example%20port%3D5432%20dbname%3Dpostgres",
+        )
+        for value in unsafe_urls:
+            with self.subTest(value=value):
+                with self.assertRaises(guard.UnsafeSupabaseTarget):
+                    guard.parse_database_url(value)
+
+        valid = guard.parse_database_url(
+            "postgresql://postgres:local-password@127.0.0.1:54322/postgres"
+        )
+        self.assertEqual(valid.database, "postgres")
+
 
 class UnifiedJourneyRunnerTests(unittest.TestCase):
     def require_runner(self):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import re
 from dataclasses import dataclass, field
 from urllib.error import HTTPError
 from urllib.parse import unquote, urlsplit
@@ -69,9 +70,11 @@ def require_loopback_url(value: str, *, label: str = "API URL") -> str:
 def parse_database_url(value: str) -> DatabaseTarget:
     """Parse one loopback PostgreSQL URI, rejecting libpq overrides.
 
-    No URI query or fragment is accepted. This intentionally rejects `hostaddr`,
-    service files, libpq `options`, multi-host and any future connection option
-    instead of trying to maintain a deny-list of endpoint overrides.
+    No URI query or fragment is accepted. The database name is a bare SQL
+    identifier because ``psql -d`` also accepts libpq conninfo; accepting a
+    decoded `key=value` string there could override the validated ``-h``.
+    This rejects `hostaddr`, service files, connection options and multi-host
+    endpoints instead of maintaining a deny-list of connection overrides.
     """
 
     if not isinstance(value, str) or not value or value != value.strip():
@@ -92,7 +95,7 @@ def parse_database_url(value: str) -> DatabaseTarget:
         or parts.username is None
         or parts.password is None
         or not parts.username
-        or not database
+        or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", database)
         or "/" in database
         or "?" in value
         or "#" in value
