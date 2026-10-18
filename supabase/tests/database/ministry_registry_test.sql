@@ -8,8 +8,13 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
 INSERT INTO public.congregations(id,name) VALUES
  ('92000000-0000-0000-0000-000000000001','Registry A'),
  ('92000000-0000-0000-0000-000000000002','Registry B');
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('registry-staff@example.test','91000000-0000-0000-0000-000000000001','Membro da direção da campanha','92000000-0000-0000-0000-000000000001'),
+ ('registry-supervisor@example.test','91000000-0000-0000-0000-000000000002','Membro da supervisão das campanhas',NULL),
+ ('registry-other@example.test','91000000-0000-0000-0000-000000000003','Membro da direção da campanha','92000000-0000-0000-0000-000000000002');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('91000000-0000-0000-0000-000000000001','92000000-0000-0000-0000-000000000001','ministry_staff',true),
+ ('91000000-0000-0000-0000-000000000001',NULL,'ministry_supervision',true),
  ('91000000-0000-0000-0000-000000000002',NULL,'ministry_supervision',true),
  ('91000000-0000-0000-0000-000000000003','92000000-0000-0000-0000-000000000002','ministry_staff',true);
 SELECT set_config('request.jwt.claim.sub','91000000-0000-0000-0000-000000000001',true);
@@ -19,11 +24,14 @@ DO $$ DECLARE created jsonb; updated jsonb; student jsonb; BEGIN
  PERFORM pg_temp.assert_true(created='{"id":"93000000-0000-0000-0000-000000000001","revision":1}'::jsonb,'contact create has minimal revision result');
  PERFORM pg_temp.assert_true(public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000001',
   '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Teacher One","role_code":"teacher","phone_e164":null,"birth_date":null}'::jsonb)=created,'contact create replay returns exact receipt');
- UPDATE public.ministry_grants SET active=false WHERE user_id='91000000-0000-0000-0000-000000000001';
+ DELETE FROM public.user_access WHERE user_id='91000000-0000-0000-0000-000000000001'
+  AND role='Membro da direção da campanha' AND congregation_id='92000000-0000-0000-0000-000000000001';
  BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000001',
   '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Teacher One","role_code":"teacher","phone_e164":null,"birth_date":null}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: revoked actor received replay'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
- UPDATE public.ministry_grants SET active=true WHERE user_id='91000000-0000-0000-0000-000000000001';
+  RAISE EXCEPTION 'ASSERTION: revoked actor received replay'; EXCEPTION WHEN SQLSTATE '42501' THEN NULL; END;
+ INSERT INTO public.user_access(user_email,user_id,role,congregation_id)
+  VALUES('registry-staff@example.test','91000000-0000-0000-0000-000000000001',
+   'Membro da direção da campanha','92000000-0000-0000-0000-000000000001');
  BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000001',
   '{"id":"93000000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Other","role_code":"teacher","phone_e164":null,"birth_date":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: changed operation replay accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
@@ -46,8 +54,10 @@ DO $$ DECLARE created jsonb; updated jsonb; student jsonb; BEGIN
  BEGIN PERFORM public.ieadpe_ministry_set_contact_archived('93000000-0000-0000-0000-000000000021',
   '{"id":"93000000-0000-0000-0000-000000000010","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","archived":true,"expected_revision":2}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: assigned contact archive accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
- PERFORM public.ieadpe_ministry_save_student('93000000-0000-0000-0000-000000000003',
+ student:=public.ieadpe_ministry_save_student('93000000-0000-0000-0000-000000000003',
   '{"id":"93000000-0000-0000-0000-000000000003","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Student One","water_baptized":null,"wants_baptism":null}'::jsonb);
+ PERFORM pg_temp.assert_true(student->>'id'='93000000-0000-0000-0000-000000000003' AND student->>'revision'='1',
+  'direction can create a student in its assigned congregation');
  PERFORM pg_temp.assert_true((SELECT water_baptized IS NULL AND wants_baptism IS NULL FROM public.ministry_students WHERE id='93000000-0000-0000-0000-000000000003'),'nullable baptism answers preserved');
  INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
   VALUES('93000000-0000-0000-0000-000000000030','92000000-0000-0000-0000-000000000001','Registry Class','registry class','2026-10-01','91000000-0000-0000-0000-000000000001');
@@ -76,7 +86,7 @@ DO $$ BEGIN
   RAISE EXCEPTION 'ASSERTION: contradictory baptism answers accepted'; EXCEPTION WHEN check_violation OR invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM public.ieadpe_ministry_save_student('93000000-0000-0000-0000-000000000006',
   '{"id":"93000000-0000-0000-0000-000000000006","congregation_id":"92000000-0000-0000-0000-000000000002","name":"Cross scope"}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: cross scope student create accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE EXCEPTION 'ASSERTION: direction created a student in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN PERFORM public.ieadpe_ministry_save_contact('93000000-0000-0000-0000-000000000007',
   '{"id":"93000000-0000-0000-0000-000000000007","scope":"congregation","congregation_id":"92000000-0000-0000-0000-000000000001","name":"Unknown","role_code":"teacher","phone_e164":null,"birth_date":null,"unexpected":1}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: unknown contact payload key accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;

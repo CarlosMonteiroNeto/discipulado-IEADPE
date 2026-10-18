@@ -1,7 +1,11 @@
 BEGIN;
 CREATE FUNCTION pg_temp.assert_true(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$ BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'ASSERTION: %',label; END IF; END $$;
 INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('94000000-0000-0000-0000-000000000001','academic-staff@example.test',now());
-INSERT INTO public.congregations(id,name) VALUES('94000000-0000-0000-0000-000000000002','Academic A');
+INSERT INTO public.congregations(id,name) VALUES
+ ('94000000-0000-0000-0000-000000000002','Academic A'),
+ ('94000000-0000-0000-0000-000000000006','Academic B');
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id)
+ VALUES('academic-staff@example.test','94000000-0000-0000-0000-000000000001','Membro da direção da campanha','94000000-0000-0000-0000-000000000002');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES('94000000-0000-0000-0000-000000000001','94000000-0000-0000-0000-000000000002','ministry_staff',true);
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000003','94000000-0000-0000-0000-000000000002','Academic Class','academic class','2026-01-01','94000000-0000-0000-0000-000000000001');
@@ -9,9 +13,19 @@ INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,star
  VALUES('94000000-0000-0000-0000-000000000020','94000000-0000-0000-0000-000000000002','Capacity Class','capacity class','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000040','94000000-0000-0000-0000-000000000002','Other Class','other class','2026-01-01','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
+ VALUES('94000000-0000-0000-0000-000000000060','94000000-0000-0000-0000-000000000006','Academic B Class','academic b class','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by) VALUES
  ('94000000-0000-0000-0000-000000000004','94000000-0000-0000-0000-000000000002','Learner A','learner a','94000000-0000-0000-0000-000000000001'),
- ('94000000-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','Learner B','learner b','94000000-0000-0000-0000-000000000001');
+ ('94000000-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','Learner B','learner b','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000006','Academic B Learner A','academic b learner a','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000062','94000000-0000-0000-0000-000000000006','Academic B Learner B','academic b learner b','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date,updated_by)
+ VALUES('94000000-0000-0000-0000-000000000063','94000000-0000-0000-0000-000000000006',
+  '94000000-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000060','2026-01-01','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_sessions(id,congregation_id,class_id,session_date,updated_by)
+ VALUES('94000000-0000-0000-0000-000000000064','94000000-0000-0000-0000-000000000006',
+  '94000000-0000-0000-0000-000000000060','2026-10-17','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by)
  SELECT ('94000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'94000000-0000-0000-0000-000000000002',
   'Capacity Learner '||n,'capacity learner '||n,'94000000-0000-0000-0000-000000000001' FROM generate_series(1001,1101) n;
@@ -30,9 +44,15 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; BEGIN
  class_result:=public.ieadpe_ministry_set_class_status('94000000-0000-0000-0000-000000000032',
   '{"id":"94000000-0000-0000-0000-000000000030","congregation_id":"94000000-0000-0000-0000-000000000002","status":"completed","expected_revision":2}'::jsonb);
  PERFORM pg_temp.assert_true(class_result->>'revision'='3' AND (SELECT status='completed' FROM public.ministry_classes WHERE id='94000000-0000-0000-0000-000000000030'),'class status is revisioned');
+ BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000070',
+  '{"id":"94000000-0000-0000-0000-000000000070","congregation_id":"94000000-0000-0000-0000-000000000006","name":"Command Class","teacher_contact_id":null,"start_date":"2026-01-01","end_date":null}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: direction created a class in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  result:=public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000011',
   '{"id":"94000000-0000-0000-0000-000000000011","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","student_id":"94000000-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'revision'='1','enrollment created');
+ BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000071',
+  '{"id":"94000000-0000-0000-0000-000000000071","congregation_id":"94000000-0000-0000-0000-000000000006","class_id":"94000000-0000-0000-0000-000000000060","student_id":"94000000-0000-0000-0000-000000000062","start_date":"2026-01-01"}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: direction enrolled a student in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000014',
   '{"id":"94000000-0000-0000-0000-000000000014","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","student_id":"94000000-0000-0000-0000-000000000005","start_date":"2026-01-01"}'::jsonb);
  BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000017',
@@ -48,6 +68,12 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; BEGIN
  result:=public.ieadpe_ministry_create_session('94000000-0000-0000-0000-000000000012',
   '{"id":"94000000-0000-0000-0000-000000000012","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","date":"2026-10-16","topic":"Lesson"}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'status'='open','session created');
+ BEGIN PERFORM public.ieadpe_ministry_create_session('94000000-0000-0000-0000-000000000072',
+  '{"id":"94000000-0000-0000-0000-000000000072","congregation_id":"94000000-0000-0000-0000-000000000006","class_id":"94000000-0000-0000-0000-000000000060","date":"2026-10-16","topic":"Lesson"}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: direction created a session in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN PERFORM public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000073',
+  '{"congregation_id":"94000000-0000-0000-0000-000000000006","session_id":"94000000-0000-0000-0000-000000000064","expected_revision":1,"marks":{"94000000-0000-0000-0000-000000000063":"present"},"finalize":true}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: direction saved attendance in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  result:=public.ieadpe_ministry_save_attendance('94000000-0000-0000-0000-000000000013',
   '{"congregation_id":"94000000-0000-0000-0000-000000000002","session_id":"94000000-0000-0000-0000-000000000012","expected_revision":1,"marks":{"94000000-0000-0000-0000-000000000011":"present","94000000-0000-0000-0000-000000000014":"excused"},"finalize":true}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'status'='finalized' AND result->>'attendance_count'='2','attendance finalized atomically');

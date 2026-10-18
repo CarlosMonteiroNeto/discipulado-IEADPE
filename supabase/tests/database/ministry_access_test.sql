@@ -11,7 +11,10 @@ INSERT INTO public.congregations(id,name) VALUES
  ('82000000-0000-0000-0000-000000000001','Ministry A'),
  ('82000000-0000-0000-0000-000000000002','Ministry B');
 INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
- ('campaign-only@example.test','81000000-0000-0000-0000-000000000003','Membro da direção da campanha','82000000-0000-0000-0000-000000000001');
+ ('ministry-staff@example.test','81000000-0000-0000-0000-000000000001','Membro da direção da campanha','82000000-0000-0000-0000-000000000001'),
+ ('ministry-supervisor@example.test','81000000-0000-0000-0000-000000000002','Membro da supervisão das campanhas',NULL),
+ ('campaign-only@example.test','81000000-0000-0000-0000-000000000003','Membro da direção da campanha','82000000-0000-0000-0000-000000000001'),
+ ('other-staff@example.test','81000000-0000-0000-0000-000000000005','Membro da direção da campanha','82000000-0000-0000-0000-000000000002');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('81000000-0000-0000-0000-000000000001','82000000-0000-0000-0000-000000000001','ministry_staff',true),
  ('81000000-0000-0000-0000-000000000002',NULL,'ministry_supervision',true),

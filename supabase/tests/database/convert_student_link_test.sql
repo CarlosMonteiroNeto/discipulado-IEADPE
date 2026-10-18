@@ -15,15 +15,18 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
  ('a1000000-0000-0000-0000-000000000001','link-staff@example.test',now()),
  ('a1000000-0000-0000-0000-000000000002','link-other@example.test',now()),
  ('a1000000-0000-0000-0000-000000000003','link-campaign@example.test',now()),
- ('a1000000-0000-0000-0000-000000000004','link-revoked@example.test',now()),
+ ('a1000000-0000-0000-0000-000000000004','link-legacy@example.test',now()),
  ('a1000000-0000-0000-0000-000000000005','link-admin@example.test',now());
 INSERT INTO private.admin_allowlist(user_id) VALUES('a1000000-0000-0000-0000-000000000005');
 INSERT INTO public.congregations(id,name) VALUES
  ('a2000000-0000-0000-0000-000000000001','Link A'),('a2000000-0000-0000-0000-000000000002','Link B');
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('link-staff@example.test','a1000000-0000-0000-0000-000000000001','Membro da direção da campanha','a2000000-0000-0000-0000-000000000001'),
+ ('link-other@example.test','a1000000-0000-0000-0000-000000000002','Membro da direção da campanha','a2000000-0000-0000-0000-000000000002');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('a1000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','ministry_staff',true),
  ('a1000000-0000-0000-0000-000000000002','a2000000-0000-0000-0000-000000000002','ministry_staff',true),
- ('a1000000-0000-0000-0000-000000000004','a2000000-0000-0000-0000-000000000001','ministry_staff',false);
+ ('a1000000-0000-0000-0000-000000000004','a2000000-0000-0000-0000-000000000001','ministry_staff',true);
 INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
  ('link-campaign@example.test','a1000000-0000-0000-0000-000000000003','Membro da direção da campanha','a2000000-0000-0000-0000-000000000001');
 INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,
@@ -34,7 +37,8 @@ INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,
  ('a3000000-0000-0000-0000-000000000004','link-deleted','Deleted','Praça','male','2026-10-04','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,now()),
  ('a3000000-0000-0000-0000-000000000005','link-unassigned','Unassigned','Praça','male','2026-10-05','Culto',NULL,NULL,NULL,false,NULL),
  ('a3000000-0000-0000-0000-000000000006','link-invalid-phone','Bad Phone','Praça','male','2026-10-06','Culto','a2000000-0000-0000-0000-000000000001',NULL,'(11) 99999-9999',false,NULL),
- ('a3000000-0000-0000-0000-000000000007','link-deviated-2','Deviated','Praça','male','2026-10-07','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL);
+ ('a3000000-0000-0000-0000-000000000007','link-deviated-2','Deviated','Praça','male','2026-10-07','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL),
+ ('a3000000-0000-0000-0000-000000000008','link-other-scope','Other Scope','Praça','female','2026-10-08','Culto','a2000000-0000-0000-0000-000000000002',NULL,NULL,false,NULL);
 UPDATE public.converts SET is_deviated=true WHERE id='a3000000-0000-0000-0000-000000000007';
 INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,phone_e164,address,education,
  new_convert,updated_by) VALUES
@@ -66,7 +70,8 @@ DO $$ DECLARE page jsonb; page2 jsonb; page3 jsonb; result jsonb; BEGIN
  PERFORM pg_temp.assert_true(jsonb_array_length(page->'items')=1 AND page->'items'->0->>'student_id'='a4000000-0000-0000-0000-000000000004' AND
   jsonb_array_length(page2->'items')=1 AND page2->'items'->0->>'student_id'='a4000000-0000-0000-0000-000000000001' AND page2->'next_cursor'='null'::jsonb,
   'candidate cursors bind name prefix and page only scoped unlinked nonarchived students');
- PERFORM pg_temp.assert_true((SELECT count(*)=0 FROM public.converts),'RLS hides campaign rows from ministry-only actor');
+ PERFORM pg_temp.assert_true((SELECT count(*)=5 FROM public.converts),
+  'campaign direction sees active converts in its own congregation only');
  BEGIN PERFORM count(*) FROM public.ministry_students; RAISE EXCEPTION 'ASSERTION: ministry actor bypassed bounded student read';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN UPDATE public.ministry_students SET name=name WHERE id='a4000000-0000-0000-0000-000000000001';
@@ -85,6 +90,9 @@ DO $$ DECLARE page jsonb; page2 jsonb; page3 jsonb; result jsonb; BEGIN
  PERFORM pg_temp.assert_true(public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000001',
   '{"convert_id":"a3000000-0000-0000-0000-000000000001","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb)=result,
   'lost-response retry replays the exact result');
+ BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000015',
+  '{"convert_id":"a3000000-0000-0000-0000-000000000008","congregation_id":"a2000000-0000-0000-0000-000000000002","student_id":null}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: direction promoted a convert in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000001',
   '{"convert_id":"a3000000-0000-0000-0000-000000000002","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: altered payload under same operation accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
@@ -138,16 +146,23 @@ DO $$ BEGIN
   RAISE EXCEPTION 'ASSERTION: out-of-scope conversion promoted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000003',true);
-DO $$ BEGIN
- BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000006',
-  '{"convert_id":"a3000000-0000-0000-0000-000000000001","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: campaign-only actor promoted convert'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+RESET ROLE;
+INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id)
+ VALUES('a3000000-0000-0000-0000-000000000009','link-direction-promotion','Direction Promotion','Praça','female','2026-10-09','Culto','a2000000-0000-0000-0000-000000000001');
+SET LOCAL ROLE authenticated;
+DO $$ DECLARE result jsonb; BEGIN
+ result:=public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000006',
+  '{"convert_id":"a3000000-0000-0000-0000-000000000009","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
+ PERFORM pg_temp.assert_true(result->>'status'='linked',
+  'direction assignment also authorizes ministry handoff in its congregation');
 END $$;
 SELECT set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000004',true);
 DO $$ BEGIN
+ PERFORM pg_temp.assert_true((SELECT count(*)=0 FROM public.converts),
+  'active legacy ministry grant without user_access cannot read campaign rows');
  BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000007',
   '{"convert_id":"a3000000-0000-0000-0000-000000000001","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: revoked grant promoted convert'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE EXCEPTION 'ASSERTION: active legacy ministry grant alone promoted convert'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000001',true);
 DO $$ BEGIN

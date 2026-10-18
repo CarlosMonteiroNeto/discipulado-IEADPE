@@ -65,6 +65,9 @@ def check_convert_student_concurrency(psql, connection):
       INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
        ('{actor_a}','race-link-a@example.test',now()),('{actor_b}','race-link-b@example.test',now());
       INSERT INTO public.congregations(id,name) VALUES('{scope}','Link race');
+      INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+       ('race-link-a@example.test','{actor_a}','Membro da direção da campanha','{scope}'),
+       ('race-link-b@example.test','{actor_b}','Membro da direção da campanha','{scope}');
       INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES
        ('{actor_a}','{scope}','ministry_staff'),('{actor_b}','{scope}','ministry_staff');
       INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,phone)
@@ -107,6 +110,7 @@ def check_convert_student_concurrency(psql, connection):
             assert query(f"SELECT count(*) FROM public.ministry_students WHERE convert_id='{convert_id}' "
                          "AND promoted_at IS NOT NULL AND convert_snapshot->>'name' IS NOT NULL") == "1", \
                 "ASSERTION: committed link lacks provenance"
+        print("PASS: competing convert-to-student promotions serialize; one winner and one link receipt", flush=True)
     finally:
         for session in sessions:
             if session.process.poll() is None:

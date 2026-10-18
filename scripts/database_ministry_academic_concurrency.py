@@ -63,6 +63,8 @@ def check_ministry_academic_concurrency(psql, connection):
     query(f"""
       INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('{actor}','academic-race@example.test',now());
       INSERT INTO public.congregations(id,name) VALUES('{scope}','Academic race');
+      INSERT INTO public.user_access(user_email,user_id,role,congregation_id)
+       VALUES('academic-race@example.test','{actor}','Membro da direção da campanha','{scope}');
       INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES('{actor}','{scope}','ministry_staff');
       INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
        VALUES('{cap_class}','{scope}','Capacity Race','capacity race','2026-01-01','{actor}');

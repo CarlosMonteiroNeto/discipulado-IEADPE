@@ -8,6 +8,9 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
 INSERT INTO public.congregations(id,name) VALUES
  ('92000000-0000-0000-0000-000000000001','UI Congregation A'),
  ('92000000-0000-0000-0000-000000000002','UI Congregation B');
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('ui-staff-a@example.test','91000000-0000-0000-0000-000000000001','Membro da direção da campanha','92000000-0000-0000-0000-000000000001'),
+ ('ui-staff-b@example.test','91000000-0000-0000-0000-000000000002','Membro da direção da campanha','92000000-0000-0000-0000-000000000002');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('91000000-0000-0000-0000-000000000001','92000000-0000-0000-0000-000000000001','ministry_staff',true),
  ('91000000-0000-0000-0000-000000000002','92000000-0000-0000-0000-000000000002','ministry_staff',true);

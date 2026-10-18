@@ -11,6 +11,9 @@ INSERT INTO public.congregations(id,name) VALUES
  ('b2700000-0000-0000-0000-000000000003','Archived');
 UPDATE public.congregations SET archived_at=now()
  WHERE id='b2700000-0000-0000-0000-000000000003';
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('ministry-supervisor@example.test','b1700000-0000-0000-0000-000000000001','Membro da supervisão das campanhas',NULL),
+ ('ministry-staff@example.test','b1700000-0000-0000-0000-000000000002','Membro da direção da campanha','b2700000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('b1700000-0000-0000-0000-000000000001',NULL,'ministry_supervision',true),
  ('b1700000-0000-0000-0000-000000000002','b2700000-0000-0000-0000-000000000001','ministry_staff',true);
@@ -38,6 +41,9 @@ DO $$ DECLARE page jsonb; BEGIN
   page->'items'->0->>'id'='b2700000-0000-0000-0000-000000000001' AND
   page->'items'->0->>'name'='Active One',
   'staff sees only its own active ministry congregation');
+ PERFORM pg_temp.assert_true(NOT EXISTS(SELECT FROM jsonb_array_elements(page->'items') item
+  WHERE item->>'id'='b2700000-0000-0000-0000-000000000002'),
+  'direction cannot list congregation B');
 END $$;
 RESET ROLE;
 SELECT set_config('request.jwt.claim.sub','b1700000-0000-0000-0000-000000000003',true);

@@ -65,6 +65,8 @@ def check_ministry_registry_concurrency(psql, connection):
     query(f"""
       INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('{actor}','registry-race@example.test',now());
       INSERT INTO public.congregations(id,name) VALUES('{scope}','Registry race');
+      INSERT INTO public.user_access(user_email,user_id,role,congregation_id)
+       VALUES('registry-race@example.test','{actor}','Membro da direção da campanha','{scope}');
       INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES('{actor}','{scope}','ministry_staff');
       INSERT INTO public.ministry_contacts(id,congregation_id,name,normalized_name,scope,role_code,updated_by) VALUES
        ('{old}','{scope}','Old Teacher','old teacher','congregation','teacher','{actor}'),
