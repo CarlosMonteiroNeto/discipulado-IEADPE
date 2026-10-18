@@ -4,19 +4,50 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/features/auth/auth_repository.dart';
+import 'package:ieadpe_converts/routing/router.dart';
 
 void main() {
-  test('scope RPC uses current session and ignores editable metadata roles', () async {
+  test('scope RPC uses server snapshots and ignores editable metadata roles', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final requests = <HttpRequest>[];
+    const congregationA = '11111111-1111-1111-1111-111111111111';
+    const congregationB = '22222222-2222-2222-2222-222222222222';
+    final snapshots = [
+      {
+        'is_admin': true,
+        'is_supervision': false,
+        'congregation_ids': <String>[],
+        'ministry_supervision': true,
+        'ministry_congregation_ids': <String>[],
+      },
+      {
+        'is_admin': false,
+        'is_supervision': true,
+        'congregation_ids': <String>[],
+        'ministry_supervision': true,
+        'ministry_congregation_ids': <String>[],
+      },
+      {
+        'is_admin': false,
+        'is_supervision': false,
+        'congregation_ids': [congregationA],
+        'ministry_supervision': false,
+        'ministry_congregation_ids': [congregationA],
+      },
+      {
+        'is_admin': false,
+        'is_supervision': false,
+        'congregation_ids': <String>[],
+        'ministry_supervision': false,
+        'ministry_congregation_ids': <String>[],
+      },
+    ];
     Object response = {
       'is_admin': false,
       'is_supervision': false,
-      'congregation_ids': ['11111111-1111-1111-1111-111111111111'],
-      'ministry_supervision': true,
-      'ministry_congregation_ids': [
-        '22222222-2222-2222-2222-222222222222',
-      ],
+      'congregation_ids': [congregationA],
+      'ministry_supervision': false,
+      'ministry_congregation_ids': [congregationB],
     };
     final serving = server.listen((request) async {
       requests.add(request);
@@ -60,11 +91,56 @@ void main() {
     final scope = await repository.loadScope();
     expect(scope.isAdmin, isFalse);
     expect(scope.isSupervision, isFalse);
-    expect(scope.congregationIds, {'11111111-1111-1111-1111-111111111111'});
-    expect(scope.isMinistrySupervision, isTrue);
-    expect(scope.ministryCongregationIds, {
-      '22222222-2222-2222-2222-222222222222',
-    });
+    expect(scope.congregationIds, {congregationA});
+    expect(scope.isMinistrySupervision, isFalse);
+    expect(scope.ministryCongregationIds, {congregationB});
+
+    response = snapshots[0];
+    final adminScope = await repository.loadScope();
+    expect(adminScope.isAdmin, isTrue);
+    expect(adminScope.isSupervision, isFalse);
+    expect(adminScope.congregationIds, isEmpty);
+    expect(adminScope.isMinistrySupervision, isTrue);
+    expect(adminScope.ministryCongregationIds, isEmpty);
+    final adminRoutes = routesFor(adminScope);
+    expect(adminRoutes, contains('/admin'));
+    expect(adminRoutes, contains('/ministry/students'));
+
+    response = snapshots[1];
+    final supervisionScope = await repository.loadScope();
+    expect(supervisionScope.isAdmin, isFalse);
+    expect(supervisionScope.isSupervision, isTrue);
+    expect(supervisionScope.congregationIds, isEmpty);
+    expect(supervisionScope.isMinistrySupervision, isTrue);
+    expect(supervisionScope.ministryCongregationIds, isEmpty);
+    final supervisionRoutes = routesFor(supervisionScope);
+    expect(supervisionRoutes, contains('/admin'));
+    expect(supervisionRoutes, contains('/ministry/students'));
+
+    response = snapshots[2];
+    final directionScope = await repository.loadScope();
+    expect(directionScope.isAdmin, isFalse);
+    expect(directionScope.isSupervision, isFalse);
+    expect(directionScope.congregationIds, {congregationA});
+    expect(directionScope.isMinistrySupervision, isFalse);
+    expect(directionScope.ministryCongregationIds, {congregationA});
+    final directionRoutes = routesFor(directionScope);
+    expect(directionRoutes, contains('/ministry/students'));
+    expect(directionRoutes, isNot(contains('/admin')));
+    expect(directionScope.canAccessMinistry(congregationA), isTrue);
+    expect(directionScope.canAccessMinistry(congregationB), isFalse);
+
+    response = snapshots[3];
+    final revokedScope = await repository.loadScope();
+    expect(revokedScope.isAdmin, isFalse);
+    expect(revokedScope.isSupervision, isFalse);
+    expect(revokedScope.congregationIds, isEmpty);
+    expect(revokedScope.isMinistrySupervision, isFalse);
+    expect(revokedScope.ministryCongregationIds, isEmpty);
+    final revokedRoutes = routesFor(revokedScope);
+    expect(revokedRoutes, isNot(contains('/ministry')));
+    expect(revokedRoutes, isNot(contains('/admin')));
+
     response = {
       'is_admin': true,
       'is_supervision': false,
@@ -75,16 +151,18 @@ void main() {
     await expectLater(repository.loadScope(), throwsFormatException);
   });
 
-  test('rejects a scope response missing ministry grants', () async {
+  test('rejects a server scope snapshot missing ministry fields', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final serving = server.listen((request) async {
       await request.drain<void>();
       request.response.headers.contentType = ContentType.json;
-      request.response.write(jsonEncode({
-        'is_admin': false,
-        'is_supervision': false,
-        'congregation_ids': [],
-      }));
+      request.response.write(
+        jsonEncode({
+          'is_admin': false,
+          'is_supervision': false,
+          'congregation_ids': [],
+        }),
+      );
       await request.response.close();
     });
     final client = SupabaseClient(
@@ -97,16 +175,18 @@ void main() {
       await serving.cancel();
       await server.close(force: true);
     });
-    await client.auth.recoverSession(jsonEncode({
-      'access_token':
-          'e30.${base64Url.encode(utf8.encode(jsonEncode({'exp': 4102444800}))).replaceAll('=', '')}.signature',
-      'token_type': 'bearer',
-      'user': {
-        'id': 'synthetic-user',
-        'aud': 'authenticated',
-        'created_at': '2026-10-15T00:00:00Z',
-      },
-    }));
+    await client.auth.recoverSession(
+      jsonEncode({
+        'access_token':
+            'e30.${base64Url.encode(utf8.encode(jsonEncode({'exp': 4102444800}))).replaceAll('=', '')}.signature',
+        'token_type': 'bearer',
+        'user': {
+          'id': 'synthetic-user',
+          'aud': 'authenticated',
+          'created_at': '2026-10-15T00:00:00Z',
+        },
+      }),
+    );
     final repository = AuthRepository(
       client,
       AuthRedirectPolicy(Uri.parse('https://app.test/auth/callback')),

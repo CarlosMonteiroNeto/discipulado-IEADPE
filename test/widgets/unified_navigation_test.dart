@@ -7,7 +7,7 @@ import 'package:ieadpe_converts/features/ministry/ui/ministry_home_page.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
 
 void main() {
-  testWidgets('campaign grants do not expose ministry navigation', (
+  testWidgets('AccessScope without ministry fields hides ministry navigation', (
     tester,
   ) async {
     final scope = AccessScope(congregationIds: ['campaign']);
@@ -24,13 +24,20 @@ void main() {
       ),
     );
     expect(find.text('Discipulado'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('app-shell-ministry-selector')),
+      findsNothing,
+    );
     expect(routesFor(scope), isNot(contains('/ministry')));
   });
 
   testWidgets(
-    'ministry grant adds ministry navigation within the shared shell',
+    'direction server scope adds ministry navigation within the shared shell',
     (tester) async {
-      final scope = AccessScope(ministryCongregationIds: ['ministry']);
+      final scope = AccessScope(
+        congregationIds: ['direction-a'],
+        ministryCongregationIds: ['direction-a'],
+      );
       final opened = <String>[];
       await tester.pumpWidget(
         MaterialApp(
@@ -45,6 +52,8 @@ void main() {
         ),
       );
       expect(find.text('Discipulado'), findsNWidgets(2));
+      expect(routesFor(scope), contains('/ministry/students'));
+      expect(routesFor(scope), isNot(contains('/admin')));
       expect(
         find.byKey(const ValueKey('app-shell-ministry-selector')),
         findsOneWidget,
@@ -59,6 +68,32 @@ void main() {
     },
   );
 
+  testWidgets('global server scope keeps the Discipulado selector visible', (
+    tester,
+  ) async {
+    final scope = AccessScope(isAdmin: true, isMinistrySupervision: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildUnifiedTheme(),
+        home: AppShell(
+          scope: scope,
+          currentRoute: '/ministry',
+          onNavigate: (_) {},
+          onSignOut: () {},
+          child: const Text('Área global'),
+        ),
+      ),
+    );
+
+    expect(find.text('Discipulado'), findsNWidgets(2));
+    expect(
+      find.byKey(const ValueKey('app-shell-ministry-selector')),
+      findsOneWidget,
+    );
+    expect(routesFor(scope), contains('/admin'));
+    expect(routesFor(scope), contains('/ministry/students'));
+  });
+
   test(
     'unified theme uses the readable campaign palette and shared surfaces',
     () {
@@ -72,66 +107,65 @@ void main() {
     },
   );
 
-  testWidgets(
-    'ministry supervisor must choose one of the server granted scopes',
-    (tester) async {
-      var selected = '';
-      var openedStudents = false;
-      var requestedNextPage = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: MinistryHomePage(
-              loadOverview: () async => const {
-                'students': 0,
-                'classes': 0,
-                'open_sessions': 0,
-                'through_date': '2026-10-17',
-              },
-              scopeName: 'Escolha uma congregação',
-              availableCongregationIds: const [
-                'b2700000-0000-0000-0000-000000000001',
-                'b2700000-0000-0000-0000-000000000002',
-              ],
-              congregationNames: const {
-                'b2700000-0000-0000-0000-000000000001': 'Congregação Central',
-                'b2700000-0000-0000-0000-000000000002': 'Congregação Norte',
-              },
-              selectedCongregationId: null,
-              hasNextCongregationPage: true,
-              congregationPageNumber: 1,
-              onNextCongregationPage: () => requestedNextPage = true,
-              onSelectCongregation: (value) => selected = value!,
-              scopedActionsEnabled: false,
-              onOpenStudents: () => openedStudents = true,
-              onOpenClasses: () {},
-              onOpenAttendance: () {},
-            ),
+  testWidgets('ministry supervision chooses from the server supplied scopes', (
+    tester,
+  ) async {
+    var selected = '';
+    var openedStudents = false;
+    var requestedNextPage = false;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MinistryHomePage(
+            loadOverview: () async => const {
+              'students': 0,
+              'classes': 0,
+              'open_sessions': 0,
+              'through_date': '2026-10-17',
+            },
+            scopeName: 'Escolha uma congregação',
+            availableCongregationIds: const [
+              'b2700000-0000-0000-0000-000000000001',
+              'b2700000-0000-0000-0000-000000000002',
+            ],
+            congregationNames: const {
+              'b2700000-0000-0000-0000-000000000001': 'Congregação Central',
+              'b2700000-0000-0000-0000-000000000002': 'Congregação Norte',
+            },
+            selectedCongregationId: null,
+            hasNextCongregationPage: true,
+            congregationPageNumber: 1,
+            onNextCongregationPage: () => requestedNextPage = true,
+            onSelectCongregation: (value) => selected = value!,
+            scopedActionsEnabled: false,
+            onOpenStudents: () => openedStudents = true,
+            onOpenClasses: () {},
+            onOpenAttendance: () {},
           ),
         ),
-      );
-      expect(find.textContaining('Escolha uma congregação'), findsOneWidget);
-      expect(
-        tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
-            .onPressed,
-        isNull,
-      );
-      await tester.tap(find.byType(DropdownButtonFormField<String>));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Congregação Central').last);
-      await tester.pumpAndSettle();
-      expect(selected, 'b2700000-0000-0000-0000-000000000001');
-      expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
-      expect(find.text('b2700000-0000-0000-0000-000000000001'), findsNothing);
-      expect(openedStudents, isFalse);
-      expect(find.text('Página 1'), findsOneWidget);
-      final nextButton = find.widgetWithText(OutlinedButton, 'Próxima');
-      await tester.ensureVisible(nextButton);
-      await tester.tap(nextButton);
-      expect(requestedNextPage, isTrue);
-    },
-  );
+      ),
+    );
+    expect(find.textContaining('Escolha uma congregação'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+          .onPressed,
+      isNull,
+    );
+    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Congregação Central').last);
+    await tester.pumpAndSettle();
+    expect(selected, 'b2700000-0000-0000-0000-000000000001');
+    expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
+    expect(find.text('b2700000-0000-0000-0000-000000000001'), findsNothing);
+    expect(openedStudents, isFalse);
+    expect(find.text('Página 1'), findsOneWidget);
+    final nextButton = find.widgetWithText(OutlinedButton, 'Próxima');
+    await tester.ensureVisible(nextButton);
+    await tester.tap(nextButton);
+    expect(requestedNextPage, isTrue);
+  });
 
   testWidgets('directory failures expose a retry action', (tester) async {
     var retried = false;
