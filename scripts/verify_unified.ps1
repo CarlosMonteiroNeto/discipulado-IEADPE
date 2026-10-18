@@ -20,8 +20,16 @@ try {
         $command = "$($resolved.Source) $($Arguments -join ' ')"
         if ($env:SUPABASE_ANON_KEY) { $command = $command.Replace($env:SUPABASE_ANON_KEY, '[redacted]') }
         Add-Content $transcript "`n[$Name] $command"
-        & $resolved.Source @Arguments 2>&1 | Tee-Object -FilePath $transcript -Append
-        $code = $LASTEXITCODE
+        $previousErrorActionPreference = $ErrorActionPreference
+        try {
+            # Windows PowerShell 5.1 promotes native stderr to a terminating error under Stop,
+            # even when the executable succeeds. Keep it as captured diagnostic output here.
+            $ErrorActionPreference = 'Continue'
+            & $resolved.Source @Arguments 2>&1 | Tee-Object -FilePath $transcript -Append -ErrorAction Stop
+            $code = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $previousErrorActionPreference
+        }
         if ($null -eq $code) { $code = 0 }
         $state = if ($code -eq 0) { 'PASS' } else { 'FAIL' }
         $results.Add([pscustomobject]@{ Name=$Name; State=$state; Exit=$code; Command=$command; Detail='' })
