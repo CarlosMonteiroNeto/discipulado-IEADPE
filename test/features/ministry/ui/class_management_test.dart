@@ -15,6 +15,7 @@ import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/features/ministry/ui/class_detail_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/class_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/classes_page.dart';
+import 'package:ieadpe_converts/ui/unified_theme.dart';
 
 const _scope = '33333333-3333-4333-8333-333333333333';
 const _otherScope = '77777777-7777-4777-8777-777777777777';
@@ -527,7 +528,7 @@ void main() {
     final gateway = _ClassGateway();
     await tester.pumpWidget(
       MaterialApp(
-        theme: ThemeData(fontFamily: _classGoldenFont),
+        theme: _classCaptureTheme(),
         home: RepaintBoundary(
           key: const ValueKey('class-form-capture'),
           child: ColoredBox(
@@ -628,6 +629,16 @@ void main() {
       expect(find.text('Fundamentos'), findsOneWidget);
       expect(find.text('Arquivada'), findsWidgets);
     },
+  );
+}
+
+ThemeData _classCaptureTheme() {
+  final productionTheme = buildUnifiedTheme();
+  return productionTheme.copyWith(
+    textTheme: productionTheme.textTheme.apply(fontFamily: _classGoldenFont),
+    primaryTextTheme: productionTheme.primaryTextTheme.apply(
+      fontFamily: _classGoldenFont,
+    ),
   );
 }
 
