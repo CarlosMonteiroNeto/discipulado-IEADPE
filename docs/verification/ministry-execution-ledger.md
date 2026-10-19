@@ -61,10 +61,10 @@ C1 policy defaults do not establish hosted state. Hosted migration/function/scop
 
 ## P1 contract amendment — legacy name preservation
 
-- Base: P1 worktree `646b186c727f694ef21c9aac98ec1c73ab642fe9`; contract amendment commit pending.
+- Base: P1 worktree `646b186c727f694ef21c9aac98ec1c73ab642fe9`; contract/manifest amendment commit `2026c36`.
 - Finding: original `converts.name` permits any trimmed non-empty length, while C1 capped `ministry_people.name` at 200. A valid longer legacy name would abort the migration or require truncation.
 - Decision: preserve over-200-character legacy names unchanged in canonical storage and reads; authenticated `save_person` remains limited to 1–200 characters and requires explicit shortening before editing. Updated the C1 forward contract and P1 acceptance criteria.
 - Files: `docs/integration/ministry-completion-contracts.md`; `docs/verification/ministry-task-manifest.md`; this ledger.
 - Reviewer: requested `gpt-6.1-sol` / `low`; zero critical, important, and minor findings. Actual runtime metadata unavailable. Review also identified the P1 decoder must accept preserved names; P2 must preserve canonical values and avoid routing them through `save_person` unchanged.
-- Checks: `git diff --check` to be rerun after ledger entry. Documentation gate; no tests/builds.
+- Checks: `git diff --check` exit 0; `git diff --cached --check` exit 0. Documentation gate; no tests/builds.
 - Local/hosted: no product change or hosted access occurred in this amendment. P1 implementation review remains open; hosted/data/device states remain unchanged.
