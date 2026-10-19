@@ -1,6 +1,6 @@
 # Ministry Task Manifest
 
-Status: I1 and C1 are committed/reviewed; the user-selected plan recommendations are implementation defaults. V1 has passed final Sol/low review with zero critical, important, or minor findings and is ready to commit. C1 reviewed follow-up: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. P1 follows V1 and uses the reviewed exact interfaces. Hosted state remains unknown.
+Status: I1, C1, and V1 are committed/reviewed; the user-selected plan recommendations are implementation defaults. Final V1 Sol/low re-review found zero critical, important, or minor findings. V1 commit: `e6160f9790419f4004834c07ef3d453ca5f1be02`; C1 reviewed follow-up: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. P1 is next and uses the reviewed exact interfaces. Hosted state remains unknown.
 
 ## Execution rules
 
@@ -35,7 +35,7 @@ Status: I1 and C1 are committed/reviewed; the user-selected plan recommendations
 - Interfaces/models: no backend RPC; shared Flutter theme and widget contracts only.
 - Acceptance/check: gallery can interactively switch shared component states using synthetic data. Review screenshots at 360/768/1440 widths and 200% text. Verify no overflow/clipping, contrast, visible keyboard focus, labeled semantics/action order, and reduced-motion behavior. Keep synthetic visual evidence with the V1 review. Run each test file separately: `flutter test --concurrency=1 test/widgets/ministry_component_gallery_test.dart`; `flutter test --concurrency=1 test/widgets/base44_responsive_test.dart`; `flutter test --concurrency=1 test/widgets/unified_theme_accessibility_test.dart`. Expected: all layouts/actions remain usable and accessibility checks pass.
 - Result: all three focused test files passed separately (4, 3, and 6 tests); `flutter analyze --no-pub`, formatting check, `git diff --check`, and golden generation passed. Twenty readable synthetic captures cover top/actions/loading/empty/error at 360, 768, 1440, and 360 at 200% text. These are widget-test captures; physical-device and screen-reader behavior remain unverified.
-- Review: initial Sol/low review found three Important issues; Luna/max fixed them. Fresh Sol/low re-review of the final V1 diff and all 20 captures found zero Critical, Important, or Minor findings. Requested models/effort: writer `gpt-6-luna` / `max`, reviewer `gpt-6.1-sol` / `low`; actual runtime metadata unavailable. Commit SHA will be recorded after commit.
+- Review: initial Sol/low review found three Important issues; Luna/max fixed them. Fresh Sol/low re-review of the final V1 diff and all 20 captures found zero Critical, Important, or Minor findings. Requested models/effort: writer `gpt-6-luna` / `max`, reviewer `gpt-6.1-sol` / `low`; actual runtime metadata unavailable. Reviewed V1 commit: `e6160f9790419f4004834c07ef3d453ca5f1be02`.
 
 ### P1 — Canonical identity/link migration
 
