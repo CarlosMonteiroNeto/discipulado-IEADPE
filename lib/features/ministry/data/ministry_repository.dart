@@ -734,6 +734,43 @@ class MinistryRepository {
     }
   }
 
+  Future<MinistryPage<TeamAccessCandidate>> listAccessCandidates({
+    required ContactScope scope,
+    String? congregationId,
+    required AccessRole role,
+    int limit = 50,
+    String? cursor,
+  }) async {
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        (role == AccessRole.direction) !=
+            (scope == ContactScope.congregation)) {
+      throw const DataFailure('invalid');
+    }
+    if (congregationId != null) _uuid(congregationId);
+    _page(limit, cursor);
+    final result = await _read('ministry_list_access_candidates', {
+      'scope': scope.wire,
+      'congregation_id': congregationId,
+      'role': role.wireValue,
+      'limit': limit,
+      'cursor': cursor,
+    });
+    try {
+      final page = decodeAccessCandidatePage(result);
+      if (page.items.any(
+        (candidate) =>
+            candidate.scope != scope ||
+            candidate.congregationId != congregationId ||
+            candidate.role != role,
+      )) {
+        throw const MinistryDataException('Access candidate scope differs.');
+      }
+      return page;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
   Future<MinistryPage<ClassStudentEntry>> listClassStudents({
     required String congregationId,
     required String classId,

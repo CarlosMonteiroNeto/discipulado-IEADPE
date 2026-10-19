@@ -1,20 +1,28 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart';
 import 'package:ieadpe_converts/features/ministry/ui/team_contact_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/team_page.dart';
+import 'package:ieadpe_converts/ui/unified_theme.dart';
 
 const _congregationId = '22222222-2222-4222-8222-222222222222';
 const _contactId = '11111111-1111-4111-8111-111111111111';
 const _otherContactId = '33333333-3333-4333-8333-333333333333';
 const _assignmentId = '44444444-4444-4444-8444-444444444444';
+const _teamGoldenFontFamily = 'TeamGoldenRoboto';
 
 class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   _TeamGateway({
     this.globalManager = false,
     List<Map<String, Object?>> contacts = const [],
+    this.accessCandidates = const [],
   }) {
     for (final contact in contacts) {
       _contacts[contact['id']! as String] = Map.of(contact);
@@ -22,10 +30,15 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   }
 
   final bool globalManager;
+  final List<Map<String, Object?>> accessCandidates;
   final boundary = ProtectedDataBoundary();
   final _contacts = <String, Map<String, Object?>>{};
   final reads = <(String, Map<String, Object?>)>[];
   final writes = <(String, Map<String, Object?>)>[];
+  final operationIds = <String>[];
+  final _receipts = <String, _TeamReceipt>{};
+  String? failBeforeCommandOnce;
+  String? dropResponseAfterCommitOnce;
 
   @override
   String get context => boundary.generation;
@@ -52,6 +65,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
         'contact': {
           ...contact,
           'user_access_id': accessId,
+          'access_linked': contact['user_access_id'] != null,
           'created_at': '2026-10-19T00:00:00Z',
           'updated_at': '2026-10-19T00:00:00Z',
           'updated_by': _contactId,
@@ -81,6 +95,23 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
           'birth_date': contact['birth_date'],
           'revision': contact['revision'],
         },
+      };
+    }
+    if (rpc == 'ministry_list_access_candidates') {
+      if (!globalManager) throw const DataFailure('permission');
+      final scope = parameters['scope'];
+      final congregationId = parameters['congregation_id'];
+      final role = parameters['role'];
+      return {
+        'items': accessCandidates
+            .where(
+              (candidate) =>
+                  candidate['scope'] == scope &&
+                  candidate['congregation_id'] == congregationId &&
+                  candidate['role'] == role,
+            )
+            .toList(growable: false),
+        'next_cursor': null,
       };
     }
     final scope = parameters['scope']! as String;
@@ -136,6 +167,19 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   ) async {
     final frozen = Map<String, Object?>.of(payload);
     writes.add((command, frozen));
+    operationIds.add(operationId);
+    final receipt = _receipts[operationId];
+    if (receipt != null) {
+      if (receipt.command != command ||
+          jsonEncode(receipt.payload) != jsonEncode(frozen)) {
+        throw const DataFailure('operation_conflict');
+      }
+      return Map<String, dynamic>.of(receipt.result);
+    }
+    if (failBeforeCommandOnce == command) {
+      failBeforeCommandOnce = null;
+      throw const DataFailure('unavailable');
+    }
     final id = payload['id']! as String;
     final old = _contacts[id];
     switch (command) {
@@ -155,7 +199,10 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
           'revision': revision,
           'user_access_id': old?['user_access_id'],
         };
-        return {'id': id, 'revision': revision};
+        return _commit(operationId, command, frozen, {
+          'id': id,
+          'revision': revision,
+        });
       case 'save_contact_with_access':
         final access = payload['access']! as Map<String, Object?>;
         final accessId = access['id'] as String? ?? _assignmentId;
@@ -174,37 +221,62 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
           'revision': revision,
           'user_access_id': accessId,
         };
-        return {'id': id, 'revision': revision, 'access_id': accessId};
+        return _commit(operationId, command, frozen, {
+          'id': id,
+          'revision': revision,
+          'access_id': accessId,
+        });
       case 'revoke_contact_access':
         final revision = (old!['revision']! as int) + 1;
         old['user_access_id'] = null;
         old['revision'] = revision;
-        return {
+        return _commit(operationId, command, frozen, {
           'id': id,
           'revision': revision,
           'revoked_access_id': _assignmentId,
-        };
+        });
       case 'set_contact_archived':
         final revision = (old!['revision']! as int) + 1;
         old['archived_at'] = payload['archived'] == true
             ? '2026-10-19T00:00:00Z'
             : null;
         old['revision'] = revision;
-        return {'id': id, 'revision': revision};
+        return _commit(operationId, command, frozen, {
+          'id': id,
+          'revision': revision,
+        });
       case 'replace_role_holder':
         final previousId = payload['previous_contact_id']! as String;
         final previous = _contacts[previousId]!;
         final revision = (old!['revision']! as int) + 1;
         previous['revision'] = (previous['revision']! as int) + 1;
         old['revision'] = revision;
-        return {
+        return _commit(operationId, command, frozen, {
           'id': id,
           'revision': revision,
           'previous_contact_id': previousId,
           'previous_revision': previous['revision'],
-        };
+        });
     }
     throw StateError('Unexpected command: $command');
+  }
+
+  Map<String, dynamic> _commit(
+    String operationId,
+    String command,
+    Map<String, Object?> payload,
+    Map<String, dynamic> result,
+  ) {
+    _receipts[operationId] = _TeamReceipt(
+      command: command,
+      payload: Map.of(payload),
+      result: Map.of(result),
+    );
+    if (dropResponseAfterCommitOnce == command) {
+      dropResponseAfterCommitOnce = null;
+      throw const DataFailure('unavailable');
+    }
+    return result;
   }
 
   @override
@@ -214,6 +286,18 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   ) async => {};
 
   Map<String, Object?> contact(String id) => _contacts[id]!;
+}
+
+class _TeamReceipt {
+  const _TeamReceipt({
+    required this.command,
+    required this.payload,
+    required this.result,
+  });
+
+  final String command;
+  final Map<String, Object?> payload;
+  final Map<String, dynamic> result;
 }
 
 Map<String, Object?> _contact({
@@ -260,6 +344,38 @@ Future<void> _pumpTeam(
   await tester.pumpAndSettle();
 }
 
+Future<void> _pumpTeamViewport(
+  WidgetTester tester,
+  _TeamGateway gateway, {
+  required Size size,
+  double textScale = 1,
+}) async {
+  tester.view.physicalSize = size;
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  final theme = buildUnifiedTheme();
+  await tester.pumpWidget(
+    MaterialApp(
+      theme: theme.copyWith(
+        textTheme: theme.textTheme.apply(fontFamily: _teamGoldenFontFamily),
+      ),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(context).copyWith(
+          textScaler: TextScaler.linear(textScale),
+          disableAnimations: true,
+        ),
+        child: child!,
+      ),
+      home: TeamPage(
+        repository: MinistryRepository(gateway),
+        congregationId: _congregationId,
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
 Future<void> _tapAndSettle(WidgetTester tester, Finder finder) async {
   expect(finder, findsOneWidget);
   await tester.ensureVisible(finder);
@@ -268,6 +384,11 @@ Future<void> _tapAndSettle(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  setUpAll(() async {
+    await _loadTeamFont(_teamGoldenFontFamily, 'roboto-regular.ttf');
+    await _loadTeamFont('MaterialIcons', 'materialicons-regular.otf');
+  });
+
   testWidgets('directory-only contact has no login', (tester) async {
     final gateway = _TeamGateway(contacts: [_contact(email: null)]);
     await _pumpTeam(tester, gateway);
@@ -378,6 +499,10 @@ void main() {
     );
     expect(gateway.writes, isEmpty);
     await _tapAndSettle(tester, find.text('Conceder acesso ao aplicativo'));
+    await _tapAndSettle(
+      tester,
+      find.byKey(const ValueKey('team-create-new-access')),
+    );
     await _tapAndSettle(tester, find.text('Salvar contato'));
 
     expect(gateway.writes.single.$1, 'save_contact_with_access');
@@ -388,6 +513,80 @@ void main() {
       AccessRole.supervision.wireValue,
     );
   });
+
+  testWidgets(
+    'existing unlinked assignment requires explicit exact ID choice',
+    (tester) async {
+      final gateway = _TeamGateway(
+        globalManager: true,
+        accessCandidates: [
+          {
+            'id': _assignmentId,
+            'email': 'marcos@example.test',
+            'role': AccessRole.supervision.wireValue,
+            'scope': 'supervision',
+            'congregation_id': null,
+          },
+        ],
+      );
+      await _pumpTeam(
+        tester,
+        gateway,
+        congregationId: null,
+        supervision: true,
+        canManageAccess: true,
+      );
+
+      await _tapAndSettle(tester, find.text('Adicionar contato'));
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-name')),
+        'Marcos Lima',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-email')),
+        'marcos@example.test',
+      );
+      await _tapAndSettle(tester, find.text('Conceder acesso ao aplicativo'));
+
+      final candidateDropdown = find.byKey(
+        const ValueKey('team-access-candidate'),
+      );
+      expect(candidateDropdown, findsOneWidget);
+      expect(
+        tester
+            .widget<DropdownButtonFormField<String>>(candidateDropdown)
+            .initialValue,
+        isNull,
+      );
+      expect(
+        gateway.reads.map((read) => read.$1),
+        contains('ministry_list_access_candidates'),
+      );
+      final candidateRead = gateway.reads.singleWhere(
+        (read) => read.$1 == 'ministry_list_access_candidates',
+      );
+      expect(candidateRead.$2['role'], AccessRole.supervision.wireValue);
+      expect(candidateRead.$2['scope'], 'supervision');
+      expect(candidateRead.$2['congregation_id'], isNull);
+
+      await _tapAndSettle(
+        tester,
+        find.byKey(const ValueKey('team-contact-save')),
+      );
+      expect(gateway.writes, isEmpty);
+
+      await _tapAndSettle(tester, candidateDropdown);
+      expect(find.textContaining(_assignmentId), findsOneWidget);
+      await _tapAndSettle(tester, find.textContaining(_assignmentId));
+      await _tapAndSettle(tester, find.text('Salvar contato'));
+
+      expect(gateway.writes.single.$1, 'save_contact_with_access');
+      expect(
+        (gateway.writes.single.$2['access']! as Map<String, Object?>)['id'],
+        _assignmentId,
+      );
+    },
+  );
 
   testWidgets('role replacement keeps the previous contact in the directory', (
     tester,
@@ -407,7 +606,10 @@ void main() {
       find.byKey(const ValueKey('team-replace-holder')),
     );
     await _tapAndSettle(tester, find.text('Ana Silva').last);
-    await _tapAndSettle(tester, find.text('Salvar contato'));
+    await _tapAndSettle(
+      tester,
+      find.byKey(const ValueKey('team-contact-save')),
+    );
 
     expect(
       gateway.writes.map((write) => write.$1),
@@ -415,6 +617,173 @@ void main() {
     );
     expect(gateway.contact(_contactId)['archived_at'], isNull);
     expect(gateway.contact(_contactId)['name'], 'Ana Silva');
+  });
+
+  testWidgets(
+    'role replacement retry resumes from the committed contact revision',
+    (tester) async {
+      final gateway = _TeamGateway(
+        contacts: [
+          _contact(name: 'Ana Silva'),
+          _contact(id: _otherContactId, name: 'Bia Santos', revision: 2),
+        ],
+      )..failBeforeCommandOnce = 'replace_role_holder';
+      await _pumpTeam(tester, gateway);
+
+      await _tapAndSettle(tester, find.text('Bia Santos'));
+      await _tapAndSettle(tester, find.text('Substituir ocupante atual'));
+      await _tapAndSettle(
+        tester,
+        find.byKey(const ValueKey('team-replace-holder')),
+      );
+      await _tapAndSettle(tester, find.text('Ana Silva').last);
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-phone')),
+        '+5511999990002',
+      );
+
+      await _tapAndSettle(tester, find.text('Salvar contato'));
+      expect(gateway.contact(_otherContactId)['revision'], 3);
+      expect(
+        gateway.writes.where((write) => write.$1 == 'save_contact'),
+        hasLength(1),
+      );
+
+      await _tapAndSettle(tester, find.text('Tentar novamente'));
+
+      final replacementWrites = gateway.writes
+          .where((write) => write.$1 == 'replace_role_holder')
+          .toList();
+      expect(replacementWrites, hasLength(2));
+      expect(gateway.operationIds[0], isNot(gateway.operationIds[1]));
+      expect(gateway.operationIds[1], gateway.operationIds[2]);
+      expect(replacementWrites.last.$2['expected_revision'], 3);
+      expect(replacementWrites.last.$2['previous_expected_revision'], 4);
+      expect(
+        gateway.writes.where((write) => write.$1 == 'save_contact'),
+        hasLength(1),
+      );
+      expect(gateway.contact(_contactId)['name'], 'Ana Silva');
+    },
+  );
+
+  testWidgets('ambiguous save retry reuses the frozen payload and operation', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(contacts: [_contact()])
+      ..dropResponseAfterCommitOnce = 'save_contact';
+    await _pumpTeam(tester, gateway);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    final phoneField = find.byKey(const ValueKey('team-contact-phone'));
+    await tester.enterText(phoneField, '+5511999990002');
+    await _tapAndSettle(
+      tester,
+      find.byKey(const ValueKey('team-contact-save')),
+    );
+
+    expect(gateway.contact(_contactId)['revision'], 5);
+    expect(
+      find.textContaining('Os dados permanecem no formulário'),
+      findsOneWidget,
+    );
+    expect(tester.widget<TextFormField>(phoneField).enabled, isFalse);
+
+    await _tapAndSettle(tester, find.text('Tentar novamente'));
+
+    expect(gateway.writes, hasLength(2));
+    expect(gateway.writes[0].$1, gateway.writes[1].$1);
+    expect(jsonEncode(gateway.writes[0].$2), jsonEncode(gateway.writes[1].$2));
+    expect(gateway.operationIds[0], gateway.operationIds[1]);
+    expect(gateway.contact(_contactId)['revision'], 5);
+  });
+
+  testWidgets(
+    'ambiguous replacement retry replays without changing its first-stage save',
+    (tester) async {
+      final gateway = _TeamGateway(
+        contacts: [
+          _contact(name: 'Ana Silva'),
+          _contact(id: _otherContactId, name: 'Bia Santos', revision: 2),
+        ],
+      )..dropResponseAfterCommitOnce = 'replace_role_holder';
+      await _pumpTeam(tester, gateway);
+
+      await _tapAndSettle(tester, find.text('Bia Santos'));
+      await _tapAndSettle(tester, find.text('Substituir ocupante atual'));
+      await _tapAndSettle(
+        tester,
+        find.byKey(const ValueKey('team-replace-holder')),
+      );
+      await _tapAndSettle(tester, find.text('Ana Silva').last);
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-phone')),
+        '+5511999990002',
+      );
+      await _tapAndSettle(
+        tester,
+        find.byKey(const ValueKey('team-contact-save')),
+      );
+
+      expect(gateway.contact(_otherContactId)['revision'], 4);
+      expect(gateway.contact(_contactId)['revision'], 5);
+      final phoneField = find.byKey(const ValueKey('team-contact-phone'));
+      expect(tester.widget<TextFormField>(phoneField).enabled, isFalse);
+
+      await _tapAndSettle(tester, find.text('Tentar novamente'));
+
+      expect(gateway.writes.map((write) => write.$1), [
+        'save_contact',
+        'replace_role_holder',
+        'replace_role_holder',
+      ]);
+      expect(gateway.operationIds[1], gateway.operationIds[2]);
+      expect(
+        jsonEncode(gateway.writes[1].$2),
+        jsonEncode(gateway.writes[2].$2),
+      );
+      expect(gateway.contact(_otherContactId)['revision'], 4);
+      expect(gateway.contact(_contactId)['revision'], 5);
+    },
+  );
+
+  testWidgets('local user can edit email only for an unlinked contact', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(
+      contacts: [_contact(email: 'old@example.test')],
+    );
+    await _pumpTeam(tester, gateway);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    final emailField = find.byKey(const ValueKey('team-contact-email'));
+    expect(tester.widget<TextFormField>(emailField).enabled, isTrue);
+    await tester.enterText(emailField, 'new@example.test');
+    await _tapAndSettle(tester, find.text('Salvar contato'));
+
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['email'], 'new@example.test');
+  });
+
+  testWidgets('local user cannot edit email for a linked contact', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(
+      contacts: [
+        _contact(email: 'linked@example.test', userAccessId: _assignmentId),
+      ],
+    );
+    await _pumpTeam(tester, gateway);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('team-contact-email')),
+          )
+          .enabled,
+      isFalse,
+    );
   });
 
   testWidgets('archive and access revoke are distinct lifecycle actions', (
@@ -466,4 +835,97 @@ void main() {
     expect(gateway.writes.single.$1, 'save_contact');
     expect(gateway.writes.single.$2, isNot(contains('access')));
   });
+
+  testWidgets('Team contact form renders at planned responsive viewports', (
+    tester,
+  ) async {
+    for (final (size, textScale, golden) in [
+      (const Size(360, 900), 1.0, 'team_lifecycle_360.png'),
+      (const Size(768, 900), 1.0, 'team_lifecycle_768.png'),
+      (const Size(1440, 900), 1.0, 'team_lifecycle_1440.png'),
+      (const Size(360, 900), 2.0, 'team_lifecycle_360_text_200.png'),
+    ]) {
+      final gateway = _TeamGateway(
+        contacts: [
+          _contact(name: 'Ana Silva'),
+          _contact(id: _otherContactId, name: 'Bia Santos'),
+        ],
+      );
+      await _pumpTeamViewport(
+        tester,
+        gateway,
+        size: size,
+        textScale: textScale,
+      );
+      await _tapAndSettle(tester, find.text('Adicionar contato'));
+      expect(find.byType(TeamContactForm), findsOneWidget);
+      final saveButton = find.byKey(const ValueKey('team-contact-save'));
+      expect(saveButton.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await expectLater(
+        find.byType(AlertDialog),
+        matchesGoldenFile('goldens/$golden'),
+      );
+      await _tapAndSettle(tester, find.text('Cancelar'));
+    }
+  });
+
+  testWidgets('Team contact form scrolls email above the keyboard', (
+    tester,
+  ) async {
+    await _pumpTeamViewport(
+      tester,
+      _TeamGateway(),
+      size: const Size(360, 900),
+      textScale: 2,
+    );
+    await _tapAndSettle(tester, find.text('Adicionar contato'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pumpAndSettle();
+
+    final email = find.byKey(const ValueKey('team-contact-email'));
+    await tester.ensureVisible(email);
+    await tester.showKeyboard(email);
+    await tester.pumpAndSettle();
+
+    final usableBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+        tester.view.viewInsets.bottom / tester.view.devicePixelRatio;
+    expect(tester.getBottomRight(email).dy, lessThanOrEqualTo(usableBottom));
+    expect(
+      find.byKey(const ValueKey('team-contact-save')).hitTestable(),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+}
+
+Future<void> _loadTeamFont(String family, String fileName) async {
+  final fontFile = _findTeamFont(fileName);
+  final fontBytes = await fontFile.readAsBytes();
+  final loader = FontLoader(family)
+    ..addFont(Future<ByteData>.value(ByteData.sublistView(fontBytes)));
+  await loader.load();
+}
+
+File _findTeamFont(String fileName) {
+  var directory = File(Platform.resolvedExecutable).parent;
+  while (true) {
+    final candidate = File(
+      <String>[
+        directory.path,
+        'bin',
+        'cache',
+        'artifacts',
+        'material_fonts',
+        fileName,
+      ].join(Platform.pathSeparator),
+    );
+    if (candidate.existsSync()) return candidate;
+    final parent = directory.parent;
+    if (parent.path == directory.path) break;
+    directory = parent;
+  }
+  throw StateError('Could not find $fileName in the Flutter SDK fonts.');
 }

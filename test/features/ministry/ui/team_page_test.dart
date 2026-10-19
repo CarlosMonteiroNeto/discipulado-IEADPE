@@ -53,6 +53,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
       return {
         'contact': {
           ...contact,
+          'access_linked': contact['user_access_id'] != null,
           'created_at': '2026-10-19T00:00:00Z',
           'updated_at': '2026-10-19T00:00:00Z',
           'updated_by': _contactId,

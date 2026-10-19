@@ -31,6 +31,24 @@ class MinistryPage<T> {
   final String? nextCursor;
 }
 
+/// Existing user-access rows that are not linked to a ministry contact.
+/// The projection intentionally excludes the bound Auth user ID.
+class TeamAccessCandidate {
+  const TeamAccessCandidate({
+    required this.id,
+    required this.email,
+    required this.role,
+    required this.scope,
+    required this.congregationId,
+  });
+
+  final String id;
+  final String email;
+  final AccessRole role;
+  final ContactScope scope;
+  final String? congregationId;
+}
+
 class MinistryPersonSummary {
   const MinistryPersonSummary({
     required this.id,
@@ -181,6 +199,49 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
       .toList(growable: false);
   return MinistryPage(
     items: List.unmodifiable(decoded),
+    nextCursor: _optionalText(json['next_cursor']),
+  );
+}
+
+MinistryPage<TeamAccessCandidate> decodeAccessCandidatePage(Object? raw) {
+  final json = _object(raw);
+  _exactKeys(json, {'items', 'next_cursor'});
+  final items = json['items'];
+  if (items is! List || items.length > 100) _invalid();
+  String? previousId;
+  final candidates = items
+      .map((item) {
+        final row = _object(item);
+        _exactKeys(row, {'id', 'email', 'role', 'scope', 'congregation_id'});
+        final id = _uuid(row['id']);
+        if (previousId != null && id.compareTo(previousId!) <= 0) _invalid();
+        previousId = id;
+        final email = _optionalNormalizedEmail(row['email']);
+        if (email == null) _invalid();
+        late final AccessRole role;
+        try {
+          role = AccessRole.fromWire(_text(row['role']));
+        } on FormatException {
+          _invalid();
+        }
+        final scope = ContactScope.fromWire(_text(row['scope']));
+        final congregationId = _optionalUuid(row['congregation_id']);
+        if ((scope == ContactScope.congregation) != (congregationId != null) ||
+            (role == AccessRole.direction) !=
+                (scope == ContactScope.congregation)) {
+          _invalid();
+        }
+        return TeamAccessCandidate(
+          id: id,
+          email: email,
+          role: role,
+          scope: scope,
+          congregationId: congregationId,
+        );
+      })
+      .toList(growable: false);
+  return MinistryPage(
+    items: List.unmodifiable(candidates),
     nextCursor: _optionalText(json['next_cursor']),
   );
 }
@@ -499,6 +560,7 @@ MinistryContactDetail decodeMinistryContactDetail(Object? raw) {
     'archived_at',
     'revision',
     'user_access_id',
+    'access_linked',
     'created_at',
     'updated_at',
     'updated_by',

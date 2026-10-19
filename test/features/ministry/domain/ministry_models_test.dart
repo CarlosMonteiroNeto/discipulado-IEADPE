@@ -290,6 +290,46 @@ void main() {
       );
     });
 
+    test(
+      'contact detail retains boolean link state without requiring an ID',
+      () {
+        final contact = MinistryContact.fromJson(<String, Object?>{
+          ..._metadata(),
+          'name': 'João',
+          'normalized_name': 'joão',
+          'scope': 'congregation',
+          'congregation_id': '123e4567-e89b-42d3-a456-426614174001',
+          'role_code': 'teacher',
+          'phone_e164': null,
+          'birth_date': null,
+          'archived': false,
+          'email': 'joao@example.test',
+          'access_linked': true,
+          'user_access_id': null,
+        });
+        expect(contact.accessLinked, isTrue);
+        expect(contact.userAccessId, isNull);
+
+        expect(
+          () => MinistryContact.fromJson(<String, Object?>{
+            ..._metadata(),
+            'name': 'João',
+            'normalized_name': 'joão',
+            'scope': 'congregation',
+            'congregation_id': '123e4567-e89b-42d3-a456-426614174001',
+            'role_code': 'teacher',
+            'phone_e164': null,
+            'birth_date': null,
+            'archived': false,
+            'email': 'joao@example.test',
+            'access_linked': false,
+            'user_access_id': '123e4567-e89b-42d3-a456-426614174099',
+          }),
+          throwsA(isA<MinistryDataException>()),
+        );
+      },
+    );
+
     test('rejects contradictory baptism answers', () {
       expect(
         () => Student.fromJson(<String, Object?>{

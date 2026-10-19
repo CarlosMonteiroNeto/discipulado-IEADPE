@@ -175,6 +175,7 @@ class MinistryContact extends MinistryRecord {
     required this.birthDate,
     required this.archived,
     required this.email,
+    required this.accessLinked,
     required this.userAccessId,
   });
 
@@ -186,6 +187,7 @@ class MinistryContact extends MinistryRecord {
   final CalendarDate? birthDate;
   final bool archived;
   final String? email;
+  final bool accessLinked;
   final String? userAccessId;
 
   factory MinistryContact.fromJson(MinistryJson json) {
@@ -199,9 +201,15 @@ class MinistryContact extends MinistryRecord {
       'birth_date',
       'archived',
       'email',
+      'access_linked',
       'user_access_id',
     });
     final metadata = CommonMetadata.fromJson(json);
+    final accessLinked = _requiredBool(json, 'access_linked');
+    final userAccessId = _optionalUuid(json, 'user_access_id');
+    if (userAccessId != null && !accessLinked) {
+      throw const MinistryDataException('Contact access link state disagrees.');
+    }
     final scope = ContactScope.fromWire(_requiredText(json, 'scope'));
     final congregationId = metadata.congregationId;
     if ((scope == ContactScope.congregation) != (congregationId != null)) {
@@ -224,7 +232,8 @@ class MinistryContact extends MinistryRecord {
       birthDate: _optionalDate(json, 'birth_date'),
       archived: _requiredBool(json, 'archived'),
       email: _optionalNormalizedEmail(json, 'email'),
-      userAccessId: _optionalUuid(json, 'user_access_id'),
+      accessLinked: accessLinked,
+      userAccessId: userAccessId,
     );
   }
 }

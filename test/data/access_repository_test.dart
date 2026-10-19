@@ -67,6 +67,7 @@ void main() {
             'archived_at': null,
             'revision': 2,
             'user_access_id': _id(2),
+            'access_linked': true,
             'created_at': '2026-10-19T10:00:00Z',
             'updated_at': '2026-10-19T10:01:00Z',
             'updated_by': _id(3),

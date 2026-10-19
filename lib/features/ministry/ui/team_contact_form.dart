@@ -10,6 +10,7 @@ import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
+import 'team_role_labels.dart';
 
 class TeamContactForm extends StatefulWidget {
   const TeamContactForm({
@@ -56,19 +57,35 @@ class _TeamContactFormState extends State<TeamContactForm> {
   bool _replaceHolder = false;
   bool _loadingPrevious = false;
   bool _busy = false;
+  bool _mutationAttempted = false;
   String? _previousContactId;
   MinistryContactDetail? _previousContact;
   String? _selectedAccessId;
+  bool _createNewAccess = false;
+  MinistryPage<TeamAccessCandidate>? _accessCandidatePage;
+  bool _loadingAccessCandidates = false;
+  String? _accessCandidateError;
+  int _accessCandidateLoadGeneration = 0;
   String? _error;
   String? _saveSignature;
   String? _saveOperationId;
+  String? _completedStageSignature;
+  int? _completedStageRevision;
+  bool _completedStageChangedAccess = false;
   String? _replaceSignature;
   String? _replaceOperationId;
   String? _lifecycleSignature;
   String? _lifecycleOperationId;
 
   MinistryContact? get _contact => widget.current?.contact;
-  bool get _hasLinkedAccess => _contact?.userAccessId != null;
+  bool get _hasLinkedAccess => _contact?.accessLinked ?? false;
+
+  bool get _canEditFields =>
+      !_busy && !_mutationAttempted && !(_contact?.archived ?? false);
+
+  bool get _canEditEmail =>
+      _canEditFields &&
+      (!_hasLinkedAccess || (widget.canManageAccess && _manageAccess));
 
   @override
   void initState() {
@@ -145,6 +162,47 @@ class _TeamContactFormState extends State<TeamContactForm> {
     }
   }
 
+  Future<void> _loadAccessCandidates({String? cursor}) async {
+    if (!widget.canManageAccess || !_manageAccess || _hasLinkedAccess) return;
+    final generation = ++_accessCandidateLoadGeneration;
+    if (cursor != null) {
+      _selectedAccessId = null;
+      _createNewAccess = false;
+    }
+    final token = widget.repository.gateway.context;
+    setState(() {
+      _loadingAccessCandidates = true;
+      _accessCandidateError = null;
+    });
+    try {
+      final page = await widget.accessRepository.listCandidates(
+        scope: widget.scope,
+        congregationId: widget.congregationId,
+        role: _accessRole,
+        limit: 50,
+        cursor: cursor,
+      );
+      widget.repository.gateway.ensureCurrent(token);
+      if (!mounted ||
+          generation != _accessCandidateLoadGeneration ||
+          !widget.isScopeCurrent() ||
+          !_manageAccess) {
+        return;
+      }
+      setState(() {
+        _accessCandidatePage = page;
+        _loadingAccessCandidates = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _accessCandidateLoadGeneration) return;
+      setState(() {
+        _loadingAccessCandidates = false;
+        _accessCandidateError =
+            'Não foi possível carregar os vínculos disponíveis.';
+      });
+    }
+  }
+
   Future<void> _save() async {
     if (_busy || !(_form.currentState?.validate() ?? false)) return;
     if (!widget.isScopeCurrent()) {
@@ -167,6 +225,16 @@ class _TeamContactFormState extends State<TeamContactForm> {
     if (_manageAccess && _hasLinkedAccess && _selectedAccessId == null) {
       setState(
         () => _error = 'Selecione o vínculo de acesso que será atualizado.',
+      );
+      return;
+    }
+    if (_manageAccess &&
+        !_hasLinkedAccess &&
+        _selectedAccessId == null &&
+        !_createNewAccess) {
+      setState(
+        () =>
+            _error = 'Selecione um vínculo existente ou escolha criar um novo.',
       );
       return;
     }
@@ -194,63 +262,80 @@ class _TeamContactFormState extends State<TeamContactForm> {
       _previousContactId,
       _previousContact?.contact.revision,
     ]);
+    if (_mutationAttempted && _saveSignature != signature) {
+      setState(() {
+        _error = 'O envio anterior ainda está pendente. Tente novamente ou reabra o formulário.';
+      });
+      return;
+    }
     if (_saveSignature != signature) {
       _saveSignature = signature;
       _saveOperationId = widget.createId();
       _replaceSignature = null;
       _replaceOperationId = null;
+      _completedStageSignature = null;
+      _completedStageRevision = null;
+      _completedStageChangedAccess = false;
     }
     final token = widget.repository.gateway.context;
     setState(() {
       _busy = true;
+      _mutationAttempted = true;
       _error = null;
     });
 
     try {
-      final hasDirectoryChanges =
-          current == null ||
-          current.name != name ||
-          current.roleCode != _roleCode ||
-          current.phoneE164 != phone ||
-          current.birthDate != birthDate ||
-          (!_hasLinkedAccess && current.email != email);
-      var targetRevision = current?.revision;
-      var accessChanged = false;
-      if (_manageAccess) {
-        final accessResult = await widget.accessRepository
-            .saveContactWithAccess(
-              operationId: _saveOperationId!,
-              id: _contactId,
-              expectedRevision: current?.revision,
-              scope: widget.scope,
-              congregationId: widget.congregationId,
-              name: name,
-              roleCode: _roleCode,
-              phoneE164: phone,
-              birthDate: birthDate,
-              email: email!,
-              accessId: _selectedAccessId,
-              accessRole: _accessRole,
-              accessCongregationId: widget.scope == ContactScope.congregation
-                  ? widget.congregationId
-                  : null,
-            );
-        targetRevision = accessResult.revision;
-        accessChanged = true;
-      } else if (hasDirectoryChanges) {
-        final result = await widget.repository.saveContact(
-          operationId: _saveOperationId!,
-          id: _contactId,
-          scope: widget.scope,
-          congregationId: widget.congregationId,
-          name: name,
-          roleCode: _roleCode,
-          phoneE164: phone,
-          birthDate: birthDate,
-          email: email,
-          expectedRevision: current?.revision,
-        );
-        targetRevision = result.revision;
+      var targetRevision = _completedStageRevision;
+      var accessChanged = _completedStageChangedAccess;
+      if (_completedStageSignature != signature) {
+        final hasDirectoryChanges =
+            current == null ||
+            current.name != name ||
+            current.roleCode != _roleCode ||
+            current.phoneE164 != phone ||
+            current.birthDate != birthDate ||
+            (!_hasLinkedAccess && current.email != email);
+        targetRevision = current?.revision;
+        accessChanged = false;
+        if (_manageAccess) {
+          final accessResult = await widget.accessRepository
+              .saveContactWithAccess(
+                operationId: _saveOperationId!,
+                id: _contactId,
+                expectedRevision: current?.revision,
+                scope: widget.scope,
+                congregationId: widget.congregationId,
+                name: name,
+                roleCode: _roleCode,
+                phoneE164: phone,
+                birthDate: birthDate,
+                email: email!,
+                accessId: _selectedAccessId,
+                accessRole: _accessRole,
+                accessCongregationId: widget.scope == ContactScope.congregation
+                    ? widget.congregationId
+                    : null,
+              );
+          targetRevision = accessResult.revision;
+          accessChanged = true;
+        } else if (hasDirectoryChanges) {
+          final result = await widget.repository.saveContact(
+            operationId: _saveOperationId!,
+            id: _contactId,
+            scope: widget.scope,
+            congregationId: widget.congregationId,
+            name: name,
+            roleCode: _roleCode,
+            phoneE164: phone,
+            birthDate: birthDate,
+            email: email,
+            expectedRevision: current?.revision,
+          );
+          targetRevision = result.revision;
+        }
+        _completedStageSignature = signature;
+        _completedStageRevision = targetRevision;
+        _completedStageChangedAccess = accessChanged;
       }
 
       if (_replaceHolder) {
@@ -431,21 +516,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
     }
   }
 
-  String _roleLabel(RoleCode role) => switch (role) {
-    RoleCode.campaignSupervisor => 'Supervisor(a) das campanhas',
-    RoleCode.campaignDeputy => 'Vice-supervisor(a) das campanhas',
-    RoleCode.discipleshipCoordinator => 'Coordenador(a) do discipulado',
-    RoleCode.discipleshipDeputy => 'Vice-coordenador(a) do discipulado',
-    RoleCode.coordinationSecretary => 'Secretário(a) da coordenação',
-    RoleCode.coordinationDeputySecretary => 'Vice-secretário(a) da coordenação',
-    RoleCode.congregationAssistant => 'Assistente de congregação',
-    RoleCode.campaignLeader => 'Dirigente de campanha',
-    RoleCode.campaignDeputyLeader => 'Vice-dirigente de campanha',
-    RoleCode.teacher => 'Professor(a) do discipulado',
-    RoleCode.discipleshipSecretary => 'Secretário(a) do discipulado',
-    RoleCode.discipleshipDeputySecretary => 'Vice-secretário(a) do discipulado',
-  };
-
   @override
   Widget build(BuildContext context) {
     final current = _contact;
@@ -454,10 +524,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
         .where((role) => role.scope == widget.scope)
         .toList(growable: false);
     final linkedAccess = widget.current?.access;
-    final canEditEmail =
-        widget.canManageAccess &&
-        (!_hasLinkedAccess || _manageAccess) &&
-        !archived;
 
     return AlertDialog(
       title: Text(current == null ? 'Novo contato' : 'Editar contato'),
@@ -480,7 +546,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                 TextFormField(
                   key: const ValueKey('team-contact-name'),
                   controller: _name,
-                  enabled: !_busy && !archived,
+                  enabled: _canEditFields,
                   maxLength: 200,
                   decoration: const InputDecoration(labelText: 'Nome *'),
                   validator: (value) {
@@ -507,10 +573,10 @@ class _TeamContactFormState extends State<TeamContactForm> {
                     for (final role in roleOptions)
                       DropdownMenuItem<RoleCode?>(
                         value: role,
-                        child: Text(_roleLabel(role)),
+                        child: Text(teamRoleLabel(role.wire)),
                       ),
                   ],
-                  onChanged: _busy || archived
+                  onChanged: !_canEditFields
                       ? null
                       : (role) => setState(() {
                           _roleCode = role;
@@ -525,7 +591,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                     key: const ValueKey('team-replace-holder-toggle'),
                     contentPadding: EdgeInsets.zero,
                     value: _replaceHolder,
-                    onChanged: _busy || archived
+                    onChanged: !_canEditFields
                         ? null
                         : (value) => setState(() {
                             _replaceHolder = value ?? false;
@@ -555,7 +621,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                             child: Text(entry.name, softWrap: true),
                           ),
                       ],
-                      onChanged: _busy ? null : _loadPreviousContact,
+                      onChanged: _canEditFields ? _loadPreviousContact : null,
                       validator: (value) =>
                           value == null ? 'Selecione o contato atual.' : null,
                     ),
@@ -564,10 +630,11 @@ class _TeamContactFormState extends State<TeamContactForm> {
                 TextFormField(
                   key: const ValueKey('team-contact-phone'),
                   controller: _phone,
-                  enabled: !_busy && !archived,
+                  enabled: _canEditFields,
                   keyboardType: TextInputType.phone,
                   decoration: const InputDecoration(
-                    labelText: 'Telefone (opcional)',
+                    labelText: 'Telefone',
+                    helperText: 'Opcional',
                   ),
                   validator: (value) {
                     final phone = value?.trim() ?? '';
@@ -582,10 +649,11 @@ class _TeamContactFormState extends State<TeamContactForm> {
                 TextFormField(
                   key: const ValueKey('team-contact-birth-date'),
                   controller: _birthDate,
-                  enabled: !_busy && !archived,
+                  enabled: _canEditFields,
                   keyboardType: TextInputType.datetime,
                   decoration: const InputDecoration(
-                    labelText: 'Data de nascimento (aaaa-mm-dd)',
+                    labelText: 'Nascimento',
+                    helperText: 'aaaa-mm-dd',
                   ),
                   validator: (value) =>
                       value == null ||
@@ -611,12 +679,22 @@ class _TeamContactFormState extends State<TeamContactForm> {
                       key: const ValueKey('team-manage-access-toggle'),
                       contentPadding: EdgeInsets.zero,
                       value: _manageAccess,
-                      onChanged: _busy
+                      onChanged: !_canEditFields
                           ? null
-                          : (value) => setState(() {
-                              _manageAccess = value ?? false;
-                              _selectedAccessId = null;
-                            }),
+                          : (value) async {
+                              final manageAccess = value ?? false;
+                              setState(() {
+                                _manageAccess = manageAccess;
+                                _selectedAccessId = null;
+                                _createNewAccess = false;
+                                _accessCandidatePage = null;
+                                _accessCandidateError = null;
+                                _accessCandidateLoadGeneration++;
+                              });
+                              if (manageAccess && !_hasLinkedAccess) {
+                                await _loadAccessCandidates();
+                              }
+                            },
                       title: Text(
                         _hasLinkedAccess
                             ? 'Atualizar vínculo de acesso'
@@ -649,11 +727,20 @@ class _TeamContactFormState extends State<TeamContactForm> {
                           ),
                         ),
                       ],
-                      onChanged: _busy
+                      onChanged: !_canEditFields
                           ? null
-                          : (role) {
-                              if (role != null)
-                                setState(() => _accessRole = role);
+                          : (role) async {
+                              if (role != null && role != _accessRole) {
+                                setState(() {
+                                  _accessRole = role;
+                                  _selectedAccessId = null;
+                                  _createNewAccess = false;
+                                  _accessCandidatePage = null;
+                                });
+                                if (!_hasLinkedAccess) {
+                                  await _loadAccessCandidates();
+                                }
+                              }
                             },
                     ),
                     if (_hasLinkedAccess) ...[
@@ -674,13 +761,112 @@ class _TeamContactFormState extends State<TeamContactForm> {
                               child: Text('ID ${linkedAccess.id}'),
                             ),
                         ],
-                        onChanged: _busy
+                        onChanged: !_canEditFields
                             ? null
-                            : (id) => setState(() => _selectedAccessId = id),
+                            : (id) => setState(() {
+                                _selectedAccessId = id;
+                                _createNewAccess = false;
+                              }),
                         validator: (value) => value == null
                             ? 'Selecione o vínculo existente.'
                             : null,
                       ),
+                    ],
+                    if (!_hasLinkedAccess) ...[
+                      const SizedBox(height: UnifiedSpace.x2),
+                      if (_loadingAccessCandidates)
+                        const LinearProgressIndicator(
+                          semanticsLabel: 'Carregando vínculos de acesso',
+                        )
+                      else if (_accessCandidateError != null)
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(_accessCandidateError!),
+                            TextButton.icon(
+                              onPressed: _canEditFields
+                                  ? _loadAccessCandidates
+                                  : null,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Tentar carregar novamente'),
+                            ),
+                          ],
+                        )
+                      else ...[
+                        DropdownButtonFormField<String>(
+                          key: const ValueKey('team-access-candidate'),
+                          initialValue: _selectedAccessId,
+                          isExpanded: true,
+                          itemHeight: null,
+                          decoration: const InputDecoration(
+                            labelText: 'Vínculo existente (escolha pelo ID)',
+                          ),
+                          items: [
+                            for (final candidate
+                                in _accessCandidatePage?.items ??
+                                    const <TeamAccessCandidate>[])
+                              DropdownMenuItem(
+                                value: candidate.id,
+                                child: Text(
+                                  'ID ${candidate.id} · ${candidate.email} · ${teamAccessRoleLabel(candidate.role)} · ${candidate.scope.wire}',
+                                  softWrap: true,
+                                ),
+                              ),
+                          ],
+                          onChanged:
+                              !_canEditFields || _accessCandidatePage == null
+                              ? null
+                              : (id) => setState(() {
+                                  _selectedAccessId = id;
+                                  _createNewAccess = false;
+                                }),
+                          validator: (value) =>
+                              value != null || _createNewAccess
+                              ? null
+                              : 'Escolha um vínculo ou crie um novo.',
+                        ),
+                        if (_accessCandidatePage?.items.isEmpty == true)
+                          Padding(
+                            padding: const EdgeInsets.only(
+                              top: UnifiedSpace.x1,
+                            ),
+                            child: Text(
+                              'Nenhum vínculo existente neste perfil e escopo.',
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                        if (_accessCandidatePage?.nextCursor != null)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _canEditFields
+                                  ? () => _loadAccessCandidates(
+                                      cursor: _accessCandidatePage!.nextCursor,
+                                    )
+                                  : null,
+                              icon: const Icon(Icons.chevron_right),
+                              label: const Text('Mais vínculos'),
+                            ),
+                          ),
+                        CheckboxListTile(
+                          key: const ValueKey('team-create-new-access'),
+                          contentPadding: EdgeInsets.zero,
+                          value: _createNewAccess,
+                          onChanged: !_canEditFields
+                              ? null
+                              : (value) => setState(() {
+                                  _createNewAccess = value ?? false;
+                                  if (_createNewAccess) {
+                                    _selectedAccessId = null;
+                                  }
+                                }),
+                          title: const Text('Criar novo vínculo pendente'),
+                          subtitle: const Text(
+                            'Use quando nenhuma atribuição existente deve ser vinculada.',
+                          ),
+                          controlAffinity: ListTileControlAffinity.leading,
+                        ),
+                      ],
                     ],
                   ],
                   if (_hasLinkedAccess && linkedAccess != null) ...[
@@ -695,7 +881,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton.icon(
-                          onPressed: _busy ? null : _revokeAccess,
+                          onPressed: _canEditFields ? _revokeAccess : null,
                           icon: const Icon(Icons.person_remove_outlined),
                           label: const Text('Revogar acesso'),
                         ),
@@ -705,13 +891,13 @@ class _TeamContactFormState extends State<TeamContactForm> {
                 TextFormField(
                   key: const ValueKey('team-contact-email'),
                   controller: _email,
-                  enabled: !_busy && canEditEmail,
+                  enabled: _canEditEmail,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: _manageAccess
                         ? 'Email para acesso *'
                         : 'Email (opcional)',
-                    helperText: current?.userAccessId != null
+                    helperText: _hasLinkedAccess
                         ? 'O email muda somente com o vínculo selecionado.'
                         : null,
                   ),
@@ -733,7 +919,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
-                      onPressed: _busy ? null : _changeArchiveState,
+                      onPressed: _canEditFields ? _changeArchiveState : null,
                       icon: Icon(
                         archived
                             ? Icons.unarchive_outlined
@@ -765,9 +951,16 @@ class _TeamContactFormState extends State<TeamContactForm> {
           child: const Text('Cancelar'),
         ),
         FilledButton.icon(
+          key: const ValueKey('team-contact-save'),
           onPressed: _busy || archived ? null : _save,
           icon: Icon(_busy ? Icons.hourglass_top : Icons.save_outlined),
-          label: Text(_busy ? 'Salvando…' : 'Salvar contato'),
+          label: Text(
+            _busy
+                ? 'Salvando…'
+                : _mutationAttempted
+                ? 'Tentar novamente'
+                : 'Salvar contato',
+          ),
         ),
       ],
     );

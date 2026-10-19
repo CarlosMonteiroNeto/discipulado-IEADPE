@@ -10,8 +10,9 @@ SELECT pg_temp.assert_true(
    AND table_name='ministry_contacts' AND column_name='email' AND is_nullable='YES') AND
  EXISTS(SELECT FROM information_schema.columns WHERE table_schema='public'
    AND table_name='ministry_contacts' AND column_name='user_access_id' AND is_nullable='YES') AND
- to_regprocedure('public.ieadpe_ministry_save_contact_with_access(uuid,jsonb)') IS NOT NULL,
- 'nullable contact email, unique access link, and atomic save RPC are installed');
+ to_regprocedure('public.ieadpe_ministry_save_contact_with_access(uuid,jsonb)') IS NOT NULL AND
+ to_regprocedure('public.ieadpe_ministry_list_access_candidates(jsonb)') IS NOT NULL,
+ 'nullable contact email, unique access link, atomic save, and candidate read RPC are installed');
 
 INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
  ('e1000000-0000-4000-8000-000000000001','direction@example.test',now()),
@@ -28,7 +29,13 @@ INSERT INTO public.user_access(id,user_email,user_id,role,congregation_id) VALUE
   'e1000000-0000-4000-8000-000000000001','Membro da direção da campanha',
   'e2000000-0000-4000-8000-000000000001'),
  ('e3000000-0000-4000-8000-000000000002','manager@example.test',
-  'e1000000-0000-4000-8000-000000000002','Membro da supervisão das campanhas',NULL);
+  'e1000000-0000-4000-8000-000000000002','Membro da supervisão das campanhas',NULL),
+ ('e3000000-0000-4000-8000-000000000003','pending-a@example.test',NULL,
+  'Membro da direção da campanha','e2000000-0000-4000-8000-000000000001'),
+ ('e3000000-0000-4000-8000-000000000004','pending-b@example.test',NULL,
+  'Membro da direção da campanha','e2000000-0000-4000-8000-000000000002'),
+ ('e3000000-0000-4000-8000-000000000005','pending-supervision@example.test',NULL,
+  'Membro da supervisão das campanhas',NULL);
 INSERT INTO public.ministry_contacts(id,congregation_id,scope,name,normalized_name,role_code,updated_by) VALUES
  ('e4000000-0000-4000-8000-000000000001','e2000000-0000-4000-8000-000000000001',
   'congregation','Directory Only','directory only','teacher','e1000000-0000-4000-8000-000000000001'),
@@ -56,7 +63,7 @@ END $$;
 SELECT set_config('request.jwt.claim.sub','e1000000-0000-4000-8000-000000000002',true);
 DO $$
 DECLARE created jsonb; replay jsonb; detail jsonb; access_id uuid; directory jsonb;
-        failed_contact uuid:='e4000000-0000-4000-8000-000000000099';
+        failed_contact uuid:='e4000000-0000-4000-8000-000000000099'; candidates jsonb;
 BEGIN
  -- A mismatched pair is rejected before either side is written.
  BEGIN
@@ -122,7 +129,7 @@ BEGIN
  detail:=public.ieadpe_ministry_get_contact(jsonb_build_object('scope','congregation',
   'congregation_id','e2000000-0000-4000-8000-000000000001','contact_id','e4000000-0000-4000-8000-000000000003'));
  PERFORM pg_temp.assert_true((SELECT count(*)=2 FROM jsonb_object_keys(detail)) AND
-  (SELECT count(*)=15 FROM jsonb_object_keys(detail->'contact')) AND
+  (SELECT count(*)=16 FROM jsonb_object_keys(detail->'contact')) AND
   (SELECT count(*)=5 FROM jsonb_object_keys(detail->'access')) AND detail->'contact'->>'revision'='1' AND
   detail->'contact'->>'user_access_id'=access_id::text AND detail->'access'->>'id'=access_id::text AND
   detail->'access'->>'user_email'='member-old@example.test' AND detail->'access'->'user_id'='null'::jsonb,
@@ -132,6 +139,40 @@ BEGIN
  PERFORM pg_temp.assert_true((SELECT item->>'user_access_id'=access_id::text AND item->>'email'='member-old@example.test'
   FROM jsonb_array_elements(directory->'items') item WHERE item->>'id'='e4000000-0000-4000-8000-000000000003'),
   'global directory exposes only the linked assignment ID with matching email');
+
+ candidates:=public.ieadpe_ministry_list_access_candidates(jsonb_build_object(
+  'scope','congregation','congregation_id','e2000000-0000-4000-8000-000000000001',
+  'role','Membro da direção da campanha','limit',20,'cursor',NULL));
+ PERFORM pg_temp.assert_true(jsonb_array_length(candidates->'items')=2 AND
+  EXISTS(SELECT FROM jsonb_array_elements(candidates->'items') item
+   WHERE item=jsonb_build_object('id','e3000000-0000-4000-8000-000000000001',
+    'email','direction@example.test','role','Membro da direção da campanha','scope','congregation',
+    'congregation_id','e2000000-0000-4000-8000-000000000001')) AND
+  EXISTS(SELECT FROM jsonb_array_elements(candidates->'items') item
+   WHERE item=jsonb_build_object('id','e3000000-0000-4000-8000-000000000003',
+    'email','pending-a@example.test','role','Membro da direção da campanha','scope','congregation',
+    'congregation_id','e2000000-0000-4000-8000-000000000001')) AND candidates ? 'next_cursor',
+  'manager candidate read returns exact unlinked role and congregation assignments without user IDs');
+ candidates:=public.ieadpe_ministry_list_access_candidates(jsonb_build_object(
+  'scope','congregation','congregation_id','e2000000-0000-4000-8000-000000000001',
+  'role','Membro da direção da campanha','limit',1,'cursor',NULL));
+ PERFORM pg_temp.assert_true(jsonb_array_length(candidates->'items')=1 AND
+  candidates->>'next_cursor' IS NOT NULL,
+  'candidate read returns a bounded first page with a continuation cursor');
+ candidates:=public.ieadpe_ministry_list_access_candidates(jsonb_build_object(
+  'scope','congregation','congregation_id','e2000000-0000-4000-8000-000000000001',
+  'role','Membro da direção da campanha','limit',1,'cursor',candidates->>'next_cursor'));
+ PERFORM pg_temp.assert_true(jsonb_array_length(candidates->'items')=1 AND
+  candidates->'items'->0->>'id'<>'e3000000-0000-4000-8000-000000000001',
+  'candidate cursor advances within its exact scope and role filter');
+ candidates:=public.ieadpe_ministry_list_access_candidates(jsonb_build_object(
+  'scope','supervision','congregation_id',NULL,'role','Membro da supervisão das campanhas',
+  'limit',20,'cursor',NULL));
+ PERFORM pg_temp.assert_true(jsonb_array_length(candidates->'items')=2 AND
+  EXISTS(SELECT FROM jsonb_array_elements(candidates->'items') item
+   WHERE item->>'id'='e3000000-0000-4000-8000-000000000005') AND
+  NOT (candidates->'items'->0 ? 'user_id'),
+  'supervision candidate projection omits bound user identity');
 END $$;
 
 SELECT set_config('request.jwt.claim.sub','e1000000-0000-4000-8000-000000000001',true);
@@ -140,8 +181,29 @@ DECLARE detail jsonb; saved jsonb;
 BEGIN
  detail:=public.ieadpe_ministry_get_contact(jsonb_build_object('scope','congregation',
   'congregation_id','e2000000-0000-4000-8000-000000000001','contact_id','e4000000-0000-4000-8000-000000000003'));
- PERFORM pg_temp.assert_true(detail->'contact'->'user_access_id'='null'::jsonb AND detail->'access'='null'::jsonb,
-  'local contact detail never reveals linked assignment identity or access data');
+ PERFORM pg_temp.assert_true(detail->'contact'->'user_access_id'='null'::jsonb AND
+  detail->'contact'->'access_linked'='true'::jsonb AND detail->'access'='null'::jsonb,
+  'local contact detail returns only a boolean link state and never the assignment identity');
+ detail:=public.ieadpe_ministry_get_contact(jsonb_build_object('scope','congregation',
+  'congregation_id','e2000000-0000-4000-8000-000000000001','contact_id','e4000000-0000-4000-8000-000000000001'));
+ PERFORM pg_temp.assert_true(detail->'contact'->'user_access_id'='null'::jsonb AND
+  detail->'contact'->'access_linked'='false'::jsonb AND detail->'contact'->>'email' IS NULL,
+  'local directory-only detail reports an unlinked email capability without assignment identity');
+ saved:=public.ieadpe_ministry_save_contact('e5000000-0000-4000-8000-000000000011',jsonb_build_object(
+  'id','e4000000-0000-4000-8000-000000000001','scope','congregation',
+  'congregation_id','e2000000-0000-4000-8000-000000000001','name','Directory Only',
+  'role_code','teacher','phone_e164',NULL,'birth_date',NULL,'email','directory@example.test',
+  'expected_revision',1));
+ PERFORM pg_temp.assert_true(saved->>'revision'='2' AND
+  (SELECT email='directory@example.test' FROM public.ministry_contacts
+   WHERE id='e4000000-0000-4000-8000-000000000001'),
+  'local direction may edit email on an unlinked directory contact');
+ BEGIN
+  PERFORM public.ieadpe_ministry_list_access_candidates(jsonb_build_object(
+   'scope','congregation','congregation_id','e2000000-0000-4000-8000-000000000001',
+   'role','Membro da direção da campanha','limit',20,'cursor',NULL));
+  RAISE EXCEPTION 'ASSERTION: local direction listed access candidates';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN
    PERFORM public.ieadpe_ministry_save_contact('e5000000-0000-4000-8000-000000000004',jsonb_build_object(
     'id','e4000000-0000-4000-8000-000000000003','scope','congregation',

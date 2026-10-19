@@ -155,6 +155,56 @@ void main() {
     });
   });
 
+  test('access candidate read uses the manager-only scoped envelope', () async {
+    var requestCount = 0;
+    final gateway = await fixture.fixture((request) async {
+      requestCount++;
+      expect(
+        request.uri.path,
+        '/rest/v1/rpc/ieadpe_ministry_list_access_candidates',
+      );
+      expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+        'request': {
+          'scope': 'congregation',
+          'congregation_id': fixture.scopeId,
+          'role': 'Membro da direção da campanha',
+          'limit': 25,
+          'cursor': null,
+        },
+      });
+      await fixture.respond(request, {'items': [], 'next_cursor': null});
+    });
+
+    final result = await gateway.readRpc(
+      'ministry_list_access_candidates',
+      context: gateway.context,
+      parameters: {
+        'scope': 'congregation',
+        'congregation_id': fixture.scopeId,
+        'role': 'Membro da direção da campanha',
+        'limit': 25,
+        'cursor': null,
+      },
+    );
+    expect(result, {'items': [], 'next_cursor': null});
+    await expectLater(
+      gateway.readRpc(
+        'ministry_list_access_candidates',
+        context: gateway.context,
+        parameters: {
+          'scope': 'congregation',
+          'congregation_id': fixture.scopeId,
+          'role': 'Membro da direção da campanha',
+          'limit': 25,
+          'cursor': null,
+          'user_id': fixture.id(3),
+        },
+      ),
+      throwsA(isA<DataFailure>()),
+    );
+    expect(requestCount, 1);
+  });
+
   test(
     'linked contact commands reject malformed payloads and result envelopes',
     () async {

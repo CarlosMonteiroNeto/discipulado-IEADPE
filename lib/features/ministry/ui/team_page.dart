@@ -9,6 +9,7 @@ import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
 import 'team_contact_form.dart';
+import 'team_role_labels.dart';
 
 /// Scoped directory for local and supervision ministry contacts.
 class TeamPage extends StatefulWidget {
@@ -127,25 +128,6 @@ class _TeamPageState extends State<TeamPage> {
         });
       }
     }
-  }
-
-  String _roleLabel(String? wire) {
-    if (wire == null) return 'Sem função atribuída';
-    return switch (wire) {
-      'campaignSupervisor' => 'Supervisor(a) das campanhas',
-      'campaignDeputy' => 'Vice-supervisor(a) das campanhas',
-      'discipleshipCoordinator' => 'Coordenador(a) do discipulado',
-      'discipleshipDeputy' => 'Vice-coordenador(a) do discipulado',
-      'coordinationSecretary' => 'Secretário(a) da coordenação',
-      'coordinationDeputySecretary' => 'Vice-secretário(a) da coordenação',
-      'congregationAssistant' => 'Assistente de congregação',
-      'campaignLeader' => 'Dirigente de campanha',
-      'campaignDeputyLeader' => 'Vice-dirigente de campanha',
-      'teacher' => 'Professor(a) do discipulado',
-      'discipleshipSecretary' => 'Secretário(a) do discipulado',
-      'discipleshipDeputySecretary' => 'Vice-secretário(a) do discipulado',
-      _ => 'Função cadastrada',
-    };
   }
 
   String _accessStatus(MinistryDirectoryEntry item) {
@@ -318,7 +300,7 @@ class _TeamPageState extends State<TeamPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(_roleLabel(item.roleCode)),
+                        Text(teamRoleLabel(item.roleCode)),
                         Text(_accessStatus(item)),
                         if (item.archivedAt != null)
                           const Text('Contato arquivado'),

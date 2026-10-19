@@ -518,6 +518,13 @@ class SupabaseGateway
         'limit',
         'cursor',
       },
+      'ministry_list_access_candidates': {
+        'scope',
+        'congregation_id',
+        'role',
+        'limit',
+        'cursor',
+      },
       'ministry_list_class_students': {
         'congregation_id',
         'class_id',
@@ -562,6 +569,13 @@ class SupabaseGateway
       'ministry_get_student': {'congregation_id', 'student_id'},
       'ministry_get_teacher_contact': {'congregation_id', 'contact_id'},
       'ministry_get_contact': {'scope', 'contact_id'},
+      'ministry_list_access_candidates': {
+        'scope',
+        'congregation_id',
+        'role',
+        'limit',
+        'cursor',
+      },
       'ministry_list_students': {'congregation_id', 'limit'},
       'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
     };

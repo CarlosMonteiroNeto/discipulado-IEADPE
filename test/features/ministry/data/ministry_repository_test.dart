@@ -79,6 +79,7 @@ class _TeacherRetryGateway implements ReadRpcGateway, MinistryCommandGateway {
         'archived_at': null,
         'revision': 4,
         'user_access_id': null,
+        'access_linked': false,
         'created_at': '2026-10-19T00:00:00Z',
         'updated_at': '2026-10-19T00:00:00Z',
         'updated_by': _op,
@@ -125,7 +126,119 @@ class _TeacherRetryGateway implements ReadRpcGateway, MinistryCommandGateway {
   ) async => throw UnimplementedError();
 }
 
+class _AccessCandidateGateway implements ReadRpcGateway {
+  _AccessCandidateGateway(this.response);
+
+  final Map<String, dynamic> response;
+  final boundary = ProtectedDataBoundary();
+  String? rpc;
+  Map<String, Object?>? parameters;
+
+  @override
+  String get context => boundary.generation;
+
+  @override
+  void ensureCurrent(String context) {
+    if (context != this.context) throw const DataFailure('stale');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> read(
+    String table, {
+    required String context,
+    String? afterId,
+    Map<String, Object> equals = const {},
+    String? name,
+    bool excludeDeleted = false,
+  }) async => [];
+
+  @override
+  Future<MutationResult<String>> command(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => MutationResult.applied(
+    operationId: operationId,
+    value: '22222222-2222-4222-8222-222222222222',
+  );
+
+  @override
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  }) async {
+    ensureCurrent(context);
+    this.rpc = rpc;
+    this.parameters = Map.of(parameters);
+    return response;
+  }
+}
+
 void main() {
+  test('access candidate codec is strict and omits Auth identity', () {
+    final page = decodeAccessCandidatePage({
+      'items': [
+        {
+          'id': _id,
+          'email': 'pending@example.test',
+          'role': AccessRole.direction.wireValue,
+          'scope': 'congregation',
+          'congregation_id': _scope,
+        },
+      ],
+      'next_cursor': null,
+    });
+    expect(page.items.single.id, _id);
+    expect(page.items.single.email, 'pending@example.test');
+    expect(page.items.single.role, AccessRole.direction);
+    expect(page.items.single.scope, ContactScope.congregation);
+    expect(page.items.single.congregationId, _scope);
+
+    expect(
+      () => decodeAccessCandidatePage({
+        'items': [
+          {
+            'id': _id,
+            'email': 'pending@example.test',
+            'role': AccessRole.direction.wireValue,
+            'scope': 'congregation',
+            'congregation_id': _scope,
+            'user_id': _person,
+          },
+        ],
+        'next_cursor': null,
+      }),
+      throwsA(isA<MinistryDataException>()),
+    );
+  });
+
+  test(
+    'access candidate repository binds rows to the requested role and scope',
+    () async {
+      final gateway = _AccessCandidateGateway({
+        'items': [],
+        'next_cursor': null,
+      });
+      final repository = MinistryRepository(gateway);
+      final page = await repository.listAccessCandidates(
+        scope: ContactScope.congregation,
+        congregationId: _scope,
+        role: AccessRole.direction,
+        limit: 25,
+      );
+      expect(page.items, isEmpty);
+      expect(gateway.rpc, 'ministry_list_access_candidates');
+      expect(gateway.parameters, {
+        'scope': 'congregation',
+        'congregation_id': _scope,
+        'role': AccessRole.direction.wireValue,
+        'limit': 25,
+        'cursor': null,
+      });
+    },
+  );
+
   test(
     'ministry command uses operation receipt envelope and typed response',
     () async {
@@ -443,6 +556,7 @@ void main() {
             'archived_at': null,
             'revision': 4,
             'user_access_id': null,
+            'access_linked': false,
             'created_at': '2026-10-19T00:00:00Z',
             'updated_at': '2026-10-19T00:00:00Z',
             'updated_by': _op,

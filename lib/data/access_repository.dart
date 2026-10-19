@@ -13,6 +13,20 @@ class AccessRepository {
 
   final MinistryRepository _ministry;
 
+  Future<MinistryPage<TeamAccessCandidate>> listCandidates({
+    required ContactScope scope,
+    String? congregationId,
+    required AccessRole role,
+    int limit = 50,
+    String? cursor,
+  }) => _ministry.listAccessCandidates(
+    scope: scope,
+    congregationId: congregationId,
+    role: role,
+    limit: limit,
+    cursor: cursor,
+  );
+
   Future<MinistryContactAccessResult> saveContactWithAccess({
     required String operationId,
     String? id,
