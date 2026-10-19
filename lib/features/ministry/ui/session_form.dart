@@ -151,7 +151,11 @@ class _SessionFormState extends State<SessionForm> {
           TextField(
             key: const Key('session-date'),
             controller: _date,
-            decoration: const InputDecoration(labelText: 'Data (DD/MM/AAAA)'),
+            decoration: const InputDecoration(
+              labelText: 'Data',
+              helperText: 'Formato: DD/MM/AAAA',
+              helperMaxLines: 2,
+            ),
             keyboardType: TextInputType.datetime,
           ),
           TextField(
@@ -161,10 +165,13 @@ class _SessionFormState extends State<SessionForm> {
             decoration: const InputDecoration(labelText: 'Tema (opcional)'),
           ),
           if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           FilledButton(
             onPressed: _busy ? null : _save,
-            child: const Text('Salvar aula'),
+            child: const Text('Salvar'),
           ),
           if (_pending != null)
             TextButton(

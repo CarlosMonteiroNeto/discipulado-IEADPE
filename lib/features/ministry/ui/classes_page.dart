@@ -14,11 +14,13 @@ class ClassesPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.congregationId,
-    required this.onOpenAttendance,
+    this.onOpenAttendance,
   });
   final MinistryBrowserRepository repository;
   final String congregationId;
-  final VoidCallback onOpenAttendance;
+  // Kept as an optional source-compatibility argument for direct embeddings.
+  // The class detail flow no longer forwards global pending-queue navigation.
+  final VoidCallback? onOpenAttendance;
   @override
   State<ClassesPage> createState() => _ClassesPageState();
 }
@@ -70,7 +72,6 @@ class _ClassesPageState extends State<ClassesPage> {
           repository: _commandRepository,
           congregationId: widget.congregationId,
           classSummary: summary,
-          onOpenAttendance: widget.onOpenAttendance,
           onChanged: () => _load(),
         ),
       ),

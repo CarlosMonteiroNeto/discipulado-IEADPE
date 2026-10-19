@@ -165,6 +165,7 @@ class ProtectedApplication extends StatefulWidget {
 
 class _ProtectedApplicationState extends State<ProtectedApplication> {
   final _boundary = ProtectedDataBoundary();
+  final _protectedNavigatorKey = GlobalKey<NavigatorState>();
   late final SupabaseGateway _gateway;
   late final SessionRouter _router;
   late final ConvertRepository _converts;
@@ -275,20 +276,30 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
             excluding: _router.isChecking,
             child: IgnorePointer(
               ignoring: _router.isChecking,
-              child: _ProtectedFeatures(
-                key: ValueKey(_gateway.context),
-                scope: scope,
-                router: _router,
-                gateway: _gateway,
-                converts: _converts,
-                photos: _photos,
-                home: _home,
-                weekly: _weekly,
-                reports: _reports,
-                backup: _backup,
-                feedback: _feedback,
-                exporter: _exporter,
-                pickPhoto: _pickPhoto,
+              child: NavigatorPopHandler<Object?>(
+                onPop: () => _protectedNavigatorKey.currentState?.maybePop(),
+                child: SizedBox.expand(
+                  child: Navigator(
+                    key: _protectedNavigatorKey,
+                    onGenerateRoute: (_) => MaterialPageRoute<void>(
+                      builder: (_) => _ProtectedFeatures(
+                        scope: scope,
+                        router: _router,
+                        gateway: _gateway,
+                        converts: _converts,
+                        photos: _photos,
+                        home: _home,
+                        weekly: _weekly,
+                        reports: _reports,
+                        backup: _backup,
+                        feedback: _feedback,
+                        exporter: _exporter,
+                        pickPhoto: _pickPhoto,
+                        onCongregationChanged: _clearNestedRoutes,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -299,6 +310,12 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
           ),
       ],
     );
+  }
+
+  void _clearNestedRoutes() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _protectedNavigatorKey.currentState?.popUntil((route) => route.isFirst);
+    });
   }
 }
 
@@ -317,6 +334,7 @@ class _ProtectedFeatures extends StatefulWidget {
     required this.feedback,
     required this.exporter,
     required this.pickPhoto,
+    required this.onCongregationChanged,
   });
   final AccessScope scope;
   final SessionRouter router;
@@ -330,6 +348,7 @@ class _ProtectedFeatures extends StatefulWidget {
   final FeedbackRepository feedback;
   final FileExporter exporter;
   final Future<Uint8List?> Function() pickPhoto;
+  final VoidCallback onCongregationChanged;
   @override
   State<_ProtectedFeatures> createState() => _ProtectedFeaturesState();
 }
@@ -664,12 +683,15 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         scopeError: _ministryCatalogError,
         onRetryScope: () =>
             _navigateMinistryCatalog(_ministryCatalogRetryNavigation),
-        onSelectCongregation: (value) => setState(() {
-          _selectedMinistryCongregationId = value;
-          _selectedMinistryCongregationName = value == null
-              ? null
-              : available.where((item) => item.id == value).firstOrNull?.name;
-        }),
+        onSelectCongregation: (value) {
+          setState(() {
+            _selectedMinistryCongregationId = value;
+            _selectedMinistryCongregationName = value == null
+                ? null
+                : available.where((item) => item.id == value).firstOrNull?.name;
+          });
+          widget.onCongregationChanged();
+        },
         scopedActionsEnabled: scopedActionsEnabled,
         scopeRequired:
             !widget.scope.isMinistrySupervision &&
@@ -718,7 +740,6 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         key: ValueKey('ministry-classes:$congregationId'),
         repository: browser,
         congregationId: congregationId,
-        onOpenAttendance: () => widget.router.go('/ministry/attendance'),
       ),
       '/ministry/attendance' when scopedActionsEnabled => AttendancePage(
         key: ValueKey('ministry-attendance:$congregationId'),

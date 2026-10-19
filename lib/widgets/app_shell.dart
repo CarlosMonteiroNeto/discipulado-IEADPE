@@ -35,6 +35,7 @@ class AppShell extends StatelessWidget {
     '/ministry': 'Discipulado',
     '/ministry/team': 'Equipe',
     '/ministry/students': 'Alunos',
+    '/ministry/students/register': 'Cadastrar aluno',
     '/ministry/classes': 'Turmas',
     '/ministry/attendance': 'Frequência',
     '/ministry/handoff': 'Novos convertidos',

@@ -175,7 +175,7 @@ class _SessionListPageState extends State<SessionListPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Confirmar cancelamento'),
+            child: const Text('Cancelar aula'),
           ),
         ],
       ),
@@ -286,7 +286,10 @@ class _SessionListPageState extends State<SessionListPage> {
           ),
           if (_loading) const Center(child: CircularProgressIndicator()),
           if (_error != null)
-            Text(_error!, style: const TextStyle(color: Colors.red)),
+            Text(
+              _error!,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           if (_notice != null)
             Text(_notice!, style: const TextStyle(color: Colors.orange)),
           if (!_loading && _error == null && _sessions.isEmpty)
@@ -296,19 +299,31 @@ class _SessionListPageState extends State<SessionListPage> {
             ),
           for (final item in _sessions)
             Card(
-              child: ListTile(
-                title: Text(item.date.toString().split('-').reversed.join('/')),
-                subtitle: Text(
-                  '${_label(item.status)}${item.topic == null ? '' : ' · ${item.topic}'}',
-                ),
-                onTap: () => _open(item),
-                trailing: item.status != SessionStatus.canceled
-                    ? TextButton(
-                        key: Key('cancel-session-${item.id}'),
-                        onPressed: _busy ? null : () => _cancel(item),
-                        child: const Text('Cancelar aula'),
-                      )
-                    : null,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ListTile(
+                    title: Text(
+                      item.date.toString().split('-').reversed.join('/'),
+                    ),
+                    subtitle: Text(
+                      '${_label(item.status)}${item.topic == null ? '' : ' · ${item.topic}'}',
+                    ),
+                    onTap: () => _open(item),
+                  ),
+                  if (item.status != SessionStatus.canceled)
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Padding(
+                        padding: const EdgeInsets.only(right: 8, bottom: 4),
+                        child: TextButton(
+                          key: Key('cancel-session-${item.id}'),
+                          onPressed: _busy ? null : () => _cancel(item),
+                          child: const Text('Cancelar aula'),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
           if (_nextCursor != null)

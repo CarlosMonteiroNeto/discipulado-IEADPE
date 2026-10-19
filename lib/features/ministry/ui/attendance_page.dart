@@ -7,16 +7,19 @@ import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
+import '../domain/session_navigation_context.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({
     super.key,
     required this.repository,
     this.congregationId,
+    this.selectedSession,
     this.createOperationId,
   });
   final MinistryRepository repository;
   final String? congregationId;
+  final SessionNavigationContext? selectedSession;
   final String Function()? createOperationId;
   @override
   State<AttendancePage> createState() => _AttendancePageState();
@@ -35,7 +38,27 @@ class _AttendancePageState extends State<AttendancePage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    if (widget.selectedSession case final selected?) {
+      _loadSelected(selected);
+    } else {
+      _load();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant AttendancePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.selectedSession != widget.selectedSession ||
+        oldWidget.congregationId != widget.congregationId) {
+      _page = null;
+      _roster = null;
+      _marks.clear();
+      if (widget.selectedSession case final selected?) {
+        _loadSelected(selected);
+      } else {
+        _load();
+      }
+    }
   }
 
   String _newOperation() => widget.createOperationId?.call() ?? _uuid.v4();
@@ -66,6 +89,45 @@ class _AttendancePageState extends State<AttendancePage> {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar as chamadas. Tente novamente.';
+        });
+      }
+    }
+  }
+
+  Future<void> _loadSelected(SessionNavigationContext selected) async {
+    setState(() {
+      _loading = true;
+      _error = null;
+      _page = null;
+      _roster = null;
+      _marks.clear();
+    });
+    try {
+      final roster = await widget.repository.getSessionAttendance(
+        congregationId: selected.congregationId,
+        sessionId: selected.sessionId,
+      );
+      final session = roster.session;
+      if (session.id != selected.sessionId ||
+          session.classId != selected.classId ||
+          session.congregationId != selected.congregationId) {
+        throw const DataFailure('invalid_response');
+      }
+      if (!mounted) return;
+      setState(() {
+        _roster = roster;
+        _loading = false;
+        for (final mark in roster.marks) {
+          _marks[mark.enrollmentId] = mark.status;
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _roster = null;
+          _marks.clear();
+          _error = 'Não foi possível abrir a chamada. Tente novamente.';
         });
       }
     }

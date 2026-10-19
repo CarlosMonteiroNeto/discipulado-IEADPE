@@ -9,6 +9,9 @@ import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
+import '../domain/session_navigation_context.dart';
+import 'attendance_page.dart';
+import 'session_list.dart';
 import 'class_form.dart';
 import 'class_enrollment_panel.dart';
 
@@ -18,14 +21,12 @@ class ClassDetailPage extends StatefulWidget {
     required this.repository,
     required this.congregationId,
     required this.classSummary,
-    required this.onOpenAttendance,
     required this.onChanged,
   });
 
   final MinistryRepository repository;
   final String congregationId;
   final MinistryClassSummary classSummary;
-  final VoidCallback onOpenAttendance;
   final VoidCallback onChanged;
 
   @override
@@ -111,6 +112,33 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     _loadTeacherName();
     widget.onChanged();
   }
+
+  Future<void> _openSession(String sessionId) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => AttendancePage(
+          repository: widget.repository,
+          congregationId: widget.congregationId,
+          selectedSession: SessionNavigationContext(
+            congregationId: widget.congregationId,
+            classId: _classSummary.id,
+            sessionId: sessionId,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openSessions() => Navigator.of(context).push<void>(
+    MaterialPageRoute(
+      builder: (_) => SessionListPage(
+        repository: widget.repository,
+        congregationId: widget.congregationId,
+        classSummary: _classSummary,
+        onOpenSession: _openSession,
+      ),
+    ),
+  );
 
   Future<bool> _confirmStatus(ClassStatus next) async {
     final accepted = await showDialog<bool>(
@@ -233,9 +261,9 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                     ),
                     const SizedBox(height: UnifiedSpace.x4),
                     OutlinedButton.icon(
-                      onPressed: widget.onOpenAttendance,
-                      icon: const Icon(Icons.fact_check_outlined),
-                      label: const Text('Ver frequência'),
+                      onPressed: _openSessions,
+                      icon: const Icon(Icons.menu_book_outlined),
+                      label: const Text('Ver aulas'),
                     ),
                   ],
                 ),

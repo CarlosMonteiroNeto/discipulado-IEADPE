@@ -210,7 +210,7 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls.single.payload['class_id'], classAId);
     expect(
@@ -228,7 +228,7 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls.single.payload['class_id'], classBId);
   });
@@ -240,7 +240,7 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
     await tester.pumpWidget(listApp(gateway));
@@ -264,10 +264,10 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, isEmpty);
-    expect(find.text('Salvar aula'), findsOneWidget);
+    expect(find.text('Salvar'), findsOneWidget);
   });
 
   testWidgets('cancel preserves roster history', (tester) async {
@@ -291,7 +291,12 @@ void main() {
     expect(gateway.cancelCalls, isEmpty);
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirmar cancelamento'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancelar aula'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(gateway.cancelCalls.single.payload['expected_revision'], 7);
     expect(gateway.cancelCalls.single.payload['id'], sessionId);
@@ -306,7 +311,7 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('retry-pending-session-create')));
     await tester.pumpAndSettle();
@@ -333,7 +338,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirmar cancelamento'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancelar aula'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('create-session')), findsOneWidget);
     await tester.tap(find.byKey(const Key('create-session')));
@@ -380,7 +390,12 @@ void main() {
           }
           await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
           await tester.pumpAndSettle();
-          await tester.tap(find.text('Confirmar cancelamento'));
+          await tester.tap(
+            find.descendant(
+              of: find.byType(AlertDialog),
+              matching: find.text('Cancelar aula'),
+            ),
+          );
           await tester.pumpAndSettle();
           expect(gateway.cancelCalls.single.payload['expected_revision'], 7);
           expect(gateway.sessions.single['status'], 'canceled');
@@ -443,7 +458,12 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('Confirmar cancelamento'));
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Cancelar aula'),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(gateway.cancelCalls, hasLength(1));
     },
@@ -514,7 +534,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirmar cancelamento'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancelar aula'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(gateway.cancelCalls.single.payload['expected_revision'], 7);
     expect(
@@ -523,10 +548,16 @@ void main() {
       ),
       findsOneWidget,
     );
-    expect(find.text('Confirmar cancelamento'), findsNothing);
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(find.byKey(const Key('cancel-session-$sessionId')), findsOneWidget);
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Confirmar cancelamento'));
+    await tester.tap(
+      find.descendant(
+        of: find.byType(AlertDialog),
+        matching: find.text('Cancelar aula'),
+      ),
+    );
     await tester.pumpAndSettle();
     expect(gateway.cancelCalls, hasLength(2));
     expect(gateway.cancelCalls.last.payload['expected_revision'], 8);
@@ -567,12 +598,12 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '21/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, hasLength(1));
     await tester.tap(find.byKey(const Key('retry-pending-session-create')));
@@ -593,10 +624,10 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const Key('session-date')), '21/12/2026');
-    await tester.tap(find.text('Salvar aula'));
+    await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, hasLength(2));
     expect(gateway.createCalls.last.payload['date'], '2026-12-21');

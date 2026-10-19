@@ -580,7 +580,6 @@ void main() {
         home: ClassesPage(
           repository: MinistryBrowserRepository(gateway),
           congregationId: _scope,
-          onOpenAttendance: () {},
         ),
       ),
     );
@@ -607,7 +606,6 @@ void main() {
               status: ClassStatus.completed,
               revision: 4,
             ),
-            onOpenAttendance: () {},
             onChanged: () {},
           ),
         ),
