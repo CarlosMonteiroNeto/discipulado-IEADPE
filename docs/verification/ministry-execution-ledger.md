@@ -18,3 +18,14 @@ Worktree: `codex/ministry-production-completion` at `C:/Users/Carlos_Neto/.codex
 ## Next gate
 
 C1 contract review is pending. No code slice is authorized for dispatch until the completion contract and manifest interfaces are reviewed.
+## C1 — Source-backed local contract draft
+
+- Base: `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; draft commit: `b748999de0c5b2fdc43dd9cd7c3efba9a474b6ca`.
+- Implementer: requested `gpt-6-luna` / `max`; actual runtime metadata unavailable. Reviewer: requested `gpt-6.1-sol` / `low`; actual runtime metadata unavailable.
+- Files: `docs/integration/ministry-completion-contracts.md`; `docs/verification/ministry-task-manifest.md`; narrow pointer in `docs/integration/ministry-contracts.md`.
+- Checks: `git diff --check` exit 0. No tests/builds; this is a documentation gate.
+- Review: first pass found four important/two minor mismatches. Corrections covered RPC result keys, emitted vs caught SQL errors, Firebase lifecycle/collection paths, RPC-specific cursors, student nullability, and the 90-day start rule. Final review: zero critical/important findings. Duplicate wording removed; historical I1 blocker text refreshed.
+- User decisions: canonical person ownership/cardinality and legacy links; directory email, verified login email and local contact edits; contact/access atomicity and conflicting-email handling; whether independent manual discipleship remains active after the last enrollment closes. No dependent code slice dispatched.
+- Local: no product code changed; hosted RPC/schema/data remain unknown. No hosted, Firebase export or Android/device action occurred.
+
+C1 is a reviewed contract draft, not an approved implementation contract until the listed user decisions are settled.
