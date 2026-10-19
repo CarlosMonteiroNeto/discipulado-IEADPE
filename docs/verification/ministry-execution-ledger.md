@@ -58,3 +58,13 @@ C1, V1, and the C1 attribution correction are committed and reviewed. V1 final S
 Per the user's 2026-10-19 direction to follow the plan including stage models, use a fresh `gpt-6-luna` / `max` writer and `gpt-6.1-sol` / `low` reviewer for each new slice. Use Luna/max to fix every critical/important finding and Sol/low to re-review until none remain. Verify requested model availability and record actual models/effort at dispatch; do not silently substitute. I1/C1 actual runtime model metadata was unavailable and remains recorded as unavailable.
 
 C1 policy defaults do not establish hosted state. Hosted migration/function/scope/backups, legacy export and Android/device evidence remain separate gates.
+
+## P1 contract amendment — legacy name preservation
+
+- Base: P1 worktree `646b186c727f694ef21c9aac98ec1c73ab642fe9`; contract amendment commit pending.
+- Finding: original `converts.name` permits any trimmed non-empty length, while C1 capped `ministry_people.name` at 200. A valid longer legacy name would abort the migration or require truncation.
+- Decision: preserve over-200-character legacy names unchanged in canonical storage and reads; authenticated `save_person` remains limited to 1–200 characters and requires explicit shortening before editing. Updated the C1 forward contract and P1 acceptance criteria.
+- Files: `docs/integration/ministry-completion-contracts.md`; `docs/verification/ministry-task-manifest.md`; this ledger.
+- Reviewer: requested `gpt-6.1-sol` / `low`; zero critical, important, and minor findings. Actual runtime metadata unavailable. Review also identified the P1 decoder must accept preserved names; P2 must preserve canonical values and avoid routing them through `save_person` unchanged.
+- Checks: `git diff --check` to be rerun after ledger entry. Documentation gate; no tests/builds.
+- Local/hosted: no product change or hosted access occurred in this amendment. P1 implementation review remains open; hosted/data/device states remain unchanged.
