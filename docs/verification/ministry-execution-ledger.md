@@ -17,10 +17,11 @@ Worktree: `codex/ministry-production-completion` at `C:/Users/Carlos_Neto/.codex
 
 ## Next gate
 
-C1 policy and exact-interface review are complete. Final Sol/low re-review found zero critical, important, or minor findings; record the C1 follow-up commit SHA below before dispatching V1. V1 is next in plan order and consumes no backend RPC. P1/P2/E1 remain after V1 and use the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
+C1 policy and exact-interface review are complete. Final Sol/low re-review found zero critical, important, or minor findings. Reviewed C1 follow-up commit: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. V1 is next in plan order and consumes no backend RPC. P1/P2/E1 remain after V1 and use the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
 ## C1 — Reviewed local contract and plan-selected defaults
 
 - Base: `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; draft commit: `b748999de0c5b2fdc43dd9cd7c3efba9a474b6ca`.
+- Exact-interface follow-up commit: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`; Sol/low final review: zero critical, important, or minor findings.
 - Implementer: requested `gpt-6-luna` / `max`; actual runtime metadata unavailable. Reviewer: requested `gpt-6.1-sol` / `low`; actual runtime metadata unavailable.
 - Files: `docs/integration/ministry-completion-contracts.md`; `docs/verification/ministry-task-manifest.md`; narrow pointer in `docs/integration/ministry-contracts.md`.
 - This exact-interface follow-up is based on `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd` and changes only `docs/integration/ministry-completion-contracts.md`, `docs/verification/ministry-task-manifest.md`, and `docs/verification/ministry-execution-ledger.md`.
@@ -28,7 +29,7 @@ C1 policy and exact-interface review are complete. Final Sol/low re-review found
 - Review: the initial C1 review found four important/two minor mismatches; fixes covered RPC results/errors, Firebase mapping, cursors, nullability, and the 90-day rule. Later Sol/low reviews found missing exact interfaces/read revisions, Team response fields, production convert gateway owners, and unlinked legacy convert identity/detail. These were fixed with scope/privacy and H2 reconciliation boundaries. Final Sol/low re-review found zero critical, important, or minor findings.
 - User direction: on 2026-10-19, the user directed “Follow the plan as written, including the models used at each stage.” The explicit plan recommendations are selected as implementation defaults; this direction selects policy, not separate approval of source evidence or hosted facts.
 - Selected defaults: neutral canonical person with at most one convert profile and one student academic extension; no name-only or cross-congregation merge; ambiguous legacy rows stay preserved/unlinked. Directory-only email may be null. A linked contact email equals `user_access.user_email`; a bound assignment is effective only with the same confirmed Auth email. Local direction may edit other contact fields but not linked email. Global-manager reassignment requires the exact linked assignment ID and a confirmed target Auth email, then updates both email fields and the Auth UID atomically; conflicts fail closed, with no silent reuse or transfer. Global managers alone grant/revoke access. Active enrollment contributes effective discipleship, closure removes only that contribution, independent manual state remains effective, and the earliest evidenced qualifying start governs the 90-day completion guard; unknown start keeps completion unavailable.
-- Dispatch: C1 is reviewed clean; its follow-up commit SHA is to be recorded after commit. V1 may start next. P1/P2/E1 follow V1 and use the reviewed exact contracts. Keep hosted, Firebase-export, and device blockers below.
+- Dispatch: C1 is reviewed clean. V1 may start next; P1/P2/E1 follow V1 and use the reviewed exact contracts. Keep hosted, Firebase-export, and device blockers below.
 - Local: no product code changed. This follow-up edits only `docs/integration/ministry-completion-contracts.md`, `docs/verification/ministry-task-manifest.md`, and this ledger; it preserves hosted RPC/schema/data as unknown. No hosted, Firebase export or Android/device action occurred.
 
 ## Model/settings direction for each new slice
