@@ -12,6 +12,117 @@ class MinistryRepository {
   final ReadRpcGateway gateway;
   final _teacherContactSaves = <String, _PendingTeacherContactSave>{};
 
+  Future<List<MinistryDirectoryEntry>> listEligibleClassTeachers({
+    required String congregationId,
+  }) async {
+    _uuid(congregationId);
+    final page = await listDirectory(
+      scope: 'congregation',
+      congregationId: congregationId,
+      roleCode: 'teacher',
+      limit: 100,
+    );
+    return List.unmodifiable(
+      page.items.where(
+        (entry) =>
+            entry.scope == 'congregation' &&
+            entry.congregationId == congregationId &&
+            entry.roleCode == 'teacher' &&
+            entry.archivedAt == null,
+      ),
+    );
+  }
+
+  Future<MinistryCommandResult> saveClass({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required String name,
+    required String? teacherContactId,
+    required CalendarDate startDate,
+    required CalendarDate? endDate,
+    int? expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(congregationId);
+    if (teacherContactId != null) _uuid(teacherContactId);
+    if (expectedRevision != null && expectedRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty ||
+        normalizedName.length > 200 ||
+        name != normalizedName ||
+        (endDate != null && endDate.compareTo(startDate) < 0)) {
+      throw const DataFailure('invalid');
+    }
+    if (teacherContactId != null) {
+      await getTeacherContact(
+        congregationId: congregationId,
+        contactId: teacherContactId,
+      );
+    }
+    final result = await command(
+      name: 'save_class',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'name': normalizedName,
+        'teacher_contact_id': teacherContactId,
+        'start_date': startDate.toString(),
+        'end_date': endDate?.toString(),
+        if (expectedRevision != null) 'expected_revision': expectedRevision,
+      },
+    );
+    if (result.revision !=
+        (expectedRevision == null ? 1 : expectedRevision + 1)) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<MinistryCommandResult> setClassStatus({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required ClassStatus currentStatus,
+    required ClassStatus status,
+    required int expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(congregationId);
+    if (expectedRevision < 1 ||
+        !_classTransitionAllowed(currentStatus, status)) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'set_class_status',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'status': status.wire,
+        'expected_revision': expectedRevision,
+      },
+    );
+    if (result.revision != expectedRevision + 1) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  static bool _classTransitionAllowed(ClassStatus current, ClassStatus next) =>
+      switch ((current, next)) {
+        (ClassStatus.active, ClassStatus.completed) ||
+        (ClassStatus.active, ClassStatus.archived) ||
+        (ClassStatus.completed, ClassStatus.archived) ||
+        (ClassStatus.archived, ClassStatus.active) => true,
+        _ => false,
+      };
+
   Future<MinistryCommandResult> setStudentArchived({
     required String operationId,
     required String id,

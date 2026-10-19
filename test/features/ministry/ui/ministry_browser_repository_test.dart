@@ -350,6 +350,7 @@ void main() {
             'start_date': '2026-10-01',
             'end_date': null,
             'revision': 1,
+            'teacher_contact_id': _person,
           },
         ],
         'next_cursor': null,
@@ -378,6 +379,7 @@ void main() {
     expect(page.items.single.id, _classId);
     expect(page.items.single.startDate, '2026-10-01');
     expect(page.items.single.endDate, isNull);
+    expect(page.items.single.teacherContactId, _person);
   });
 
   test(

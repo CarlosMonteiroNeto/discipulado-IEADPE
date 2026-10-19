@@ -47,6 +47,7 @@ class MinistryClassSummary {
     required this.startDate,
     required this.endDate,
     required this.revision,
+    required this.teacherContactId,
   });
   final String id;
   final String name;
@@ -54,6 +55,7 @@ class MinistryClassSummary {
   final String startDate;
   final String? endDate;
   final int revision;
+  final String? teacherContactId;
 }
 
 class MinistryCongregationChoice {
@@ -343,6 +345,7 @@ MinistryPage<MinistryClassSummary> _classPage(Object? raw) {
           'start_date',
           'end_date',
           'revision',
+          'teacher_contact_id',
         });
         final revision = row['revision'];
         if (revision is! int || revision < 1) {
@@ -357,6 +360,7 @@ MinistryPage<MinistryClassSummary> _classPage(Object? raw) {
           startDate: start,
           endDate: end,
           revision: revision,
+          teacherContactId: _optionalUuidValue(row['teacher_contact_id']),
         );
       })
       .toList(growable: false);

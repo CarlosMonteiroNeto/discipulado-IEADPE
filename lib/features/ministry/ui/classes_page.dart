@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
+import '../data/ministry_repository.dart';
+import 'class_detail_page.dart';
+import 'class_form.dart';
 
 class ClassesPage extends StatefulWidget {
   const ClassesPage({
@@ -25,10 +28,54 @@ class _ClassesPageState extends State<ClassesPage> {
   String? _error;
   bool _loading = false;
   MinistryPage<MinistryClassSummary>? _page;
+  late MinistryRepository _commandRepository;
   @override
   void initState() {
     super.initState();
+    _commandRepository = MinistryRepository(widget.repository.gateway);
     _load();
+  }
+
+  @override
+  void didUpdateWidget(covariant ClassesPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.repository.gateway != widget.repository.gateway) {
+      _commandRepository = MinistryRepository(widget.repository.gateway);
+    }
+    if (oldWidget.congregationId != widget.congregationId) {
+      _page = null;
+      _load();
+    }
+  }
+
+  Future<void> _createClass() async {
+    final saved = await Navigator.of(context).push<MinistryClassSummary>(
+      MaterialPageRoute(
+        builder: (_) => ClassForm(
+          repository: _commandRepository,
+          congregationId: widget.congregationId,
+          onCancel: () => Navigator.of(context).pop(),
+          onSaved: (summary) => Navigator.of(context).pop(summary),
+        ),
+      ),
+    );
+    if (!mounted || saved == null) return;
+    await _load();
+  }
+
+  Future<void> _openDetails(MinistryClassSummary summary) async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ClassDetailPage(
+          repository: _commandRepository,
+          congregationId: widget.congregationId,
+          classSummary: summary,
+          onOpenAttendance: widget.onOpenAttendance,
+          onChanged: () => _load(),
+        ),
+      ),
+    );
+    if (mounted) await _load();
   }
 
   Future<void> _load({String? cursor}) async {
@@ -68,9 +115,14 @@ class _ClassesPageState extends State<ClassesPage> {
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              const Base44PageHeading(
+              Base44PageHeading(
                 title: 'Turmas',
                 icon: Icons.groups_outlined,
+                trailing: FilledButton.icon(
+                  onPressed: _loading ? null : _createClass,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nova turma'),
+                ),
               ),
               const SizedBox(height: 16),
               Base44Panel(
@@ -160,7 +212,7 @@ class _ClassesPageState extends State<ClassesPage> {
                       Icons.groups_outlined,
                       color: UnifiedColors.brandNavy,
                     ),
-                    onTap: widget.onOpenAttendance,
+                    onTap: () => _openDetails(item),
                     minVerticalPadding: 12,
                   ),
                 ),
