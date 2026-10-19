@@ -1,6 +1,6 @@
 # L1 Ministry Delivery: Cross-Device Handoff
 
-**Status:** In progress; not release-ready. Snapshot: branch head `bb08638440529c2bf91b5f29ab1edc6f467708cb` plus the documentation commit containing this handoff.
+**Status:** In progress; not release-ready. Pushed branch head: `3e2c54e3ee987c518a279c1d1de4840671bf81fd` on `origin/codex/ministry-production-completion`.
 
 ## Resume this branch
 
@@ -11,7 +11,7 @@ git fetch origin
 git switch --track -c codex/ministry-production-completion origin/codex/ministry-production-completion
 ```
 
-If the local branch already exists, use `git switch codex/ministry-production-completion`. The source worktree used in this session was local to one device; use the committed branch and this handoff as the portable record. Four unrelated, pre-existing untracked user documents were intentionally excluded from commits.
+If the local branch already exists, use `git switch codex/ministry-production-completion`. The source worktree used in this session was local to one device; use the pushed branch and this handoff as the portable record. Four unrelated, pre-existing untracked user documents were intentionally excluded from commits.
 
 ## Approved scope and roles
 
