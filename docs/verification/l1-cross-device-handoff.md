@@ -1,6 +1,6 @@
 # L1 Ministry Delivery: Cross-Device Handoff
 
-**Status:** In progress; not release-ready. Pushed branch head: `3e2c54e3ee987c518a279c1d1de4840671bf81fd` on `origin/codex/ministry-production-completion`.
+**Status:** In progress; not release-ready. Pushed to `origin/codex/ministry-production-completion`; resume from the current remote HEAD.
 
 ## Resume this branch
 
