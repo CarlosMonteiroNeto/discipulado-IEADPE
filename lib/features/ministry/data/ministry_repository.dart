@@ -1,4 +1,5 @@
 import '../../../data/supabase_gateway.dart';
+import '../../../domain/models.dart';
 import '../domain/ministry_models.dart';
 import 'ministry_codec.dart';
 
@@ -137,6 +138,62 @@ class MinistryRepository {
     } on MinistryDataException {
       throw const DataFailure('invalid_response');
     }
+  }
+
+  Future<PersonRegistrationResult> registerStudent({
+    required String operationId,
+    required String studentId,
+    required String personId,
+    required String congregationId,
+    required MinistryPersonDraft person,
+    String? education,
+    String? maritalStatus,
+    bool? newConvert,
+    bool? waterBaptized,
+    bool? wantsBaptism,
+  }) async {
+    _uuid(operationId);
+    _uuid(studentId);
+    _uuid(personId);
+    _uuid(congregationId);
+    if (person.name.trim().isEmpty ||
+        person.name != person.name.trim() ||
+        person.name.length > 200 ||
+        newConvert == true ||
+        (waterBaptized == true && wantsBaptism == true)) {
+      throw const DataFailure('invalid');
+    }
+    final transport = gateway;
+    if (transport is! StudentRegistrationCommandGateway) {
+      throw const DataFailure('unavailable');
+    }
+    final commandGateway = transport as StudentRegistrationCommandGateway;
+    final result = await commandGateway.registerStudent(operationId, {
+      'id': studentId,
+      'person_id': personId,
+      'congregation_id': congregationId,
+      'person': person.toJson(),
+      'academic': {
+        'education': education,
+        'marital_status': maritalStatus,
+        'new_convert': newConvert,
+        'water_baptized': waterBaptized,
+        'wants_baptism': wantsBaptism,
+      },
+    });
+    if (result.status != MutationStatus.applied || result.value == null) {
+      throw DataFailure(result.errorCode ?? 'invalid_response');
+    }
+    final value = result.value!;
+    if (value.studentId != studentId ||
+        value.personId != personId ||
+        value.studentRevision != 1 ||
+        value.personRevision != 1 ||
+        value.convertId != null ||
+        value.convertRevision != null) {
+      throw const DataFailure('invalid_response');
+    }
+    return value;
   }
 
   Future<MinistryPage<MinistryDirectoryEntry>> listDirectory({

@@ -65,8 +65,23 @@ abstract interface class MinistryCommandGateway implements Gateway {
   );
 }
 
+abstract interface class StudentRegistrationCommandGateway implements Gateway {
+  Future<MutationResult<PersonRegistrationResult>> registerStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
 abstract interface class HandoffCommandGateway implements Gateway {
   Future<Map<String, dynamic>> promoteConvertToStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
+abstract interface class ConvertCommandGateway implements Gateway {
+  Future<MutationResult<PersonRegistrationResult>> saveConvert(
+    String command,
     String operationId,
     Map<String, Object?> payload,
   );
@@ -84,7 +99,9 @@ class SupabaseGateway
         ReadRpcGateway,
         ImportRpcGateway,
         MinistryCommandGateway,
-        HandoffCommandGateway {
+        StudentRegistrationCommandGateway,
+        HandoffCommandGateway,
+        ConvertCommandGateway {
   SupabaseGateway(
     this.client,
     this.boundary, {
@@ -185,6 +202,281 @@ class SupabaseGateway
   }
 
   @override
+  Future<MutationResult<PersonRegistrationResult>> saveConvert(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    if (!{'create_convert', 'edit_convert'}.contains(command)) {
+      throw ArgumentError.value(command, 'command');
+    }
+    final expectedKeys = command == 'create_convert'
+        ? const {'congregation_id', 'person', 'convert'}
+        : const {
+            'id',
+            'congregation_id',
+            'expected_revision',
+            'expected_person_revision',
+            'person',
+            'convert',
+          };
+    if (!_hasExactKeys(payload, expectedKeys)) {
+      throw const DataFailure('invalid');
+    }
+    validateUuid(payload['congregation_id']);
+    if (command == 'edit_convert') {
+      validateUuid(payload['id']);
+      for (final key in ['expected_revision', 'expected_person_revision']) {
+        final revision = payload[key];
+        if (revision is! int || revision < 1) {
+          throw const DataFailure('invalid');
+        }
+      }
+    }
+    final rawPerson = payload['person'];
+    final rawConvert = payload['convert'];
+    if (rawPerson is! Map || rawConvert is! Map) {
+      throw const DataFailure('invalid');
+    }
+    final person = Map<String, Object?>.from(rawPerson);
+    final convert = Map<String, Object?>.from(rawConvert);
+    const personKeys = {'name', 'phone', 'birth_date', 'address'};
+    const convertKeys = {
+      'landmark',
+      'gender',
+      'conversion_date',
+      'worship_type',
+      'age',
+      'photo_asset_id',
+    };
+    final name = person['name'];
+    if (!_hasExactKeys(person, personKeys) ||
+        !_hasExactKeys(convert, convertKeys) ||
+        name is! String ||
+        name.trim().isEmpty ||
+        name != name.trim() ||
+        (command == 'create_convert' && name.length > 200)) {
+      throw const DataFailure('invalid');
+    }
+    final phone = person['phone'];
+    final birthDate = person['birth_date'];
+    if ((phone != null && phone is! String) ||
+        (birthDate != null &&
+            (birthDate is! String || !_isIsoDate(birthDate)))) {
+      throw const DataFailure('invalid');
+    }
+    final rawAddress = person['address'];
+    if (rawAddress != null) {
+      if (rawAddress is! Map) throw const DataFailure('invalid');
+      final address = Map<String, Object?>.from(rawAddress);
+      const addressKeys = {
+        'street',
+        'district',
+        'city',
+        'postal_code',
+        'state_code',
+      };
+      if (!_hasExactKeys(address, addressKeys) ||
+          address.values.any((value) => value != null && value is! String)) {
+        throw const DataFailure('invalid');
+      }
+    }
+    final landmark = convert['landmark'];
+    final gender = convert['gender'];
+    final conversionDate = convert['conversion_date'];
+    final worshipType = convert['worship_type'];
+    final age = convert['age'];
+    final photoAssetId = convert['photo_asset_id'];
+    if (landmark is! String ||
+        landmark.trim().isEmpty ||
+        landmark != landmark.trim() ||
+        (gender != 'male' && gender != 'female') ||
+        conversionDate is! String ||
+        !_isIsoDate(conversionDate) ||
+        worshipType is! String ||
+        worshipType.trim().isEmpty ||
+        worshipType != worshipType.trim() ||
+        (age != null && (age is! int || age < 0 || age > 150))) {
+      throw const DataFailure('invalid');
+    }
+    if (photoAssetId != null) validateUuid(photoAssetId);
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final token = context;
+    try {
+      final value = await _run(
+        token,
+        () => client
+            .rpc(
+              'ieadpe_$command',
+              params: {'operation_id': operationId, 'payload': frozen},
+            )
+            .retry(enabled: false, requestTimeout: requestTimeout),
+      );
+      const resultKeys = {'id', 'person_id', 'revision', 'person_revision'};
+      if (value is! Map<String, dynamic> ||
+          !_hasExactKeys(value, resultKeys) ||
+          value['id'] is! String ||
+          value['person_id'] is! String ||
+          value['revision'] is! int ||
+          value['person_revision'] is! int ||
+          (value['revision'] as int) < 1 ||
+          (value['person_revision'] as int) < 1) {
+        throw const DataFailure('invalid_response');
+      }
+      validateUuid(value['id']);
+      validateUuid(value['person_id']);
+      if (command == 'create_convert' &&
+          (value['revision'] != 1 || value['person_revision'] != 1)) {
+        throw const DataFailure('invalid_response');
+      }
+      if (command == 'edit_convert' &&
+          (value['id'] != payload['id'] ||
+              value['revision'] != (payload['expected_revision'] as int) + 1 ||
+              !{
+                payload['expected_person_revision'],
+                (payload['expected_person_revision'] as int) + 1,
+              }.contains(value['person_revision']))) {
+        throw const DataFailure('invalid_response');
+      }
+      return MutationResult.applied(
+        operationId: operationId,
+        value: PersonRegistrationResult(
+          personId: value['person_id'] as String,
+          convertId: value['id'] as String,
+          personRevision: value['person_revision'] as int,
+          convertRevision: value['revision'] as int,
+        ),
+      );
+    } on DataFailure catch (error) {
+      return MutationResult.rejected(
+        operationId: operationId,
+        errorCode: error.code,
+      );
+    }
+  }
+
+  @override
+  Future<MutationResult<PersonRegistrationResult>> registerStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    const topLevelKeys = {
+      'id',
+      'person_id',
+      'congregation_id',
+      'person',
+      'academic',
+    };
+    if (!_hasExactKeys(payload, topLevelKeys)) {
+      throw const DataFailure('invalid');
+    }
+    for (final key in ['id', 'person_id', 'congregation_id']) {
+      validateUuid(payload[key]);
+    }
+    final rawPerson = payload['person'];
+    final rawAcademic = payload['academic'];
+    if (rawPerson is! Map || rawAcademic is! Map) {
+      throw const DataFailure('invalid');
+    }
+    final person = Map<String, Object?>.from(rawPerson);
+    final academic = Map<String, Object?>.from(rawAcademic);
+    const personKeys = {'name', 'phone', 'birth_date', 'address'};
+    const academicKeys = {
+      'education',
+      'marital_status',
+      'new_convert',
+      'water_baptized',
+      'wants_baptism',
+    };
+    final name = person['name'];
+    if (!_hasExactKeys(person, personKeys) ||
+        !_hasExactKeys(academic, academicKeys) ||
+        name is! String ||
+        name.trim().isEmpty ||
+        name != name.trim() ||
+        name.length > 200) {
+      throw const DataFailure('invalid');
+    }
+    final phone = person['phone'];
+    final birthDate = person['birth_date'];
+    if ((phone != null && phone is! String) ||
+        (birthDate != null &&
+            (birthDate is! String || !_isIsoDate(birthDate)))) {
+      throw const DataFailure('invalid');
+    }
+    final rawAddress = person['address'];
+    if (rawAddress != null) {
+      if (rawAddress is! Map) throw const DataFailure('invalid');
+      final address = Map<String, Object?>.from(rawAddress);
+      const addressKeys = {
+        'street',
+        'district',
+        'city',
+        'postal_code',
+        'state_code',
+      };
+      if (!_hasExactKeys(address, addressKeys) ||
+          address.values.any((value) => value != null && value is! String)) {
+        throw const DataFailure('invalid');
+      }
+    }
+    if (academic['new_convert'] == true ||
+        academic.values.any(
+          (value) => value != null && value is! String && value is! bool,
+        ) ||
+        (academic['new_convert'] != null && academic['new_convert'] is! bool) ||
+        (academic['water_baptized'] != null &&
+            academic['water_baptized'] is! bool) ||
+        (academic['wants_baptism'] != null &&
+            academic['wants_baptism'] is! bool) ||
+        (academic['water_baptized'] == true &&
+            academic['wants_baptism'] == true)) {
+      throw const DataFailure('invalid');
+    }
+
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final token = context;
+    try {
+      final value = await _run(
+        token,
+        () => client
+            .rpc(
+              'ieadpe_ministry_register_student',
+              params: {'operation_id': operationId, 'payload': frozen},
+            )
+            .retry(enabled: false, requestTimeout: requestTimeout),
+      );
+      const resultKeys = {'id', 'person_id', 'revision', 'person_revision'};
+      if (value is! Map<String, dynamic> ||
+          !_hasExactKeys(value, resultKeys) ||
+          value['id'] != payload['id'] ||
+          value['person_id'] != payload['person_id'] ||
+          value['revision'] != 1 ||
+          value['person_revision'] != 1) {
+        throw const DataFailure('invalid_response');
+      }
+      validateUuid(value['id']);
+      validateUuid(value['person_id']);
+      return MutationResult.applied(
+        operationId: operationId,
+        value: PersonRegistrationResult(
+          personId: value['person_id'] as String,
+          studentId: value['id'] as String,
+          personRevision: value['person_revision'] as int,
+          studentRevision: value['revision'] as int,
+        ),
+      );
+    } on DataFailure catch (error) {
+      return MutationResult.rejected(
+        operationId: operationId,
+        errorCode: error.code,
+      );
+    }
+  }
+
+  @override
   Future<Map<String, dynamic>> readRpc(
     String rpc, {
     required String context,
@@ -198,6 +490,13 @@ class SupabaseGateway
         'limit',
         'cursor',
       },
+      'ministry_list_converts': {
+        'congregation_id',
+        'name_prefix',
+        'limit',
+        'cursor',
+      },
+      'ministry_get_convert': {'congregation_id', 'convert_id'},
       'ministry_get_person': {'congregation_id', 'person_id'},
       'ministry_list_directory': {
         'scope',
@@ -245,6 +544,8 @@ class SupabaseGateway
     }
     const requiredReadKeys = <String, Set<String>>{
       'ministry_list_people': {'congregation_id', 'limit'},
+      'ministry_list_converts': {'limit'},
+      'ministry_get_convert': {'congregation_id', 'convert_id'},
       'ministry_get_person': {'congregation_id', 'person_id'},
       'ministry_list_students': {'congregation_id', 'limit'},
       'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
@@ -306,10 +607,6 @@ class SupabaseGateway
       'save_student': {
         'id',
         'congregation_id',
-        'name',
-        'phone_e164',
-        'birth_date',
-        'address',
         'education',
         'marital_status',
         'new_convert',
@@ -393,7 +690,7 @@ class SupabaseGateway
         'archived',
         'expected_revision',
       },
-      'save_student': {'id', 'congregation_id', 'name'},
+      'save_student': {'id', 'congregation_id', 'expected_revision'},
       'save_person': {'id', 'congregation_id', 'expected_revision', 'person'},
       'set_student_archived': {
         'id',
@@ -497,6 +794,25 @@ class SupabaseGateway
         }
       }
     }
+    if (command == 'save_student') {
+      final revision = payload['expected_revision'];
+      if (revision is! int ||
+          revision < 1 ||
+          ['education', 'marital_status'].any(
+            (key) =>
+                payload.containsKey(key) &&
+                payload[key] != null &&
+                payload[key] is! String,
+          ) ||
+          ['new_convert', 'water_baptized', 'wants_baptism'].any(
+            (key) =>
+                payload.containsKey(key) &&
+                payload[key] != null &&
+                payload[key] is! bool,
+          )) {
+        throw const DataFailure('invalid');
+      }
+    }
     final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
     final token = context;
     final value = await _run(
@@ -532,6 +848,10 @@ class SupabaseGateway
         !value.keys.toSet().containsAll(expectedFields) ||
         value['revision'] is! int ||
         (value['revision'] as int) < 1) {
+      throw const DataFailure('invalid_response');
+    }
+    if (command == 'save_student' &&
+        value['revision'] != (payload['expected_revision'] as int) + 1) {
       throw const DataFailure('invalid_response');
     }
     if (command == 'save_person' &&
@@ -786,6 +1106,10 @@ void validateUuid(Object? value) {
     throw const DataFailure('invalid_response');
   }
 }
+
+bool _hasExactKeys(Map<String, Object?> value, Set<String> expected) =>
+    value.keys.toSet().difference(expected).isEmpty &&
+    value.keys.toSet().containsAll(expected);
 
 bool _isIsoDate(String value) {
   if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return false;

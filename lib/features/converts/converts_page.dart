@@ -83,13 +83,28 @@ class _ConvertsPageState extends State<ConvertsPage> {
       final ordered = await orderCongregations(widget.congregations);
       if (!_current() || request != _request) return;
       final rows = <ConvertRecord>[];
-      String? cursor;
-      do {
-        final page = await widget.converts.list(const ConvertQuery(), cursor);
-        if (!_current() || request != _request) return;
-        rows.addAll(page.items);
-        cursor = page.nextCursor;
-      } while (cursor != null);
+      final scopes = widget.scope.isGlobalManager
+          ? <String?>[null]
+          : ordered
+                .where(
+                  (congregation) =>
+                      congregation.archivedAt == null &&
+                      widget.scope.congregationIds.contains(congregation.id),
+                )
+                .map((congregation) => congregation.id)
+                .toList(growable: false);
+      for (final scopeId in scopes) {
+        String? cursor;
+        do {
+          final page = await widget.converts.list(
+            ConvertQuery(congregationId: scopeId),
+            cursor,
+          );
+          if (!_current() || request != _request) return;
+          rows.addAll(page.items);
+          cursor = page.nextCursor;
+        } while (cursor != null);
+      }
       if (_current() && request == _request) {
         setState(() {
           _rows = rows;
@@ -380,19 +395,32 @@ class _ConvertsPageState extends State<ConvertsPage> {
                     break;
                   }
                 }
-                return ConvertCard(
-                  key: ValueKey('${record.id}:$_context'),
-                  record: record,
-                  today: today,
-                  congregation: congregation,
-                  gateway: widget.converts.gateway,
-                  photos: widget.photos,
-                  busy: _pending.contains(record.id),
-                  error: _errors[record.id],
-                  onAction: (action) => _execute(action, record),
-                  onEdit: _pending.isNotEmpty
-                      ? null
-                      : () => setState(() => _editing = record),
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (record.legacyIdentity != null)
+                      const Padding(
+                        padding: EdgeInsets.fromLTRB(4, 12, 4, 0),
+                        child: Text(
+                          'Identidade legada original · somente leitura',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ConvertCard(
+                      key: ValueKey('${record.id}:$_context'),
+                      record: record,
+                      today: today,
+                      congregation: congregation,
+                      gateway: widget.converts.gateway,
+                      photos: widget.photos,
+                      busy: _pending.contains(record.id),
+                      error: _errors[record.id],
+                      onAction: (action) => _execute(action, record),
+                      onEdit: _pending.isNotEmpty || record.personId == null
+                          ? null
+                          : () => setState(() => _editing = record),
+                    ),
+                  ],
                 );
               },
             ),

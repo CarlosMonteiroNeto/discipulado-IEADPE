@@ -27,15 +27,31 @@ class Photos implements PhotoRepository {
 }
 
 typedef VoidCallback = void Function();
-ConvertDraft photoDraft({bool remove = false}) => ConvertDraft(
-  name: 'Pessoa',
-  landmark: 'Praça',
-  gender: Gender.female,
-  conversionDate: DateOnly(2026, 1, 1),
-  worshipType: '01 - Oração',
-  photoBytes: remove ? null : Uint8List.fromList([1, 2, 3]),
-  removePhoto: remove,
-);
+ConvertDraft photoDraft({bool remove = false, bool upload = true}) =>
+    ConvertDraft(
+      name: 'Pessoa',
+      landmark: 'Praça',
+      gender: Gender.female,
+      conversionDate: DateOnly(2026, 1, 1),
+      worshipType: '01 - Oração',
+      congregationId: 'congregation',
+      photoBytes: remove || !upload ? null : Uint8List.fromList([1, 2, 3]),
+      removePhoto: remove,
+    );
+ConvertRecord photoRecord({String? photoAssetId = 'attached-asset'}) =>
+    ConvertRecord(
+      id: 'existing',
+      internalId: 'existing',
+      name: 'Pessoa',
+      landmark: 'Praça',
+      gender: Gender.female,
+      conversionDate: DateOnly(2026, 1, 1),
+      worshipType: '01 - Oração',
+      congregationId: 'congregation',
+      photoAssetId: photoAssetId,
+      personId: 'person',
+      personRevision: 1,
+    );
 void main() {
   test('failed upload never mutates convert; attach retry reuses asset and operation', () async {
     final gateway = TestGateway();
@@ -43,23 +59,41 @@ void main() {
     final saver = ConvertSaveController(
       gateway: gateway,
       photos: photos,
-      convertId: 'existing',
+      initial: photoRecord(photoAssetId: 'previous-asset'),
     );
     await expectLater(saver.save(photoDraft()), throwsA(isA<DataFailure>()));
     expect(gateway.calls, isEmpty);
     photos.fail = false;
     await expectLater(saver.save(photoDraft()), throwsA(isA<DataFailure>()));
     gateway.fail = false;
-    expect(await saver.save(photoDraft()), 'record');
+    expect(await saver.save(photoDraft()), 'existing');
     expect(photos.uploads, 2);
     expect(gateway.calls[0], gateway.calls[1]);
     expect(
-      gateway.calls.singleWhere(
-        (c) => identical(c, gateway.calls.first),
-      )['payload'],
-      containsPair('photo_asset_id', 'asset'),
+      ((gateway.calls.first['payload'] as Map)['convert']
+          as Map)['photo_asset_id'],
+      'asset',
     );
   });
+  test(
+    'an edit preserves its attached photo when the form leaves it unchanged',
+    () async {
+      final gateway = TestGateway()..fail = false;
+      final photos = Photos();
+      final saver = ConvertSaveController(
+        gateway: gateway,
+        photos: photos,
+        initial: photoRecord(),
+      );
+
+      await saver.save(photoDraft(upload: false));
+
+      expect(photos.uploads, 0);
+      final convert =
+          (gateway.calls.single['payload'] as Map)['convert'] as Map;
+      expect(convert['photo_asset_id'], 'attached-asset');
+    },
+  );
   test(
     'invalidation after upload discards result before convert command',
     () async {
@@ -81,14 +115,15 @@ void main() {
       final saver = ConvertSaveController(
         gateway: gateway,
         photos: photos,
-        convertId: 'existing',
+        initial: photoRecord(),
       );
       expect(gateway.calls, isEmpty);
       await saver.save(photoDraft(remove: true));
       expect(photos.uploads, 0);
       expect(
-        gateway.calls.single['payload'],
-        containsPair('photo_asset_id', null),
+        ((gateway.calls.single['payload'] as Map)['convert']
+            as Map)['photo_asset_id'],
+        null,
       );
       expect(gateway.calls.single['command'], 'edit_convert');
     },

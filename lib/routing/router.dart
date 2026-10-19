@@ -15,6 +15,7 @@ const _knownRoutes = {
   '/ministry',
   '/ministry/team',
   '/ministry/students',
+  '/ministry/students/register',
   '/ministry/classes',
   '/ministry/attendance',
   '/ministry/handoff',
@@ -34,6 +35,7 @@ List<String> routesFor(AccessScope scope) => [
     if (scope.ministryCongregationIds.isNotEmpty ||
         scope.isMinistrySupervision) ...[
       '/ministry/students',
+      '/ministry/students/register',
       '/ministry/classes',
       '/ministry/attendance',
       '/ministry/handoff',

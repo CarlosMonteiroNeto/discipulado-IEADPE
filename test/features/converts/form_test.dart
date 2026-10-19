@@ -7,15 +7,30 @@ import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
 import 'package:ieadpe_converts/features/converts/convert_form.dart';
 
-ConvertRecord record({String worship = '01 - Oração'}) => ConvertRecord(
+const _congregationId = 'b0000000-0000-4000-8000-000000000001';
+
+ConvertRecord record({
+  String worship = '01 - Oração',
+  String name = 'Pessoa',
+  String? congregationId = _congregationId,
+  String? personId,
+  int? personRevision,
+  CanonicalPersonIdentity? personIdentity,
+  String? address,
+}) => ConvertRecord(
   id: 'id',
   internalId: 'legacy',
-  name: 'Pessoa',
+  name: name,
   landmark: 'Praça',
   gender: Gender.male,
   conversionDate: DateOnly(2026, 1, 1),
   worshipType: worship,
   age: 0,
+  congregationId: congregationId,
+  personId: personId,
+  personRevision: personRevision,
+  personIdentity: personIdentity,
+  address: address,
 );
 Widget host(Widget child, {double scale = 1}) => MaterialApp(
   home: MediaQuery(
@@ -60,13 +75,78 @@ void main() {
       await tapSave(t, 'Atualizar');
       expect(drafts.single.age, 0);
       expect(drafts.single.phone, null);
-      expect(drafts.single.congregationId, null);
+      expect(drafts.single.congregationId, _congregationId);
       expect(drafts.single.worshipType, 'Culto legado');
       await t.tap(find.text('Salvando…'));
       await t.pump();
       expect(drafts.length, 1);
       pending.complete();
       await t.pumpAndSettle();
+    },
+  );
+  testWidgets(
+    'unchanged null canonical address stays null for an inherited long name',
+    (t) async {
+      final name = List.filled(244, 'A').join();
+      ConvertDraft? saved;
+      await t.pumpWidget(
+        host(
+          ConvertForm(
+            initial: record(
+              name: name,
+              congregationId: _congregationId,
+              personId: 'person',
+              personRevision: 7,
+              personIdentity: CanonicalPersonIdentity(name: name),
+            ),
+            onSubmit: (draft) async => saved = draft,
+          ),
+        ),
+      );
+
+      await tapSave(t, 'Atualizar');
+
+      expect(saved!.name, name);
+      expect((saved!.payload()['person'] as Map)['address'], isNull);
+    },
+  );
+  testWidgets(
+    'edited canonical address fields remain a complete address object',
+    (t) async {
+      ConvertDraft? saved;
+      const name = 'Pessoa';
+      await t.pumpWidget(
+        host(
+          ConvertForm(
+            initial: record(
+              name: name,
+              congregationId: _congregationId,
+              personId: 'person',
+              personRevision: 1,
+              personIdentity: const CanonicalPersonIdentity(name: name),
+            ),
+            onSubmit: (draft) async => saved = draft,
+          ),
+        ),
+      );
+      await t.enterText(
+        find.byKey(const ValueKey('person-address-street')),
+        'Rua Nova',
+      );
+      await t.enterText(
+        find.byKey(const ValueKey('person-address-city')),
+        'Recife',
+      );
+
+      await tapSave(t, 'Atualizar');
+
+      expect((saved!.payload()['person'] as Map)['address'], {
+        'street': 'Rua Nova',
+        'district': null,
+        'city': 'Recife',
+        'postal_code': null,
+        'state_code': null,
+      });
     },
   );
   testWidgets(
@@ -142,8 +222,8 @@ void main() {
           scale: 2,
         ),
       );
-      await t.ensureVisible(find.byKey(const ValueKey('phone')));
-      await t.tap(find.byKey(const ValueKey('phone')));
+      await t.ensureVisible(find.byKey(const ValueKey('person-phone')));
+      await t.tap(find.byKey(const ValueKey('person-phone')));
       await t.pump();
       await t.ensureVisible(find.text('Atualizar'));
       await t.pump();

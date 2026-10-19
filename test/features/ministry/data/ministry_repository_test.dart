@@ -66,6 +66,94 @@ void main() {
   );
 
   test(
+    'student registration sends separate person and academic objects',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final serving = server.listen((request) async {
+        expect(
+          request.uri.path,
+          '/rest/v1/rpc/ieadpe_ministry_register_student',
+        );
+        expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+          'operation_id': _op,
+          'payload': {
+            'id': _id,
+            'person_id': _person,
+            'congregation_id': _scope,
+            'person': {
+              'name': 'Ana Silva',
+              'phone': null,
+              'birth_date': '1990-02-28',
+              'address': {
+                'street': 'Rua A',
+                'district': null,
+                'city': 'Recife',
+                'postal_code': null,
+                'state_code': 'PE',
+              },
+            },
+            'academic': {
+              'education': 'Médio',
+              'marital_status': null,
+              'new_convert': false,
+              'water_baptized': null,
+              'wants_baptism': true,
+            },
+          },
+        });
+        await _respond(request, {
+          'id': _id,
+          'person_id': _person,
+          'revision': 1,
+          'person_revision': 1,
+        });
+      });
+      final client = SupabaseClient(
+        'http://127.0.0.1:${server.port}',
+        'test',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(() async {
+        await client.dispose();
+        await serving.cancel();
+        await server.close(force: true);
+      });
+      final repo = MinistryRepository(
+        SupabaseGateway(client, ProtectedDataBoundary()),
+      );
+
+      final result = await (repo as dynamic).registerStudent(
+        operationId: _op,
+        studentId: _id,
+        personId: _person,
+        congregationId: _scope,
+        person: MinistryPersonDraft(
+          name: 'Ana Silva',
+          phone: null,
+          birthDate: CalendarDate(1990, 2, 28),
+          address: const Address(
+            street: 'Rua A',
+            district: null,
+            city: 'Recife',
+            postalCode: null,
+            stateCode: 'PE',
+          ),
+        ),
+        education: 'Médio',
+        maritalStatus: null,
+        newConvert: false,
+        waterBaptized: null,
+        wantsBaptism: true,
+      );
+
+      expect(result.studentId, _id);
+      expect(result.personId, _person);
+      expect(result.studentRevision, 1);
+      expect(result.personRevision, 1);
+    },
+  );
+
+  test(
     'person detail decodes every canonical edit field and its revision',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -687,7 +775,16 @@ void main() {
           'archived': true,
           'expected_revision': 1,
         },
-        'save_student': {'id': _id, 'congregation_id': _scope, 'name': 'A'},
+        'save_student': {
+          'id': _id,
+          'congregation_id': _scope,
+          'expected_revision': 1,
+          'education': 'Médio',
+          'marital_status': null,
+          'new_convert': false,
+          'water_baptized': null,
+          'wants_baptism': true,
+        },
         'set_student_archived': {
           'id': _id,
           'congregation_id': _scope,
@@ -792,6 +889,13 @@ void main() {
       for (final entry in commands.entries) {
         await gateway.ministryCommand(entry.key, _op, entry.value);
       }
+      await expectLater(
+        gateway.ministryCommand('save_student', _op, {
+          ...commands['save_student']!,
+          'name': 'A identidade é editada pelo cadastro canônico.',
+        }),
+        throwsA(isA<DataFailure>()),
+      );
       await expectLater(
         gateway.ministryCommand('not_a_command', _op, {}),
         throwsA(isA<DataFailure>()),

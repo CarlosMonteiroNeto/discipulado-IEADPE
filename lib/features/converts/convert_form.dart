@@ -8,6 +8,7 @@ import '../../domain/business_calendar.dart';
 import '../../domain/worship_types.dart';
 import '../../data/supabase_gateway.dart';
 import '../../ui/unified_theme.dart';
+import '../people/person_fields.dart';
 
 /// Only user-editable fields. Never serialize a read DTO into a command.
 class ConvertDraft {
@@ -19,6 +20,9 @@ class ConvertDraft {
     required this.worshipType,
     this.address,
     this.phone,
+    this.birthDate,
+    this.personAddress,
+    this.preserveNullAddress = false,
     this.congregationId,
     this.age,
     this.photoBytes,
@@ -28,19 +32,37 @@ class ConvertDraft {
   final Gender gender;
   final DateOnly conversionDate;
   final String? address, phone, congregationId;
+  final DateOnly? birthDate;
+  final Map<String, Object?>? personAddress;
+  final bool preserveNullAddress;
   final int? age;
   final Uint8List? photoBytes;
   final bool removePhoto;
   Map<String, Object?> payload() => {
-    'name': name,
-    'landmark': landmark,
-    'gender': gender.wireValue,
-    'conversion_date': conversionDate.toString(),
-    'worship_type': worshipType,
-    'address': address,
-    'phone': phone,
     'congregation_id': congregationId,
-    'age': age,
+    'person': {
+      'name': name,
+      'phone': phone,
+      'birth_date': birthDate?.toString(),
+      'address': preserveNullAddress
+          ? null
+          : personAddress ??
+                {
+                  'street': address,
+                  'district': null,
+                  'city': null,
+                  'postal_code': null,
+                  'state_code': null,
+                },
+    },
+    'convert': {
+      'landmark': landmark,
+      'gender': gender.wireValue,
+      'conversion_date': conversionDate.toString(),
+      'worship_type': worshipType,
+      'age': age,
+      'photo_asset_id': null,
+    },
   };
 }
 
@@ -81,8 +103,13 @@ class _ConvertFormState extends State<ConvertForm> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _name,
       _address,
+      _district,
+      _city,
+      _postalCode,
+      _stateCode,
       _landmark,
       _phone,
+      _birthDate,
       _age,
       _date;
   String? _congregation, _worship;
@@ -94,10 +121,29 @@ class _ConvertFormState extends State<ConvertForm> {
   void initState() {
     super.initState();
     final i = widget.initial;
-    _name = TextEditingController(text: i?.name);
-    _address = TextEditingController(text: i?.address);
+    final identity = i?.personIdentity;
+    final identityAddress = identity?.address;
+    _name = TextEditingController(text: identity?.name ?? i?.name);
+    _address = TextEditingController(
+      text: identity == null
+          ? (i?.legacyIdentity?.address ?? i?.address)
+          : identityAddress?['street'] as String?,
+    );
+    _district = TextEditingController(
+      text: identityAddress?['district'] as String?,
+    );
+    _city = TextEditingController(text: identityAddress?['city'] as String?);
+    _postalCode = TextEditingController(
+      text: identityAddress?['postal_code'] as String?,
+    );
+    _stateCode = TextEditingController(
+      text: identityAddress?['state_code'] as String?,
+    );
     _landmark = TextEditingController(text: i?.landmark);
-    _phone = TextEditingController(text: i?.phone);
+    _phone = TextEditingController(
+      text: identity?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
+    );
+    _birthDate = TextEditingController(text: identity?.birthDate?.toString());
     _age = TextEditingController(text: i?.age?.toString());
     _date = TextEditingController(text: i?.conversionDate.toString());
     _congregation = i?.congregationId;
@@ -107,7 +153,19 @@ class _ConvertFormState extends State<ConvertForm> {
 
   @override
   void dispose() {
-    for (final c in [_name, _address, _landmark, _phone, _age, _date]) {
+    for (final c in [
+      _name,
+      _address,
+      _district,
+      _city,
+      _postalCode,
+      _stateCode,
+      _landmark,
+      _phone,
+      _birthDate,
+      _age,
+      _date,
+    ]) {
       c.clear();
       c.dispose();
     }
@@ -163,6 +221,15 @@ class _ConvertFormState extends State<ConvertForm> {
     }
   }
 
+  DateOnly? _parsedBirthDate() {
+    if (_birthDate.text.trim().isEmpty) return null;
+    try {
+      return DateOnly.parse(_birthDate.text.trim());
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _submit() async {
     if (_busy || _picking || !_form.currentState!.validate()) return;
     final token = widget.gateway?.context;
@@ -171,14 +238,49 @@ class _ConvertFormState extends State<ConvertForm> {
         c.text == (old ?? '')
         ? old
         : (c.text.trim().isEmpty ? null : c.text.trim());
+    final oldPerson = i?.personIdentity;
+    final oldAddress = oldPerson?.address;
+    final oldName = oldPerson?.name ?? i?.name;
+    final oldAddressStreet = oldPerson == null
+        ? i?.legacyIdentity?.address ?? i?.address
+        : oldAddress?['street'] as String?;
+    final preserveNullAddress =
+        oldPerson != null &&
+        oldAddress == null &&
+        [
+          _address,
+          _district,
+          _city,
+          _postalCode,
+          _stateCode,
+        ].every((controller) => controller.text.trim().isEmpty);
+    final name = _name.text == oldName ? oldName! : _name.text.trim();
     final draft = ConvertDraft(
-      name: _name.text.trim(),
+      name: name,
       landmark: _landmark.text.trim(),
       gender: _gender!,
       conversionDate: _parsedDate()!,
       worshipType: _worship!,
-      address: optional(_address, i?.address),
-      phone: optional(_phone, i?.phone),
+      address: optional(_address, oldAddressStreet),
+      phone: optional(
+        _phone,
+        oldPerson?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
+      ),
+      birthDate: _birthDate.text.trim().isEmpty ? null : _parsedBirthDate(),
+      personAddress: {
+        'street': optional(_address, oldAddressStreet),
+        'district': optional(_district, oldAddress?['district'] as String?),
+        'city': optional(_city, oldAddress?['city'] as String?),
+        'postal_code': optional(
+          _postalCode,
+          oldAddress?['postal_code'] as String?,
+        ),
+        'state_code': optional(
+          _stateCode,
+          oldAddress?['state_code'] as String?,
+        ),
+      },
+      preserveNullAddress: preserveNullAddress,
       congregationId: _congregation,
       age: _age.text.isEmpty ? null : int.parse(_age.text),
       photoBytes: _photo == null ? null : Uint8List.fromList(_photo!),
@@ -236,223 +338,244 @@ class _ConvertFormState extends State<ConvertForm> {
     if (_congregation != null) {
       congregations.putIfAbsent(_congregation!, () => 'Congregação anterior');
     }
-    return Center(
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 512),
-        child: Form(
-          key: _form,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Semantics(
-                label: displayed == null
-                    ? 'Sem foto do convertido'
-                    : 'Foto do convertido',
-                child: Center(
-                  child: Container(
-                    width: 104,
-                    height: 104,
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: UnifiedColors.border, width: 2),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x140f172a),
-                          blurRadius: 8,
-                          offset: Offset(0, 3),
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 512),
+          child: Form(
+            key: _form,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Semantics(
+                  label: displayed == null
+                      ? 'Sem foto do convertido'
+                      : 'Foto do convertido',
+                  child: Center(
+                    child: Container(
+                      width: 104,
+                      height: 104,
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: UnifiedColors.border,
+                          width: 2,
                         ),
-                      ],
-                    ),
-                    child: ClipOval(
-                      child: displayed == null
-                          ? const ColoredBox(
-                              color: UnifiedColors.pageTint,
-                              child: Icon(
-                                Icons.person_outline,
-                                size: 52,
-                                color: UnifiedColors.muted,
-                              ),
-                            )
-                          : Image.memory(
-                              displayed,
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, e, s) => const ColoredBox(
+                        boxShadow: const [
+                          BoxShadow(
+                            color: Color(0x140f172a),
+                            blurRadius: 8,
+                            offset: Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: ClipOval(
+                        child: displayed == null
+                            ? const ColoredBox(
                                 color: UnifiedColors.pageTint,
                                 child: Icon(
                                   Icons.person_outline,
                                   size: 52,
                                   color: UnifiedColors.muted,
                                 ),
+                              )
+                            : Image.memory(
+                                displayed,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, e, s) => const ColoredBox(
+                                  color: UnifiedColors.pageTint,
+                                  child: Icon(
+                                    Icons.person_outline,
+                                    size: 52,
+                                    color: UnifiedColors.muted,
+                                  ),
+                                ),
                               ),
-                            ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                alignment: WrapAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  TextButton.icon(
-                    onPressed: _busy || _picking ? null : _pick,
-                    icon: const Icon(Icons.add_a_photo_outlined),
-                    label: Text(_picking ? 'Abrindo foto…' : 'Escolher foto'),
-                  ),
-                  if (_photo != null ||
-                      old != null ||
-                      widget.initial?.photoAssetId != null)
-                    TextButton(
-                      onPressed: _busy
-                          ? null
-                          : () => setState(() {
-                              _photo = null;
-                              _removePhoto = true;
-                            }),
-                      child: const Text('Remover foto'),
+                const SizedBox(height: 8),
+                Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _busy || _picking ? null : _pick,
+                      icon: const Icon(Icons.add_a_photo_outlined),
+                      label: Text(_picking ? 'Abrindo foto…' : 'Escolher foto'),
                     ),
-                ],
-              ),
-              if (_photo != null && old != null)
-                const Text(
-                  'Nova foto selecionada. A foto atual será mantida até salvar.',
+                    if (_photo != null ||
+                        old != null ||
+                        widget.initial?.photoAssetId != null)
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => setState(() {
+                                _photo = null;
+                                _removePhoto = true;
+                              }),
+                        child: const Text('Remover foto'),
+                      ),
+                  ],
                 ),
-              if (_removePhoto) const Text('A foto será removida ao salvar.'),
-              DropdownButtonFormField<String>(
-                initialValue: _congregation,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  labelText: 'Congregação (opcional)',
-                  filled: true,
-                  fillColor: Colors.white,
+                if (_photo != null && old != null)
+                  const Text(
+                    'Nova foto selecionada. A foto atual será mantida até salvar.',
+                  ),
+                if (_removePhoto) const Text('A foto será removida ao salvar.'),
+                DropdownButtonFormField<String>(
+                  initialValue: _congregation,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Congregação *',
+                    filled: true,
+                    fillColor: Colors.white,
+                  ),
+                  items: [
+                    for (final c in congregations.entries)
+                      DropdownMenuItem(value: c.key, child: Text(c.value)),
+                  ],
+                  onChanged: _busy
+                      ? null
+                      : (v) => setState(() => _congregation = v),
+                  validator: (v) =>
+                      v == null ? 'Selecione uma congregação' : null,
                 ),
-                items: [
-                  const DropdownMenuItem(
-                    value: null,
-                    child: Text('Sem congregação'),
-                  ),
-                  for (final c in congregations.entries)
-                    DropdownMenuItem(value: c.key, child: Text(c.value)),
-                ],
-                onChanged: _busy
-                    ? null
-                    : (v) => setState(() => _congregation = v),
-              ),
-              const SizedBox(height: 16),
-              _field(
-                'name',
-                'Nome *',
-                _name,
-                validator: (v) =>
-                    v!.trim().isEmpty ? 'Nome é obrigatório' : null,
-              ),
-              _field('address', 'Endereço', _address),
-              _field(
-                'landmark',
-                'Ponto de referência *',
-                _landmark,
-                validator: (v) => v!.trim().isEmpty
-                    ? 'Ponto de referência é obrigatório'
-                    : null,
-              ),
-              _field(
-                'phone',
-                'Telefone (opcional)',
-                _phone,
-                keyboard: TextInputType.phone,
-              ),
-              _field(
-                'age',
-                'Idade',
-                _age,
-                keyboard: TextInputType.number,
-                validator: (v) => v!.isEmpty
-                    ? null
-                    : (int.tryParse(v) == null ||
-                              int.parse(v) < 0 ||
-                              int.parse(v) > 150
-                          ? 'Informe uma idade entre 0 e 150'
-                          : null),
-              ),
-              DropdownButtonFormField<Gender>(
-                initialValue: _gender,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Gênero *'),
-                items: const [
-                  DropdownMenuItem(
-                    value: Gender.male,
-                    child: Text('Masculino'),
-                  ),
-                  DropdownMenuItem(
-                    value: Gender.female,
-                    child: Text('Feminino'),
-                  ),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _gender = v),
-                validator: (v) => v == null ? 'Gênero é obrigatório' : null,
-              ),
-              const SizedBox(height: 16),
-              _field(
-                'conversion_date',
-                'Data de conversão * (aaaa-mm-dd)',
-                _date,
-                keyboard: TextInputType.datetime,
-                validator: (v) {
-                  final d = _parsedDate();
-                  if (d == null) return 'Informe uma data válida (aaaa-mm-dd)';
-                  return d.compareTo(BusinessCalendar().today(widget.now())) > 0
-                      ? 'A data não pode ser futura'
-                      : null;
-                },
-              ),
-              DropdownButtonFormField<String>(
-                initialValue: _worship,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Tipo de culto *'),
-                items: [
-                  for (final w in worships)
-                    DropdownMenuItem(value: w, child: Text(w)),
-                ],
-                onChanged: _busy ? null : (v) => setState(() => _worship = v),
-                validator: (v) => v == null || v.trim().isEmpty
-                    ? 'Tipo de culto é obrigatório'
-                    : null,
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Semantics(liveRegion: true, child: Text(_error!)),
+                const SizedBox(height: 16),
+                PersonFields(
+                  name: _name,
+                  phone: _phone,
+                  birthDate: _birthDate,
+                  street: _address,
+                  district: _district,
+                  city: _city,
+                  postalCode: _postalCode,
+                  stateCode: _stateCode,
+                  enabled: !_busy,
+                  nameValidator: (value) {
+                    final name = value?.trim() ?? '';
+                    if (name.isEmpty) return 'Nome é obrigatório';
+                    final inherited = widget.initial?.personIdentity?.name;
+                    if (value != inherited && name.length > 200) {
+                      return 'Reduza o nome para até 200 caracteres';
+                    }
+                    return null;
+                  },
+                  birthDateValidator: (value) {
+                    if (value == null || value.trim().isEmpty) return null;
+                    return _parsedBirthDate() == null
+                        ? 'Informe uma data válida (aaaa-mm-dd)'
+                        : null;
+                  },
                 ),
-              const SizedBox(height: 24),
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 12,
-                runSpacing: 8,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: _busy ? null : widget.onCancel,
-                    icon: const Icon(Icons.close),
-                    label: const Text('Cancelar'),
-                  ),
-                  FilledButton.icon(
-                    onPressed: _busy || _picking ? null : _submit,
-                    icon: Icon(
-                      _busy ? Icons.hourglass_top : Icons.save_outlined,
+                _field(
+                  'landmark',
+                  'Ponto de referência *',
+                  _landmark,
+                  validator: (v) => v!.trim().isEmpty
+                      ? 'Ponto de referência é obrigatório'
+                      : null,
+                ),
+                _field(
+                  'age',
+                  'Idade',
+                  _age,
+                  keyboard: TextInputType.number,
+                  validator: (v) => v!.isEmpty
+                      ? null
+                      : (int.tryParse(v) == null ||
+                                int.parse(v) < 0 ||
+                                int.parse(v) > 150
+                            ? 'Informe uma idade entre 0 e 150'
+                            : null),
+                ),
+                DropdownButtonFormField<Gender>(
+                  initialValue: _gender,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Gênero *'),
+                  items: const [
+                    DropdownMenuItem(
+                      value: Gender.male,
+                      child: Text('Masculino'),
                     ),
-                    label: Text(
-                      _busy
-                          ? 'Salvando…'
-                          : widget.initial == null
-                          ? 'Cadastrar'
-                          : 'Atualizar',
+                    DropdownMenuItem(
+                      value: Gender.female,
+                      child: Text('Feminino'),
                     ),
+                  ],
+                  onChanged: _busy ? null : (v) => setState(() => _gender = v),
+                  validator: (v) => v == null ? 'Gênero é obrigatório' : null,
+                ),
+                const SizedBox(height: 16),
+                _field(
+                  'conversion_date',
+                  'Data de conversão * (aaaa-mm-dd)',
+                  _date,
+                  keyboard: TextInputType.datetime,
+                  validator: (v) {
+                    final d = _parsedDate();
+                    if (d == null)
+                      return 'Informe uma data válida (aaaa-mm-dd)';
+                    return d.compareTo(BusinessCalendar().today(widget.now())) >
+                            0
+                        ? 'A data não pode ser futura'
+                        : null;
+                  },
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _worship,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de culto *',
                   ),
-                ],
-              ),
-            ],
+                  items: [
+                    for (final w in worships)
+                      DropdownMenuItem(value: w, child: Text(w)),
+                  ],
+                  onChanged: _busy ? null : (v) => setState(() => _worship = v),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Tipo de culto é obrigatório'
+                      : null,
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Semantics(liveRegion: true, child: Text(_error!)),
+                  ),
+                const SizedBox(height: 24),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _busy ? null : widget.onCancel,
+                      icon: const Icon(Icons.close),
+                      label: const Text('Cancelar'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: _busy || _picking ? null : _submit,
+                      icon: Icon(
+                        _busy ? Icons.hourglass_top : Icons.save_outlined,
+                      ),
+                      label: Text(
+                        _busy
+                            ? 'Salvando…'
+                            : widget.initial == null
+                            ? 'Cadastrar'
+                            : 'Atualizar',
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),

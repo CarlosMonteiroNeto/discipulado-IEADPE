@@ -28,6 +28,40 @@ Map<String, Object?> row(int i) => {
   'created_at': '2026-10-01T12:00:00Z',
   'updated_at': '2026-10-01T12:00:00Z',
 };
+Map<String, Object?> convertProjectionRow(int i) => {
+  'id': id(i),
+  'internal_id': 'legacy-$i',
+  'person_id': null,
+  'congregation_id': scopeId,
+  'landmark': 'Praça',
+  'gender': 'female',
+  'conversion_date': '2026-10-01',
+  'worship_type': '60 - Discipulado',
+  'photo_url': null,
+  'photo_asset_id': null,
+  'age': null,
+  'last_visit_date': null,
+  'was_visited_once': false,
+  'visit_count': 0,
+  'is_in_discipleship': false,
+  'discipleship_start_date': null,
+  'is_discipleship_completed': false,
+  'is_deviated': false,
+  'created_by': null,
+  'created_at': '2026-10-01T12:00:00Z',
+  'updated_at': '2026-10-01T12:00:00Z',
+  'deleted_at': null,
+  'revision': 1,
+};
+Map<String, Object?> convertProjection(
+  int i, {
+  Map<String, Object?> convertChanges = const {},
+}) => {
+  'convert': {...convertProjectionRow(i), ...convertChanges},
+  'person': null,
+  'person_revision': null,
+  'legacy_identity': {'name': 'Pessoa $i', 'phone': null, 'address': null},
+};
 Future<void> respond(HttpRequest r, Object value, [int status = 200]) async {
   r.response.statusCode = status;
   r.response.headers.contentType = ContentType.json;
@@ -67,22 +101,36 @@ void main() {
     await gateway.read('converts', context: gateway.context, name: r'A*%_\.[]');
   });
   test(
-    '1205 scoped rows cross bounded 100-row SDK pages exactly once',
+    '1205 scoped rows cross thirteen bounded server pages exactly once',
     () async {
-      var requests = 0;
+      final requestBodies = <Map<String, dynamic>>[];
       final gateway = await fixture((r) async {
-        requests++;
-        expect(r.uri.path, '/rest/v1/converts');
-        expect(r.uri.queryParameters['limit'], '100');
-        expect(r.uri.queryParameters['order'], 'id.asc.nullslast');
-        expect(r.uri.queryParameters['deleted_at'], 'is.null');
-        expect(r.uri.queryParameters['congregation_id'], 'eq.$scopeId');
-        expect(r.uri.queryParameters['name'], 'ilike.%Pessoa%');
-        final after = r.uri.queryParameters['id'];
-        final start = after == null ? 1 : int.parse(after.split('-').last) + 1;
-        await respond(r, [
-          for (var i = start; i <= 1205 && i < start + 100; i++) row(i),
-        ]);
+        expect(r.method, 'POST');
+        expect(r.uri.path, '/rest/v1/rpc/ieadpe_ministry_list_converts');
+        final body = Map<String, dynamic>.from(
+          jsonDecode(await utf8.decoder.bind(r).join()) as Map,
+        );
+        requestBodies.add(body);
+        final pageNumber = requestBodies.length;
+        final expectedCursor = pageNumber == 1
+            ? null
+            : 'opaque-server-cursor-${pageNumber - 1}';
+        expect(body, {
+          'request': {
+            'congregation_id': scopeId,
+            'name_prefix': 'Pessoa',
+            'limit': 100,
+            'cursor': expectedCursor,
+          },
+        });
+        final start = (pageNumber - 1) * 100 + 1;
+        final end = pageNumber == 13 ? 1205 : pageNumber * 100;
+        await respond(r, {
+          'items': [for (var i = start; i <= end; i++) convertProjection(i)],
+          'next_cursor': pageNumber == 13
+              ? null
+              : 'opaque-server-cursor-$pageNumber',
+        });
       });
       final repository = ConvertRepository(gateway);
       final ids = <String>[];
@@ -97,7 +145,7 @@ void main() {
       } while (cursor != null);
       expect(ids, [for (var i = 1; i <= 1205; i++) id(i)]);
       expect(ids.toSet(), hasLength(1205));
-      expect(requests, 13);
+      expect(requestBodies, hasLength(13));
     },
   );
   test(
@@ -158,7 +206,10 @@ void main() {
     final gateway = await fixture((r) async {
       received.complete();
       await release.future;
-      await respond(r, [row(1)]);
+      await respond(r, {
+        'items': [convertProjection(1)],
+        'next_cursor': null,
+      });
     });
     final pending = ConvertRepository(gateway).list(const ConvertQuery(), null);
     final assertion = expectLater(pending, throwsA(isA<Exception>()));

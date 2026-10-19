@@ -21,9 +21,10 @@ void main() {
       {'congregation_id': 'legacy-id'},
     ]) {
       final gateway = await fixture.fixture(
-        (r) => fixture.respond(r, [
-          {...fixture.row(1), ...change},
-        ]),
+        (r) => fixture.respond(r, {
+          'items': [fixture.convertProjection(1, convertChanges: change)],
+          'next_cursor': null,
+        }),
       );
       await expectLater(
         ConvertRepository(gateway).list(const ConvertQuery(), null),
@@ -34,58 +35,87 @@ void main() {
     }
   });
   test(
-    'cursor rejects changed query, generation, corrupt encoding before network',
+    'convert cursors are forwarded unchanged and rejected by the server',
     () async {
-      var calls = 0;
-      final gateway = await fixture.fixture((r) {
-        calls++;
-        return fixture.respond(r, [
-          for (var i = 1; i <= 100; i++) fixture.row(i),
-        ]);
+      const serverCursor = 'opaque/server-issued.cursor:v1?signature=hidden';
+      final requests = <Map<String, dynamic>>[];
+      final gateway = await fixture.fixture((r) async {
+        expect(r.uri.path, '/rest/v1/rpc/ieadpe_ministry_list_converts');
+        final body = Map<String, dynamic>.from(
+          jsonDecode(await utf8.decoder.bind(r).join()) as Map,
+        );
+        requests.add(body);
+        if (requests.length == 1) {
+          await fixture.respond(r, {
+            'items': [fixture.convertProjection(1)],
+            'next_cursor': serverCursor,
+          });
+        } else {
+          await fixture.respond(r, {
+            'code': '22023',
+            'message': 'invalid_cursor',
+          }, 400);
+        }
       });
       final repository = ConvertRepository(gateway);
       final page = await repository.list(const ConvertQuery(), null);
-      expect(page.nextCursor, isNotNull);
-      for (final cursor in ['invalid', base64Url.encode(utf8.encode('[1]'))]) {
-        await expectLater(
-          repository.list(const ConvertQuery(), cursor),
-          throwsA(isA<DataFailure>()),
-        );
-      }
+      expect(page.nextCursor, serverCursor);
       await expectLater(
         repository.list(const ConvertQuery(name: 'changed'), page.nextCursor),
-        throwsA(isA<DataFailure>()),
+        throwsA(isA<DataFailure>().having((e) => e.code, 'code', 'invalid')),
       );
-      gateway.boundary.invalidate();
-      await expectLater(
-        repository.list(const ConvertQuery(), page.nextCursor),
-        throwsA(isA<DataFailure>()),
-      );
-      expect(calls, 1);
+      expect(requests, [
+        {
+          'request': {
+            'congregation_id': null,
+            'name_prefix': null,
+            'limit': 100,
+            'cursor': null,
+          },
+        },
+        {
+          'request': {
+            'congregation_id': null,
+            'name_prefix': 'changed',
+            'limit': 100,
+            'cursor': serverCursor,
+          },
+        },
+      ]);
     },
   );
   test(
     'duplicate or unordered page fails instead of skipping records',
     () async {
-      final gateway = await fixture.fixture(
-        (r) => fixture.respond(r, [fixture.row(2), fixture.row(1)]),
-      );
-      await expectLater(
-        ConvertRepository(gateway).list(const ConvertQuery(), null),
-        throwsA(isA<DataFailure>()),
-      );
+      for (final items in <List<Map<String, Object?>>>[
+        [fixture.convertProjection(2), fixture.convertProjection(1)],
+        [fixture.convertProjection(1), fixture.convertProjection(1)],
+      ]) {
+        final gateway = await fixture.fixture(
+          (r) => fixture.respond(r, {'items': items, 'next_cursor': null}),
+        );
+        await expectLater(
+          ConvertRepository(gateway).list(const ConvertQuery(), null),
+          throwsA(
+            isA<DataFailure>().having(
+              (e) => e.code,
+              'code',
+              'invalid_response',
+            ),
+          ),
+        );
+      }
     },
   );
-  test(
-    'empty authorized page is successful and errors remain failures',
-    () async {
-      final gateway = await fixture.fixture((r) => fixture.respond(r, []));
-      final page = await ConvertRepository(gateway)
-          .list(const ConvertQuery(), null);
-      expect(page.items, isEmpty);
-      expect(page.nextCursor, isNull);
-    },
-  );
+  test('empty authorized RPC page is successful', () async {
+    final gateway = await fixture.fixture(
+      (r) => fixture.respond(r, {'items': [], 'next_cursor': null}),
+    );
+    final page = await ConvertRepository(gateway)
+        .list(const ConvertQuery(), null);
+    expect(page.items, isEmpty);
+    expect(page.nextCursor, isNull);
+  });
   test(
     'invalidation during transient response prevents retry under new scope',
     () async {
@@ -175,7 +205,10 @@ void main() {
     final gateway = await fixture.fixture((r) async {
       received.complete();
       await release.future;
-      await fixture.respond(r, [fixture.row(1)]);
+      await fixture.respond(r, {
+        'items': [fixture.convertProjection(1)],
+        'next_cursor': null,
+      });
     });
     final pending = ConvertRepository(gateway).list(const ConvertQuery(), null);
     final checked = expectLater(

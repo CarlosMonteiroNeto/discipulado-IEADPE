@@ -85,6 +85,11 @@ final class ConvertRecord {
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
+    this.personId,
+    this.personRevision,
+    this.convertRevision = 1,
+    this.personIdentity,
+    this.legacyIdentity,
   });
   final String id;
   final String internalId;
@@ -110,6 +115,11 @@ final class ConvertRecord {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
+  final String? personId;
+  final int? personRevision;
+  final int convertRevision;
+  final CanonicalPersonIdentity? personIdentity;
+  final LegacyConvertIdentity? legacyIdentity;
   factory ConvertRecord.fromJson(Map<String, dynamic> json) => ConvertRecord(
     id: json['id'] as String,
     internalId: json['internal_id'] as String,
@@ -146,6 +156,19 @@ final class ConvertRecord {
     deletedAt: json['deleted_at'] == null
         ? null
         : DateTime.parse(json['deleted_at'] as String),
+    personId: json['person_id'] as String?,
+    personRevision: json['person_revision'] as int?,
+    convertRevision: json['revision'] as int? ?? 1,
+    personIdentity: json['person_identity'] == null
+        ? null
+        : CanonicalPersonIdentity.fromJson(
+            Map<String, dynamic>.from(json['person_identity'] as Map),
+          ),
+    legacyIdentity: json['legacy_identity'] == null
+        ? null
+        : LegacyConvertIdentity.fromJson(
+            Map<String, dynamic>.from(json['legacy_identity'] as Map),
+          ),
   );
   Map<String, dynamic> toJson() => {
     'id': id,
@@ -172,7 +195,123 @@ final class ConvertRecord {
     'created_at': createdAt?.toIso8601String(),
     'updated_at': updatedAt?.toIso8601String(),
     'deleted_at': deletedAt?.toIso8601String(),
+    'person_id': personId,
+    'person_revision': personRevision,
+    'revision': convertRevision,
+    'person_identity': personIdentity?.toJson(),
+    'legacy_identity': legacyIdentity?.toJson(),
   };
+}
+
+/// The joined canonical fields used to edit a linked convert identity.
+final class CanonicalPersonIdentity {
+  const CanonicalPersonIdentity({
+    required this.name,
+    this.phone,
+    this.birthDate,
+    this.address,
+  });
+
+  final String name;
+  final String? phone;
+  final DateOnly? birthDate;
+  final Map<String, Object?>? address;
+
+  factory CanonicalPersonIdentity.fromJson(Map<String, dynamic> json) =>
+      CanonicalPersonIdentity(
+        name: json['name'] as String,
+        phone: json['phone'] as String?,
+        birthDate: json['birth_date'] == null
+            ? null
+            : DateOnly.parse(json['birth_date'] as String),
+        address: json['address'] == null
+            ? null
+            : Map<String, Object?>.unmodifiable(
+                Map<String, Object?>.from(json['address'] as Map),
+              ),
+      );
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'phone': phone,
+    'birth_date': birthDate?.toString(),
+    'address': address,
+  };
+}
+
+/// Original snapshot for a convert that has no canonical person link.
+final class LegacyConvertIdentity {
+  const LegacyConvertIdentity({required this.name, this.phone, this.address});
+
+  final String name;
+  final String? phone;
+  final String? address;
+
+  factory LegacyConvertIdentity.fromJson(Map<String, dynamic> json) =>
+      LegacyConvertIdentity(
+        name: json['name'] as String,
+        phone: json['phone'] as String?,
+        address: json['address'] as String?,
+      );
+
+  Map<String, Object?> toJson() => {
+    'name': name,
+    'phone': phone,
+    'address': address,
+  };
+}
+
+/// Typed IDs and independent revisions returned by atomic registration RPCs.
+final class PersonRegistrationResult {
+  const PersonRegistrationResult({
+    required this.personId,
+    required this.personRevision,
+    this.convertId,
+    this.studentId,
+    this.convertRevision,
+    this.studentRevision,
+  });
+
+  final String personId;
+  final String? convertId;
+  final String? studentId;
+  final int personRevision;
+  final int? convertRevision;
+  final int? studentRevision;
+}
+
+enum MinistryReturnRoute {
+  students('/ministry/students'),
+  classes('/ministry/classes'),
+  attendance('/ministry/attendance'),
+  handoff('/ministry/handoff');
+
+  const MinistryReturnRoute(this.path);
+  final String path;
+}
+
+/// In-memory only. This object contains IDs and a safe return enum, never PII.
+final class MinistryRouteContext {
+  const MinistryRouteContext({
+    required this.congregationId,
+    required this.returnTo,
+    this.classId,
+    this.personId,
+  });
+
+  final String congregationId;
+  final MinistryReturnRoute returnTo;
+  final String? classId;
+  final String? personId;
+
+  bool get hasValidIds =>
+      _isUuid(congregationId) &&
+      (classId == null || _isUuid(classId!)) &&
+      (personId == null || _isUuid(personId!));
+
+  static bool _isUuid(String value) => RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
+  ).hasMatch(value);
 }
 
 final class Congregation {
@@ -353,7 +492,8 @@ final class AccessScope {
 
   bool canAccessMinistry(String? congregationId) =>
       isMinistrySupervision ||
-      (congregationId != null && ministryCongregationIds.contains(congregationId));
+      (congregationId != null &&
+          ministryCongregationIds.contains(congregationId));
 
   @override
   bool operator ==(Object other) =>

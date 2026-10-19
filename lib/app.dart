@@ -348,6 +348,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   bool _catalogLoading = false;
   String? _error;
   String? _overlay;
+  MinistryRouteContext? _studentRegistrationContext;
   @override
   void initState() {
     super.initState();
@@ -365,6 +366,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   void didUpdateWidget(covariant _ProtectedFeatures oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.scope != widget.scope) {
+      _studentRegistrationContext = null;
       _selectedMinistryCongregationId = null;
       _selectedMinistryCongregationName = null;
       _ministryCongregations = null;
@@ -603,6 +605,21 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     final scopedActionsEnabled =
         congregationId != null &&
         widget.scope.canAccessMinistry(congregationId);
+    final registrationContext = _studentRegistrationContext;
+    final registrationContextValid =
+        registrationContext != null &&
+        registrationContext.hasValidIds &&
+        registrationContext.congregationId == congregationId &&
+        widget.scope.canAccessMinistry(registrationContext.congregationId);
+    if (widget.router.route == '/ministry/students/register' &&
+        !registrationContextValid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.router.route == '/ministry/students/register') {
+          widget.router.go('/register');
+        }
+      });
+      return const Center(child: Text('Cadastro de aluno indisponível.'));
+    }
     if (!widget.scope.isMinistrySupervision &&
         widget.router.route != '/ministry' &&
         !scopedActionsEnabled) {
@@ -680,7 +697,19 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         repository: browser,
         congregationId: congregationId,
         onOpenHandoff: () => widget.router.go('/ministry/handoff'),
+        onRegister: () => _openStudentRegistration(congregationId),
       ),
+      '/ministry/students/register'
+          when scopedActionsEnabled && registrationContextValid =>
+        StudentRegistrationPage(
+          key: ValueKey(
+            'ministry-student-register:${registrationContext!.congregationId}',
+          ),
+          repository: ministry,
+          congregationId: registrationContext.congregationId,
+          onCancel: _returnFromStudentRegistration,
+          onSaved: (_) => _returnFromStudentRegistration(),
+        ),
       '/ministry/classes' when scopedActionsEnabled => ClassesPage(
         key: ValueKey('ministry-classes:$congregationId'),
         repository: browser,
@@ -706,5 +735,44 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         child: Text('Selecione uma congregação autorizada antes de continuar.'),
       ),
     };
+  }
+
+  void _openStudentRegistration(String? congregationId) {
+    if (congregationId == null ||
+        !widget.scope.canAccessMinistry(congregationId)) {
+      return;
+    }
+    setState(() {
+      _studentRegistrationContext = MinistryRouteContext(
+        congregationId: congregationId,
+        returnTo: MinistryReturnRoute.students,
+      );
+    });
+    widget.router.go('/ministry/students/register');
+  }
+
+  Future<void> _returnFromStudentRegistration() async {
+    final savedContext = _studentRegistrationContext;
+    if (mounted) setState(() => _studentRegistrationContext = null);
+    if (savedContext == null || !savedContext.hasValidIds) {
+      widget.router.go('/register');
+      return;
+    }
+    try {
+      await widget.router.revalidate();
+      await widget.router.ensureValidated();
+    } catch (_) {
+      widget.router.go('/register');
+      return;
+    }
+    final scope = widget.router.scope;
+    final target = savedContext.returnTo.path;
+    if (scope != null &&
+        scope.canAccessMinistry(savedContext.congregationId) &&
+        widget.router.allowedRoutes.contains(target)) {
+      widget.router.go(target);
+    } else {
+      widget.router.go('/register');
+    }
   }
 }

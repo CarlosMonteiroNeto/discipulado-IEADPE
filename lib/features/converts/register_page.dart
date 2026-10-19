@@ -43,7 +43,7 @@ class _RegisterPageState extends State<RegisterPage> {
     _save = ConvertSaveController(
       gateway: widget.converts.gateway,
       photos: widget.photos,
-      convertId: widget.initial?.id,
+      initial: widget.initial,
     );
     if (widget.initial?.photoAssetId != null) _loadPhoto();
   }

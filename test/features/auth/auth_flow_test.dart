@@ -179,8 +179,45 @@ void main() {
     expect(routesFor(campaign), contains('/converts'));
     expect(routesFor(campaign), isNot(contains('/ministry')));
     expect(routesFor(ministry), contains('/ministry'));
+    expect(routesFor(ministry), contains('/ministry/students/register'));
     expect(routesFor(ministry), isNot(contains('/converts')));
+    expect(routesFor(campaign), isNot(contains('/ministry/students/register')));
+    expect(
+      safeRoute('/ministry/students/register'),
+      '/ministry/students/register',
+    );
   });
+  test(
+    'student registration route requires an authorized ministry scope',
+    () async {
+      final authorized = FakeAuth()
+        ..access = AccessScope(ministryCongregationIds: ['ministry-id']);
+      final allowed = SessionRouter(
+        authorized,
+        clearProtectedCaches: () {},
+        intendedRoute: '/ministry/students/register',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(allowed.route, '/ministry/students/register');
+      expect(allowed.allowedRoutes, contains('/ministry/students/register'));
+      allowed.dispose();
+      await authorized.events.close();
+
+      final denied = FakeAuth()
+        ..access = AccessScope(congregationIds: ['campaign']);
+      final rejected = SessionRouter(
+        denied,
+        clearProtectedCaches: () {},
+        intendedRoute: '/ministry/students/register',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(rejected.route, '/register');
+      rejected.go('/ministry/students/register');
+      expect(rejected.route, '/register');
+      rejected.dispose();
+      await denied.events.close();
+    },
+  );
   test('a campaign session cannot open a ministry deep link', () async {
     final auth = FakeAuth()
       ..access = AccessScope(congregationIds: ['campaign']);
