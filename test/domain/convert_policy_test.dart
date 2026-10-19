@@ -12,6 +12,9 @@ ConvertRecord record({
   bool active = false,
   int visits = 0,
   int? start,
+  DateOnly? followUp,
+  bool? effectiveActive,
+  DateOnly? effectiveStart,
   bool completed = false,
   bool deviated = false,
   DateTime? deleted,
@@ -30,6 +33,10 @@ ConvertRecord record({
   discipleshipStartDate: start == null
       ? null
       : DateOnly(2026, 1, 1).addDays(-start),
+  effectiveIsInDiscipleship: effectiveActive,
+  effectiveDiscipleshipStartDate: effectiveStart,
+  latestQualifyingLessonDate: followUp,
+  effectiveFollowUpDate: followUp,
   isDiscipleshipCompleted: completed,
   isDeviated: deviated,
   deletedAt: deleted,
@@ -91,6 +98,21 @@ void main() {
       ..['last_visit_date'] = '2026-01-01';
     expect(needsVisit(ConvertRecord.fromJson(json), today), false);
   });
+  test('a qualifying contact establishes initial contact and recurrence', () {
+    final contacted = ConvertRecord(
+      id: 'contacted',
+      internalId: 'contacted',
+      name: 'Synthetic',
+      landmark: 'Square',
+      gender: Gender.male,
+      conversionDate: DateOnly(2026, 1, 1).addDays(-20),
+      worshipType: worshipTypes.first,
+      lastVisitDate: DateOnly(2026, 1, 1).addDays(-6),
+      wasVisitedOnce: false,
+    );
+    expect(needsVisit(contacted, today), isFalse);
+    expect(needsVisit(contacted, DateOnly(2026, 1, 1).addDays(1)), isTrue);
+  });
   test('completion requires active known start at least ninety days', () {
     expect(
       canCompleteDiscipleship(record(active: true, start: 89), today),
@@ -103,6 +125,47 @@ void main() {
     expect(canCompleteDiscipleship(record(start: 100), today), false);
     expect(canCompleteDiscipleship(record(active: true), today), false);
   });
+  test(
+    'derived enrollment and lesson dates drive follow-up and completion',
+    () {
+      final lesson = DateOnly(2026, 1, 1).addDays(-6);
+      final present = record(followUp: lesson);
+      expect(needsVisit(present, today), isFalse);
+      expect(needsVisit(present, today.addDays(1)), isTrue);
+
+      final enrolled = record(
+        effectiveActive: true,
+        effectiveStart: DateOnly(2026, 1, 1).addDays(-90),
+        followUp: today.addDays(-29),
+      );
+      expect(needsVisit(enrolled, today), isFalse);
+      expect(needsVisit(enrolled, today.addDays(1)), isTrue);
+      expect(canCompleteDiscipleship(enrolled, today), isTrue);
+      expect(canStopDiscipleship(enrolled), isFalse);
+      expect(
+        canCompleteDiscipleship(
+          record(
+            effectiveActive: true,
+            effectiveStart: DateOnly(2026, 1, 1).addDays(-89),
+          ),
+          today,
+        ),
+        isFalse,
+      );
+      expect(
+        canCompleteDiscipleship(record(effectiveActive: true), today),
+        isFalse,
+      );
+      expect(
+        canCompleteDiscipleship(
+          record(start: 100, effectiveActive: true, effectiveStart: null),
+          today,
+        ),
+        isFalse,
+        reason: 'a stale raw start cannot replace the missing effective start',
+      );
+    },
+  );
   test(
     'deviation requires three visits and terminal records reject lifecycle',
     () {

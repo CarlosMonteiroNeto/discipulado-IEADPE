@@ -81,6 +81,10 @@ final class ConvertRecord {
     this.discipleshipStartDate,
     this.isDiscipleshipCompleted = false,
     this.isDeviated = false,
+    this.effectiveIsInDiscipleship,
+    this.effectiveDiscipleshipStartDate,
+    this.latestQualifyingLessonDate,
+    this.effectiveFollowUpDate,
     this.createdBy,
     this.createdAt,
     this.updatedAt,
@@ -111,6 +115,15 @@ final class ConvertRecord {
   final DateOnly? discipleshipStartDate;
   final bool isDiscipleshipCompleted;
   final bool isDeviated;
+
+  /// Server-derived active state; null only for non-projection local records.
+  final bool? effectiveIsInDiscipleship;
+  final DateOnly? effectiveDiscipleshipStartDate;
+  final DateOnly? latestQualifyingLessonDate;
+  final DateOnly? effectiveFollowUpDate;
+  bool get isEffectivelyInDiscipleship =>
+      effectiveIsInDiscipleship ?? isInDiscipleship;
+  DateOnly? get followUpDate => effectiveFollowUpDate ?? lastVisitDate;
   final String? createdBy;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -146,6 +159,17 @@ final class ConvertRecord {
     isDiscipleshipCompleted:
         json['is_discipleship_completed'] as bool? ?? false,
     isDeviated: json['is_deviated'] as bool? ?? false,
+    effectiveIsInDiscipleship: json['effective_is_in_discipleship'] as bool?,
+    effectiveDiscipleshipStartDate:
+        json['effective_discipleship_start_date'] == null
+        ? null
+        : DateOnly.parse(json['effective_discipleship_start_date'] as String),
+    latestQualifyingLessonDate: json['latest_qualifying_lesson_date'] == null
+        ? null
+        : DateOnly.parse(json['latest_qualifying_lesson_date'] as String),
+    effectiveFollowUpDate: json['effective_follow_up_date'] == null
+        ? null
+        : DateOnly.parse(json['effective_follow_up_date'] as String),
     createdBy: json['created_by'] as String?,
     createdAt: json['created_at'] == null
         ? null
@@ -191,6 +215,11 @@ final class ConvertRecord {
     'discipleship_start_date': discipleshipStartDate?.toString(),
     'is_discipleship_completed': isDiscipleshipCompleted,
     'is_deviated': isDeviated,
+    'effective_is_in_discipleship': effectiveIsInDiscipleship,
+    'effective_discipleship_start_date': effectiveDiscipleshipStartDate
+        ?.toString(),
+    'latest_qualifying_lesson_date': latestQualifyingLessonDate?.toString(),
+    'effective_follow_up_date': effectiveFollowUpDate?.toString(),
     'created_by': createdBy,
     'created_at': createdAt?.toIso8601String(),
     'updated_at': updatedAt?.toIso8601String(),

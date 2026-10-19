@@ -100,6 +100,66 @@ Cursor handling is RPC-specific. `ieadpe_ministry_list_congregations` uses a raw
 
 ## Proposed forward local target contract (P1/P2/P3/E1/E2)
 
+### F1 derived convert follow-up projection (plan-selected, exact local target)
+
+F1 extends the nested `convert` object returned by both
+`ieadpe_ministry_list_converts` (`items[]`) and
+`ieadpe_ministry_get_convert` (root object). The list and detail RPCs continue
+to use `private.ministry_convert_projection(source public.converts)` as their
+single projection owner; authorization, congregation filtering, canonical
+person join, cursor shape, and RPC request/result envelopes do not change.
+The projection adds these required keys inside `convert`:
+
+| Key | JSON type | Definition |
+| --- | --- | --- |
+| `effective_is_in_discipleship` | boolean | `source.is_in_discipleship OR EXISTS` an active `ministry_enrollments` row for the linked `ministry_students.person_id` in the same congregation. Referral/handoff links alone do not contribute. |
+| `effective_discipleship_start_date` | date string or null | Earliest currently qualifying start: the manual `discipleship_start_date` only while the manual `is_in_discipleship` flag is true, plus start dates of currently active same-congregation enrollments linked through the same canonical `person_id`. Null when neither source verifies a current start. |
+| `latest_qualifying_lesson_date` | date string or null | Maximum lesson date among same-person/same-congregation attendance rows marked `present` whose session is `finalized` and not canceled. This is a historical contact fact and remains eligible after enrollment closure; draft, absent, excused, unmarked, canceled, or foreign-scope rows never contribute. |
+| `effective_follow_up_date` | date string or null | Maximum of actual manual `last_visit_date` and `latest_qualifying_lesson_date`; it changes no visit counter, `was_visited_once`, visit event, or manual provenance. |
+
+The in-memory decoder requires these four keys and their exact types. Both list
+and detail decode through that same contract. Policy uses the effective
+discipleship boolean and follow-up date; an existing actual visit or qualifying
+presence establishes initial contact. The contact recurrence interval is one
+day before initial contact, seven days outside effective discipleship, and 30
+days during it. A qualifying lesson date is the session/lesson date, including
+when backdated, and the latest actual visit or lesson wins for recurrence.
+F1 updates the server-side `ieadpe_transition_convert` visit guard to use this
+same effective follow-up date, initial-contact evidence, and effective
+discipleship interval, so a recent qualifying presence or active enrollment
+cannot disagree with the client due rule. A visit still records only an actual
+visit: its counter, `last_visit_date`, event, authorization, and operation
+receipt behavior remain intact. Its `start` and `stop` actions change only the
+manual source. Starting is rejected when the effective state is already active;
+stopping never closes or alters an enrollment contribution.
+Backup import/export continues to preserve only the persisted manual visit and
+discipleship facts; server-derived attendance/enrollment values are not
+serialized as manual history.
+
+Completion remains an explicit/manual action. F1 updates
+`ieadpe_transition_convert` completion validation to require the effective
+discipleship state and a verified effective start at least 90 days old,
+including the current active same-scope enrollment contribution. If the
+effective state is inactive or no effective start is verified, completion is
+rejected. The transition keeps its current payload, event, revision, and
+operation-receipt semantics and does not fabricate or write a manual
+`discipleship_start_date`. Deviation remains explicit/manual and requires at
+least three actual visits; enrollment and attendance do not satisfy that
+count.
+
+Enrollment close/withdraw retains its row and removes only its active-state
+and active-start contributions. It does not erase historical finalized
+presence, manual visits, manual flags, or infer a terminal action. Session
+cancellation retains roster/attendance history but makes that session's
+presence ineligible. F1 allows cancellation of an already finalized session;
+only that session's contribution is removed from the derived projection.
+Existing `save_attendance` and `cancel_session` payloads, revision checks,
+actor authorization, per-class/session row locks, and operation-receipt replay
+are preserved. Finalization and cancellation serialize on the existing
+class/session locks; the final status follows commit order, and exact retries
+replay their original receipt. Same-scope person joins remain mandatory; no
+name matching or cross-congregation join is permitted.
+
 Sol/low reviewed the earlier interfaces and manifest at `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`, then re-reviewed the attribution correction and P1 manifest with zero critical, important, or minor findings. The correction preserves unknown canonical-person edit attribution as null for migrated rows. E2 adds the reviewed local access-candidate read and the contact-link state field described below; their implementation evidence and current review status are in the task manifest. These local contracts are not evidence of hosted Supabase state. P2/E1 retain their prior manifest dependencies. The P3 supplement remains governed by its own recorded review status in the execution ledger.
 
 ### Forward schema and ownership

@@ -24,6 +24,8 @@ ConvertRecord row(
   bool terminal = false,
   String? photo,
   bool discipleship = false,
+  bool? effectiveDiscipleship,
+  DateOnly? effectiveFollowUpDate,
   DateOnly? date,
   DateTime? created,
 }) => ConvertRecord(
@@ -38,6 +40,8 @@ ConvertRecord row(
   isDeviated: terminal,
   photoAssetId: photo,
   isInDiscipleship: discipleship,
+  effectiveIsInDiscipleship: effectiveDiscipleship,
+  effectiveFollowUpDate: effectiveFollowUpDate,
   wasVisitedOnce: discipleship,
   age: 0,
   createdAt: created,
@@ -123,6 +127,36 @@ void main() {
     }
   });
   final today = DateOnly(2026, 10, 15);
+  testWidgets('card uses projected contact date and enrollment state', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(360, 1200);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    await t.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ConvertCard(
+              record: row(
+                'enrolled',
+                effectiveDiscipleship: true,
+                effectiveFollowUpDate: today.addDays(-29),
+              ),
+              today: today,
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Em dia'), findsOneWidget);
+    expect(find.text('29 dias desde último contato'), findsOneWidget);
+    expect(find.text('Em Discipulado'), findsOneWidget);
+    expect(find.text('0 visitas'), findsOneWidget);
+    expect(find.text('Já visitado'), findsNothing);
+    expect(t.takeException(), isNull);
+  });
   test('Brazilian WhatsApp validates and prefixes domestic numbers', () {
     expect(
       brazilWhatsApp('(81) 99999-1234')?.toString(),

@@ -121,6 +121,10 @@ ConvertRecord decodeConvertProjection(Map<String, dynamic> row) {
     'discipleship_start_date',
     'is_discipleship_completed',
     'is_deviated',
+    'effective_is_in_discipleship',
+    'effective_discipleship_start_date',
+    'latest_qualifying_lesson_date',
+    'effective_follow_up_date',
     'created_by',
     'created_at',
     'updated_at',
@@ -128,7 +132,8 @@ ConvertRecord decodeConvertProjection(Map<String, dynamic> row) {
     'revision',
   };
   if (!_hasOnly(convert, convertKeys) ||
-      !convert.keys.toSet().containsAll(convertKeys)) {
+      !convert.keys.toSet().containsAll(convertKeys) ||
+      convert['effective_is_in_discipleship'] is! bool) {
     throw const FormatException();
   }
   final personId = convert['person_id'];

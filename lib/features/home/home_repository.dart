@@ -48,7 +48,7 @@ class HomeRepository {
       urgentVisits: rows
           .where((r) => visitState(r, today) == VisitState.urgent)
           .length,
-      inDiscipleship: rows.where((r) => r.isInDiscipleship).length,
+      inDiscipleship: rows.where((r) => r.isEffectivelyInDiscipleship).length,
       recent: recent.take(5).toList(),
     );
   }

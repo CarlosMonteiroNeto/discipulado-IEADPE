@@ -68,6 +68,26 @@ void main() {
       'six',
     });
   });
+  test('dashboard counts server-derived enrollment state', () async {
+    final today = DateOnly(2026, 10, 15);
+    final result = await HomeRepository(
+      RowsRepository(TestGateway(), [
+        row(
+          'enrolled-by-ministry',
+          effectiveDiscipleship: true,
+          effectiveFollowUpDate: today.addDays(-29),
+        ),
+        row(
+          'manual-inactive',
+          effectiveDiscipleship: false,
+          effectiveFollowUpDate: today.addDays(-7),
+        ),
+      ]),
+      now: () => DateTime.utc(2026, 10, 16, 1),
+    ).summary();
+    expect(result.inDiscipleship, 1);
+    expect(result.urgentVisits, 1);
+  });
   test('failed traversal never publishes fabricated empty summary', () async {
     final repository = RowsRepository(TestGateway(), [])..fail = true;
     await expectLater(

@@ -212,7 +212,7 @@ class _ConvertCardState extends State<ConvertCard> {
                   ),
                 ),
                 Text(
-                  '${widget.today.differenceInDays(record.lastVisitDate ?? record.conversionDate)} dias desde última visita',
+                  '${widget.today.differenceInDays(record.followUpDate ?? record.conversionDate)} dias desde último contato',
                   style: TextStyle(color: stripTextColor),
                 ),
               ],
@@ -427,7 +427,7 @@ class _ConvertCardState extends State<ConvertCard> {
                   spacing: 8,
                   runSpacing: 6,
                   children: [
-                    if (record.isInDiscipleship)
+                    if (record.isEffectivelyInDiscipleship)
                       const Chip(label: Text('Em Discipulado')),
                     if (record.wasVisitedOnce)
                       const Chip(label: Text('Já visitado')),
