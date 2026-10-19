@@ -19,6 +19,7 @@ class ClassEnrollmentPanel extends StatefulWidget {
     required this.classStartDate,
     required this.classEndDate,
     required this.onChanged,
+    this.now,
   });
 
   final MinistryRepository repository;
@@ -27,6 +28,7 @@ class ClassEnrollmentPanel extends StatefulWidget {
   final String classStartDate;
   final String? classEndDate;
   final VoidCallback onChanged;
+  final DateTime Function()? now;
 
   @override
   State<ClassEnrollmentPanel> createState() => _ClassEnrollmentPanelState();
@@ -42,11 +44,11 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
   bool _searching = false;
   bool _busy = false;
   String? _error;
-  String? _enrollSignature;
-  String? _enrollOperationId;
-  String? _enrollId;
-  String? _closeSignature;
-  String? _closeOperationId;
+  int _scopeGeneration = 0;
+  int _rosterGeneration = 0;
+  int _peopleSearchGeneration = 0;
+  _PendingEnrollment? _pendingEnrollment;
+  _PendingClose? _pendingClose;
 
   @override
   void initState() {
@@ -65,36 +67,38 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.congregationId != widget.congregationId ||
         oldWidget.classId != widget.classId) {
+      _scopeGeneration++;
+      _peopleSearchGeneration++;
+      _searching = false;
       _entries = const [];
       _people = const [];
       _selectedPersonId = null;
-      _enrollSignature = null;
-      _enrollOperationId = null;
-      _enrollId = null;
-      _closeSignature = null;
-      _closeOperationId = null;
+      _query.clear();
       _load();
     }
   }
 
   Future<void> _load() async {
+    final generation = ++_rosterGeneration;
+    final congregationId = widget.congregationId;
+    final classId = widget.classId;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final page = await widget.repository.listClassStudents(
-        congregationId: widget.congregationId,
-        classId: widget.classId,
+        congregationId: congregationId,
+        classId: classId,
         limit: 100,
       );
-      if (!mounted) return;
+      if (!mounted || generation != _rosterGeneration) return;
       setState(() {
         _entries = page.items;
         _loading = false;
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted || generation != _rosterGeneration) return;
       setState(() {
         _loading = false;
         _error = _message(error);
@@ -108,17 +112,23 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       setState(() => _error = 'Informe um nome para buscar pessoas.');
       return;
     }
+    final generation = ++_peopleSearchGeneration;
+    final congregationId = widget.congregationId;
     setState(() {
       _searching = true;
       _error = null;
     });
     try {
       final page = await widget.repository.listPeople(
-        congregationId: widget.congregationId,
+        congregationId: congregationId,
         namePrefix: query,
         limit: 50,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _peopleSearchGeneration ||
+          congregationId != widget.congregationId) {
+        return;
+      }
       setState(() {
         _people = page.items;
         _selectedPersonId = null;
@@ -126,7 +136,11 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
         if (page.items.isEmpty) _error = 'Nenhuma pessoa encontrada.';
       });
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _peopleSearchGeneration ||
+          congregationId != widget.congregationId) {
+        return;
+      }
       setState(() {
         _searching = false;
         _error = _message(error);
@@ -137,39 +151,69 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
   Future<void> _enroll() async {
     final personId = _selectedPersonId;
     if (_busy || personId == null) return;
+    if (_pendingClose != null) {
+      setState(() => _error = 'Confirme primeiro o encerramento pendente.');
+      return;
+    }
     final startDate = CalendarDate.parse(widget.classStartDate);
-    final signature = jsonEncode([
+    final signature = _PendingEnrollment.signatureFor(
       widget.congregationId,
       widget.classId,
       personId,
-      startDate.toString(),
-    ]);
-    if (_enrollSignature != signature) {
-      _enrollSignature = signature;
-      _enrollOperationId = _uuid.v4();
-      _enrollId = _uuid.v4();
+      startDate,
+    );
+    final pending = _pendingEnrollment;
+    if (pending != null && pending.signature != signature) {
+      setState(() {
+        _error =
+            'Confirme primeiro a matrícula pendente antes de iniciar outra.';
+      });
+      return;
     }
+    final request =
+        pending ??
+        _PendingEnrollment(
+          operationId: _uuid.v4(),
+          id: _uuid.v4(),
+          congregationId: widget.congregationId,
+          classId: widget.classId,
+          personId: personId,
+          startDate: startDate,
+        );
+    _pendingEnrollment ??= request;
+    await _submitEnrollment(request);
+  }
+
+  Future<void> _retryPendingEnrollment() async {
+    final pending = _pendingEnrollment;
+    if (pending == null || _busy) return;
+    await _submitEnrollment(pending);
+  }
+
+  Future<void> _submitEnrollment(_PendingEnrollment request) async {
+    if (_busy) return;
+    final scopeGeneration = _scopeGeneration;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await widget.repository.enrollStudent(
-        operationId: _enrollOperationId!,
-        id: _enrollId!,
-        congregationId: widget.congregationId,
-        classId: widget.classId,
-        personId: personId,
-        startDate: startDate,
+        operationId: request.operationId,
+        id: request.id,
+        congregationId: request.congregationId,
+        classId: request.classId,
+        personId: request.personId,
+        startDate: request.startDate,
       );
-      _enrollSignature = null;
-      _enrollOperationId = null;
-      _enrollId = null;
+      if (identical(_pendingEnrollment, request)) _pendingEnrollment = null;
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _selectedPersonId = null;
-        _people = const [];
+        if (scopeGeneration == _scopeGeneration) {
+          _selectedPersonId = null;
+          _people = const [];
+        }
       });
       widget.onChanged();
       await _load();
@@ -177,13 +221,18 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _message(error);
+        if (scopeGeneration == _scopeGeneration) _error = _message(error);
       });
     }
   }
 
   Future<void> _chooseClose(ClassStudentEntry entry) async {
     if (_busy) return;
+    if (_pendingEnrollment != null) {
+      setState(() => _error = 'Confirme primeiro a matrícula pendente.');
+      return;
+    }
+    final scopeGeneration = _scopeGeneration;
     final status = await showDialog<EnrollmentStatus>(
       context: context,
       builder: (context) => AlertDialog(
@@ -207,49 +256,84 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
         ],
       ),
     );
-    if (status != null && mounted) await _close(entry, status);
+    if (status != null && mounted && scopeGeneration == _scopeGeneration) {
+      await _close(entry, status);
+    }
   }
 
   Future<void> _close(ClassStudentEntry entry, EnrollmentStatus status) async {
+    if (_busy) return;
+    if (_pendingEnrollment != null) {
+      setState(() => _error = 'Confirme primeiro a matrícula pendente.');
+      return;
+    }
     final enrollment = entry.enrollment;
-    final today = DateTime.now();
-    final now = CalendarDate(today.year, today.month, today.day);
-    final start = enrollment.startDate;
+    final today = widget.now?.call() ?? DateTime.now();
+    final todayDate = CalendarDate(today.year, today.month, today.day);
+    final startDate = enrollment.startDate;
     final endBound = widget.classEndDate == null
         ? null
         : CalendarDate.parse(widget.classEndDate!);
-    final endDate = now.compareTo(start) < 0
-        ? start
-        : endBound != null && endBound.compareTo(now) < 0
+    final endDate = todayDate.compareTo(startDate) < 0
+        ? startDate
+        : endBound != null && endBound.compareTo(todayDate) < 0
         ? endBound
-        : now;
-    final signature = jsonEncode([
+        : todayDate;
+    final signature = _PendingClose.signatureFor(
       enrollment.id,
       widget.congregationId,
-      status.wire,
-      endDate.toString(),
+      status,
+      endDate,
+      startDate,
       enrollment.revision,
-    ]);
-    if (_closeSignature != signature) {
-      _closeSignature = signature;
-      _closeOperationId = _uuid.v4();
+    );
+    final pending = _pendingClose;
+    if (pending != null && pending.signature != signature) {
+      setState(() {
+        _error =
+            'Confirme primeiro o encerramento pendente antes de iniciar outro.';
+      });
+      return;
     }
+    final request =
+        pending ??
+        _PendingClose(
+          operationId: _uuid.v4(),
+          enrollmentId: enrollment.id,
+          congregationId: widget.congregationId,
+          status: status,
+          endDate: endDate,
+          startDate: startDate,
+          expectedRevision: enrollment.revision,
+        );
+    _pendingClose ??= request;
+    await _submitClose(request);
+  }
+
+  Future<void> _retryPendingClose() async {
+    final pending = _pendingClose;
+    if (pending == null || _busy) return;
+    await _submitClose(pending);
+  }
+
+  Future<void> _submitClose(_PendingClose request) async {
+    if (_busy) return;
+    final scopeGeneration = _scopeGeneration;
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
       await widget.repository.closeEnrollment(
-        operationId: _closeOperationId!,
-        enrollmentId: enrollment.id,
-        congregationId: widget.congregationId,
-        status: status,
-        endDate: endDate,
-        startDate: start,
-        expectedRevision: enrollment.revision,
+        operationId: request.operationId,
+        enrollmentId: request.enrollmentId,
+        congregationId: request.congregationId,
+        status: request.status,
+        endDate: request.endDate,
+        startDate: request.startDate,
+        expectedRevision: request.expectedRevision,
       );
-      _closeSignature = null;
-      _closeOperationId = null;
+      if (identical(_pendingClose, request)) _pendingClose = null;
       if (!mounted) return;
       setState(() => _busy = false);
       widget.onChanged();
@@ -258,7 +342,7 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       if (!mounted) return;
       setState(() {
         _busy = false;
-        _error = _message(error);
+        if (scopeGeneration == _scopeGeneration) _error = _message(error);
       });
     }
   }
@@ -370,6 +454,18 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
           Text(_error!, style: const TextStyle(color: UnifiedColors.error)),
           TextButton(onPressed: _load, child: const Text('Atualizar')),
         ],
+        if (_pendingEnrollment != null)
+          TextButton(
+            key: const Key('retry-pending-enrollment'),
+            onPressed: _busy ? null : _retryPendingEnrollment,
+            child: const Text('Repetir matrícula pendente'),
+          ),
+        if (_pendingClose != null)
+          TextButton(
+            key: const Key('retry-pending-close'),
+            onPressed: _busy ? null : _retryPendingClose,
+            child: const Text('Repetir encerramento pendente'),
+          ),
         if (_busy)
           const Padding(
             padding: EdgeInsets.only(top: UnifiedSpace.x2),
@@ -380,4 +476,77 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       ],
     ),
   );
+}
+
+class _PendingEnrollment {
+  const _PendingEnrollment({
+    required this.operationId,
+    required this.id,
+    required this.congregationId,
+    required this.classId,
+    required this.personId,
+    required this.startDate,
+  });
+
+  final String operationId;
+  final String id;
+  final String congregationId;
+  final String classId;
+  final String personId;
+  final CalendarDate startDate;
+
+  String get signature =>
+      signatureFor(congregationId, classId, personId, startDate);
+
+  static String signatureFor(
+    String congregationId,
+    String classId,
+    String personId,
+    CalendarDate startDate,
+  ) => jsonEncode([congregationId, classId, personId, startDate.toString()]);
+}
+
+class _PendingClose {
+  const _PendingClose({
+    required this.operationId,
+    required this.enrollmentId,
+    required this.congregationId,
+    required this.status,
+    required this.endDate,
+    required this.startDate,
+    required this.expectedRevision,
+  });
+
+  final String operationId;
+  final String enrollmentId;
+  final String congregationId;
+  final EnrollmentStatus status;
+  final CalendarDate endDate;
+  final CalendarDate startDate;
+  final int expectedRevision;
+
+  String get signature => signatureFor(
+    enrollmentId,
+    congregationId,
+    status,
+    endDate,
+    startDate,
+    expectedRevision,
+  );
+
+  static String signatureFor(
+    String enrollmentId,
+    String congregationId,
+    EnrollmentStatus status,
+    CalendarDate endDate,
+    CalendarDate startDate,
+    int expectedRevision,
+  ) => jsonEncode([
+    enrollmentId,
+    congregationId,
+    status.name,
+    endDate.toString(),
+    startDate.toString(),
+    expectedRevision,
+  ]);
 }

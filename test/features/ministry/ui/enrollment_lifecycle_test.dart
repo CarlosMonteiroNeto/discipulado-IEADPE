@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
@@ -7,8 +9,11 @@ import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/features/ministry/ui/class_enrollment_panel.dart';
 
 const _scope = '33333333-3333-4333-8333-333333333333';
+const _otherScope = '99999999-9999-4999-8999-999999999998';
 const _classId = '22222222-2222-4222-8222-222222222222';
+const _otherClassId = '99999999-9999-4999-8999-999999999997';
 const _personId = '55555555-5555-4555-8555-555555555555';
+const _otherPersonId = '99999999-9999-4999-8999-999999999996';
 const _studentId = '66666666-6666-4666-8666-666666666666';
 const _enrollmentId = '77777777-7777-4777-8777-777777777777';
 const _actor = '88888888-8888-4888-8888-888888888888';
@@ -21,6 +26,69 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
   bool closed = false;
   bool loseNextEnrollmentResponse = false;
   bool loseNextCloseResponse = false;
+  Completer<Map<String, dynamic>>? delayedPeopleResponse;
+  Completer<Map<String, dynamic>>? delayedRosterResponse;
+
+  Map<String, dynamic> _peopleResponse(String scope, String name, String id) =>
+      {
+        'items': [
+          {
+            'id': id,
+            'congregation_id': scope,
+            'name': name,
+            'normalized_name': name.toLowerCase(),
+            'phone': null,
+            'birth_date': null,
+            'address': null,
+            'person_revision': 1,
+          },
+        ],
+        'next_cursor': null,
+      };
+
+  Map<String, dynamic> _rosterResponse({bool includeEnrollment = false}) => {
+    'items': includeEnrollment
+        ? [
+            {
+              'student': {
+                'id': _studentId,
+                'person_id': _personId,
+                'person_revision': 1,
+                'congregation_id': _scope,
+                'name': 'Pessoa Exemplo',
+                'normalized_name': 'pessoa exemplo',
+                'phone_e164': null,
+                'birth_date': null,
+                'address': null,
+                'education': null,
+                'marital_status': null,
+                'new_convert': null,
+                'water_baptized': null,
+                'wants_baptism': null,
+                'archived_at': null,
+                'revision': 1,
+                'created_at': '2026-10-19T00:00:00Z',
+                'updated_at': '2026-10-19T00:00:00Z',
+                'updated_by': _actor,
+              },
+              'enrollment': {
+                'id': _enrollmentId,
+                'congregation_id': _scope,
+                'student_id': _studentId,
+                'class_id': _classId,
+                'start_date': '2026-10-01',
+                'end_date': null,
+                'status': 'active',
+                'revision': 1,
+                'created_at': '2026-10-19T00:00:00Z',
+                'updated_at': '2026-10-19T00:00:00Z',
+                'updated_by': _actor,
+              },
+            },
+          ]
+        : [],
+    'next_cursor': null,
+  };
 
   @override
   final boundary = ProtectedDataBoundary();
@@ -41,67 +109,25 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
   }) async {
     ensureCurrent(context);
     if (rpc == 'ministry_list_people') {
-      return {
-        'items': [
-          {
-            'id': _personId,
-            'congregation_id': _scope,
-            'name': 'Pessoa Exemplo',
-            'normalized_name': 'pessoa exemplo',
-            'phone': null,
-            'birth_date': null,
-            'address': null,
-            'person_revision': 1,
-          },
-        ],
-        'next_cursor': null,
-      };
+      final delayed = delayedPeopleResponse;
+      if (delayed != null) {
+        delayedPeopleResponse = null;
+        return delayed.future;
+      }
+      return parameters['congregation_id'] == _otherScope
+          ? _peopleResponse(_otherScope, 'Outra Pessoa', _otherPersonId)
+          : parameters['name_prefix'] == 'Outra'
+          ? _peopleResponse(_scope, 'Outra Pessoa', _otherPersonId)
+          : _peopleResponse(_scope, 'Pessoa Exemplo', _personId);
     }
     if (rpc == 'ministry_list_class_students') {
       reads++;
-      return {
-        'items': enrolled && !closed
-            ? [
-                {
-                  'student': {
-                    'id': _studentId,
-                    'person_id': _personId,
-                    'person_revision': 1,
-                    'congregation_id': _scope,
-                    'name': 'Pessoa Exemplo',
-                    'normalized_name': 'pessoa exemplo',
-                    'phone_e164': null,
-                    'birth_date': null,
-                    'address': null,
-                    'education': null,
-                    'marital_status': null,
-                    'new_convert': null,
-                    'water_baptized': null,
-                    'wants_baptism': null,
-                    'archived_at': null,
-                    'revision': 1,
-                    'created_at': '2026-10-19T00:00:00Z',
-                    'updated_at': '2026-10-19T00:00:00Z',
-                    'updated_by': _actor,
-                  },
-                  'enrollment': {
-                    'id': _enrollmentId,
-                    'congregation_id': _scope,
-                    'student_id': _studentId,
-                    'class_id': _classId,
-                    'start_date': '2026-10-01',
-                    'end_date': null,
-                    'status': 'active',
-                    'revision': 1,
-                    'created_at': '2026-10-19T00:00:00Z',
-                    'updated_at': '2026-10-19T00:00:00Z',
-                    'updated_by': _actor,
-                  },
-                },
-              ]
-            : [],
-        'next_cursor': null,
-      };
+      final delayed = delayedRosterResponse;
+      if (delayed != null) {
+        delayedRosterResponse = null;
+        return delayed.future;
+      }
+      return _rosterResponse(includeEnrollment: enrolled && !closed);
     }
     throw UnimplementedError(rpc);
   }
@@ -301,6 +327,61 @@ void main() {
     expect(gateway.calls[1].payload, gateway.calls[0].payload);
   });
 
+  testWidgets('person changes cannot replace an unresolved enrollment', (
+    tester,
+  ) async {
+    final gateway = _EnrollmentGateway()..loseNextEnrollmentResponse = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClassEnrollmentPanel(
+            key: const ValueKey('enrollment-panel'),
+            repository: MinistryRepository(gateway),
+            congregationId: _scope,
+            classId: _classId,
+            classStartDate: '2026-10-01',
+            classEndDate: null,
+            onChanged: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Pessoa',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enrollment-person-search')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pessoa Exemplo').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enroll-person-button')));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(1));
+
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Outra',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enrollment-person-search')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Outra Pessoa').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enroll-person-button')));
+    await tester.pumpAndSettle();
+
+    expect(gateway.calls, hasLength(1));
+    await tester.tap(find.byKey(const Key('retry-pending-enrollment')));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(2));
+    expect(gateway.calls[1].operationId, gateway.calls[0].operationId);
+    expect(gateway.calls[1].payload, gateway.calls[0].payload);
+  });
+
   testWidgets('replays the same close command after a lost response', (
     tester,
   ) async {
@@ -336,5 +417,181 @@ void main() {
     expect(gateway.calls, hasLength(2));
     expect(gateway.calls[1].operationId, gateway.calls[0].operationId);
     expect(gateway.calls[1].payload, gateway.calls[0].payload);
+  });
+
+  testWidgets('status changes cannot replace an unresolved close command', (
+    tester,
+  ) async {
+    final gateway = _EnrollmentGateway()
+      ..enrolled = true
+      ..loseNextCloseResponse = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClassEnrollmentPanel(
+            repository: MinistryRepository(gateway),
+            congregationId: _scope,
+            classId: _classId,
+            classStartDate: '2026-10-01',
+            classEndDate: null,
+            onChanged: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Registrar desistência'));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(1));
+
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Concluir participação'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.calls, hasLength(1));
+    await tester.tap(find.byKey(const Key('retry-pending-close')));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(2));
+    expect(gateway.calls[1].operationId, gateway.calls[0].operationId);
+    expect(gateway.calls[1].payload, gateway.calls[0].payload);
+    expect(gateway.calls[1].payload['status'], 'withdrawn');
+  });
+
+  testWidgets('close date changes cannot replace an unresolved payload', (
+    tester,
+  ) async {
+    var currentTime = DateTime(2026, 10, 19, 12);
+    final gateway = _EnrollmentGateway()
+      ..enrolled = true
+      ..loseNextCloseResponse = true;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClassEnrollmentPanel(
+            repository: MinistryRepository(gateway),
+            congregationId: _scope,
+            classId: _classId,
+            classStartDate: '2026-10-01',
+            classEndDate: null,
+            now: () => currentTime,
+            onChanged: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Registrar desistência'));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(1));
+
+    currentTime = currentTime.add(const Duration(days: 1));
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Registrar desistência'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.calls, hasLength(1));
+    await tester.tap(find.byKey(const Key('retry-pending-close')));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(2));
+    expect(gateway.calls[1].operationId, gateway.calls[0].operationId);
+    expect(gateway.calls[1].payload, gateway.calls[0].payload);
+  });
+
+  testWidgets('old roster response is discarded after scope and class change', (
+    tester,
+  ) async {
+    final oldRoster = Completer<Map<String, dynamic>>();
+    final gateway = _EnrollmentGateway()..delayedRosterResponse = oldRoster;
+    Widget panel(String scope, String classId) => MaterialApp(
+      home: Scaffold(
+        body: ClassEnrollmentPanel(
+          key: const ValueKey('enrollment-panel'),
+          repository: MinistryRepository(gateway),
+          congregationId: scope,
+          classId: classId,
+          classStartDate: '2026-10-01',
+          classEndDate: null,
+          onChanged: () {},
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(panel(_scope, _classId));
+    await tester.pumpWidget(panel(_otherScope, _otherClassId));
+    await tester.pump();
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('enrollment-search-button')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    expect(find.text('Nenhum aluno matriculado nesta turma.'), findsOneWidget);
+    oldRoster.complete(gateway._rosterResponse(includeEnrollment: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Pessoa Exemplo'), findsNothing);
+  });
+
+  testWidgets('old people search is discarded and new search can finish', (
+    tester,
+  ) async {
+    final gateway = _EnrollmentGateway();
+    Widget panel(String scope, String classId) => MaterialApp(
+      home: Scaffold(
+        body: ClassEnrollmentPanel(
+          key: const ValueKey('enrollment-panel'),
+          repository: MinistryRepository(gateway),
+          congregationId: scope,
+          classId: classId,
+          classStartDate: '2026-10-01',
+          classEndDate: null,
+          onChanged: () {},
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(panel(_scope, _classId));
+    await tester.pumpAndSettle();
+    final oldPeople = Completer<Map<String, dynamic>>();
+    gateway.delayedPeopleResponse = oldPeople;
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Pessoa',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pump();
+
+    await tester.pumpWidget(panel(_otherScope, _otherClassId));
+    await tester.pump();
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('enrollment-search-button')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Outra',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('enrollment-person-search')), findsOneWidget);
+    oldPeople.complete(
+      gateway._peopleResponse(_scope, 'Pessoa Exemplo', _personId),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enrollment-person-search')));
+    await tester.pumpAndSettle();
+    expect(find.text('Outra Pessoa'), findsWidgets);
+    expect(find.text('Pessoa Exemplo'), findsNothing);
   });
 }
