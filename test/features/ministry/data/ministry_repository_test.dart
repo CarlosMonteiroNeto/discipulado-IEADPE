@@ -13,6 +13,93 @@ const _op = '33333333-3333-4333-8333-333333333333';
 const _id = '11111111-1111-4111-8111-111111111111';
 const _scope = '22222222-2222-4222-8222-222222222222';
 const _person = '44444444-4444-4444-8444-444444444444';
+const _sessionCongregationId = '55555555-5555-4555-8555-555555555555';
+const _sessionClassId = '66666666-6666-4666-8666-666666666666';
+const _sessionId = '77777777-7777-4777-8777-777777777777';
+const _sessionOperationId = '88888888-8888-4888-8888-888888888888';
+
+class _RecordedMinistryCall {
+  const _RecordedMinistryCall(this.name, this.operationId, this.payload);
+  final String name;
+  final String operationId;
+  final Map<String, Object?> payload;
+}
+
+class _ClassSessionGateway implements ReadRpcGateway, MinistryCommandGateway {
+  _ClassSessionGateway(this.response);
+
+  final Map<String, dynamic> response;
+  final boundary = ProtectedDataBoundary();
+  final calls = <_RecordedMinistryCall>[];
+
+  @override
+  String get context => boundary.generation;
+
+  @override
+  void ensureCurrent(String context) {
+    if (context != this.context) throw const DataFailure('stale');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> read(
+    String table, {
+    required String context,
+    String? afterId,
+    Map<String, Object> equals = const {},
+    String? name,
+    bool excludeDeleted = false,
+  }) async => [];
+
+  @override
+  Future<MutationResult<String>> command(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  }) async {
+    ensureCurrent(context);
+    calls.add(_RecordedMinistryCall(rpc, '', Map.of(parameters)));
+    return response;
+  }
+
+  @override
+  Future<Map<String, dynamic>> ministryCommand(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    calls.add(_RecordedMinistryCall(command, operationId, Map.of(payload)));
+    return {'id': payload['id'], 'revision': 2};
+  }
+
+  @override
+  Future<Map<String, dynamic>> linkStudentPerson(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => throw UnimplementedError();
+}
+
+Map<String, dynamic> _classSessionWire() => {
+  'items': [
+    for (final status in ['open', 'finalized', 'canceled'])
+      {
+        'id': _sessionId,
+        'class_id': _sessionClassId,
+        'congregation_id': _sessionCongregationId,
+        'date': '2099-01-10',
+        'topic': null,
+        'status': status,
+        'revision': 1,
+      },
+  ],
+  'next_cursor': null,
+};
 
 Future<void> _respond(HttpRequest request, Object value) async {
   request.response.headers.contentType = ContentType.json;
@@ -1518,5 +1605,145 @@ void main() {
     expect(active.student.personRevision, 4);
     expect(active.student.revision, 7);
     expect(active.enrollment.status.name, 'active');
+  });
+
+  test('class sessions decode all statuses and future dates', () {
+    final wire = _classSessionWire();
+    final page = decodeClassSessions(
+      wire,
+      congregationId: _sessionCongregationId,
+      classId: _sessionClassId,
+    );
+    expect(page.items.map((session) => session.status.wire), [
+      'open',
+      'finalized',
+      'canceled',
+    ]);
+    expect(page.items.first.date.toString(), '2099-01-10');
+    expect(page.items.first.revision, 1);
+    expect(page.nextCursor, isNull);
+  });
+
+  test('class sessions reject foreign item and invalid wire data', () async {
+    Map<String, dynamic> responseWith({
+      String? id,
+      String? congregationId,
+      String? classId,
+      String? date,
+      String? status,
+      Object? revision,
+      bool includeRevision = true,
+      bool addUnexpected = false,
+      bool omitCursor = false,
+      bool addUnknownPageKey = false,
+    }) {
+      final item = Map<String, dynamic>.from(
+        (_classSessionWire()['items'] as List).first as Map,
+      );
+      if (id != null) item['id'] = id;
+      if (congregationId != null) item['congregation_id'] = congregationId;
+      if (classId != null) item['class_id'] = classId;
+      if (date != null) item['date'] = date;
+      if (status != null) item['status'] = status;
+      if (includeRevision) item['revision'] = revision ?? 1;
+      if (addUnexpected) item['role'] = 'teacher';
+      if (!includeRevision) item.remove('revision');
+      final response = <String, dynamic>{
+        'items': [item],
+      };
+      if (!omitCursor) response['next_cursor'] = null;
+      if (addUnknownPageKey) response['role'] = 'teacher';
+      return response;
+    }
+
+    final invalidResponses = [
+      responseWith(omitCursor: true),
+      responseWith(addUnknownPageKey: true),
+      responseWith(addUnexpected: true),
+      responseWith(id: 'not-a-uuid'),
+      responseWith(congregationId: _scope),
+      responseWith(classId: _id),
+      responseWith(date: '2099-02-30'),
+      responseWith(status: 'scheduled'),
+      responseWith(revision: 0),
+      responseWith(includeRevision: false),
+    ];
+    for (final response in invalidResponses) {
+      final repository = MinistryRepository(_ClassSessionGateway(response));
+      await expectLater(
+        repository.listClassSessions(
+          congregationId: _sessionCongregationId,
+          classId: _sessionClassId,
+        ),
+        throwsA(
+          isA<DataFailure>().having(
+            (error) => error.code,
+            'code',
+            'invalid_response',
+          ),
+        ),
+      );
+    }
+  });
+
+  test('session mutations preserve exact envelope', () async {
+    final gateway = _ClassSessionGateway(_classSessionWire());
+    final repository = MinistryRepository(gateway);
+    final calls = gateway.calls;
+
+    await repository.listClassSessions(
+      congregationId: _sessionCongregationId,
+      classId: _sessionClassId,
+    );
+    expect(calls.last.name, 'ministry_list_class_sessions');
+    expect(calls.last.payload, {
+      'congregation_id': _sessionCongregationId,
+      'class_id': _sessionClassId,
+      'limit': 50,
+      'cursor': null,
+    });
+    await expectLater(
+      repository.listClassSessions(
+        congregationId: _sessionCongregationId,
+        classId: _sessionClassId,
+        limit: 101,
+      ),
+      throwsA(
+        isA<DataFailure>().having((error) => error.code, 'code', 'invalid'),
+      ),
+    );
+    expect(calls.length, 1);
+
+    await repository.createSession(
+      operationId: _sessionOperationId,
+      id: _sessionId,
+      congregationId: _sessionCongregationId,
+      classId: _sessionClassId,
+      date: CalendarDate.parse('2026-12-20'),
+      topic: null,
+    );
+    expect(calls.last.name, 'create_session');
+    expect(calls.last.operationId, _sessionOperationId);
+    expect(calls.last.payload, {
+      'id': _sessionId,
+      'congregation_id': _sessionCongregationId,
+      'class_id': _sessionClassId,
+      'date': '2026-12-20',
+      'topic': null,
+    });
+
+    await repository.cancelSession(
+      operationId: _sessionOperationId,
+      id: _sessionId,
+      congregationId: _sessionCongregationId,
+      expectedRevision: 7,
+    );
+    expect(calls.last.name, 'cancel_session');
+    expect(calls.last.operationId, _sessionOperationId);
+    expect(calls.last.payload, {
+      'id': _sessionId,
+      'congregation_id': _sessionCongregationId,
+      'expected_revision': 7,
+    });
   });
 }

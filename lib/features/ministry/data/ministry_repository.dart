@@ -999,6 +999,76 @@ class MinistryRepository {
     }
   }
 
+  Future<MinistryPage<MinistrySessionSummary>> listClassSessions({
+    required String congregationId,
+    required String classId,
+    int limit = 50,
+    String? cursor,
+  }) async {
+    _uuid(congregationId);
+    _uuid(classId);
+    _page(limit, cursor);
+    final result = await _read('ministry_list_class_sessions', {
+      'congregation_id': congregationId,
+      'class_id': classId,
+      'limit': limit,
+      'cursor': cursor,
+    });
+    try {
+      return decodeClassSessions(
+        result,
+        congregationId: congregationId,
+        classId: classId,
+      );
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryCommandResult> createSession({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required String classId,
+    required CalendarDate date,
+    required String? topic,
+  }) {
+    _uuid(id);
+    _uuid(congregationId);
+    _uuid(classId);
+    return command(
+      name: 'create_session',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'class_id': classId,
+        'date': date.toString(),
+        'topic': topic,
+      },
+    );
+  }
+
+  Future<MinistryCommandResult> cancelSession({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required int expectedRevision,
+  }) {
+    _uuid(id);
+    _uuid(congregationId);
+    if (expectedRevision < 1) throw const DataFailure('invalid');
+    return command(
+      name: 'cancel_session',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'expected_revision': expectedRevision,
+      },
+    );
+  }
+
   Future<MinistryCommandResult> command({
     required String name,
     required String operationId,

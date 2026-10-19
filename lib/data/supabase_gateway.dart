@@ -531,6 +531,12 @@ class SupabaseGateway
         'limit',
         'cursor',
       },
+      'ministry_list_class_sessions': {
+        'congregation_id',
+        'class_id',
+        'limit',
+        'cursor',
+      },
       'ministry_get_session_attendance': {'congregation_id', 'session_id'},
       'ministry_get_enrollment_progress': {'congregation_id', 'enrollment_id'},
       'ministry_get_overview': {'congregation_id'},
@@ -578,6 +584,12 @@ class SupabaseGateway
       },
       'ministry_list_students': {'congregation_id', 'limit'},
       'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
+      'ministry_list_class_sessions': {
+        'congregation_id',
+        'class_id',
+        'limit',
+        'cursor',
+      },
     };
     final required = requiredReadKeys[rpc];
     if (required != null && !parameters.keys.toSet().containsAll(required)) {

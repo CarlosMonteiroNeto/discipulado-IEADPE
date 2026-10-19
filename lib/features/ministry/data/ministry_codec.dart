@@ -139,6 +139,26 @@ class PendingMinistrySession {
   final String? topic;
 }
 
+class MinistrySessionSummary {
+  const MinistrySessionSummary({
+    required this.id,
+    required this.classId,
+    required this.congregationId,
+    required this.date,
+    required this.topic,
+    required this.status,
+    required this.revision,
+  });
+
+  final String id;
+  final String classId;
+  final String congregationId;
+  final CalendarDate date;
+  final String? topic;
+  final SessionStatus status;
+  final int revision;
+}
+
 MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
   final json = _object(raw);
   _keys(json, {'items', 'next_cursor'});
@@ -713,6 +733,58 @@ MinistryPage<PendingMinistrySession> decodePendingSessions(Object? raw) {
           date: CalendarDate.parse(_text(row['date'])),
           topic: _optionalText(row['topic']),
         );
+      })
+      .toList(growable: false);
+  return MinistryPage(
+    items: List.unmodifiable(decoded),
+    nextCursor: _optionalText(json['next_cursor']),
+  );
+}
+
+MinistryPage<MinistrySessionSummary> decodeClassSessions(
+  Map<String, dynamic> json, {
+  required String congregationId,
+  required String classId,
+}) {
+  _exactKeys(json, {'items', 'next_cursor'});
+  final items = json['items'];
+  if (items is! List || items.length > 100) _invalid();
+  final decoded = items
+      .map((item) {
+        final row = _object(item);
+        _exactKeys(row, {
+          'id',
+          'class_id',
+          'congregation_id',
+          'date',
+          'topic',
+          'status',
+          'revision',
+        });
+        final rowClassId = _uuid(row['class_id']);
+        final rowCongregationId = _uuid(row['congregation_id']);
+        final revision = row['revision'];
+        if (rowClassId != classId ||
+            rowCongregationId != congregationId ||
+            revision is! int ||
+            revision < 1) {
+          _invalid();
+        }
+        final status = _text(row['status']);
+        final topic = _optionalText(row['topic']);
+        try {
+          return MinistrySessionSummary(
+            id: _uuid(row['id']),
+            classId: rowClassId,
+            congregationId: rowCongregationId,
+            date: CalendarDate.parse(_text(row['date'])),
+            topic: topic,
+            status: SessionStatus.fromWire(status),
+            revision: revision,
+          );
+        } on MinistryDataException {
+          _invalid();
+        }
       })
       .toList(growable: false);
   return MinistryPage(

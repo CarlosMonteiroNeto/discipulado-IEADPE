@@ -205,6 +205,65 @@ void main() {
     expect(requestCount, 1);
   });
 
+  test('class sessions gateway requires exact keys', () async {
+    var requestCount = 0;
+    final gateway = await fixture.fixture((request) async {
+      requestCount++;
+      expect(
+        request.uri.path,
+        '/rest/v1/rpc/ieadpe_ministry_list_class_sessions',
+      );
+      expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+        'request': {
+          'congregation_id': fixture.scopeId,
+          'class_id': fixture.id(2),
+          'limit': 50,
+          'cursor': null,
+        },
+      });
+      await fixture.respond(request, {'items': [], 'next_cursor': null});
+    });
+
+    await expectLater(
+      gateway.readRpc(
+        'ministry_list_class_sessions',
+        context: gateway.context,
+        parameters: {
+          'congregation_id': fixture.scopeId,
+          'class_id': fixture.id(2),
+          'limit': 50,
+        },
+      ),
+      throwsA(isA<DataFailure>()),
+    );
+    await expectLater(
+      gateway.readRpc(
+        'ministry_list_class_sessions',
+        context: gateway.context,
+        parameters: {
+          'congregation_id': fixture.scopeId,
+          'class_id': fixture.id(2),
+          'limit': 50,
+          'cursor': null,
+          'role': 'teacher',
+        },
+      ),
+      throwsA(isA<DataFailure>()),
+    );
+    final result = await gateway.readRpc(
+      'ministry_list_class_sessions',
+      context: gateway.context,
+      parameters: {
+        'congregation_id': fixture.scopeId,
+        'class_id': fixture.id(2),
+        'limit': 50,
+        'cursor': null,
+      },
+    );
+    expect(result, {'items': [], 'next_cursor': null});
+    expect(requestCount, 1);
+  });
+
   test(
     'linked contact commands reject malformed payloads and result envelopes',
     () async {
