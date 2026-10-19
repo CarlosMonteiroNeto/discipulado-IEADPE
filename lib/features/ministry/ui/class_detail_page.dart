@@ -10,6 +10,7 @@ import '../data/ministry_browser_repository.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
 import 'class_form.dart';
+import 'class_enrollment_panel.dart';
 
 class ClassDetailPage extends StatefulWidget {
   const ClassDetailPage({
@@ -239,6 +240,17 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                   ],
                 ),
               ),
+              if (_classSummary.status == ClassStatus.active) ...[
+                const SizedBox(height: UnifiedSpace.x3),
+                ClassEnrollmentPanel(
+                  repository: widget.repository,
+                  congregationId: widget.congregationId,
+                  classId: _classSummary.id,
+                  classStartDate: _classSummary.startDate,
+                  classEndDate: _classSummary.endDate,
+                  onChanged: widget.onChanged,
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: UnifiedSpace.x3),
                 Base44Panel(

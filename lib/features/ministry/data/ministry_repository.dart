@@ -632,6 +632,40 @@ class MinistryRepository {
     }
   }
 
+  Future<MinistryCommandResult> closeEnrollment({
+    required String operationId,
+    required String enrollmentId,
+    required String congregationId,
+    required EnrollmentStatus status,
+    required CalendarDate endDate,
+    required CalendarDate startDate,
+    required int expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(enrollmentId);
+    _uuid(congregationId);
+    if (expectedRevision < 1 ||
+        status == EnrollmentStatus.active ||
+        endDate.compareTo(startDate) < 0) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'close_enrollment',
+      operationId: operationId,
+      payload: {
+        'id': enrollmentId,
+        'congregation_id': congregationId,
+        'status': status.wire,
+        'end_date': endDate.toString(),
+        'expected_revision': expectedRevision,
+      },
+    );
+    if (result.revision != expectedRevision + 1) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
   Future<MinistryPerson> getPerson({
     required String congregationId,
     required String personId,

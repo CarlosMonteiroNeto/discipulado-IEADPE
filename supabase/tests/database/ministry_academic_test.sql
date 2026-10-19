@@ -14,6 +14,8 @@ INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,star
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000040','94000000-0000-0000-0000-000000000002','Other Class','other class','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
+ VALUES('94000000-0000-0000-0000-000000000050','94000000-0000-0000-0000-000000000002','Empty Enrollment Class','empty enrollment class','2026-01-01','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000060','94000000-0000-0000-0000-000000000006','Academic B Class','academic b class','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_contacts(id,congregation_id,name,normalized_name,scope,role_code,updated_by,archived_at) VALUES
  ('94000000-0000-0000-0000-000000000100','94000000-0000-0000-0000-000000000002','Local Teacher','local teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
@@ -41,6 +43,8 @@ INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updat
  ('94000001-0000-0000-0000-000000000066','94000000-0000-0000-0000-000000000002','Lifecycle Learner','lifecycle learner','94000000-0000-0000-0000-000000000001'),
  ('94000001-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000006','Academic B Learner A','academic b learner a','94000000-0000-0000-0000-000000000001'),
  ('94000001-0000-0000-0000-000000000062','94000000-0000-0000-0000-000000000006','Academic B Learner B','academic b learner b','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by) VALUES
+ ('94000001-0000-0000-0000-000000000063','94000000-0000-0000-0000-000000000002','First Class Learner','first class learner','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_students(id,congregation_id,person_id,name,normalized_name,updated_by) VALUES
  ('94000000-0000-0000-0000-000000000004','94000000-0000-0000-0000-000000000002','94000001-0000-0000-0000-000000000004','Learner A','learner a','94000000-0000-0000-0000-000000000001'),
  ('94000000-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','94000001-0000-0000-0000-000000000005','Learner B','learner b','94000000-0000-0000-0000-000000000001'),
@@ -191,6 +195,22 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; 
  PERFORM pg_temp.assert_true(result=jsonb_build_object('id','94000000-0000-0000-0000-000000000011',
   'student_id','94000000-0000-0000-0000-000000000004','person_id','94000001-0000-0000-0000-000000000004',
   'revision',1,'student_revision',1),'enrollment returns both linked IDs and revisions');
+ replay:=public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000011',
+  '{"id":"94000000-0000-0000-0000-000000000011","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","person_id":"94000001-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
+ PERFORM pg_temp.assert_true(replay=result,'enrollment retry returns its exact receipt');
+ BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000011',
+  '{"id":"94000000-0000-0000-0000-000000000011","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","person_id":"94000001-0000-0000-0000-000000000005","start_date":"2026-01-01"}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: changed enrollment payload reused a receipt'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ result:=public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000074',
+  '{"id":"94000000-0000-0000-0000-000000000074","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000050","person_id":"94000001-0000-0000-0000-000000000063","start_date":"2026-01-01"}'::jsonb);
+ PERFORM pg_temp.assert_true(result->>'student_id' IS NOT NULL AND
+  (SELECT person_id='94000001-0000-0000-0000-000000000063' AND congregation_id='94000000-0000-0000-0000-000000000002'
+   FROM public.ministry_students WHERE id=(result->>'student_id')::uuid) AND
+  (SELECT count(*)=1 FROM public.ministry_enrollments WHERE class_id='94000000-0000-0000-0000-000000000050'),
+  'first enrollment in an empty class atomically creates a same-scope academic extension');
+ BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000075',
+  '{"id":"94000000-0000-0000-0000-000000000075","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000050","person_id":"94000001-0000-0000-0000-000000000061","start_date":"2026-01-01"}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: foreign congregation person enrolled'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000071',
   '{"id":"94000000-0000-0000-0000-000000000071","congregation_id":"94000000-0000-0000-0000-000000000006","class_id":"94000000-0000-0000-0000-000000000060","person_id":"94000001-0000-0000-0000-000000000062","start_date":"2026-01-01"}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: direction enrolled a student in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
@@ -239,6 +259,9 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; 
  result:=public.ieadpe_ministry_close_enrollment('94000000-0000-0000-0000-000000000019',
   '{"id":"94000000-0000-0000-0000-000000000014","congregation_id":"94000000-0000-0000-0000-000000000002","status":"completed","end_date":"2026-10-16","expected_revision":1}'::jsonb);
  PERFORM pg_temp.assert_true(result->>'revision'='2','close enrollment increments revision');
+ PERFORM pg_temp.assert_true((SELECT count(*)=1 AND bool_and(status='completed' AND end_date='2026-10-16')
+  FROM public.ministry_enrollments WHERE id='94000000-0000-0000-0000-000000000014'),
+  'closing enrollment preserves the historical row and records its end state');
  BEGIN PERFORM public.ieadpe_ministry_create_session('94000000-0000-0000-0000-000000000015',
   '{"id":"94000000-0000-0000-0000-000000000015","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","date":"2026-10-16","topic":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: duplicate class date session accepted'; EXCEPTION WHEN unique_violation THEN NULL; END;
