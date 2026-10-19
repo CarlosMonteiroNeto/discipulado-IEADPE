@@ -86,3 +86,9 @@ C1 policy defaults do not establish hosted state. Hosted migration/function/scop
 - Review: fresh `gpt-6.1-sol` / `low` review found zero Critical, Important, or Minor findings. Actual runtime metadata unavailable.
 - Checks: documentation-only gate; no tests. `git diff --check` is run before commit.
 - Dispatch: this review closes the long-name prerequisite for P2. Hosted state remains unknown.
+
+## P2 manifest correction — protected registration route
+
+- Finding: C1 requires `/ministry/students/register` in `lib/routing/router.dart`, allowed only to Ministry scope. The current allowlist omits it, so an unknown path falls back to `/register`; the P2 file list also omitted the router.
+- Ruling: add `lib/routing/router.dart` and a focused test in existing `test/features/auth/auth_flow_test.dart` to P2 scope. The reviewed C1 route contract is binding; the implementation stays limited to this route and preserves existing safe-route and scope rules. Cost if wrong: a small extra route/test change would need removal, but omitting it would leave the authorized student entry unreachable.
+- Review: fresh `gpt-6.1-sol` / `low` review found zero Critical, Important, or Minor issues. Actual runtime metadata unavailable. P2 implementation continued on independent files while this scope correction was reviewed.
