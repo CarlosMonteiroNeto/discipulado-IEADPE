@@ -1,15 +1,15 @@
 # Ministry completion contracts
 
-Status: C1 local evidence and policy were reviewed; this exact-interface follow-up is a draft pending Sol/low re-review. User direction on 2026-10-19 selects the plan recommendations below as implementation defaults; this does not certify source evidence or hosted state. Hosted schema, functions, grants, data, backups, and migration ledger are **unknown**.
+Status: C1 local evidence, policy, exact interfaces, and manifest were reviewed. Final Sol/low follow-up review found zero critical, important, or minor findings; reviewed SHA: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. User direction on 2026-10-19 selects the plan recommendations below as implementation defaults; this does not certify source evidence or hosted state. Hosted schema, functions, grants, data, backups, and migration ledger are **unknown**.
 
 ## Evidence labels and gate
 
 - **Confirmed local fact** means present in this checkout or inspected source revision. Main SQL evidence is migrations `202610140011`–`202610140018` and `202610180003_base44_unified_access.sql`; original Firebase source is Git revision `4acb563`; retained Base44 source is under `reference/base44/base44/`.
 - **Plan-confirmed requirement** means required by `docs/superpowers/specs/2026-10-18-ministry-production-completion-design.md` and the execution plan, not yet implemented or hosted.
 - **Plan-selected default** is an implementation policy selected by the user's 2026-10-19 direction to follow the plan; it is not an existing fact or claim about hosted behavior.
-- **Unresolved decision** must be settled before the affected implementation slice. The plan-selected policy defaults are closed; exact-interface review is still pending as noted below.
+- **Unresolved decision** must be settled before the affected implementation slice. The plan-selected policy defaults and exact-interface review gate are closed as noted below.
 
-The current local RPC envelopes below are preserved as evidence. The proposed forward target contracts below are not present locally or hosted. C1 follow-up review is required before the plan's next design slice, V1, and before P1/P2/E1; record the reviewed SHA. V1 consumes no backend RPC and does not depend on the proposed identity/access signatures, but it follows the reviewed C1 gate in plan order. Do not infer hosted signatures or state from these local contracts.
+The current local RPC envelopes below are preserved as evidence. The proposed forward target contracts below are not present locally or hosted. C1 exact-interface and manifest review passed with zero critical, important, or minor findings; reviewed follow-up SHA: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. V1 consumes no backend RPC and was completed after this gate. P1/P2/E1 use the reviewed interfaces in plan order. Do not infer hosted signatures or state from these local contracts.
 
 ## Table and field ownership
 
@@ -235,4 +235,4 @@ The first column records local behavior; the second is the product target. The u
 
 ## C1 policy disposition
 
-The user directed on 2026-10-19: “Follow the plan as written, including the models used at each stage.” The plan recommendations listed above are therefore selected implementation defaults, not assertions that the source behavior or hosted environment has been separately approved or verified. Canonical identity/cardinality, email and local contact-edit policy, atomic contact/access linkage and conflict handling, and manual-state/start-date precedence are closed as policy choices. The exact forward interfaces in this document still require Sol/low re-review; V1 and P1/P2/E1 cannot dispatch before that review and SHA are recorded. V1 consumes no backend RPC and has no dependency on the proposed identity/access signatures, but it remains after the C1 gate in plan order. Hosted state remains unknown and requires its separate read-only gate.
+The user directed on 2026-10-19: “Follow the plan as written, including the models used at each stage.” The plan recommendations listed above are therefore selected implementation defaults, not assertions that the source behavior or hosted environment has been separately approved or verified. Canonical identity/cardinality, email and local contact-edit policy, atomic contact/access linkage and conflict handling, and manual-state/start-date precedence are closed as policy choices. Sol/low approved the exact forward interfaces and manifest with zero critical, important, or minor findings in reviewed follow-up SHA `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. V1 and P1/P2/E1 follow this gate in plan order. V1 consumes no backend RPC and has no dependency on the proposed identity/access signatures. Hosted state remains unknown and requires its separate read-only gate.
