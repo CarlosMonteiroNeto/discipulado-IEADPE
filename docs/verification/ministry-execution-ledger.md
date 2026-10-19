@@ -17,7 +17,7 @@ Worktree: `codex/ministry-production-completion` at `C:/Users/Carlos_Neto/.codex
 
 ## Next gate
 
-C1 and V1 are committed and reviewed. V1 final Sol/low re-review found zero critical, important, or minor findings; reviewed commit: `e6160f9790419f4004834c07ef3d453ca5f1be02`. P1 is next and uses the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
+C1, V1, and the C1 attribution correction are committed and reviewed. V1 final Sol/low re-review found zero critical, important, or minor findings; reviewed commit: `e6160f9790419f4004834c07ef3d453ca5f1be02`. P1 is next and uses the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
 ## C1 — Reviewed local contract and plan-selected defaults
 
 - Base: `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; draft commit: `b748999de0c5b2fdc43dd9cd7c3efba9a474b6ca`.
@@ -31,7 +31,7 @@ C1 and V1 are committed and reviewed. V1 final Sol/low re-review found zero crit
 - Selected defaults: neutral canonical person with at most one convert profile and one student academic extension; no name-only or cross-congregation merge; ambiguous legacy rows stay preserved/unlinked. Directory-only email may be null. A linked contact email equals `user_access.user_email`; a bound assignment is effective only with the same confirmed Auth email. Local direction may edit other contact fields but not linked email. Global-manager reassignment requires the exact linked assignment ID and a confirmed target Auth email, then updates both email fields and the Auth UID atomically; conflicts fail closed, with no silent reuse or transfer. Global managers alone grant/revoke access. Active enrollment contributes effective discipleship, closure removes only that contribution, independent manual state remains effective, and the earliest evidenced qualifying start governs the 90-day completion guard; unknown start keeps completion unavailable.
 - Dispatch: C1 and V1 are reviewed clean and committed. P1 is next and may use the reviewed exact contracts. P2/P3/E1 follow their manifest dependencies. Keep hosted, Firebase-export, and device blockers below.
 - Local: no product code changed. This follow-up edits only `docs/integration/ministry-completion-contracts.md`, `docs/verification/ministry-task-manifest.md`, and this ledger; it preserves hosted RPC/schema/data as unknown. No hosted, Firebase export or Android/device action occurred.
-- Status correction after V1: replaced stale C1 review-pending wording in `docs/integration/ministry-completion-contracts.md` with the approved review result and SHA. No schema, policy, or RPC contract changed.
+- Status correction after V1: the earlier status edit did not remove all review-pending wording. P1 preflight found that nullable `converts.created_by` cannot establish a canonical-person last editor. The later reviewed correction below permits null `ministry_people.updated_by` for migrated rows with unknown attribution and requires authenticated saves to set the actual actor.
 
 ## V1 — Shared visual foundation
 
@@ -43,6 +43,15 @@ C1 and V1 are committed and reviewed. V1 final Sol/low re-review found zero crit
 - Visual evidence: 20 captures cover 360, 768, 1440, and 360 at 200% text, each with top/actions/loading/empty/error views. Captures use Flutter SDK Roboto and Material Icons. Implementer inspected all 20; primary review spot-checked the 360@200% action/error views, 768 actions, 1440 error, and 360@200% top. Evidence is synthetic widget output, not device capture.
 - Design inputs: `docs/integration/unified-design-system.md`; Superpowers workflow skills from `C:\Users\Carlos_Neto\.codex\worktrees\pipeline-consolidation\skills` at `858471dbd108caafa50c395a46ef2d1cecfe1148`, including brainstorming, test-driven-development, verification-before-completion, subagent-driven-development, and Apple Design.
 - Local/hosted: V1 makes no backend RPC or hosted change. Existing untracked user design, input-inventory, plan, and spec documents remain untouched. No personal data, Firebase export, hosted project, Android device, build, or install was used.
+
+## C1 follow-up — Legacy person attribution
+
+- Base: reviewed C1 exact-contract commit `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`; contract/manifest correction commit `f7bc88ae27dae8a4422753145e0df5f464620884`.
+- Finding: `converts.created_by` is nullable and records original convert creation, not the last editor of canonical identity fields. The local migration runner has no authenticated JWT actor. The reviewed target requires backfill to leave `ministry_people.updated_by` null; authenticated create/edit RPCs set `auth.uid()`. No Auth user or actor is synthesized.
+- Files: `docs/integration/ministry-completion-contracts.md`; `docs/verification/ministry-task-manifest.md`.
+- Review: requested `gpt-6.1-sol` / `low`; 0 critical, 0 important, 0 minor. Actual runtime metadata unavailable. Reviewed snapshot: `f7bc88ae27dae8a4422753145e0df5f464620884`.
+- Checks: `git diff --check` and `git diff --cached --check` passed. Documentation only; no tests or builds.
+- Local/hosted: no product code changed and no hosted query/write occurred. User-owned untracked planning/design documents remain untouched.
 
 ## Model/settings direction for each new slice
 
