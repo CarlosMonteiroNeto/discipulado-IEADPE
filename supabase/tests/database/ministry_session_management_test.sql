@@ -46,8 +46,9 @@ INSERT INTO public.ministry_attendance(id,congregation_id,session_id,enrollment_
 INSERT INTO public.ministry_sessions(id,congregation_id,class_id,session_date,status,updated_by)
  SELECT ('97000001-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'97000000-0000-0000-0000-000000000001','97000000-0000-0000-0000-000000000002',('2027-03-01'::date+n),CASE WHEN n%2=0 THEN 'open' ELSE 'canceled' END,'97000000-0000-0000-0000-000000000010' FROM generate_series(0,100) n;
 SELECT set_config('request.jwt.claim.sub','97000000-0000-0000-0000-000000000010',true);
-DO $$ DECLARE response jsonb; tail jsonb; all_items jsonb; BEGIN
+DO $$ DECLARE response jsonb; tail jsonb; all_items jsonb; class_page jsonb; other_resource_page jsonb; BEGIN
  response:=public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',100,'cursor',NULL));
+ class_page:=response;
  PERFORM pg_temp.assert_true((SELECT count(*)=2 FROM jsonb_object_keys(response)) AND jsonb_array_length(response->'items')=100 AND response->>'next_cursor' IS NOT NULL,'class session page is scoped and bounded');
  PERFORM pg_temp.assert_true(response->'items'->0->>'id'='97000000-0000-0000-0000-000000000020' AND response->'items'->0->>'revision'='1','page returns exact ordered keys and revision');
  PERFORM pg_temp.assert_true((SELECT bool_and(item ?& ARRAY['id','class_id','congregation_id','date','topic','status','revision'] AND item-ARRAY['id','class_id','congregation_id','date','topic','status','revision']='{}'::jsonb) FROM jsonb_array_elements(response->'items') item),'item exact keys');
@@ -61,13 +62,23 @@ DO $$ DECLARE response jsonb; tail jsonb; all_items jsonb; BEGIN
   (SELECT count(DISTINCT item->>'status')=3 FROM jsonb_array_elements(all_items) item),'future and all statuses remain discoverable');
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000004','limit',100,'cursor',NULL))->'items')=1,'archived class sessions remain discoverable');
  PERFORM pg_temp.assert_true(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000003','limit',100,'cursor',NULL))->'items'->0->>'status'='finalized','historical finalized status is preserved');
- PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',1,'cursor',response->>'next_cursor'))->'items')=1,'page size may change');
+ response:=public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000008','limit',100,'cursor',NULL));
+ PERFORM pg_temp.assert_true(response->'items'='[]'::jsonb AND response->'next_cursor'='null'::jsonb,'empty class has empty items and null cursor');
+ other_resource_page:=public.ieadpe_ministry_list_classes('{"congregation_id":"97000000-0000-0000-0000-000000000001","status":null,"limit":1,"cursor":null}'::jsonb);
+ BEGIN PERFORM public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',1,'cursor',other_resource_page->>'next_cursor')); RAISE EXCEPTION 'ASSERTION: other-resource cursor accepted';
+ EXCEPTION WHEN SQLSTATE '22023' THEN PERFORM pg_temp.assert_true(SQLERRM='invalid_cursor','valid other-resource cursor is rejected'); END;
+ PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',1,'cursor',class_page->>'next_cursor'))->'items')=1,'page size may change');
 END $$;
 
-DO $$ DECLARE response jsonb; page1 jsonb; page2 jsonb; other_page jsonb; day_value text; begin_count integer; receipt_count integer; BEGIN
+DO $$ DECLARE response jsonb; page1 jsonb; page2 jsonb; other_page jsonb; actual_ids jsonb; expected_ids jsonb; day_value text; begin_count integer; receipt_count integer; BEGIN
  response:=public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',100,'cursor',NULL));
  page1:=response; page2:=public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',100,'cursor',response->>'next_cursor'));
  PERFORM pg_temp.assert_true(jsonb_array_length(page2->'items')=6 AND page2->>'next_cursor' IS NULL,'empty tail returns remaining rows and null cursor');
+ SELECT jsonb_agg(item->>'id' ORDER BY ordinal) INTO actual_ids FROM jsonb_array_elements((page1->'items')||(page2->'items')) WITH ORDINALITY AS page(item,ordinal);
+ SELECT jsonb_agg(s.id::text ORDER BY s.session_date,s.id) INTO expected_ids FROM public.ministry_sessions s
+  WHERE s.congregation_id='97000000-0000-0000-0000-000000000001' AND s.class_id='97000000-0000-0000-0000-000000000002';
+ PERFORM pg_temp.assert_true(actual_ids=expected_ids,'pagination has no gaps and follows exact sorted IDs');
+ PERFORM pg_temp.assert_true(jsonb_array_length(actual_ids)=(SELECT count(DISTINCT item) FROM jsonb_array_elements(actual_ids) item),'pagination has no duplicates');
  PERFORM pg_temp.assert_true(page1->'items'->0->>'date'='2026-01-08' AND page1->'items'->1->>'date'='2026-01-08' AND page1->'items'->0->>'id'<'97000000-0000-0000-0000-000000000025','date and id order is ascending');
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',1,'cursor',NULL))->'items')=1,'page size one is accepted');
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_ministry_list_class_sessions(jsonb_build_object('congregation_id','97000000-0000-0000-0000-000000000001','class_id','97000000-0000-0000-0000-000000000002','limit',100,'cursor',NULL))->'items')=100,'page size 100 is accepted');

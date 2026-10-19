@@ -68,7 +68,17 @@ VALUES('89000000-0000-0000-0000-000000000001','82000000-0000-0000-0000-000000000
 INSERT INTO public.ministry_attendance(id,congregation_id,session_id,enrollment_id,student_id,status,updated_by)
 VALUES('8a000000-0000-0000-0000-000000000001','82000000-0000-0000-0000-000000000001','88000000-0000-0000-0000-000000000001','87000000-0000-0000-0000-000000000001','84000000-0000-0000-0000-000000000001','present','81000000-0000-0000-0000-000000000001');
 
-SELECT pg_temp.assert_true((SELECT count(*)=9 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname LIKE 'ministry_%' AND c.relkind='r' AND c.relrowsecurity),'RLS enabled on every ministry table');
+WITH expected(name) AS (VALUES
+ ('ministry_attendance'),('ministry_classes'),('ministry_contacts'),('ministry_enrollments'),
+ ('ministry_grants'),('ministry_people'),('ministry_role_slots'),('ministry_session_roster'),
+ ('ministry_sessions'),('ministry_students')),
+ actual AS (
+  SELECT c.relname,c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname='public' AND c.relname LIKE 'ministry_%' AND c.relkind IN ('r','p'))
+SELECT pg_temp.assert_true(
+ NOT EXISTS(SELECT FROM expected e LEFT JOIN actual a ON a.relname=e.name WHERE a.relname IS NULL OR NOT a.relrowsecurity) AND
+ NOT EXISTS(SELECT FROM actual a LEFT JOIN expected e ON e.name=a.relname WHERE e.name IS NULL),
+ 'RLS enabled on every ministry table');
 SELECT pg_temp.assert_true((SELECT count(*)=3 FROM public.ministry_students),'legacy Firebase keys are separate from UUID primary keys');
 SELECT pg_temp.assert_true(NOT has_table_privilege('anon','public.ministry_grants','SELECT') AND
  NOT has_table_privilege('anon','public.ministry_contacts','SELECT') AND
