@@ -6,10 +6,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
+import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 
 const _scope = '33333333-3333-4333-8333-333333333333';
 const _student = '11111111-1111-4111-8111-111111111111';
 const _classId = '22222222-2222-4222-8222-222222222222';
+const _person = '44444444-4444-4444-8444-444444444444';
+const _legacyStudent = '55555555-5555-4555-8555-555555555555';
 
 class _BrowserGateway implements ReadRpcGateway {
   _BrowserGateway(this.respond);
@@ -156,7 +159,7 @@ void main() {
   });
 
   test(
-    'student page sends congregation scope and decodes linked provenance id',
+    'student page decodes canonical link state and blank phone strings',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       final serving = server.listen((request) async {
@@ -173,10 +176,45 @@ void main() {
           'items': [
             {
               'id': _student,
-              'name': 'Ana',
-              'phone_e164': null,
-              'convert_id': '44444444-4444-4444-8444-444444444444',
+              'person_id': _person,
+              'congregation_id': _scope,
+              'name': 'Ana Silva',
+              'phone': '   ',
+              'birth_date': '1990-02-28',
+              'address': {
+                'street': 'Rua A',
+                'district': null,
+                'city': null,
+                'postal_code': null,
+                'state_code': null,
+              },
+              'education': 'Ensino médio',
+              'marital_status': null,
+              'new_convert': false,
+              'water_baptized': null,
+              'wants_baptism': null,
+              'archived_at': null,
+              'revision': 7,
+              'person_revision': 3,
+              'link_state': 'linked',
+            },
+            {
+              'id': _legacyStudent,
+              'person_id': null,
+              'congregation_id': _scope,
+              'name': 'Ana Silva',
+              'phone': '',
+              'birth_date': null,
+              'address': null,
+              'education': null,
+              'marital_status': null,
+              'new_convert': null,
+              'water_baptized': null,
+              'wants_baptism': null,
+              'archived_at': null,
               'revision': 2,
+              'person_revision': null,
+              'link_state': 'unlinked',
             },
           ],
           'next_cursor': 'cursor',
@@ -202,9 +240,92 @@ void main() {
         limit: 10,
       );
 
-      expect(page.items.single.convertId, isNotNull);
-      expect(page.items.single.revision, 2);
+      expect(page.items.first.personId, _person);
+      expect(page.items.first.personRevision, 3);
+      expect(page.items.first.revision, 7);
+      expect(page.items.first.linkState, PersonLinkState.linked);
+      expect(page.items.first.name, 'Ana Silva');
+      expect(page.items.first.phone, '   ');
+      expect(page.items.first.address?.street, 'Rua A');
+      expect(page.items.last.personId, isNull);
+      expect(page.items.last.personRevision, isNull);
+      expect(page.items.last.revision, 2);
+      expect(page.items.last.linkState, PersonLinkState.unlinked);
+      expect(page.items.last.phone, '');
       expect(page.nextCursor, 'cursor');
+    },
+  );
+
+  test('student page rejects non-string phone values', () async {
+    final gateway = _BrowserGateway((rpc, parameters) {
+      expect(rpc, 'ministry_list_students');
+      return {
+        'items': [
+          {
+            'id': _student,
+            'person_id': _person,
+            'congregation_id': _scope,
+            'name': 'Ana Silva',
+            'phone': 123,
+            'birth_date': null,
+            'address': null,
+            'education': null,
+            'marital_status': null,
+            'new_convert': null,
+            'water_baptized': null,
+            'wants_baptism': null,
+            'archived_at': null,
+            'revision': 2,
+            'person_revision': 1,
+            'link_state': 'linked',
+          },
+        ],
+        'next_cursor': null,
+      };
+    });
+    final repo = MinistryBrowserRepository(gateway);
+
+    await expectLater(
+      repo.listStudents(congregationId: _scope),
+      throwsA(isA<DataFailure>()),
+    );
+  });
+
+  test(
+    'list_students decoder accepts a legacy canonical name over 200 chars',
+    () async {
+      final name = List.filled(201, 'A').join();
+      final gateway = _BrowserGateway((rpc, parameters) {
+        expect(rpc, 'ministry_list_students');
+        return {
+          'items': [
+            {
+              'id': _student,
+              'person_id': _person,
+              'congregation_id': _scope,
+              'name': name,
+              'phone': null,
+              'birth_date': null,
+              'address': null,
+              'education': null,
+              'marital_status': null,
+              'new_convert': null,
+              'water_baptized': null,
+              'wants_baptism': null,
+              'archived_at': null,
+              'revision': 2,
+              'person_revision': 1,
+              'link_state': 'linked',
+            },
+          ],
+          'next_cursor': null,
+        };
+      });
+
+      final page = await MinistryBrowserRepository(gateway)
+          .listStudents(congregationId: _scope);
+
+      expect(page.items.single.name, name);
     },
   );
 

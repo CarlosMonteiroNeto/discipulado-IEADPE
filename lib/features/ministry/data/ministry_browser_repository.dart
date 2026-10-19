@@ -5,16 +5,38 @@ import 'ministry_codec.dart';
 class MinistryStudentSummary {
   const MinistryStudentSummary({
     required this.id,
+    required this.personId,
+    required this.congregationId,
     required this.name,
-    required this.phoneE164,
-    required this.convertId,
+    required this.phone,
+    required this.birthDate,
+    required this.address,
+    required this.education,
+    required this.maritalStatus,
+    required this.newConvert,
+    required this.waterBaptized,
+    required this.wantsBaptism,
+    required this.archivedAt,
     required this.revision,
+    required this.personRevision,
+    required this.linkState,
   });
   final String id;
+  final String? personId;
+  final String congregationId;
   final String name;
-  final String? phoneE164;
-  final String? convertId;
+  final String? phone;
+  final CalendarDate? birthDate;
+  final Address? address;
+  final String? education;
+  final String? maritalStatus;
+  final bool? newConvert;
+  final bool? waterBaptized;
+  final bool? wantsBaptism;
+  final DateTime? archivedAt;
   final int revision;
+  final int? personRevision;
+  final PersonLinkState linkState;
 }
 
 class MinistryClassSummary {
@@ -218,25 +240,80 @@ MinistryPage<MinistryStudentSummary> _studentPage(Object? raw) {
       .map((item) {
         final row = _row(item, {
           'id',
+          'person_id',
+          'congregation_id',
           'name',
-          'phone_e164',
-          'convert_id',
+          'phone',
+          'birth_date',
+          'address',
+          'education',
+          'marital_status',
+          'new_convert',
+          'water_baptized',
+          'wants_baptism',
+          'archived_at',
           'revision',
+          'person_revision',
+          'link_state',
         });
         final revision = row['revision'];
         if (revision is! int || revision < 1) {
           _invalid();
         }
-        final phone = _optionalText(row['phone_e164']);
-        if (phone != null && !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phone)) {
+        final personId = _optionalUuidValue(row['person_id']);
+        final personRevision = row['person_revision'];
+        if (personRevision != null &&
+            (personRevision is! int || personRevision < 1)) {
           _invalid();
         }
+        final linkState = switch (_text(row['link_state'])) {
+          'linked' => PersonLinkState.linked,
+          'unlinked' => PersonLinkState.unlinked,
+          _ => _invalid(),
+        };
+        if ((personId != null) != (linkState == PersonLinkState.linked) ||
+            (personId == null) != (personRevision == null)) {
+          _invalid();
+        }
+        final congregationId = _uuidValue(row['congregation_id']);
+        final rawAddress = row['address'];
+        if (rawAddress != null && rawAddress is! Map) _invalid();
+        final rawBirthDate = row['birth_date'];
+        final rawArchivedAt = row['archived_at'];
+        final rawNewConvert = row['new_convert'];
+        final rawWaterBaptized = row['water_baptized'];
+        final rawWantsBaptism = row['wants_baptism'];
+        for (final answer in [
+          rawNewConvert,
+          rawWaterBaptized,
+          rawWantsBaptism,
+        ]) {
+          if (answer != null && answer is! bool) _invalid();
+        }
+        final waterBaptized = rawWaterBaptized as bool?;
+        final wantsBaptism = rawWantsBaptism as bool?;
+        if (waterBaptized == true && wantsBaptism == true) _invalid();
         return MinistryStudentSummary(
           id: _uuidValue(row['id']),
+          personId: personId,
+          congregationId: congregationId,
           name: _text(row['name']),
-          phoneE164: phone,
-          convertId: _optionalUuidValue(row['convert_id']),
+          phone: _optionalPhoneText(row['phone']),
+          birthDate: rawBirthDate == null
+              ? null
+              : CalendarDate.parse(_date(rawBirthDate)),
+          address: rawAddress == null
+              ? null
+              : Address.fromJson(Map<String, Object?>.from(rawAddress as Map)),
+          education: _optionalText(row['education']),
+          maritalStatus: _optionalText(row['marital_status']),
+          newConvert: rawNewConvert as bool?,
+          waterBaptized: waterBaptized,
+          wantsBaptism: wantsBaptism,
+          archivedAt: rawArchivedAt == null ? null : _timestamp(rawArchivedAt),
           revision: revision,
+          personRevision: personRevision as int?,
+          linkState: linkState,
         );
       })
       .toList(growable: false);
@@ -244,6 +321,13 @@ MinistryPage<MinistryStudentSummary> _studentPage(Object? raw) {
     items: List.unmodifiable(rows),
     nextCursor: _cursor(page['next_cursor']),
   );
+}
+
+DateTime _timestamp(Object? value) {
+  final text = _text(value);
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null || !text.contains('T')) _invalid();
+  return parsed.toUtc();
 }
 
 MinistryPage<MinistryClassSummary> _classPage(Object? raw) {
@@ -302,6 +386,12 @@ String _text(Object? value) {
 String? _optionalText(Object? value) {
   if (value == null) return null;
   return _text(value);
+}
+
+String? _optionalPhoneText(Object? value) {
+  if (value == null) return null;
+  if (value is! String) _invalid();
+  return value;
 }
 
 String _uuidValue(Object? value) {

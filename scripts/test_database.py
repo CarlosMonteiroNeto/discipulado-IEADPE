@@ -22,6 +22,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("scenario", nargs="?", default="access_test.sql")
+    parser.add_argument("--seed-before-migration")
+    parser.add_argument("--seed-scenario")
     parser.add_argument("--catalog-concurrency", action="store_true")
     parser.add_argument("--access-concurrency", action="store_true")
     parser.add_argument("--convert-concurrency", action="store_true")
@@ -31,9 +33,34 @@ def main():
     parser.add_argument("--ministry-academic-concurrency", action="store_true")
     parser.add_argument("--convert-student-concurrency", action="store_true")
     args = parser.parse_args()
-    scenario = (ROOT / "supabase/tests/database" / args.scenario).resolve()
-    if scenario.parent != (ROOT / "supabase/tests/database").resolve():
+    database_tests = (ROOT / "supabase/tests/database").resolve()
+    migrations_dir = (ROOT / "supabase/migrations").resolve()
+    scenario = (database_tests / args.scenario).resolve()
+    if scenario.parent != database_tests or not scenario.is_file():
         raise ValueError("Scenario must belong to database tests")
+    if (args.seed_before_migration is None) != (args.seed_scenario is None):
+        parser.error("--seed-before-migration and --seed-scenario must be used together")
+    seed_migration = None
+    seed_scenario = None
+    if args.seed_before_migration is not None:
+        migration_name = args.seed_before_migration
+        migration_path = (migrations_dir / migration_name).resolve()
+        migrations = sorted(migrations_dir.glob("*.sql"))
+        if (
+            Path(migration_name).name != migration_name
+            or migration_path.parent != migrations_dir
+            or migration_path.suffix != ".sql"
+            or migration_path not in migrations
+        ):
+            raise ValueError("Seed target must name an existing migration")
+        seed_scenario = (database_tests / args.seed_scenario).resolve()
+        if (
+            seed_scenario.parent != database_tests
+            or not seed_scenario.is_file()
+            or seed_scenario.suffix != ".sql"
+        ):
+            raise ValueError("Seed scenario must be an existing .sql database scenario")
+        seed_migration = migration_path
     uri = urlparse(os.environ.get("IEADPE_DATABASE_URL", "postgresql://postgres@127.0.0.1:54329/postgres"))
     if uri.scheme not in ("postgres", "postgresql") or uri.hostname not in ("127.0.0.1", "localhost", "::1") or uri.query:
         raise ValueError("Only loopback PostgreSQL is permitted")
@@ -53,7 +80,9 @@ def main():
     run(admin, "-c", f'CREATE DATABASE "{database}"')
     try:
         run(target, "-f", str(ROOT / "supabase/tests/fixtures/local_auth_storage.sql"))
-        for migration in sorted((ROOT / "supabase/migrations").glob("*.sql")):
+        for migration in sorted(migrations_dir.glob("*.sql")):
+            if migration == seed_migration:
+                run(target, "-f", str(seed_scenario))
             run(target, "-f", str(migration))
         if args.catalog_concurrency:
             check_catalog_concurrency(psql, target)

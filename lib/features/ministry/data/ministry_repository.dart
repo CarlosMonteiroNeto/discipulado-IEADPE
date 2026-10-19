@@ -25,6 +25,120 @@ class MinistryRepository {
     },
   );
 
+  Future<MinistryPerson> getPerson({
+    required String congregationId,
+    required String personId,
+  }) async {
+    _uuid(congregationId);
+    _uuid(personId);
+    final result = await _read('ministry_get_person', {
+      'congregation_id': congregationId,
+      'person_id': personId,
+    });
+    try {
+      final person = decodeMinistryPersonDetail(result);
+      if (person.id != personId || person.congregationId != congregationId) {
+        throw const MinistryDataException('Person scope does not match.');
+      }
+      return person;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryPage<MinistryPersonSummary>> listPeople({
+    required String congregationId,
+    String? namePrefix,
+    int limit = 50,
+    String? cursor,
+  }) async {
+    _uuid(congregationId);
+    _page(limit, cursor);
+    if (namePrefix != null &&
+        (namePrefix.trim().isEmpty ||
+            namePrefix != namePrefix.trim() ||
+            namePrefix.length > 200)) {
+      throw const DataFailure('invalid');
+    }
+    final result = await _read('ministry_list_people', {
+      'congregation_id': congregationId,
+      'name_prefix': namePrefix,
+      'limit': limit,
+      'cursor': cursor,
+    });
+    try {
+      return decodePeoplePage(result);
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryCommandResult> savePerson({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required int expectedRevision,
+    required MinistryPersonDraft person,
+  }) async {
+    _uuid(id);
+    _uuid(congregationId);
+    if (expectedRevision < 1) throw const DataFailure('invalid');
+    final result = await command(
+      name: 'save_person',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'expected_revision': expectedRevision,
+        'person': person.toJson(),
+      },
+    );
+    if (result.revision != expectedRevision + 1) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<StudentPersonLinkResult> linkStudentPerson({
+    required String operationId,
+    required String congregationId,
+    required String studentId,
+    required String personId,
+    required int expectedStudentRevision,
+    required int expectedPersonRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(congregationId);
+    _uuid(studentId);
+    _uuid(personId);
+    if (expectedStudentRevision < 1 || expectedPersonRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final transport = gateway;
+    if (transport is! MinistryCommandGateway) {
+      throw const DataFailure('unavailable');
+    }
+    try {
+      final commandGateway = transport as MinistryCommandGateway;
+      final raw = await commandGateway.linkStudentPerson(operationId, {
+        'congregation_id': congregationId,
+        'student_id': studentId,
+        'person_id': personId,
+        'expected_student_revision': expectedStudentRevision,
+        'expected_person_revision': expectedPersonRevision,
+      });
+      return decodeStudentPersonLinkResult(
+        raw,
+        expectedStudentId: studentId,
+        expectedPersonId: personId,
+        expectedStudentRevision: expectedStudentRevision,
+        expectedPersonRevision: expectedPersonRevision,
+      );
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
   Future<MinistryPage<MinistryDirectoryEntry>> listDirectory({
     required String scope,
     String? congregationId,

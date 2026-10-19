@@ -21,6 +21,28 @@ class MinistryPage<T> {
   final String? nextCursor;
 }
 
+class MinistryPersonSummary {
+  const MinistryPersonSummary({
+    required this.id,
+    required this.congregationId,
+    required this.name,
+    required this.normalizedName,
+    required this.phone,
+    required this.birthDate,
+    required this.address,
+    required this.revision,
+  });
+
+  final String id;
+  final String congregationId;
+  final String name;
+  final String normalizedName;
+  final String? phone;
+  final CalendarDate? birthDate;
+  final Address? address;
+  final int revision;
+}
+
 class MinistryCommandResult {
   const MinistryCommandResult({
     required this.id,
@@ -108,6 +130,63 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
   );
 }
 
+MinistryPage<MinistryPersonSummary> decodePeoplePage(Object? raw) {
+  final json = _object(raw);
+  _exactKeys(json, {'items', 'next_cursor'});
+  final items = json['items'];
+  if (items is! List || items.length > 100) _invalid();
+  final people = items
+      .map((item) {
+        final row = _object(item);
+        _exactKeys(row, {
+          'id',
+          'congregation_id',
+          'name',
+          'normalized_name',
+          'phone',
+          'birth_date',
+          'address',
+          'person_revision',
+        });
+        final revision = row['person_revision'];
+        if (revision is! int || revision < 1) _invalid();
+        final rawAddress = row['address'];
+        if (rawAddress != null) {
+          final address = _object(rawAddress);
+          _exactKeys(address, {
+            'street',
+            'district',
+            'city',
+            'postal_code',
+            'state_code',
+          });
+        }
+        final name = _text(row['name']);
+        final normalizedName = _text(row['normalized_name']);
+        if (name != name.trim() || normalizedName != name.toLowerCase()) {
+          _invalid();
+        }
+        return MinistryPersonSummary(
+          id: _uuid(row['id']),
+          congregationId: _uuid(row['congregation_id']),
+          name: name,
+          normalizedName: normalizedName,
+          phone: _optionalPhoneText(row['phone']),
+          birthDate: row['birth_date'] == null
+              ? null
+              : CalendarDate.parse(_text(row['birth_date'])),
+          address: rawAddress == null
+              ? null
+              : Address.fromJson(Map<String, Object?>.from(rawAddress as Map)),
+          revision: revision,
+        );
+      })
+      .toList(growable: false);
+  final nextCursor = _optionalText(json['next_cursor']);
+  if (nextCursor != null && nextCursor.length > 4096) _invalid();
+  return MinistryPage(items: List.unmodifiable(people), nextCursor: nextCursor);
+}
+
 MinistryRoster decodeRoster(Object? raw) {
   final json = _object(raw);
   _keys(json, {'session', 'roster'});
@@ -152,14 +231,37 @@ MinistryPage<ClassStudentEntry> decodeClassStudents(Object? raw) {
           'water_baptized',
           'wants_baptism',
           'archived_at',
+          'person_id',
           'revision',
+          'person_revision',
           'created_at',
           'updated_at',
           'updated_by',
         });
         studentJson['archived'] = studentJson.remove('archived_at') != null;
         studentJson['legacy_firebase_id'] = null;
-        studentJson['convert_id'] = null;
+        _exactKeys(studentJson, {
+          'id',
+          'congregation_id',
+          'name',
+          'normalized_name',
+          'phone_e164',
+          'birth_date',
+          'address',
+          'education',
+          'marital_status',
+          'new_convert',
+          'water_baptized',
+          'wants_baptism',
+          'archived',
+          'person_id',
+          'person_revision',
+          'revision',
+          'created_at',
+          'updated_at',
+          'updated_by',
+          'legacy_firebase_id',
+        });
         final enrollmentJson = _object(pair['enrollment']);
         enrollmentJson['legacy_firebase_id'] = null;
         return ClassStudentEntry(
@@ -172,6 +274,66 @@ MinistryPage<ClassStudentEntry> decodeClassStudents(Object? raw) {
     items: List.unmodifiable(decoded),
     nextCursor: _optionalText(json['next_cursor']),
   );
+}
+
+/// Decode the scoped person envelope with every canonical field and its own
+/// revision. The result must not be mistaken for an academic revision.
+MinistryPerson decodeMinistryPersonDetail(Object? raw) {
+  final json = _object(raw);
+  _exactKeys(json, {'person', 'person_revision'});
+  final revision = json['person_revision'];
+  if (revision is! int || revision < 1) _invalid();
+  final person = _object(json['person']);
+  _exactKeys(person, {
+    'id',
+    'congregation_id',
+    'name',
+    'normalized_name',
+    'phone',
+    'birth_date',
+    'address',
+    'created_at',
+    'updated_at',
+    'updated_by',
+  });
+  final address = person['address'];
+  if (address != null) {
+    final addressJson = _object(address);
+    _exactKeys(addressJson, {
+      'street',
+      'district',
+      'city',
+      'postal_code',
+      'state_code',
+    });
+  }
+  return MinistryPerson.fromJson(person, revision: revision);
+}
+
+/// Decode the explicit identity-link result without collapsing either row's
+/// revision into the generic `{id, revision}` command shape.
+StudentPersonLinkResult decodeStudentPersonLinkResult(
+  Object? raw, {
+  required String expectedStudentId,
+  required String expectedPersonId,
+  required int expectedStudentRevision,
+  required int expectedPersonRevision,
+}) {
+  final json = _object(raw);
+  _exactKeys(json, {
+    'student_id',
+    'person_id',
+    'student_revision',
+    'person_revision',
+  });
+  final result = StudentPersonLinkResult.fromJson(json);
+  if (result.studentId != expectedStudentId ||
+      result.personId != expectedPersonId ||
+      result.studentRevision != expectedStudentRevision + 1 ||
+      result.personRevision != expectedPersonRevision) {
+    _invalid();
+  }
+  return result;
 }
 
 MinistryPage<PendingMinistrySession> decodePendingSessions(Object? raw) {
@@ -244,6 +406,13 @@ void _keys(Map<String, Object?> value, Set<String> allowed) {
   if (value.keys.any((key) => !allowed.contains(key))) _invalid();
 }
 
+void _exactKeys(Map<String, Object?> value, Set<String> expected) {
+  if (value.keys.toSet().difference(expected).isNotEmpty ||
+      !value.keys.toSet().containsAll(expected)) {
+    _invalid();
+  }
+}
+
 String _text(Object? value) {
   if (value is! String || value.trim().isEmpty) _invalid();
   return value;
@@ -252,6 +421,12 @@ String _text(Object? value) {
 String? _optionalText(Object? value) {
   if (value == null) return null;
   return _text(value);
+}
+
+String? _optionalPhoneText(Object? value) {
+  if (value == null) return null;
+  if (value is! String) _invalid();
+  return value;
 }
 
 String _uuid(Object? value) {

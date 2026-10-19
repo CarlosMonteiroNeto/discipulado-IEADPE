@@ -58,6 +58,11 @@ abstract interface class MinistryCommandGateway implements Gateway {
     String operationId,
     Map<String, Object?> payload,
   );
+
+  Future<Map<String, dynamic>> linkStudentPerson(
+    String operationId,
+    Map<String, Object?> payload,
+  );
 }
 
 abstract interface class HandoffCommandGateway implements Gateway {
@@ -187,6 +192,13 @@ class SupabaseGateway
   }) async {
     const ministryReadParameters = <String, Set<String>>{
       'ministry_list_congregations': {'limit', 'cursor'},
+      'ministry_list_people': {
+        'congregation_id',
+        'name_prefix',
+        'limit',
+        'cursor',
+      },
+      'ministry_get_person': {'congregation_id', 'person_id'},
       'ministry_list_directory': {
         'scope',
         'congregation_id',
@@ -229,6 +241,16 @@ class SupabaseGateway
             : null);
     if (allowed == null ||
         parameters.keys.any((key) => !allowed.contains(key))) {
+      throw const DataFailure('invalid');
+    }
+    const requiredReadKeys = <String, Set<String>>{
+      'ministry_list_people': {'congregation_id', 'limit'},
+      'ministry_get_person': {'congregation_id', 'person_id'},
+      'ministry_list_students': {'congregation_id', 'limit'},
+      'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
+    };
+    final required = requiredReadKeys[rpc];
+    if (required != null && !parameters.keys.toSet().containsAll(required)) {
       throw const DataFailure('invalid');
     }
     final frozen = Map<String, Object?>.unmodifiable(parameters);
@@ -295,6 +317,7 @@ class SupabaseGateway
         'wants_baptism',
         'expected_revision',
       },
+      'save_person': {'id', 'congregation_id', 'expected_revision', 'person'},
       'set_student_archived': {
         'id',
         'congregation_id',
@@ -371,6 +394,7 @@ class SupabaseGateway
         'expected_revision',
       },
       'save_student': {'id', 'congregation_id', 'name'},
+      'save_person': {'id', 'congregation_id', 'expected_revision', 'person'},
       'set_student_archived': {
         'id',
         'congregation_id',
@@ -430,6 +454,49 @@ class SupabaseGateway
         validateUuid(payload[key]);
       }
     }
+    if (command == 'save_person') {
+      final revision = payload['expected_revision'];
+      if (revision is! int || revision < 1) {
+        throw const DataFailure('invalid');
+      }
+      final rawPerson = payload['person'];
+      if (rawPerson is! Map) throw const DataFailure('invalid');
+      final person = Map<String, Object?>.from(rawPerson);
+      const personFields = {'name', 'phone', 'birth_date', 'address'};
+      if (person.keys.toSet().difference(personFields).isNotEmpty ||
+          !person.keys.toSet().containsAll(personFields)) {
+        throw const DataFailure('invalid');
+      }
+      final name = person['name'];
+      final phone = person['phone'];
+      final birthDate = person['birth_date'];
+      if (name is! String ||
+          name.trim().isEmpty ||
+          name != name.trim() ||
+          name.length > 200 ||
+          (phone != null && phone is! String) ||
+          (birthDate != null &&
+              (birthDate is! String || !_isIsoDate(birthDate)))) {
+        throw const DataFailure('invalid');
+      }
+      final rawAddress = person['address'];
+      if (rawAddress != null) {
+        if (rawAddress is! Map) throw const DataFailure('invalid');
+        final address = Map<String, Object?>.from(rawAddress);
+        const addressFields = {
+          'street',
+          'district',
+          'city',
+          'postal_code',
+          'state_code',
+        };
+        if (address.keys.toSet().difference(addressFields).isNotEmpty ||
+            !address.keys.toSet().containsAll(addressFields) ||
+            address.values.any((value) => value != null && value is! String)) {
+          throw const DataFailure('invalid');
+        }
+      }
+    }
     final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
     final token = context;
     final value = await _run(
@@ -467,6 +534,10 @@ class SupabaseGateway
         (value['revision'] as int) < 1) {
       throw const DataFailure('invalid_response');
     }
+    if (command == 'save_person' &&
+        value['revision'] != (payload['expected_revision'] as int) + 1) {
+      throw const DataFailure('invalid_response');
+    }
     validateUuid(value['id']);
     if (value.containsKey('previous_contact_id')) {
       validateUuid(value['previous_contact_id']);
@@ -492,6 +563,66 @@ class SupabaseGateway
             (value['attendance_count'] as int) < 0)) {
       throw const DataFailure('invalid_response');
     }
+    return Map<String, dynamic>.unmodifiable(value);
+  }
+
+  @override
+  Future<Map<String, dynamic>> linkStudentPerson(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    const expectedFields = {
+      'congregation_id',
+      'student_id',
+      'person_id',
+      'expected_student_revision',
+      'expected_person_revision',
+    };
+    if (payload.keys.toSet().difference(expectedFields).isNotEmpty ||
+        !payload.keys.toSet().containsAll(expectedFields)) {
+      throw const DataFailure('invalid');
+    }
+    for (final key in ['congregation_id', 'student_id', 'person_id']) {
+      validateUuid(payload[key]);
+    }
+    final expectedStudentRevision = payload['expected_student_revision'];
+    final expectedPersonRevision = payload['expected_person_revision'];
+    if (expectedStudentRevision is! int ||
+        expectedStudentRevision < 1 ||
+        expectedPersonRevision is! int ||
+        expectedPersonRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
+    final value = await _run(
+      context,
+      () => client
+          .rpc(
+            'ieadpe_ministry_link_student_person',
+            params: {'operation_id': operationId, 'payload': frozen},
+          )
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    const resultFields = {
+      'student_id',
+      'person_id',
+      'student_revision',
+      'person_revision',
+    };
+    if (value is! Map<String, dynamic> ||
+        value.keys.toSet().difference(resultFields).isNotEmpty ||
+        !value.keys.toSet().containsAll(resultFields) ||
+        value['student_id'] != payload['student_id'] ||
+        value['person_id'] != payload['person_id'] ||
+        value['student_revision'] is! int ||
+        value['student_revision'] != expectedStudentRevision + 1 ||
+        value['person_revision'] is! int ||
+        value['person_revision'] != expectedPersonRevision) {
+      throw const DataFailure('invalid_response');
+    }
+    validateUuid(value['student_id']);
+    validateUuid(value['person_id']);
     return Map<String, dynamic>.unmodifiable(value);
   }
 
@@ -654,6 +785,14 @@ void validateUuid(Object? value) {
       !RegExp(r'^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$').hasMatch(value)) {
     throw const DataFailure('invalid_response');
   }
+}
+
+bool _isIsoDate(String value) {
+  if (!RegExp(r'^\d{4}-\d{2}-\d{2}$').hasMatch(value)) return false;
+  final parsed = DateTime.tryParse(value);
+  return parsed != null &&
+      '${parsed.year.toString().padLeft(4, '0')}-${parsed.month.toString().padLeft(2, '0')}-${parsed.day.toString().padLeft(2, '0')}' ==
+          value;
 }
 
 /// Opaque continuation bound to query, identity and invalidation generation.

@@ -20,6 +20,7 @@ const _scope = '33333333-3333-4333-8333-333333333333';
 const _convert = '11111111-1111-4111-8111-111111111111';
 const _student = '22222222-2222-4222-8222-222222222222';
 const _classId = '55555555-5555-4555-8555-555555555555';
+const _person = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const _convert2 = '77777777-7777-4777-8777-777777777777';
 const _candidate2 = '88888888-8888-4888-8888-888888888888';
 const _sessionId = '99999999-9999-4999-8999-999999999999';
@@ -38,6 +39,7 @@ class _Gateway
   bool failCandidateRead = false;
   bool failEnrollmentOnce = false;
   bool failFirstPromotion = true;
+  List<Map<String, dynamic>> studentRows = const [];
   Completer<Map<String, dynamic>>? promotionCompleter;
   @override
   ProtectedDataBoundary get boundary => boundaryValue;
@@ -176,7 +178,10 @@ class _Gateway
         'through_date': '2026-10-01',
       };
     }
-    if (rpc == 'ministry_list_students' || rpc == 'ministry_list_directory') {
+    if (rpc == 'ministry_list_students') {
+      return {'items': studentRows, 'next_cursor': null};
+    }
+    if (rpc == 'ministry_list_directory') {
       return {'items': [], 'next_cursor': null};
     }
     if (rpc == 'ministry_list_pending_sessions') {
@@ -280,6 +285,17 @@ class _Gateway
   }
 
   @override
+  Future<Map<String, dynamic>> linkStudentPerson(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => {
+    'student_id': payload['student_id'],
+    'person_id': payload['person_id'],
+    'student_revision': (payload['expected_student_revision'] as int) + 1,
+    'person_revision': payload['expected_person_revision'],
+  };
+
+  @override
   noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
@@ -308,6 +324,65 @@ Widget _app(
 );
 
 void main() {
+  testWidgets('student browser labels canonical link state safely', (
+    tester,
+  ) async {
+    final gateway = _Gateway()
+      ..studentRows = [
+        {
+          'id': _student,
+          'person_id': _person,
+          'congregation_id': _scope,
+          'name': 'Ana Silva',
+          'phone': '+5511999990000',
+          'birth_date': null,
+          'address': null,
+          'education': null,
+          'marital_status': null,
+          'new_convert': null,
+          'water_baptized': null,
+          'wants_baptism': null,
+          'archived_at': null,
+          'revision': 5,
+          'person_revision': 2,
+          'link_state': 'linked',
+        },
+        {
+          'id': _candidate2,
+          'person_id': null,
+          'congregation_id': _scope,
+          'name': 'Registro legado',
+          'phone': null,
+          'birth_date': null,
+          'address': null,
+          'education': null,
+          'marital_status': null,
+          'new_convert': null,
+          'water_baptized': null,
+          'wants_baptism': null,
+          'archived_at': null,
+          'revision': 1,
+          'person_revision': null,
+          'link_state': 'unlinked',
+        },
+      ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StudentsPage(
+          repository: MinistryBrowserRepository(gateway),
+          congregationId: _scope,
+          onOpenHandoff: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Identidade canônica vinculada'), findsOneWidget);
+    expect(find.text('Identidade pendente de revisão'), findsOneWidget);
+    expect(find.text('Vinculado ao cadastro de convertidos'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'permission denial does not load referral data or expose actions',
     (tester) async {

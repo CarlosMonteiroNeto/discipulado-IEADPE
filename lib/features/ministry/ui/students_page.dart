@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
+import '../domain/ministry_models.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({
@@ -84,7 +85,7 @@ class _StudentsPageState extends State<StudentsPage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     const Text(
-                      'Os dados escolares pertencem ao cadastro do aluno. O vínculo com o convertido mantém a referência de origem separada.',
+                      'Os dados pessoais vêm da identidade canônica; as informações escolares permanecem no cadastro do aluno.',
                     ),
                     const SizedBox(height: 12),
                     FilledButton.icon(
@@ -161,18 +162,18 @@ class _StudentsPageState extends State<StudentsPage> {
                   child: ListTile(
                     title: Text(student.name, softWrap: true),
                     subtitle: Text(
-                      student.convertId == null
-                          ? 'Cadastro do discipulado'
-                          : 'Vinculado ao cadastro de convertidos',
+                      student.linkState == PersonLinkState.linked
+                          ? 'Identidade canônica vinculada'
+                          : 'Identidade pendente de revisão',
                       softWrap: true,
                     ),
                     leading: Icon(
-                      student.convertId == null
-                          ? Icons.school_outlined
-                          : Icons.link,
+                      student.linkState == PersonLinkState.linked
+                          ? Icons.link
+                          : Icons.school_outlined,
                       color: UnifiedColors.brandNavy,
                     ),
-                    trailing: student.phoneE164 == null
+                    trailing: student.phone == null
                         ? null
                         : const Tooltip(
                             message: 'Telefone cadastrado',

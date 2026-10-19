@@ -260,6 +260,129 @@ class Address {
   };
 }
 
+enum PersonLinkState { linked, unlinked }
+
+/// Canonical, congregation-scoped identity and contact fields.
+class MinistryPerson {
+  const MinistryPerson({
+    required this.id,
+    required this.congregationId,
+    required this.name,
+    required this.normalizedName,
+    required this.phone,
+    required this.birthDate,
+    required this.address,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.updatedBy,
+  });
+
+  final String id;
+  final String congregationId;
+  final String name;
+  final String normalizedName;
+  final String? phone;
+  final CalendarDate? birthDate;
+  final Address? address;
+  final int revision;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? updatedBy;
+
+  factory MinistryPerson.fromJson(MinistryJson json, {required int revision}) {
+    _checkExactKeys(json, const <String>{
+      'id',
+      'congregation_id',
+      'name',
+      'normalized_name',
+      'phone',
+      'birth_date',
+      'address',
+      'created_at',
+      'updated_at',
+      'updated_by',
+    });
+    if (revision < 1) {
+      throw const MinistryDataException('Revision must be positive.');
+    }
+    final name = _requiredText(json, 'name');
+    final normalizedName = _requiredText(json, 'normalized_name');
+    if (name != name.trim() || normalizedName != name.toLowerCase()) {
+      throw const MinistryDataException('Person name is not normalized.');
+    }
+    final rawAddress = json['address'];
+    if (rawAddress != null && rawAddress is! Map) {
+      throw const MinistryDataException('Address must be an object or null.');
+    }
+    return MinistryPerson(
+      id: _uuid(json, 'id'),
+      congregationId: _uuid(json, 'congregation_id'),
+      name: name,
+      normalizedName: normalizedName,
+      phone: _optionalText(json, 'phone'),
+      birthDate: _optionalDate(json, 'birth_date'),
+      address: rawAddress == null
+          ? null
+          : Address.fromJson(Map<String, Object?>.from(rawAddress as Map)),
+      revision: revision,
+      createdAt: _timestamp(json, 'created_at'),
+      updatedAt: _timestamp(json, 'updated_at'),
+      updatedBy: _optionalUuid(json, 'updated_by'),
+    );
+  }
+}
+
+class MinistryPersonDraft {
+  const MinistryPersonDraft({
+    required this.name,
+    required this.phone,
+    required this.birthDate,
+    required this.address,
+  });
+
+  final String name;
+  final String? phone;
+  final CalendarDate? birthDate;
+  final Address? address;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'name': name,
+    'phone': phone,
+    'birth_date': birthDate?.toString(),
+    'address': address?.toJson(),
+  };
+}
+
+class StudentPersonLinkResult {
+  const StudentPersonLinkResult({
+    required this.studentId,
+    required this.personId,
+    required this.studentRevision,
+    required this.personRevision,
+  });
+
+  final String studentId;
+  final String personId;
+  final int studentRevision;
+  final int personRevision;
+
+  factory StudentPersonLinkResult.fromJson(MinistryJson json) {
+    _checkExactKeys(json, const <String>{
+      'student_id',
+      'person_id',
+      'student_revision',
+      'person_revision',
+    });
+    return StudentPersonLinkResult(
+      studentId: _uuid(json, 'student_id'),
+      personId: _uuid(json, 'person_id'),
+      studentRevision: _positiveInt(json, 'student_revision'),
+      personRevision: _positiveInt(json, 'person_revision'),
+    );
+  }
+}
+
 class Student extends MinistryRecord {
   const Student({
     required super.metadata,
@@ -274,7 +397,8 @@ class Student extends MinistryRecord {
     required this.waterBaptized,
     required this.wantsBaptism,
     required this.archived,
-    required this.convertId,
+    required this.personId,
+    required this.personRevision,
   });
 
   final String name;
@@ -288,7 +412,8 @@ class Student extends MinistryRecord {
   final bool? waterBaptized;
   final bool? wantsBaptism;
   final bool archived;
-  final String? convertId;
+  final String? personId;
+  final int? personRevision;
 
   factory Student.fromJson(MinistryJson json) {
     _checkKeys(json, const <String>{
@@ -304,7 +429,8 @@ class Student extends MinistryRecord {
       'water_baptized',
       'wants_baptism',
       'archived',
-      'convert_id',
+      'person_id',
+      'person_revision',
     });
     final metadata = CommonMetadata.fromJson(json);
     if (metadata.congregationId == null) {
@@ -318,6 +444,13 @@ class Student extends MinistryRecord {
     final rawAddress = json['address'];
     if (rawAddress != null && rawAddress is! Map) {
       throw const MinistryDataException('Address must be an object or null.');
+    }
+    final personId = _optionalUuid(json, 'person_id');
+    final personRevision = _optionalPositiveInt(json, 'person_revision');
+    if ((personId == null) != (personRevision == null)) {
+      throw const MinistryDataException(
+        'Student person ID and revision disagree.',
+      );
     }
     return Student(
       metadata: metadata,
@@ -334,7 +467,8 @@ class Student extends MinistryRecord {
       waterBaptized: waterBaptized,
       wantsBaptism: wantsBaptism,
       archived: _requiredBool(json, 'archived'),
-      convertId: _optionalUuid(json, 'convert_id'),
+      personId: personId,
+      personRevision: personRevision,
     );
   }
 }
@@ -629,6 +763,13 @@ void _checkKeys(MinistryJson json, Set<String> allowed) {
   final unknown = json.keys.where((key) => !allowed.contains(key));
   if (unknown.isNotEmpty) {
     throw MinistryDataException('Unknown field: ${unknown.first}.');
+  }
+}
+
+void _checkExactKeys(MinistryJson json, Set<String> expected) {
+  final actual = json.keys.toSet();
+  if (actual.difference(expected).isNotEmpty || !actual.containsAll(expected)) {
+    throw const MinistryDataException('Response fields do not match contract.');
   }
 }
 
