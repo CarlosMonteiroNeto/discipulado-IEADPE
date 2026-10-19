@@ -1,6 +1,6 @@
 # Ministry Task Manifest
 
-Status: I1 draft for contract-gate review. This is a discovery manifest, not approval to dispatch implementation. All post-I1 predecessor SHAs are intentionally pending because those reviewed commits do not exist yet. Record the actual predecessor SHA before each dispatch.
+Status: C1 source-backed local contract draft, based on current HEAD `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; canonical identity and Team policy decisions remain open. This is not approval to dispatch affected implementation. Hosted state remains unknown. All post-C1 predecessor SHAs are pending; record the actual reviewed predecessor SHA before each dispatch.
 
 ## Execution rules
 
@@ -21,10 +21,12 @@ Status: I1 draft for contract-gate review. This is a discovery manifest, not app
 
 ### C1 — Reviewed completion contracts
 
-- Predecessor: reviewed/committed I1 SHA, not yet available; do not dispatch before it is recorded.
-- Files: create docs/integration/ministry-completion-contracts.md with the schema/field mapping; update docs/integration/ministry-contracts.md only to point to or reconcile the historical baseline.
-- Interfaces/models: document and review ieadpe_get_scope, all current ieadpe_ministry_* reads/commands and ieadpe_promote_convert_to_student; settle exact canonical person link, team/access linkage, route/return and role scopes; types include the current ministry models and access grant types.
-- Acceptance/check: evidence-backed field ownership, required/nullable mapping, error/result envelopes, revision/replay behavior, route parameters and per-role matrix; policy table resolves each listed lifecycle issue; Sol review has zero critical/important findings. Run git diff --check; expected clean. Documentation review, no artificial test.
+- Predecessor/base: current HEAD `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd` (I1 inventory baseline `2ecba875591e2567cf353d7045b85da44b0a085b`). Record this as the C1 documentation base; no commit was made.
+- Files changed for C1: `docs/integration/ministry-completion-contracts.md` (new), `docs/verification/ministry-task-manifest.md`, and a narrow pointer in `docs/integration/ministry-contracts.md` preserving its pre-existing user edits.
+- Interfaces/models: new contract records exact current local `ieadpe_get_scope`, `ieadpe_ministry_*` read/command envelopes, convert/student handoff and access RPCs, local result/error/revision/replay behavior, route allowlist, role matrix, source mapping, and lifecycle policy. No new canonical-person or contact/access-linked RPC is claimed to exist. Current `ministry_grants` is not current authority after `202610180003_base44_unified_access.sql` locally.
+- Policy status: proposed neutral canonical person with 0/1 convert and student extensions; no name merging; shared contact fields have one owner; active enrollment contributes effective discipleship; finalized present attendance is follow-up on lesson date; cancellation removes only its own derived contribution; history is retained. The 90-day completion guard uses the earliest evidenced qualifying start; absent a verified start, completion stays unavailable and no date is invented. Error reporting distinguishes wrapper-emitted messages from caught SQL causes; cursor contracts vary by RPC. Policy gaps are labeled in the contract. **Dispatch blockers:** approve canonical person ownership/cardinality (P1/P2), directory-only/verified-email and local contact-edit rules, contact+access atomicity/pending-state and conflict handling (E1/E2), and precedence for legacy manual discipleship state (F1).
+- Hosted status: unknown. Local migrations and source revision `4acb563` are implementation evidence only; no hosted definitions, data counts, migration state, or permissions are asserted.
+- Acceptance/check: documentation evidence and policy rows are recorded; run only `git diff --check`. No tests/builds or hosted/device access.
 
 ### V1 — Shared visual foundation
 
@@ -124,9 +126,9 @@ Status: I1 draft for contract-gate review. This is a discovery manifest, not app
 - Interfaces/models: production routes/repositories, reviewed hosted RPCs, package/version/certificate and the approved delivery target.
 - Acceptance/check: full workflow covers student/class/enrollment/session/draft/finalize/reload/progress and convert handoff with global/scoped/denied identities. Run flutter analyze --no-pub, flutter test --concurrency=1 integration_test/unified_journey_test.dart, affected python scripts/test_database.py scenarios and the inspected scripts/verify_unified.ps1 gate. Build only with public configuration and approved release signing, using --dart-define-from-file=[private-public-defines.json]; verify APK hash/package/version/certificate and install/update on an available target. Expected local, hosted and device evidence are reported separately; no category passes by inference.
 
-## Dispatch blockers at I1
+## Dispatch blockers after C1 review
 
-- C1 has not produced a reviewed completion contract, and I1 artifacts are drafts without commits. No downstream code slice is ready for dispatch.
+- I1 is committed. The C1 draft has been reviewed with zero critical or important findings. Canonical identity, Team email/edit and contact/access atomicity choices, plus legacy manual-start precedence, remain user decisions; no dependent code slice is ready for dispatch.
 - Hosted project identity, migration ledger, hosted function definitions, authenticated scope and backup/recovery evidence are unavailable because there is no Supabase CLI, linked project ref or open authenticated app session.
 - No Firebase export or source-project session is available; production data existence/counts and any Firebase import command remain unknown.
 - No Android device/session was surfaced or exercised. Device availability, install/update and persisted-data behavior remain unverified.
