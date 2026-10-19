@@ -29,3 +29,7 @@ This runs `flutter analyze` and `flutter test`, stopping on failure. Widget chec
 ## Workflow
 
 Use standard Superpowers SDD with direct project tools, TDD and independent task review. The 19-task plan and accepted design are under `docs/superpowers`. Custom pipeline runtime experiments are suspended. Production deployment, live access grants and private-record migration require separate release actions. No billing, publishing or signing credentials are configured.
+
+## Current ministry delivery work
+
+The active branch `codex/ministry-production-completion` carries the approved L1 class-session management plan. Tasks 1–4 are reviewed; Task 5 implementation and its scoped review are complete, while broad verification and final L1 review remain open. See the [cross-device handoff](docs/verification/l1-cross-device-handoff.md), [L1 plan](docs/superpowers/plans/2026-10-19-ministry-l1-session-management-plan.md), and [L1 design](docs/superpowers/specs/2026-10-19-ministry-l1-session-management-design.md) before continuing. The handoff records remaining failures and required model roles; it does not mark the work release-ready.
