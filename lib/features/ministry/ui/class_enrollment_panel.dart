@@ -219,6 +219,10 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       await _load();
     } catch (error) {
       if (!mounted) return;
+      if (_isDefinitiveMutationRejection(error) &&
+          identical(_pendingEnrollment, request)) {
+        _pendingEnrollment = null;
+      }
       setState(() {
         _busy = false;
         if (scopeGeneration == _scopeGeneration) _error = _message(error);
@@ -340,6 +344,10 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       await _load();
     } catch (error) {
       if (!mounted) return;
+      if (_isDefinitiveMutationRejection(error) &&
+          identical(_pendingClose, request)) {
+        _pendingClose = null;
+      }
       setState(() {
         _busy = false;
         if (scopeGeneration == _scopeGeneration) _error = _message(error);
@@ -365,6 +373,24 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
     }
     return 'Não foi possível carregar os dados. Tente novamente.';
   }
+
+  bool _isDefinitiveMutationRejection(Object error) =>
+      error is DataFailure &&
+      const {
+        'invalid',
+        'permission',
+        'forbidden',
+        'invalid_congregation',
+        'stale_revision',
+        'class_capacity',
+        'active_enrollment',
+        'academic_conflict',
+        'record_exists',
+        'person_not_found',
+        'academic_invalid',
+        'class_not_active',
+        'operation_conflict',
+      }.contains(error.code);
 
   @override
   Widget build(BuildContext context) => Base44Panel(

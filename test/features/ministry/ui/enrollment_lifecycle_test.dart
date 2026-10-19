@@ -24,8 +24,11 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
   int reads = 0;
   bool enrolled = false;
   bool closed = false;
+  int enrollmentRevision = 1;
   bool loseNextEnrollmentResponse = false;
   bool loseNextCloseResponse = false;
+  String? rejectNextEnrollment;
+  String? rejectNextClose;
   Completer<Map<String, dynamic>>? delayedPeopleResponse;
   Completer<Map<String, dynamic>>? delayedRosterResponse;
 
@@ -79,7 +82,7 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
                 'start_date': '2026-10-01',
                 'end_date': null,
                 'status': 'active',
-                'revision': 1,
+                'revision': enrollmentRevision,
                 'created_at': '2026-10-19T00:00:00Z',
                 'updated_at': '2026-10-19T00:00:00Z',
                 'updated_by': _actor,
@@ -140,6 +143,11 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
   ) async {
     calls.add((name: name, operationId: operationId, payload: Map.of(payload)));
     if (name == 'enroll_student') {
+      final rejection = rejectNextEnrollment;
+      if (rejection != null) {
+        rejectNextEnrollment = null;
+        throw DataFailure(rejection);
+      }
       enrolled = true;
       if (loseNextEnrollmentResponse) {
         loseNextEnrollmentResponse = false;
@@ -154,6 +162,12 @@ class _EnrollmentGateway implements ReadRpcGateway, MinistryCommandGateway {
       };
     }
     if (name == 'close_enrollment') {
+      final rejection = rejectNextClose;
+      if (rejection != null) {
+        rejectNextClose = null;
+        if (rejection == 'stale_revision') enrollmentRevision++;
+        throw DataFailure(rejection);
+      }
       closed = true;
       if (loseNextCloseResponse) {
         loseNextCloseResponse = false;
@@ -382,6 +396,57 @@ void main() {
     expect(gateway.calls[1].payload, gateway.calls[0].payload);
   });
 
+  testWidgets('definitive enrollment rejection releases the pending command', (
+    tester,
+  ) async {
+    final gateway = _EnrollmentGateway()..rejectNextEnrollment = 'invalid';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClassEnrollmentPanel(
+            repository: MinistryRepository(gateway),
+            congregationId: _scope,
+            classId: _classId,
+            classStartDate: '2026-10-01',
+            classEndDate: null,
+            onChanged: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Pessoa',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enrollment-person-search')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Pessoa Exemplo').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enroll-person-button')));
+    await tester.pumpAndSettle();
+    expect(gateway.calls, hasLength(1));
+
+    await tester.enterText(
+      find.byKey(const Key('enrollment-person-query')),
+      'Outra',
+    );
+    await tester.tap(find.byKey(const Key('enrollment-search-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enrollment-person-search')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Outra Pessoa').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('enroll-person-button')));
+    await tester.pumpAndSettle();
+
+    expect(gateway.calls, hasLength(2));
+    expect(gateway.calls[1].payload['person_id'], _otherPersonId);
+    expect(gateway.calls[1].operationId, isNot(gateway.calls[0].operationId));
+  });
+
   testWidgets('replays the same close command after a lost response', (
     tester,
   ) async {
@@ -501,6 +566,51 @@ void main() {
     expect(gateway.calls, hasLength(2));
     expect(gateway.calls[1].operationId, gateway.calls[0].operationId);
     expect(gateway.calls[1].payload, gateway.calls[0].payload);
+  });
+
+  testWidgets('stale close revision allows a fresh command after refresh', (
+    tester,
+  ) async {
+    final gateway = _EnrollmentGateway()
+      ..enrolled = true
+      ..rejectNextClose = 'stale_revision';
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ClassEnrollmentPanel(
+            repository: MinistryRepository(gateway),
+            congregationId: _scope,
+            classId: _classId,
+            classStartDate: '2026-10-01',
+            classEndDate: null,
+            onChanged: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Registrar desistência'));
+    await tester.pumpAndSettle();
+    expect(gateway.calls.single.payload['expected_revision'], 1);
+    expect(
+      find.text(
+        'A matrícula foi alterada por outra pessoa. Atualize a turma e tente novamente.',
+      ),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Atualizar'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('close-enrollment-$_enrollmentId')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Concluir participação'));
+    await tester.pumpAndSettle();
+
+    expect(gateway.calls, hasLength(2));
+    expect(gateway.calls[1].payload['expected_revision'], 2);
+    expect(gateway.calls[1].operationId, isNot(gateway.calls[0].operationId));
   });
 
   testWidgets('old roster response is discarded after scope and class change', (
