@@ -153,25 +153,87 @@ void main() {
   );
 
   test(
-    'access repository exposes assignments with a distinct access role type',
+    'access facade grants only through the linked-contact command',
     () async {
       final gateway = await fixture.fixture((request) async {
-        expect(request.uri.path, '/rest/v1/user_access');
-        await fixture.respond(request, [
-          {
-            'id': _id(2),
-            'user_email': 'teacher@example.test',
-            'role': AccessRole.direction.wireValue,
+        expect(
+          request.uri.path,
+          '/rest/v1/rpc/ieadpe_ministry_save_contact_with_access',
+        );
+        expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+          'operation_id': _operationId,
+          'payload': {
+            'id': _id(1),
+            'scope': 'congregation',
             'congregation_id': _scopeId,
-            'user_id': _id(4),
+            'name': 'Teacher One',
+            'role_code': 'teacher',
+            'phone_e164': null,
+            'birth_date': null,
+            'email': 'teacher@example.test',
+            'access': {
+              'user_email': 'teacher@example.test',
+              'role': AccessRole.direction.wireValue,
+              'congregation_id': _scopeId,
+            },
           },
-        ]);
+        });
+        await fixture.respond(request, {
+          'id': _id(1),
+          'revision': 1,
+          'access_id': _id(2),
+        });
       });
-      final dynamic page = await (AccessRepository(gateway) as dynamic)
-          .listAssignments();
-      expect(page.items.single.runtimeType.toString(), 'TeamAccessAssignment');
-      expect(page.items.single.role, AccessRole.direction);
-      expect(page.items.single.boundUserId, _id(4));
+      final result = await AccessRepository(gateway).saveContactWithAccess(
+        operationId: _operationId,
+        id: _id(1),
+        scope: ContactScope.congregation,
+        congregationId: _scopeId,
+        name: 'Teacher One',
+        roleCode: RoleCode.teacher,
+        phoneE164: null,
+        birthDate: null,
+        email: 'teacher@example.test',
+        accessRole: AccessRole.direction,
+        accessCongregationId: _scopeId,
+      );
+      expect(result.accessId, _id(2));
+      expect(result.revision, 1);
+    },
+  );
+
+  test(
+    'access revoke is scoped to a contact and its returned revision',
+    () async {
+      final gateway = await fixture.fixture((request) async {
+        expect(
+          request.uri.path,
+          '/rest/v1/rpc/ieadpe_ministry_revoke_contact_access',
+        );
+        expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+          'operation_id': _operationId,
+          'payload': {
+            'id': _id(1),
+            'scope': 'congregation',
+            'congregation_id': _scopeId,
+            'expected_revision': 4,
+          },
+        });
+        await fixture.respond(request, {
+          'id': _id(1),
+          'revision': 5,
+          'revoked_access_id': _id(2),
+        });
+      });
+      final result = await AccessRepository(gateway).revokeContactAccess(
+        operationId: _operationId,
+        id: _id(1),
+        scope: ContactScope.congregation,
+        congregationId: _scopeId,
+        expectedRevision: 4,
+      );
+      expect(result.revokedAccessId, _id(2));
+      expect(result.revision, 5);
     },
   );
 }

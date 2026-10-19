@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
-import '../../data/access_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart';
 import '../../ui/base44_widgets.dart';
@@ -18,6 +17,7 @@ class AdminPage extends StatefulWidget {
     required this.scope,
     required this.gateway,
     required this.onScopeRefresh,
+    required this.onOpenTeam,
     this.reportBuilder,
     this.eventsBuilder,
     this.backupBuilder,
@@ -26,6 +26,7 @@ class AdminPage extends StatefulWidget {
   final AccessScope scope;
   final Gateway gateway;
   final Future<void> Function() onScopeRefresh;
+  final VoidCallback onOpenTeam;
   final WidgetBuilder? reportBuilder, eventsBuilder, backupBuilder;
   final VoidCallback? onFeedback;
   @override
@@ -36,7 +37,6 @@ class _AdminPageState extends State<AdminPage> {
   late String _token;
   int _request = 0, _selected = 0, _owner = 0;
   List<Congregation>? _catalog;
-  List<UserAccess>? _access;
   String? _error;
   bool _busy = false, _denied = false, _refreshing = false;
   String? _operation;
@@ -74,7 +74,6 @@ class _AdminPageState extends State<AdminPage> {
       _owner++;
       _token = widget.gateway.context;
       _catalog = null;
-      _access = null;
       _denied = false;
       _refreshing = false;
       _busy = false;
@@ -89,7 +88,6 @@ class _AdminPageState extends State<AdminPage> {
     setState(() {
       _denied = true;
       _catalog = null;
-      _access = null;
       _retry = null;
       _operation = null;
       _request++;
@@ -126,26 +124,14 @@ class _AdminPageState extends State<AdminPage> {
     final token = _token;
     setState(() {
       _catalog = null;
-      _access = null;
       _error = null;
     });
     try {
       final catalog = await CongregationRepository(gateway).list();
       gateway.ensureCurrent(token);
       if (!_current || request != _request || gateway != widget.gateway) return;
-      final access = <UserAccess>[];
-      String? cursor;
-      do {
-        final page = await AccessRepository(gateway).list(cursor);
-        gateway.ensureCurrent(token);
-        access.addAll(page.items);
-        cursor = page.nextCursor;
-      } while (cursor != null);
       if (_current && request == _request) {
-        setState(() {
-          _catalog = catalog;
-          _access = List.unmodifiable(access);
-        });
+        setState(() => _catalog = catalog);
       }
     } catch (error) {
       if (!_current || request != _request) return;
@@ -194,7 +180,6 @@ class _AdminPageState extends State<AdminPage> {
           _retry = null;
           _operation = null;
           _catalog = null;
-          _access = null;
           _refreshing = true;
           _request++;
         });
@@ -321,7 +306,6 @@ class _AdminPageState extends State<AdminPage> {
     }
     final locked = _busy || _retry != null;
     final repository = CongregationRepository(widget.gateway);
-    final accessRepository = AccessRepository(widget.gateway);
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(
@@ -445,7 +429,7 @@ class _AdminPageState extends State<AdminPage> {
                     ),
                   ),
                 ),
-              if (_selected < 2 && (_catalog == null || _access == null)) ...[
+              if (_selected == 0 && _catalog == null) ...[
                 Base44Panel(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -472,23 +456,7 @@ class _AdminPageState extends State<AdminPage> {
                       _mutate((op) => repository.archive(op, id)),
                 )
               else if (_selected == 1)
-                AccessPanel(
-                  key: ValueKey('access-$_token'),
-                  items: _access!,
-                  congregations: _catalog!,
-                  busy: locked,
-                  onSave: (id, email, role, congregationId) => _mutate(
-                    (op) => accessRepository.save(
-                      op,
-                      id: id,
-                      email: email,
-                      role: role,
-                      congregationId: congregationId,
-                    ),
-                  ),
-                  onRevoke: (id) =>
-                      _mutate((op) => accessRepository.revoke(op, id)),
-                )
+                AccessPanel(onOpenTeam: widget.onOpenTeam)
               else if (_selected == 2)
                 _later(widget.reportBuilder, 'O relatório')
               else if (_selected == 3)

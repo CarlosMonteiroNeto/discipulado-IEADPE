@@ -12,6 +12,7 @@ Widget app(
   Future<void> Function()? refresh,
   AccessScope? scope,
   double scale = 1,
+  VoidCallback? openTeam,
 }) => MaterialApp(
   home: Scaffold(
     body: MediaQuery(
@@ -23,6 +24,7 @@ Widget app(
         scope: scope ?? AccessScope(isSupervision: true),
         gateway: gateway,
         onScopeRefresh: refresh ?? () async {},
+        onOpenTeam: openTeam ?? () {},
         reportBuilder: (_) => const Text('Relatório real'),
         eventsBuilder: (_) => const Text('Eventos reais'),
         backupBuilder: (_) => const Text('Backup real'),
@@ -59,6 +61,7 @@ void main() {
                 scope: AccessScope(isSupervision: true),
                 gateway: gateway,
                 onScopeRefresh: () async {},
+                onOpenTeam: () {},
                 reportBuilder: (_) => const Text('Relatório real'),
                 eventsBuilder: (_) => const Text('Eventos reais'),
                 backupBuilder: (_) => const Text('Backup real'),
@@ -129,65 +132,18 @@ void main() {
     expect(gateway.commands, ['archive_congregation']);
     expect(gateway.payloads.single, {'id': catalogId});
   });
-  testWidgets(
-    'access grants normalize email and require congregation for direction',
-    (t) async {
-      final gateway = AdminGateway();
-      await t.pumpWidget(app(gateway));
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      await press(t, 'Novo acesso');
-      await t.enterText(find.byType(TextFormField), ' USER@Example.Test ');
-      await press(t, 'Salvar acesso');
-      expect(gateway.commands, isEmpty);
-      expect(find.text('Selecione uma congregação ativa.'), findsOneWidget);
-      await t.tap(find.byType(DropdownButtonFormField<String>));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Sede').last);
-      await t.pumpAndSettle();
-      await press(t, 'Salvar acesso');
-      expect(gateway.commands, ['save_access']);
-      expect(gateway.payloads.single, {
-        'user_email': 'user@example.test',
-        'role': 'Membro da direção da campanha',
-        'congregation_id': catalogId,
-      });
-    },
-  );
-  testWidgets(
-    'revoking self invalidates before scope refresh and hides grant records',
-    (t) async {
-      final gateway = AdminGateway()
-        ..accesses = [
-          {
-            'id': '20000000-0000-0000-0000-000000000001',
-            'user_email': 'self@example.test',
-            'role': 'Membro da supervisão das campanhas',
-            'user_id': '00000000-0000-0000-0000-000000000001',
-            'congregation_id': null,
-          },
-        ];
-      final token = gateway.context;
-      var refreshed = 0;
-      await t.pumpWidget(
-        app(
-          gateway,
-          refresh: () async {
-            expect(gateway.context, isNot(token));
-            refreshed++;
-          },
-        ),
-      );
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      await press(t, 'Remover');
-      await t.tap(find.widgetWithText(FilledButton, 'Remover'));
-      await t.pumpAndSettle();
-      expect(gateway.commands, ['revoke_access']);
-      expect(refreshed, 1);
-      expect(find.text('self@example.test'), findsNothing);
-    },
-  );
+  testWidgets('Admin access tab opens the unified Team workflow', (t) async {
+    final gateway = AdminGateway();
+    var opened = 0;
+    await t.pumpWidget(app(gateway, openTeam: () => opened++));
+    await t.pumpAndSettle();
+    await press(t, 'Acessos');
+    expect(find.text('Abrir equipe'), findsOneWidget);
+    expect(find.text('Novo acesso'), findsNothing);
+    await press(t, 'Abrir equipe');
+    expect(opened, 1);
+    expect(gateway.commands, isEmpty);
+  });
   testWidgets('stale protected read cannot publish former user catalog', (
     t,
   ) async {
@@ -241,115 +197,6 @@ void main() {
     },
   );
 
-  testWidgets(
-    'duplicate existing grant offers correction before sending command',
-    (t) async {
-      final gateway = AdminGateway()
-        ..accesses = [
-          {
-            'id': '20000000-0000-0000-0000-000000000001',
-            'user_email': 'existing@example.test',
-            'role': 'Membro da direção da campanha',
-            'congregation_id': catalogId,
-            'user_id': null,
-          },
-        ];
-      await t.pumpWidget(app(gateway));
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      await press(t, 'Novo acesso');
-      await t.enterText(find.byType(TextFormField), 'EXISTING@example.test');
-      await t.tap(find.byType(DropdownButtonFormField<String>));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Sede').last);
-      await t.pumpAndSettle();
-      await press(t, 'Salvar acesso');
-      expect(gateway.commands, isEmpty);
-      expect(
-        find.text(
-          'Este usuário já possui este acesso. Confira o cargo e a congregação.',
-        ),
-        findsOneWidget,
-      );
-    },
-  );
-
-  testWidgets(
-    'access editor wraps scaled roles and remains usable at 360 pixels',
-    (t) async {
-      t.view.physicalSize = const Size(360, 800);
-      t.view.devicePixelRatio = 1;
-      addTearDown(t.view.resetPhysicalSize);
-      addTearDown(t.view.resetDevicePixelRatio);
-      final gateway = AdminGateway();
-      await t.pumpWidget(app(gateway, scale: 2));
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      await press(t, 'Novo acesso');
-      await t.enterText(find.byType(TextFormField), 'supervision@example.test');
-      await t.ensureVisible(find.byType(DropdownButtonFormField<AccessRole>));
-      await t.tap(find.byType(DropdownButtonFormField<AccessRole>));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Membro da supervisão das campanhas').last);
-      await t.pumpAndSettle();
-      await press(t, 'Salvar acesso');
-      expect(gateway.payloads.single['congregation_id'], isNull);
-      expect(t.takeException(), isNull);
-    },
-  );
-  testWidgets(
-    'narrow admin keeps uncertain retry reachable and mutation actions locked',
-    (t) async {
-      t.view.physicalSize = const Size(320, 800);
-      t.view.devicePixelRatio = 1;
-      addTearDown(t.view.resetPhysicalSize);
-      addTearDown(t.view.resetDevicePixelRatio);
-      final gateway = AdminGateway()..failure = 'unavailable';
-      await t.pumpWidget(app(gateway, scale: 2));
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      await press(t, 'Novo acesso');
-      await t.enterText(find.byType(TextFormField), 'supervision@example.test');
-      await t.ensureVisible(find.byType(DropdownButtonFormField<AccessRole>));
-      await t.tap(find.byType(DropdownButtonFormField<AccessRole>));
-      await t.pumpAndSettle();
-      await t.tap(find.text('Membro da supervisão das campanhas').last);
-      await t.pumpAndSettle();
-      await press(t, 'Salvar acesso');
-
-      expect(
-        find.text(
-          'Não foi possível confirmar a alteração. Tente a mesma alteração novamente.',
-        ),
-        findsOneWidget,
-      );
-      await t.ensureVisible(find.text('Tentar a mesma alteração novamente'));
-      expect(
-        t
-            .widget<FilledButton>(
-              find.widgetWithText(FilledButton, 'Salvar acesso'),
-            )
-            .onPressed,
-        isNull,
-      );
-      expect(
-        t
-            .widget<ChoiceChip>(find.widgetWithText(ChoiceChip, 'Eventos'))
-            .onSelected,
-        isNull,
-      );
-      expect(t.takeException(), isNull);
-
-      gateway.failure = null;
-      await press(t, 'Tentar a mesma alteração novamente');
-      expect(gateway.operations, [
-        gateway.operations.first,
-        gateway.operations.first,
-      ]);
-      expect(find.text('Novo acesso'), findsNothing);
-      expect(t.takeException(), isNull);
-    },
-  );
   testWidgets(
     'late mutation after owner replacement cannot refresh the next user',
     (t) async {

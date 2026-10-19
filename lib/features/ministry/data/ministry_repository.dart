@@ -220,6 +220,135 @@ class MinistryRepository {
     }
   }
 
+  Future<MinistryCommandResult> saveContact({
+    required String operationId,
+    required String id,
+    required ContactScope scope,
+    String? congregationId,
+    required String name,
+    required RoleCode? roleCode,
+    required String? phoneE164,
+    required CalendarDate? birthDate,
+    required String? email,
+    int? expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    if (congregationId != null) _uuid(congregationId);
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        (expectedRevision != null && expectedRevision < 1) ||
+        name.isEmpty ||
+        name != name.trim() ||
+        name.length > 200 ||
+        (roleCode != null && roleCode.scope != scope) ||
+        (phoneE164 != null &&
+            !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phoneE164)) ||
+        (email != null &&
+            (email.isEmpty ||
+                email != email.trim().toLowerCase() ||
+                !email.contains('@')))) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'save_contact',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'scope': scope.wire,
+        'congregation_id': congregationId,
+        'name': name,
+        'role_code': roleCode?.wire,
+        'phone_e164': phoneE164,
+        'birth_date': birthDate?.toString(),
+        'email': email,
+        if (expectedRevision != null) 'expected_revision': expectedRevision,
+      },
+    );
+    if (result.revision !=
+        (expectedRevision == null ? 1 : expectedRevision + 1)) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<MinistryCommandResult> setContactArchived({
+    required String operationId,
+    required String id,
+    required ContactScope scope,
+    String? congregationId,
+    required bool archived,
+    required int expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    if (congregationId != null) _uuid(congregationId);
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        expectedRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'set_contact_archived',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'scope': scope.wire,
+        'congregation_id': congregationId,
+        'archived': archived,
+        'expected_revision': expectedRevision,
+      },
+    );
+    if (result.revision != expectedRevision + 1) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<MinistryCommandResult> replaceRoleHolder({
+    required String operationId,
+    required String id,
+    required ContactScope scope,
+    String? congregationId,
+    required RoleCode roleCode,
+    required String previousContactId,
+    required int expectedRevision,
+    required int previousExpectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(previousContactId);
+    if (congregationId != null) _uuid(congregationId);
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        roleCode.scope != scope ||
+        id == previousContactId ||
+        expectedRevision < 1 ||
+        previousExpectedRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'replace_role_holder',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'scope': scope.wire,
+        'congregation_id': congregationId,
+        'role_code': roleCode.wire,
+        'previous_contact_id': previousContactId,
+        'expected_revision': expectedRevision,
+        'previous_expected_revision': previousExpectedRevision,
+      },
+    );
+    if (result.revision != expectedRevision + 1 ||
+        result.fields['previous_contact_id'] != previousContactId ||
+        result.fields['previous_revision'] != previousExpectedRevision + 1 ||
+        result.fields.keys.toSet().difference(const {
+          'previous_contact_id',
+          'previous_revision',
+        }).isNotEmpty) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
   /// Edits only academic fields. Canonical name and contact data use
   /// [savePerson] with its independent person revision.
   Future<MinistryCommandResult> saveStudent({

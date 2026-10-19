@@ -6,8 +6,14 @@ import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/data/convert_repository.dart';
 import 'package:ieadpe_converts/data/access_repository.dart';
 import 'package:ieadpe_converts/domain/models.dart';
+import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 
 import 'repositories_test.dart' as fixture;
+
+const _accessOperationId = '33333333-3333-4333-8333-333333333333';
+const _contactId = '11111111-1111-4111-8111-111111111111';
+const _accessScopeId = '22222222-2222-4222-8222-222222222222';
+const _assignmentId = '44444444-4444-4444-8444-444444444444';
 
 void main() {
   test('invalid calendar timestamps and missing state are rejected rather than defaulted', () async {
@@ -142,51 +148,55 @@ void main() {
       expect(calls, 1);
     },
   );
-  test(
-    'access save sends editable fields only and decodes scoped access rows',
-    () async {
-      var calls = 0;
-      final gateway = await fixture.fixture((r) async {
-        calls++;
-        if (r.method == 'POST') {
-          final body = jsonDecode(await utf8.decoder.bind(r).join());
-          expect(r.uri.path, '/rest/v1/rpc/ieadpe_save_access');
-          expect(body, {
-            'operation_id': fixture.operationId,
-            'payload': {
-              'user_email': 'synthetic@example.test',
-              'role': 'Membro da direção da campanha',
-              'congregation_id': fixture.scopeId,
-            },
-          });
-          await fixture.respond(r, {'id': fixture.id(1)});
-        } else {
-          expect(r.uri.path, '/rest/v1/user_access');
-          await fixture.respond(r, [
-            {
-              'id': fixture.id(1),
-              'user_email': 'synthetic@example.test',
-              'role': 'Membro da direção da campanha',
-              'congregation_id': fixture.scopeId,
-              'user_id': null,
-            },
-          ]);
-        }
-      });
-      final repo = AccessRepository(gateway);
+  test('access grant uses the atomic contact and assignment command', () async {
+    var calls = 0;
+    final gateway = await fixture.fixture((r) async {
+      calls++;
       expect(
-        (await repo.save(
-          fixture.operationId,
-          email: ' Synthetic@example.test ',
-          role: AccessRole.direction,
-          congregationId: fixture.scopeId,
-        )).value,
-        fixture.id(1),
+        r.uri.path,
+        '/rest/v1/rpc/ieadpe_ministry_save_contact_with_access',
       );
-      expect((await repo.list()).items.single.congregationId, fixture.scopeId);
-      expect(calls, 2);
-    },
-  );
+      expect(jsonDecode(await utf8.decoder.bind(r).join()), {
+        'operation_id': _accessOperationId,
+        'payload': {
+          'id': _contactId,
+          'scope': 'congregation',
+          'congregation_id': _accessScopeId,
+          'name': 'Teacher One',
+          'role_code': 'teacher',
+          'phone_e164': null,
+          'birth_date': null,
+          'email': 'synthetic@example.test',
+          'access': {
+            'user_email': 'synthetic@example.test',
+            'role': AccessRole.direction.wireValue,
+            'congregation_id': _accessScopeId,
+          },
+        },
+      });
+      await fixture.respond(r, {
+        'id': _contactId,
+        'revision': 1,
+        'access_id': _assignmentId,
+      });
+    });
+    final repo = AccessRepository(gateway);
+    final result = await repo.saveContactWithAccess(
+      operationId: _accessOperationId,
+      id: _contactId,
+      scope: ContactScope.congregation,
+      congregationId: _accessScopeId,
+      name: 'Teacher One',
+      roleCode: RoleCode.teacher,
+      phoneE164: null,
+      birthDate: null,
+      email: 'synthetic@example.test',
+      accessRole: AccessRole.direction,
+      accessCongregationId: _accessScopeId,
+    );
+    expect(result.accessId, _assignmentId);
+    expect(calls, 1);
+  });
   test('read DTO cannot be sent as editable mutation payload', () async {
     var calls = 0;
     final gateway = await fixture.fixture((r) {
@@ -252,22 +262,30 @@ void main() {
       expect(result.errorCode, 'invalid_response');
     }
   });
-  test('invalid access role/scope combination fails strict decoding', () async {
-    final gateway = await fixture.fixture(
-      (r) => fixture.respond(r, [
-        {
-          'id': fixture.id(1),
-          'user_email': 'synthetic@example.test',
-          'role': 'Membro da supervisão das campanhas',
-          'congregation_id': fixture.scopeId,
-        },
-      ]),
-    );
-    await expectLater(
-      AccessRepository(gateway).list(),
-      throwsA(
-        isA<DataFailure>().having((e) => e.code, 'code', 'invalid_response'),
-      ),
-    );
-  });
+  test(
+    'access facade rejects a role outside the contact scope before network',
+    () async {
+      var calls = 0;
+      final gateway = await fixture.fixture((r) {
+        calls++;
+        return fixture.respond(r, {});
+      });
+      await expectLater(
+        AccessRepository(gateway).saveContactWithAccess(
+          operationId: _accessOperationId,
+          id: _contactId,
+          scope: ContactScope.congregation,
+          congregationId: _accessScopeId,
+          name: 'Teacher One',
+          roleCode: RoleCode.teacher,
+          phoneE164: null,
+          birthDate: null,
+          email: 'synthetic@example.test',
+          accessRole: AccessRole.supervision,
+        ),
+        throwsA(isA<DataFailure>().having((e) => e.code, 'code', 'invalid')),
+      );
+      expect(calls, 0);
+    },
+  );
 }

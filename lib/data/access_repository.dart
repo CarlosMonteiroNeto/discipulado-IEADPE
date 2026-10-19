@@ -1,78 +1,59 @@
-import '../domain/models.dart';
+import '../features/ministry/data/ministry_codec.dart';
+import '../features/ministry/data/ministry_repository.dart';
 import '../features/ministry/domain/ministry_models.dart';
+import '../domain/models.dart' show AccessRole;
 import 'supabase_gateway.dart';
 
+/// Login access is changed only together with an explicitly selected ministry
+/// contact. This repository deliberately exposes no standalone user_access
+/// list, grant, or revoke command.
 class AccessRepository {
-  AccessRepository(this.gateway);
-  final Gateway gateway;
+  AccessRepository(ReadRpcGateway gateway)
+    : _ministry = MinistryRepository(gateway);
 
-  Future<Page<TeamAccessAssignment>> listAssignments([String? cursor]) async {
-    final page = await list(cursor);
-    return Page(
-      items: page.items.map(
-        (assignment) => TeamAccessAssignment(
-          id: assignment.id,
-          userEmail: assignment.userEmail,
-          role: assignment.role,
-          congregationId: assignment.congregationId,
-          boundUserId: assignment.userId,
-        ),
-      ),
-      nextCursor: page.nextCursor,
-    );
-  }
+  final MinistryRepository _ministry;
 
-  Future<Page<UserAccess>> list([String? cursor]) async {
-    final token = gateway.context;
-    final after = decodeCursor(cursor, token, 'user_access');
-    final rows = await gateway.read(
-      'user_access',
-      context: token,
-      afterId: after,
-    );
-    gateway.ensureCurrent(token);
-    validatePageOrder(rows, after);
-    final records = rows
-        .map((row) {
-          try {
-            validateUuid(row['id']);
-            if (row['user_id'] != null) validateUuid(row['user_id']);
-            if (row['congregation_id'] != null) {
-              validateUuid(row['congregation_id']);
-            }
-            final record = UserAccess.fromJson(row);
-            if (!record.userEmail.contains('@') ||
-                record.userEmail != record.userEmail.trim().toLowerCase() ||
-                (record.role == AccessRole.direction) !=
-                    (record.congregationId != null)) {
-              throw const FormatException();
-            }
-            return record;
-          } catch (_) {
-            throw const DataFailure('invalid_response');
-          }
-        })
-        .toList(growable: false);
-    return Page(
-      items: records,
-      nextCursor: rows.length == 100
-          ? encodeCursor(token, 'user_access', records.last.id)
-          : null,
-    );
-  }
-
-  Future<MutationResult<String>> save(
-    String operationId, {
+  Future<MinistryContactAccessResult> saveContactWithAccess({
+    required String operationId,
     String? id,
-    required String email,
-    required AccessRole role,
+    int? expectedRevision,
+    required ContactScope scope,
     String? congregationId,
-  }) => gateway.command('save_access', operationId, {
-    'id': ?id,
-    'user_email': email.trim().toLowerCase(),
-    'role': role.wireValue,
-    'congregation_id': congregationId,
-  });
-  Future<MutationResult<String>> revoke(String operationId, String id) =>
-      gateway.command('revoke_access', operationId, {'id': id});
+    required String name,
+    required RoleCode? roleCode,
+    required String? phoneE164,
+    required CalendarDate? birthDate,
+    required String email,
+    String? accessId,
+    required AccessRole accessRole,
+    String? accessCongregationId,
+  }) => _ministry.saveContactWithAccess(
+    operationId: operationId,
+    id: id,
+    expectedRevision: expectedRevision,
+    scope: scope,
+    congregationId: congregationId,
+    name: name,
+    roleCode: roleCode,
+    phoneE164: phoneE164,
+    birthDate: birthDate,
+    email: email,
+    accessId: accessId,
+    accessRole: accessRole,
+    accessCongregationId: accessCongregationId,
+  );
+
+  Future<MinistryContactAccessRevocationResult> revokeContactAccess({
+    required String operationId,
+    required String id,
+    required ContactScope scope,
+    String? congregationId,
+    required int expectedRevision,
+  }) => _ministry.revokeContactAccess(
+    operationId: operationId,
+    id: id,
+    scope: scope,
+    congregationId: congregationId,
+    expectedRevision: expectedRevision,
+  );
 }

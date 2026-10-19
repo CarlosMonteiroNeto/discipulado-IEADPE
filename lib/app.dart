@@ -540,6 +540,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           scope: widget.scope,
           gateway: widget.gateway,
           onScopeRefresh: widget.router.refresh,
+          onOpenTeam: () => widget.router.go('/ministry/team'),
           reportBuilder: (_) => ConversionPanel(
             repository: widget.reports,
             exporter: widget.exporter,
@@ -691,6 +692,9 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         congregationId: congregationId,
         supervision:
             widget.scope.isMinistrySupervision && congregationId == null,
+        canManageAccess:
+            widget.scope.isGlobalManager || widget.scope.isMinistrySupervision,
+        onScopeRefresh: widget.router.refresh,
       ),
       '/ministry/students' when scopedActionsEnabled => StudentsPage(
         key: ValueKey('ministry-students:$congregationId'),
