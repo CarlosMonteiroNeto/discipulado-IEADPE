@@ -76,6 +76,7 @@ All current wrappers are authenticated `SECURITY DEFINER` functions; callers sup
 | `ieadpe_ministry_get_enrollment_progress` | `{congregation_id,enrollment_id}` | `{enrollment_id,present,absent,excused,denominator,percentage,rounded_percentage}`. Only finalized sessions count; denominator is present + absent; zero denominator yields null percentages. |
 | `ieadpe_ministry_get_overview` | `{congregation_id}`; UUID or null | `{students,classes,open_sessions,through_date}`. Null is global supervision only. |
 | `ieadpe_ministry_list_pending_sessions` | `{congregation_id,limit,cursor}`; UUID or null, limit 1–100 | `{items:[{id,class_id,class_name,congregation_id,date,topic,status:'open'}],next_cursor}`; open sessions through `America/Recife` business date. |
+| `ieadpe_ministry_list_class_sessions(request jsonb)` (L1 target) | Exactly `{congregation_id:UUID,class_id:UUID,limit:integer 1..100,cursor:string|null}`; every key required, unknown keys rejected. | Exactly `{items:[{id:UUID,class_id:UUID,congregation_id:UUID,date:yyyy-MM-dd,topic:string|null,status:'open'|'finalized'|'canceled',revision:positive integer}],next_cursor:string|null}`. All statuses/dates and completed/archived class history included; ASC `(session_date,id)` keyset order; max `limit` items, fetch `limit+1`. Cursor signature binds resource `class_sessions`, actor UID, congregation, class, last date/ID; limit may change between pages. Recheck access each page. Errors: `unauthorized`/`forbidden` (42501), `invalid_request`, `invalid_limit`, `invalid_cursor`, `class_not_found` (22023); well-formed integer outside 1..100 is `invalid_limit`, malformed/fractional is `invalid_request`. Class lookup follows current authorized-congregation validation; foreign class is `class_not_found`. No role argument, global/null scope, roster or personal/access metadata. |
 
 Cursor handling is RPC-specific. `ieadpe_ministry_list_congregations` uses a raw UUID `id` cursor. `ieadpe_ministry_list_directory` signs its cursor and binds UID plus scope/filter/last-key values. Other paged Ministry reads use the signed Ministry cursor helper, bound to UID, resource and the applicable congregation/class/status/prefix filters plus last key. Non-paged detail reads have no cursor. Invalid or mismatched cursors fail; reads are bounded to 100 rows.
 
@@ -97,6 +98,60 @@ Cursor handling is RPC-specific. `ieadpe_ministry_list_congregations` uses a raw
 | `ieadpe_ministry_create_session` | `{id,congregation_id,class_id,date,topic}`; nullable topic | `{id,revision,status:'open'}` |
 | `ieadpe_ministry_cancel_session` | `{id,congregation_id,expected_revision}` | `{id,revision,status:'canceled'}` |
 | `ieadpe_ministry_save_attendance` | `{congregation_id,session_id,expected_revision,marks,finalize}`; marks must exactly cover frozen roster with `present/absent/excused/unmarked` | `{id,revision,status:'open'|'finalized',roster_frozen:true,attendance_count}` |
+
+### L1 class-session navigation target
+
+Migration `202610190008_ministry_derived_follow_up.sql` remains the latest
+local migration; `202610190009_ministry_session_management.sql` is reserved for
+the class-session read and creation-only period guard. The pending-session
+contract above is unchanged.
+
+`ieadpe_ministry_list_class_sessions(request jsonb) returns jsonb` accepts
+exactly `{congregation_id:UUID,class_id:UUID,limit:integer 1..100,cursor:string|null}`;
+all four keys are required and unknown keys fail. It returns exactly
+`{items:[{id:UUID,class_id:UUID,congregation_id:UUID,date:yyyy-MM-dd,topic:string|null,status:'open'|'finalized'|'canceled',revision:positive integer}],next_cursor:string|null}`.
+It includes all dates/statuses and history for completed/archived classes,
+ordered ascending by `(session_date,id)` with keyset pagination and at most
+`limit` returned rows (`limit+1` fetched). Cursor signatures bind resource
+`class_sessions`, actor UID, congregation, class, and last date/ID. Page size
+may change. Authorization is rechecked on each page; caller role/global scope
+is not accepted. Validate envelope/types/UUIDs, then authentication and current
+congregation authority before class lookup; a foreign class is
+`class_not_found`. Errors are `unauthorized`/`forbidden` (42501),
+`invalid_request`, `invalid_limit`, `invalid_cursor`, `class_not_found` (22023).
+A well-formed integer outside 1..100 is `invalid_limit`; malformed or
+fractional values are `invalid_request`. Empty results use `items:[]` and a
+null cursor. No roster, student identity or access metadata is returned.
+
+The typed adapter is `MinistrySessionSummary(id,classId,congregationId,
+date:CalendarDate,topic:String?,status:SessionStatus,revision:int)` and
+`decodeClassSessions(Map<String,dynamic> json,{required String congregationId,
+required String classId})->MinistryPage<MinistrySessionSummary>`.
+Repository methods are `listClassSessions({required String congregationId,
+required String classId,int limit=50,String? cursor})`,
+`createSession({required String operationId,required String id,required String
+congregationId,required String classId,required CalendarDate date,required
+String? topic})`, and `cancelSession({required String operationId,required
+String id,required String congregationId,required int expectedRevision})`;
+the first returns `Future<MinistryPage<MinistrySessionSummary>>`, mutations
+return `Future<MinistryCommandResult>`. Gateway read alias is
+`ministry_list_class_sessions`, with exactly the four read keys required.
+Create and cancel continue to use the existing command envelopes above.
+
+`SessionForm({required MinistryRepository repository,required String
+congregationId,required MinistryClassSummary classSummary})` returns the
+created session ID. `SessionListPage({required MinistryRepository repository,
+required String congregationId,required MinistryClassSummary classSummary,
+required Future<void> Function(String sessionId) onOpenSession})` awaits the
+open callback before refreshing. `SessionNavigationContext` is immutable and
+contains required congregation, class and session IDs; selected detail must
+match all three. The global `/ministry/attendance` pending queue remains
+unchanged. The new session date guard is creation-only and inclusive of the
+class period; out-of-period create maps to `academic_invalid` (22023), while
+historical sessions remain readable and cancellable. Future in-period lessons
+may be created but remain subject to the existing business-date finalization
+rule. L2 attendance draft/finalize, finalized history presentation,
+roster/progress and alert presentation remain deferred.
 
 ## Proposed forward local target contract (P1/P2/P3/E1/E2)
 
@@ -301,8 +356,8 @@ The first column records local behavior; the second is the product target. The u
 | Teacher | Base migration 014 requires an active same-congregation contact but does not verify `role_code='teacher'`. | Migration `202610190006_ministry_class_management_guards.sql` requires an active same-scope teacher-role contact; title still grants no login. **A1 implementation; local SQL regression passed.** |
 | Enrollment | Local enrollment requires active class/unarchived student, one active enrollment per student, historical class cap 100. Local SQL does not check class date bounds. Close accepts `completed/withdrawn`, end ≥ start. | Keep one active enrollment; preserve completed/withdrawn history. Start/end stay within class period; close end cannot precede the latest frozen roster date for that enrollment. Closure affects only enrollment contribution; never infer completion, deviation, baptism, or conversion. **Forward-migration gap.** |
 | Discipleship/manual state | Current Base44 flags and event history are on convert; Ministry enrollment has no atomic shared-person projection. | Active enrollment contributes effective in-discipleship atomically; referral alone does not. Preserve independent manual state and provenance; closing/withdrawal removes only that enrollment's contribution. Never infer completion/deviation/baptism. The earliest evidenced qualifying discipleship start governs the 90-day completion guard; if no start is verified, completion remains unavailable and no date is invented. **Plan-selected default (F1).** |
-| Attendance/cancel | Local roster freezes on first attendance save; finalization requires full nonempty roster and date ≤ `America/Recife` today. Current SQL allows a finalized same-roster correction only with `finalize=true`; cancel rejects finalized sessions. Progress counts finalized present + absent; excused separate. | Finalized non-canceled present satisfies follow-up on lesson date, not a home visit or visit count. Finalized marks are read-only; explicit cancellation of open/finalized session retains history and removes only that session's projection. Replaying the same operation returns its receipt. **Plan-confirmed requirement; local code gap.** |
-| Backdating / session period | Local session creation and enrollment do not enforce full class-period constraints; finalization rejects future date. | Session date must be inside class period; live (not canceled) class/date pair is unique; canceled session is retained and releases that date. A backdated valid lesson uses lesson date for follow-up. Future session may be drafted but cannot finalize before `America/Recife` business date. **Forward-migration gap.** |
+| Attendance/cancel | Migration 008 allows cancellation of open/finalized sessions with revision and receipt checks, retains roster/attendance, and removes only the canceled session's derived follow-up contribution; finalization retains the `America/Recife` business-date rule. | L1 preserves migration 008 behavior and existing mutation envelopes. Canceled sessions remain readable; cancel releases the live date while retaining history. |
+| Backdating / session period | Migration 008 remains the latest migration; local session creation does not yet enforce class-period bounds; finalization rejects future dates. | L1 forward migration `202610190009_ministry_session_management.sql` adds class-scoped session read and creation-only inclusive class-period guard. Out-of-period new creation maps to `academic_invalid` (22023); historical rows remain readable/cancellable. Live class/date uniqueness remains; canceled rows release dates. Future in-period dates are valid drafts, not finalizable before business date. **L1 target.** |
 | Reassignment / transfer | Local FKs scope rows to congregation; no transfer operation exists. | Never silently move historical enrollments/classes. Require explicit reviewed transfer preserving snapshots/history, or reject cross-congregation action. **Plan-selected default.** |
 | Reminder policy | Base44 source uses 1 day before first contact, 7 days after contact outside discipleship, 30 days in discipleship; manual deviation after ≥3 actual visits and manual completion after 90 days from start. | Keep reminders and manual thresholds. Qualifying attendance clears initial-contact/30-day follow-up but does not increment visits or unlock deviation. Completion guard uses the earliest evidenced qualifying discipleship start; never manufacture a missing start date. If no verified start exists, completion remains unavailable until one is verified. **Plan-confirmed requirement.** |
 
