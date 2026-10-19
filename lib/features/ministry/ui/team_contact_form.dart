@@ -83,6 +83,8 @@ class _TeamContactFormState extends State<TeamContactForm> {
   bool get _canEditFields =>
       !_busy && !_mutationAttempted && !(_contact?.archived ?? false);
 
+  bool get _canChangeArchiveState => !_busy && !_mutationAttempted;
+
   bool get _canEditEmail =>
       _canEditFields &&
       (!_hasLinkedAccess || (widget.canManageAccess && _manageAccess));
@@ -387,7 +389,11 @@ class _TeamContactFormState extends State<TeamContactForm> {
 
   Future<void> _changeArchiveState() async {
     final contact = _contact;
-    if (contact == null || _busy || !widget.isScopeCurrent()) return;
+    if (contact == null ||
+        !_canChangeArchiveState ||
+        !widget.isScopeCurrent()) {
+      return;
+    }
     final archived = !contact.archived;
     final confirmed = await showDialog<bool>(
       context: context,
@@ -919,7 +925,9 @@ class _TeamContactFormState extends State<TeamContactForm> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton.icon(
-                      onPressed: _canEditFields ? _changeArchiveState : null,
+                      onPressed: _canChangeArchiveState
+                          ? _changeArchiveState
+                          : null,
                       icon: Icon(
                         archived
                             ? Icons.unarchive_outlined

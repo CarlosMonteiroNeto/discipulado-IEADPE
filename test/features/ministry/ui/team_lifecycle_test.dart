@@ -820,6 +820,46 @@ void main() {
     expect(revokeGateway.contact(_contactId)['user_access_id'], isNull);
   });
 
+  testWidgets('archived contact can be restored from its detail form', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(contacts: [_contact()]);
+    await _pumpTeam(tester, gateway);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    await _tapAndSettle(tester, find.text('Arquivar contato'));
+    await _tapAndSettle(tester, find.text('Confirmar arquivamento'));
+
+    expect(gateway.writes.single.$1, 'set_contact_archived');
+    expect(gateway.writes.single.$2['archived'], isTrue);
+    expect(gateway.contact(_contactId)['revision'], 5);
+    expect(gateway.contact(_contactId)['archived_at'], isNotNull);
+    expect(find.text('Contato arquivado'), findsOneWidget);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('team-contact-name')),
+          )
+          .enabled,
+      isFalse,
+    );
+    final restoreButton = find.widgetWithText(TextButton, 'Restaurar contato');
+    expect(restoreButton, findsOneWidget);
+    expect(tester.widget<TextButton>(restoreButton).onPressed, isNotNull);
+    await _tapAndSettle(tester, restoreButton);
+    await _tapAndSettle(tester, find.text('Restaurar contato').last);
+
+    expect(gateway.writes, hasLength(2));
+    expect(gateway.writes.last.$1, 'set_contact_archived');
+    expect(gateway.writes.last.$2['archived'], isFalse);
+    expect(gateway.writes.last.$2['expected_revision'], 5);
+    expect(gateway.contact(_contactId)['revision'], 6);
+    expect(gateway.contact(_contactId)['archived_at'], isNull);
+    expect(find.text('Contato arquivado'), findsNothing);
+  });
+
   testWidgets('local user cannot create global access', (tester) async {
     final gateway = _TeamGateway();
     await _pumpTeam(tester, gateway);
