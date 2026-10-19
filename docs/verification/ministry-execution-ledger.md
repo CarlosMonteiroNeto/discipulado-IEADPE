@@ -17,7 +17,7 @@ Worktree: `codex/ministry-production-completion` at `C:/Users/Carlos_Neto/.codex
 
 ## Next gate
 
-C1 policy and exact-interface review are complete. Final Sol/low re-review found zero critical, important, or minor findings. Reviewed C1 follow-up commit: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. V1 is next in plan order and consumes no backend RPC. P1/P2/E1 remain after V1 and use the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
+C1 policy and exact-interface review are complete. V1 is implemented and passed final Sol/low re-review with zero critical, important, or minor findings; its commit and next gate are recorded below. P1 uses the reviewed C1 interfaces. Hosted activation remains gated on its separate inventory/authorization requirements.
 ## C1 — Reviewed local contract and plan-selected defaults
 
 - Base: `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; draft commit: `b748999de0c5b2fdc43dd9cd7c3efba9a474b6ca`.
@@ -31,6 +31,17 @@ C1 policy and exact-interface review are complete. Final Sol/low re-review found
 - Selected defaults: neutral canonical person with at most one convert profile and one student academic extension; no name-only or cross-congregation merge; ambiguous legacy rows stay preserved/unlinked. Directory-only email may be null. A linked contact email equals `user_access.user_email`; a bound assignment is effective only with the same confirmed Auth email. Local direction may edit other contact fields but not linked email. Global-manager reassignment requires the exact linked assignment ID and a confirmed target Auth email, then updates both email fields and the Auth UID atomically; conflicts fail closed, with no silent reuse or transfer. Global managers alone grant/revoke access. Active enrollment contributes effective discipleship, closure removes only that contribution, independent manual state remains effective, and the earliest evidenced qualifying start governs the 90-day completion guard; unknown start keeps completion unavailable.
 - Dispatch: C1 is reviewed clean. V1 may start next; P1/P2/E1 follow V1 and use the reviewed exact contracts. Keep hosted, Firebase-export, and device blockers below.
 - Local: no product code changed. This follow-up edits only `docs/integration/ministry-completion-contracts.md`, `docs/verification/ministry-task-manifest.md`, and this ledger; it preserves hosted RPC/schema/data as unknown. No hosted, Firebase export or Android/device action occurred.
+
+## V1 — Shared visual foundation
+
+- Plan predecessor: reviewed C1 follow-up `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`; V1 worktree base: `e05f7934ca52245180acdc1c7753152cf11a4ea0`.
+- Implementer: requested `gpt-6-luna` / `max`; actual per-call runtime metadata unavailable. Reviewer: requested `gpt-6.1-sol` / `low`; final re-review found zero critical, important, or minor findings.
+- Files: `lib/ui/unified_theme.dart`; `lib/ui/base44_widgets.dart`; `test/widgets/ministry_component_gallery_test.dart`; `test/widgets/base44_responsive_test.dart`; `test/widgets/unified_theme_accessibility_test.dart`; 20 synthetic PNGs in `test/widgets/goldens/`.
+- Checks on final implementation: `flutter test --concurrency=1 test/widgets/ministry_component_gallery_test.dart` exit 0 (4 tests); `flutter test --concurrency=1 test/widgets/base44_responsive_test.dart` exit 0 (3 tests); `flutter test --concurrency=1 test/widgets/unified_theme_accessibility_test.dart` exit 0 (6 tests); `flutter analyze --no-pub` exit 0 (`No issues found!`); `dart format --set-exit-if-changed` on the five source/test files exit 0; `git diff --check` exit 0. Golden generation used `flutter test --no-pub --concurrency=1 --update-goldens test/widgets/ministry_component_gallery_test.dart` (exit 0). Pub reported 10 newer versions outside current constraints; no dependency file changed.
+- Review: initial Sol/low review found three important issues: static gallery states, unreadable Ahem/incomplete large-text screenshots, and section-heading overflow. Luna/max reproduced gallery and 113px overflow failures before fixes; added interactive loading/empty/error controls and scale-aware heading stacking. Fresh Sol/low re-review inspected the complete changes and all 20 PNGs and found zero critical, important, or minor findings.
+- Visual evidence: 20 captures cover 360, 768, 1440, and 360 at 200% text, each with top/actions/loading/empty/error views. Captures use Flutter SDK Roboto and Material Icons. Implementer inspected all 20; primary review spot-checked the 360@200% action/error views, 768 actions, 1440 error, and 360@200% top. Evidence is synthetic widget output, not device capture.
+- Design inputs: `docs/integration/unified-design-system.md`; Superpowers workflow skills from `C:\Users\Carlos_Neto\.codex\worktrees\pipeline-consolidation\skills` at `858471dbd108caafa50c395a46ef2d1cecfe1148`, including brainstorming, test-driven-development, verification-before-completion, subagent-driven-development, and Apple Design.
+- Local/hosted: V1 makes no backend RPC or hosted change. Existing untracked user design, input-inventory, plan, and spec documents remain untouched. No personal data, Firebase export, hosted project, Android device, build, or install was used.
 
 ## Model/settings direction for each new slice
 

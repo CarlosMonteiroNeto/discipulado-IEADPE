@@ -1,6 +1,6 @@
 # Ministry Task Manifest
 
-Status: I1 and C1 are committed/reviewed; the user-selected plan recommendations are implementation defaults. Final C1 Sol/low review found zero critical, important, or minor findings. Reviewed C1 follow-up commit: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. V1 is next in plan order and consumes no backend RPC; P1/P2/E1 use the reviewed exact interfaces after V1. Hosted state remains unknown.
+Status: I1 and C1 are committed/reviewed; the user-selected plan recommendations are implementation defaults. V1 has passed final Sol/low review with zero critical, important, or minor findings and is ready to commit. C1 reviewed follow-up: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. P1 follows V1 and uses the reviewed exact interfaces. Hosted state remains unknown.
 
 ## Execution rules
 
@@ -34,6 +34,8 @@ Status: I1 and C1 are committed/reviewed; the user-selected plan recommendations
 - Files: extend `lib/ui/unified_theme.dart` and `lib/ui/base44_widgets.dart`; add a small theme extension only if required; add `test/widgets/ministry_component_gallery_test.dart` as an interactive synthetic gallery; extend `test/widgets/base44_responsive_test.dart`; add `test/widgets/unified_theme_accessibility_test.dart`. All paths are under the existing `test/widgets` tree.
 - Interfaces/models: no backend RPC; shared Flutter theme and widget contracts only.
 - Acceptance/check: gallery can interactively switch shared component states using synthetic data. Review screenshots at 360/768/1440 widths and 200% text. Verify no overflow/clipping, contrast, visible keyboard focus, labeled semantics/action order, and reduced-motion behavior. Keep synthetic visual evidence with the V1 review. Run each test file separately: `flutter test --concurrency=1 test/widgets/ministry_component_gallery_test.dart`; `flutter test --concurrency=1 test/widgets/base44_responsive_test.dart`; `flutter test --concurrency=1 test/widgets/unified_theme_accessibility_test.dart`. Expected: all layouts/actions remain usable and accessibility checks pass.
+- Result: all three focused test files passed separately (4, 3, and 6 tests); `flutter analyze --no-pub`, formatting check, `git diff --check`, and golden generation passed. Twenty readable synthetic captures cover top/actions/loading/empty/error at 360, 768, 1440, and 360 at 200% text. These are widget-test captures; physical-device and screen-reader behavior remain unverified.
+- Review: initial Sol/low review found three Important issues; Luna/max fixed them. Fresh Sol/low re-review of the final V1 diff and all 20 captures found zero Critical, Important, or Minor findings. Requested models/effort: writer `gpt-6-luna` / `max`, reviewer `gpt-6.1-sol` / `low`; actual runtime metadata unavailable. Commit SHA will be recorded after commit.
 
 ### P1 — Canonical identity/link migration
 
