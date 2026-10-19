@@ -32,6 +32,7 @@ class _SessionListPageState extends State<SessionListPage> {
   final List<MinistrySessionSummary> _sessions = [];
   String? _nextCursor;
   String? _error;
+  String? _notice;
   bool _loading = true;
   bool _loadingMore = false;
   bool _busy = false;
@@ -71,6 +72,10 @@ class _SessionListPageState extends State<SessionListPage> {
       _loading = !append;
       _loadingMore = append;
       _error = null;
+      if (!append) {
+        _sessions.clear();
+        _nextCursor = null;
+      }
     });
     try {
       final page = await widget.repository.listClassSessions(
@@ -101,7 +106,11 @@ class _SessionListPageState extends State<SessionListPage> {
   }
 
   Future<void> _create() async {
-    if (_busy || widget.classSummary.status != ClassStatus.active) return;
+    if (_busy ||
+        _pendingCancel != null ||
+        widget.classSummary.status != ClassStatus.active) {
+      return;
+    }
     final id = await Navigator.of(context).push<String>(
       MaterialPageRoute(
         builder: (_) => SessionForm(
@@ -118,12 +127,22 @@ class _SessionListPageState extends State<SessionListPage> {
   }
 
   Future<void> _open(MinistrySessionSummary session) async {
-    await widget.onOpenSession(session.id);
-    if (mounted) await _load();
+    try {
+      await widget.onOpenSession(session.id);
+      if (mounted) await _load();
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error =
+              'Não foi possível abrir a aula. Atualize e tente novamente.',
+        );
+      }
+    }
   }
 
   Future<void> _cancel(MinistrySessionSummary item) async {
-    if (_busy || item.status != SessionStatus.open) return;
+    if (_busy || item.status == SessionStatus.canceled) return;
+    setState(() => _notice = null);
     MinistryRoster roster;
     try {
       roster = await widget.repository.getSessionAttendance(
@@ -138,11 +157,15 @@ class _SessionListPageState extends State<SessionListPage> {
       return;
     }
     if (!mounted) return;
+    final session = roster.session;
     final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Cancelar aula?'),
-        content: const Text(
+        content: Text(
+          '${widget.classSummary.name} · '
+          '${session.date.toString().split('-').reversed.join('/')} · '
+          '${session.topic ?? 'Sem tema'}\n'
           'A aula será cancelada e o histórico da turma será mantido.',
         ),
         actions: [
@@ -158,7 +181,6 @@ class _SessionListPageState extends State<SessionListPage> {
       ),
     );
     if (approved != true || !mounted) return;
-    final session = roster.session;
     final signature = jsonEncode([
       widget.congregationId,
       session.id,
@@ -219,9 +241,11 @@ class _SessionListPageState extends State<SessionListPage> {
         _pendingCancel = null;
       setState(() {
         _busy = false;
-        _error = error is DataFailure && error.code == 'stale_revision'
-            ? 'A aula foi alterada. Atualize e confirme o cancelamento novamente.'
-            : 'Não foi possível cancelar a aula. Tente novamente.';
+        if (error is DataFailure && error.code == 'stale_revision') {
+          _notice = 'A aula foi alterada. Atualize e confirme o cancelamento novamente.';
+        } else {
+          _error = 'Não foi possível cancelar a aula. Tente novamente.';
+        }
       });
       if (error is DataFailure && error.code == 'stale_revision') await _load();
     }
@@ -246,14 +270,30 @@ class _SessionListPageState extends State<SessionListPage> {
               alignment: Alignment.centerRight,
               child: FilledButton.icon(
                 key: const Key('create-session'),
-                onPressed: _busy ? null : _create,
+                onPressed: _busy || _pendingCancel != null ? null : _create,
                 icon: const Icon(Icons.add),
                 label: const Text('Nova aula'),
               ),
             ),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('refresh-sessions'),
+              onPressed: _loading || _loadingMore ? null : () => _load(),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Atualizar aulas'),
+            ),
+          ),
           if (_loading) const Center(child: CircularProgressIndicator()),
           if (_error != null)
             Text(_error!, style: const TextStyle(color: Colors.red)),
+          if (_notice != null)
+            Text(_notice!, style: const TextStyle(color: Colors.orange)),
+          if (!_loading && _error == null && _sessions.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Text('Nenhuma aula registrada nesta turma.'),
+            ),
           for (final item in _sessions)
             Card(
               child: ListTile(
@@ -262,9 +302,7 @@ class _SessionListPageState extends State<SessionListPage> {
                   '${_label(item.status)}${item.topic == null ? '' : ' · ${item.topic}'}',
                 ),
                 onTap: () => _open(item),
-                trailing:
-                    item.status == SessionStatus.open &&
-                        widget.classSummary.status == ClassStatus.active
+                trailing: item.status != SessionStatus.canceled
                     ? TextButton(
                         key: Key('cancel-session-${item.id}'),
                         onPressed: _busy ? null : () => _cancel(item),

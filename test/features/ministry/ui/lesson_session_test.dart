@@ -36,6 +36,8 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
   Completer<Map<String, dynamic>>? delayedCommand;
   String? rejection;
   bool lostResponse = false;
+  bool failAttendance = false;
+  final failListReads = <int>{};
   int revision = 7;
   int pageReads = 0;
 
@@ -59,6 +61,9 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
     readRequests.add({'rpc': rpc, ...parameters});
     if (rpc == 'ministry_list_class_sessions') {
       pageReads++;
+      if (failListReads.remove(pageReads)) {
+        throw const DataFailure('unavailable');
+      }
       final cursor = parameters['cursor'];
       if (cursor == 'next') {
         return {
@@ -67,11 +72,15 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
         };
       }
       return {
-        'items': List<Map<String, dynamic>>.from(sessions),
-        'next_cursor': 'next',
+        'items': List<Map<String, dynamic>>.from(sessions.take(1)),
+        'next_cursor': sessions.length > 1 ? 'next' : null,
       };
     }
     if (rpc == 'ministry_get_session_attendance') {
+      if (failAttendance) {
+        failAttendance = false;
+        throw const DataFailure('unavailable');
+      }
       final current = sessions.firstWhere(
         (s) => s['id'] == parameters['session_id'],
         orElse: () => session(sessionId),
@@ -177,14 +186,18 @@ Widget listApp(
   _SessionGateway gateway, {
   MinistryClassSummary? classSummary,
   Future<void> Function(String)? opened,
-}) => MaterialApp(
-  home: SessionListPage(
-    repository: MinistryRepository(gateway),
-    congregationId: congregationId,
-    classSummary: classSummary ?? cls(classAId),
-    onOpenSession: opened ?? (_) async {},
-  ),
-);
+}) {
+  final summary = classSummary ?? cls(classAId);
+  return MaterialApp(
+    home: SessionListPage(
+      key: ValueKey(summary.status),
+      repository: MinistryRepository(gateway),
+      congregationId: congregationId,
+      classSummary: summary,
+      onOpenSession: opened ?? (_) async {},
+    ),
+  );
+}
 
 void main() {
   testWidgets('create class-bound dated lesson', (tester) async {
@@ -272,6 +285,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
+    expect(find.textContaining('Turma A · 20/12/2026 · Lição'), findsOneWidget);
     await tester.tap(find.text('Cancelar'));
     await tester.pumpAndSettle();
     expect(gateway.cancelCalls, isEmpty);
@@ -321,6 +335,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confirmar cancelamento'));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('create-session')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('create-session')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('session-date')), findsNothing);
+    expect(gateway.createCalls, isEmpty);
     await tester.tap(find.byKey(const Key('retry-pending-session-cancel')));
     await tester.pumpAndSettle();
     expect(
@@ -328,6 +347,153 @@ void main() {
       gateway.cancelCalls.first.operationId,
     );
     expect(gateway.cancelCalls.last.payload, gateway.cancelCalls.first.payload);
+  });
+
+  testWidgets(
+    'open and finalized lessons can be canceled in historical classes',
+    (tester) async {
+      for (final status in [ClassStatus.completed, ClassStatus.archived]) {
+        for (final sessionStatus in ['open', 'finalized', 'canceled']) {
+          final gateway = _SessionGateway()
+            ..sessions.add({
+              'id': sessionId,
+              'class_id': classAId,
+              'congregation_id': congregationId,
+              'date': '2026-12-20',
+              'topic': 'Lição',
+              'status': sessionStatus,
+              'revision': 7,
+            });
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpWidget(
+            listApp(gateway, classSummary: cls(classAId, status: status)),
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('20/12/2026'), findsOneWidget);
+          if (sessionStatus == 'canceled') {
+            expect(
+              find.byKey(const Key('cancel-session-$sessionId')),
+              findsNothing,
+            );
+            expect(gateway.cancelCalls, isEmpty);
+            continue;
+          }
+          await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Confirmar cancelamento'));
+          await tester.pumpAndSettle();
+          expect(gateway.cancelCalls.single.payload['expected_revision'], 7);
+          expect(gateway.sessions.single['status'], 'canceled');
+        }
+      }
+    },
+  );
+
+  testWidgets('first page failure can be retried from the list', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()
+      ..failListReads.add(1)
+      ..sessions.add({
+        'id': sessionId,
+        'class_id': classAId,
+        'congregation_id': congregationId,
+        'date': '2026-12-20',
+        'topic': 'Lição',
+        'status': 'open',
+        'revision': 1,
+      });
+    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Não foi possível carregar as aulas. Tente novamente.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('refresh-sessions')));
+    await tester.pumpAndSettle();
+    expect(gateway.readRequests.last['cursor'], isNull);
+    expect(find.text('20/12/2026'), findsOneWidget);
+  });
+
+  testWidgets(
+    'attendance read failure exposes list refresh and cancellation retry',
+    (tester) async {
+      final gateway = _SessionGateway()
+        ..failAttendance = true
+        ..sessions.add({
+          'id': sessionId,
+          'class_id': classAId,
+          'congregation_id': congregationId,
+          'date': '2026-12-20',
+          'topic': 'Lição',
+          'status': 'open',
+          'revision': 1,
+        });
+      await tester.pumpWidget(listApp(gateway));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text(
+          'Não foi possível atualizar a aula. Atualize os dados e tente novamente.',
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('refresh-sessions')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Confirmar cancelamento'));
+      await tester.pumpAndSettle();
+      expect(gateway.cancelCalls, hasLength(1));
+    },
+  );
+
+  testWidgets('empty class shows an explicit empty state', (tester) async {
+    await tester.pumpWidget(listApp(_SessionGateway()));
+    await tester.pumpAndSettle();
+    expect(find.text('Nenhuma aula registrada nesta turma.'), findsOneWidget);
+  });
+
+  testWidgets('detail open failure can recover through list refresh', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()
+      ..sessions.add({
+        'id': sessionId,
+        'class_id': classAId,
+        'congregation_id': congregationId,
+        'date': '2026-12-20',
+        'topic': 'Lição',
+        'status': 'open',
+        'revision': 1,
+      });
+    var failDetail = true;
+    await tester.pumpWidget(
+      listApp(
+        gateway,
+        opened: (_) async {
+          if (failDetail) throw const DataFailure('unavailable');
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('20/12/2026'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Não foi possível abrir a aula. Atualize e tente novamente.'),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('refresh-sessions')));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Não foi possível abrir a aula. Atualize e tente novamente.'),
+      findsNothing,
+    );
+    failDetail = false;
+    await tester.tap(find.text('20/12/2026'));
+    await tester.pumpAndSettle();
+    expect(gateway.pageReads, 3);
   });
 
   testWidgets('stale cancellation reloads and requires renewed confirmation', (
@@ -351,6 +517,12 @@ void main() {
     await tester.tap(find.text('Confirmar cancelamento'));
     await tester.pumpAndSettle();
     expect(gateway.cancelCalls.single.payload['expected_revision'], 7);
+    expect(
+      find.text(
+        'A aula foi alterada. Atualize e confirme o cancelamento novamente.',
+      ),
+      findsOneWidget,
+    );
     expect(find.text('Confirmar cancelamento'), findsNothing);
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -468,7 +640,9 @@ void main() {
     expect(find.text('Nova aula'), findsOneWidget);
   });
 
-  testWidgets('pagination appends and deduplicates IDs', (tester) async {
+  testWidgets('pagination appends distinct rows and deduplicates overlaps', (
+    tester,
+  ) async {
     final gateway = _SessionGateway()
       ..sessions.add({
         'id': sessionId,
@@ -478,13 +652,24 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+      })
+      ..sessions.add({
+        'id': otherSessionId,
+        'class_id': classAId,
+        'congregation_id': congregationId,
+        'date': '2026-12-21',
+        'topic': 'Outra lição',
+        'status': 'open',
+        'revision': 1,
       });
     await tester.pumpWidget(listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Carregar mais'));
     await tester.pumpAndSettle();
+    await tester.drag(find.byType(ListView), const Offset(0, -400));
+    await tester.pumpAndSettle();
     expect(find.text('20/12/2026'), findsOneWidget);
-    expect(find.text('20/12/2026'), findsNWidgets(1));
-    expect(find.text('20/12/2026'), findsOneWidget);
+    expect(find.text('21/12/2026'), findsOneWidget);
+    expect(find.textContaining('Outra lição'), findsOneWidget);
   });
 }
