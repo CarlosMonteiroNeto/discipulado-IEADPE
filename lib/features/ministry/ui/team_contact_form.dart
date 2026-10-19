@@ -568,7 +568,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                   items: [
                     const DropdownMenuItem<RoleCode?>(
                       value: null,
-                      child: Text('Sem função definida'),
+                      child: Text('Sem função'),
                     ),
                     for (final role in roleOptions)
                       DropdownMenuItem<RoleCode?>(

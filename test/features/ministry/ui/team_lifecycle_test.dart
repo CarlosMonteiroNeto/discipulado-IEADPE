@@ -861,6 +861,13 @@ void main() {
       expect(find.byType(TeamContactForm), findsOneWidget);
       final saveButton = find.byKey(const ValueKey('team-contact-save'));
       expect(saveButton.hitTestable(), findsOneWidget);
+      if (textScale == 2) {
+        final selectedRoleLabel = find.descendant(
+          of: find.byKey(const ValueKey('team-contact-role')),
+          matching: find.text('Sem função'),
+        );
+        expect(selectedRoleLabel, findsOneWidget);
+      }
       expect(tester.takeException(), isNull);
       await expectLater(
         find.byType(AlertDialog),
