@@ -139,8 +139,9 @@ return `Future<MinistryCommandResult>`. Gateway read alias is
 Create and cancel continue to use the existing command envelopes above.
 
 `SessionForm({required MinistryRepository repository,required String
-congregationId,required MinistryClassSummary classSummary})` returns the
-created session ID. `SessionListPage({required MinistryRepository repository,
+congregationId,required MinistryClassSummary classSummary})` returns
+`String?` through `Navigator.pop`: the created session ID on success and null
+when dismissed without creation. `SessionListPage({required MinistryRepository repository,
 required String congregationId,required MinistryClassSummary classSummary,
 required Future<void> Function(String sessionId) onOpenSession})` awaits the
 open callback before refreshing. `SessionNavigationContext` is immutable and
@@ -152,6 +153,13 @@ historical sessions remain readable and cancellable. Future in-period lessons
 may be created but remain subject to the existing business-date finalization
 rule. L2 attendance draft/finalize, finalized history presentation,
 roster/progress and alert presentation remain deferred.
+
+`AttendancePage` adds nullable `SessionNavigationContext? selectedSession`.
+When supplied, it loads only the selected session detail and validates that the
+returned congregation, class and session IDs match the context before showing
+protected content. When absent, it retains the existing pending-session queue
+behavior. The selected context carries IDs in memory; no identity or return
+context is placed in a URL.
 
 ## Proposed forward local target contract (P1/P2/P3/E1/E2)
 
