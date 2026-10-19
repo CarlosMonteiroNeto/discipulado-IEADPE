@@ -57,12 +57,6 @@ class MinistryRepository {
         (endDate != null && endDate.compareTo(startDate) < 0)) {
       throw const DataFailure('invalid');
     }
-    if (teacherContactId != null) {
-      await getTeacherContact(
-        congregationId: congregationId,
-        contactId: teacherContactId,
-      );
-    }
     final result = await command(
       name: 'save_class',
       operationId: operationId,

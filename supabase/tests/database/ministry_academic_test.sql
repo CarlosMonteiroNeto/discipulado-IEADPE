@@ -21,7 +21,9 @@ INSERT INTO public.ministry_contacts(id,congregation_id,name,normalized_name,sco
  ('94000000-0000-0000-0000-000000000102','94000000-0000-0000-0000-000000000006','Foreign Teacher','foreign teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
  ('94000000-0000-0000-0000-000000000103','94000000-0000-0000-0000-000000000002','Archived Teacher','archived teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',now()),
  ('94000000-0000-0000-0000-000000000104','94000000-0000-0000-0000-000000000002','Archive Lifecycle Teacher','archive lifecycle teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
- ('94000000-0000-0000-0000-000000000105','94000000-0000-0000-0000-000000000002','Role Change Teacher','role change teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL);
+ ('94000000-0000-0000-0000-000000000105','94000000-0000-0000-0000-000000000002','Role Change Teacher','role change teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
+ ('94000000-0000-0000-0000-000000000106','94000000-0000-0000-0000-000000000002','Archive Retry Teacher','archive retry teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
+ ('94000000-0000-0000-0000-000000000107','94000000-0000-0000-0000-000000000002','Role Retry Teacher','role retry teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL);
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,teacher_contact_id,updated_by) VALUES
  ('94000000-0000-0000-0000-000000000085','94000000-0000-0000-0000-000000000002','Archived Teacher Lifecycle','archived teacher lifecycle','2026-01-01','94000000-0000-0000-0000-000000000104','94000000-0000-0000-0000-000000000001'),
  ('94000000-0000-0000-0000-000000000086','94000000-0000-0000-0000-000000000002','Role Changed Teacher Lifecycle','role changed teacher lifecycle','2026-01-01','94000000-0000-0000-0000-000000000105','94000000-0000-0000-0000-000000000001');
@@ -103,6 +105,22 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; 
  BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000137',
   '{"id":"94000000-0000-0000-0000-000000000040","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Other Class","teacher_contact_id":"94000000-0000-0000-0000-000000000105","start_date":"2026-01-01","end_date":null,"expected_revision":1}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: non-teacher contact assigned to a class'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+
+ class_result:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000138',
+  '{"id":"94000000-0000-0000-0000-000000000138","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Archive Retry Class","teacher_contact_id":"94000000-0000-0000-0000-000000000106","start_date":"2026-01-01","end_date":null}'::jsonb);
+ result:=public.ieadpe_ministry_set_contact_archived('94000000-0000-0000-0000-000000000139',
+  '{"id":"94000000-0000-0000-0000-000000000106","scope":"congregation","congregation_id":"94000000-0000-0000-0000-000000000002","archived":true,"expected_revision":1}'::jsonb);
+ replay:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000138',
+  '{"id":"94000000-0000-0000-0000-000000000138","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Archive Retry Class","teacher_contact_id":"94000000-0000-0000-0000-000000000106","start_date":"2026-01-01","end_date":null}'::jsonb);
+ PERFORM pg_temp.assert_true(replay=class_result,'class save receipt replays after selected teacher is archived');
+
+ class_result:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000140',
+  '{"id":"94000000-0000-0000-0000-000000000140","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Role Retry Class","teacher_contact_id":"94000000-0000-0000-0000-000000000107","start_date":"2026-01-01","end_date":null}'::jsonb);
+ result:=public.ieadpe_ministry_save_contact('94000000-0000-0000-0000-000000000141',
+  '{"id":"94000000-0000-0000-0000-000000000107","scope":"congregation","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Role Retry Teacher","role_code":"congregationAssistant","phone_e164":null,"birth_date":null,"email":null,"expected_revision":1}'::jsonb);
+ replay:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000140',
+  '{"id":"94000000-0000-0000-0000-000000000140","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Role Retry Class","teacher_contact_id":"94000000-0000-0000-0000-000000000107","start_date":"2026-01-01","end_date":null}'::jsonb);
+ PERFORM pg_temp.assert_true(replay=class_result,'class save receipt replays after selected contact loses teacher role');
 
  class_result:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000030',
   '{"id":"94000000-0000-0000-0000-000000000030","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Command Class","teacher_contact_id":null,"start_date":"2026-01-01","end_date":null}'::jsonb);

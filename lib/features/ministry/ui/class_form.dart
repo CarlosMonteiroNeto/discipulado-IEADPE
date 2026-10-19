@@ -373,6 +373,16 @@ class _ClassFormState extends State<ClassForm> {
                                 },
                         ),
                         Padding(
+                          key: const Key('class-teacher-selection-summary'),
+                          padding: const EdgeInsets.only(
+                            left: UnifiedSpace.x4,
+                            top: UnifiedSpace.x2,
+                          ),
+                          child: Text(
+                            'Professor selecionado: ${_selectedTeacherLabel}',
+                          ),
+                        ),
+                        Padding(
                           padding: const EdgeInsets.only(
                             left: UnifiedSpace.x4,
                             top: UnifiedSpace.x2,
@@ -486,6 +496,16 @@ class _ClassFormState extends State<ClassForm> {
       ),
     ),
   );
+
+  String get _selectedTeacherLabel {
+    if (_teacherChoice == _noTeacher) return 'Sem professor definido';
+    for (final teacher in _teachers) {
+      if (teacher.id == _teacherChoice) return teacher.name;
+    }
+    return _loadingTeachers
+        ? 'Carregando professor atual…'
+        : 'Professor atual indisponível';
+  }
 }
 
 class _PendingClassSave {

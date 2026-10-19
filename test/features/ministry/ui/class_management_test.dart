@@ -1,7 +1,11 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
@@ -19,6 +23,7 @@ const _teacherId = '44444444-4444-4444-8444-444444444444';
 const _archivedTeacherId = '55555555-5555-4555-8555-555555555555';
 const _otherTeacherId = '66666666-6666-4666-8666-666666666666';
 const _operationId = '88888888-8888-4888-8888-888888888888';
+const _classGoldenFont = 'ClassManagementGoldenRoboto';
 
 class _ClassGateway implements ReadRpcGateway, MinistryCommandGateway {
   _ClassGateway();
@@ -141,12 +146,12 @@ class _ClassGateway implements ReadRpcGateway, MinistryCommandGateway {
     String operationId,
     Map<String, Object?> payload,
   ) async {
-    if (commandFailure case final failure?) throw failure;
     commands.add((
       name: name,
       operationId: operationId,
       payload: Map.of(payload),
     ));
+    if (commandFailure case final failure?) throw failure;
     if (loseNextCommandResponse case final failure?) {
       loseNextCommandResponse = null;
       throw failure;
@@ -225,11 +230,7 @@ void main() {
         'start_date': '2026-10-01',
         'end_date': '2026-12-31',
       });
-      expect(gateway.readRequests.single.rpc, 'ministry_get_teacher_contact');
-      expect(gateway.readRequests.single.parameters, {
-        'congregation_id': _scope,
-        'contact_id': _teacherId,
-      });
+      expect(gateway.readRequests, isEmpty);
 
       gateway.commandRevision = 5;
       final edited = await repository.saveClass(
@@ -248,9 +249,9 @@ void main() {
       expect(gateway.commands.last.payload['teacher_contact_id'], _teacherId);
     });
 
-    test('rejects a teacher from another congregation before save', () async {
+    test('sends teacher eligibility to the server command guard', () async {
       final gateway = _ClassGateway()
-        ..teacherReadFailure = const DataFailure('permission');
+        ..commandFailure = const DataFailure('invalid');
       final repository = MinistryRepository(gateway);
 
       await expectLater(
@@ -265,7 +266,11 @@ void main() {
         ),
         throwsA(isA<DataFailure>()),
       );
-      expect(gateway.commands, isEmpty);
+      expect(gateway.commands, hasLength(1));
+      expect(
+        gateway.commands.single.payload['teacher_contact_id'],
+        _otherTeacherId,
+      );
     });
 
     test(
@@ -320,7 +325,7 @@ void main() {
           ),
           throwsA(isA<DataFailure>()),
         );
-        expect(gateway.commands, hasLength(0));
+        expect(gateway.commands, hasLength(1));
       },
     );
 
@@ -390,6 +395,10 @@ void main() {
       expect(find.text('Professor de outra congregação'), findsNothing);
       await tester.tap(find.text('Ana Professora'));
       await tester.pumpAndSettle();
+      expect(
+        find.text('Professor selecionado: Ana Professora'),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.byKey(const Key('class-name')),
@@ -490,7 +499,10 @@ void main() {
       await tester.pump();
       expect(tester.widget<TextFormField>(nameField).enabled, isFalse);
 
-      await tester.tap(find.byType(FilledButton).last);
+      final retryButton = find.byType(FilledButton).last;
+      await tester.drag(find.byType(ListView), const Offset(0, -360));
+      await tester.pumpAndSettle();
+      await tester.tap(retryButton);
       await tester.pumpAndSettle();
 
       expect(gateway.commands, hasLength(2));
@@ -500,6 +512,65 @@ void main() {
       expect(saved, isTrue);
     },
   );
+
+  testWidgets('selected no-teacher state stays readable at 200% text', (
+    tester,
+  ) async {
+    await tester.runAsync(() async {
+      await _loadClassGoldenFont(_classGoldenFont, 'roboto-regular.ttf');
+      await _loadClassGoldenFont('MaterialIcons', 'materialicons-regular.otf');
+    });
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 900);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final gateway = _ClassGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(fontFamily: _classGoldenFont),
+        home: RepaintBoundary(
+          key: const ValueKey('class-form-capture'),
+          child: ColoredBox(
+            color: Colors.white,
+            child: MediaQuery(
+              data: const MediaQueryData(textScaler: TextScaler.linear(2)),
+              child: ClassForm(
+                repository: MinistryRepository(gateway),
+                congregationId: _scope,
+                onSaved: (_) {},
+                onCancel: () {},
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    const selectedState = 'Professor selecionado: Sem professor definido';
+    final stateFinder = find.text(selectedState);
+    expect(stateFinder, findsOneWidget);
+    final paragraph = tester.renderObject<RenderParagraph>(stateFinder);
+    expect(paragraph.didExceedMaxLines, isFalse);
+    expect(paragraph.size.height, greaterThan(40));
+    expect(tester.takeException(), isNull);
+    final capture = tester.renderObject<RenderRepaintBoundary>(
+      find.byKey(const ValueKey('class-form-capture')),
+    );
+    await tester.runAsync(() async {
+      final image = await capture.toImage(pixelRatio: 1);
+      final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (bytes == null) throw StateError('Could not encode form capture.');
+      final output = File(
+        '.superpowers/sdd/2026-10-18-ministry-production-completion-plan/a1-visual-evidence/class-form-360x900-text-200-selected.png',
+      );
+      await output.parent.create(recursive: true);
+      await output.writeAsBytes(
+        bytes.buffer.asUint8List(bytes.offsetInBytes, bytes.lengthInBytes),
+      );
+      image.dispose();
+    });
+  });
 
   testWidgets('classes page creates and opens class details', (tester) async {
     final gateway = _ClassGateway();
@@ -558,4 +629,33 @@ void main() {
       expect(find.text('Arquivada'), findsWidgets);
     },
   );
+}
+
+Future<void> _loadClassGoldenFont(String family, String fileName) async {
+  var directory = File(Platform.resolvedExecutable).parent;
+  File? font;
+  while (true) {
+    final candidate = File(
+      <String>[
+        directory.path,
+        'bin',
+        'cache',
+        'artifacts',
+        'material_fonts',
+        fileName,
+      ].join(Platform.pathSeparator),
+    );
+    if (candidate.existsSync()) {
+      font = candidate;
+      break;
+    }
+    final parent = directory.parent;
+    if (parent.path == directory.path) break;
+    directory = parent;
+  }
+  if (font == null) throw StateError('Could not find $fileName.');
+  final bytes = await font.readAsBytes();
+  final loader = FontLoader(family)
+    ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
+  await loader.load();
 }
