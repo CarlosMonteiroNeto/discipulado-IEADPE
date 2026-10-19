@@ -17,7 +17,7 @@ Worktree: `codex/ministry-production-completion` at `C:/Users/Carlos_Neto/.codex
 
 ## Next gate
 
-C1, V1, the C1 attribution correction, P1 (`d25a7481a490532327b1859f2c50babe78735108`), P2 (`3f2f859b577bc4bc5be60b266266e97e3d9d7285`), P3 (`6513a971572155c58b959ea4d57483bc874bb286`), E1 (`38ae02dbad6e11d051b871d1554b075b12d183e0`), E2 (`b5eada28e40dbc74c7519b37055041062e037013`), and A1 (`81145195f4ed9d1f05287c5fa6b1df0121285e58`) are committed and reviewed. A1 final Sol/low review found zero Critical, Important, or Minor findings. A2 is next. Hosted activation remains gated on its separate inventory/authorization requirements.
+C1, V1, the C1 attribution correction, P1 (`d25a7481a490532327b1859f2c50babe78735108`), P2 (`3f2f859b577bc4bc5be60b266266e97e3d9d7285`), P3 (`6513a971572155c58b959ea4d57483bc874bb286`), E1 (`38ae02dbad6e11d051b871d1554b075b12d183e0`), E2 (`b5eada28e40dbc74c7519b37055041062e037013`), A1 (`81145195f4ed9d1f05287c5fa6b1df0121285e58`), A2 (`a79480fbb896a35904dad64ea3ac784011d5375c`), and F1 (`aa03c8463c02538c3fa5d96035401e7c784ae95d`) are committed and reviewed. The F1 concurrency-test finding was fixed and its scoped re-review is clean. L1 is next. Hosted activation remains gated on its separate inventory/authorization requirements.
 ## C1 — Reviewed local contract and plan-selected defaults
 
 - Base: `a1f326b9f049ba7ea0b9fbcb48f7aafdc7136fbd`; draft commit: `b748999de0c5b2fdc43dd9cd7c3efba9a474b6ca`.
