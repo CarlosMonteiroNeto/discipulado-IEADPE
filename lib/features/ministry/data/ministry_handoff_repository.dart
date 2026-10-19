@@ -37,12 +37,14 @@ class ConvertPromotionResult {
   const ConvertPromotionResult({
     required this.convertId,
     required this.studentId,
+    required this.personId,
     required this.congregationId,
     required this.status,
   });
 
   final String convertId;
   final String studentId;
+  final String personId;
   final String congregationId;
   final String status;
 }
@@ -118,11 +120,16 @@ class MinistryHandoffRepository {
     required String convertId,
     required String congregationId,
     String? studentId,
+    int? expectedStudentRevision,
   }) async {
     _checkUuid(operationId);
     _checkUuid(convertId);
     _checkUuid(congregationId);
     if (studentId != null) _checkUuid(studentId);
+    if ((studentId == null) != (expectedStudentRevision == null) ||
+        (expectedStudentRevision != null && expectedStudentRevision < 1)) {
+      throw const DataFailure('invalid');
+    }
     final commandGateway = gateway;
     if (commandGateway is! HandoffCommandGateway) {
       throw const DataFailure('unavailable');
@@ -135,6 +142,8 @@ class MinistryHandoffRepository {
             'convert_id': convertId,
             'congregation_id': congregationId,
             'student_id': studentId,
+            if (expectedStudentRevision != null)
+              'expected_student_revision': expectedStudentRevision,
           },
         ),
       );
@@ -211,6 +220,7 @@ ConvertPromotionResult decodePromotionResult(Object? raw) {
   final json = _object(raw, {
     'convert_id',
     'student_id',
+    'person_id',
     'congregation_id',
     'status',
   });
@@ -219,6 +229,7 @@ ConvertPromotionResult decodePromotionResult(Object? raw) {
   return ConvertPromotionResult(
     convertId: _parseUuid(json['convert_id']),
     studentId: _parseUuid(json['student_id']),
+    personId: _parseUuid(json['person_id']),
     congregationId: _parseUuid(json['congregation_id']),
     status: status,
   );

@@ -7,6 +7,7 @@ import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 import '../data/ministry_handoff_repository.dart';
 import '../data/ministry_repository.dart';
+import '../domain/ministry_models.dart';
 
 enum _RetryAction { referrals, candidates, classes, promotion, enrollment }
 
@@ -67,6 +68,7 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
   String? _retryCursor;
   String? _retryStudentId;
   final Map<String, String> _promotionOps = {};
+  final Map<String, int> _promotionRevisions = {};
   final Map<String, String> _enrollmentOps = {};
 
   @override
@@ -239,11 +241,25 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
       _retryStudentId = studentId;
     });
     try {
+      int? expectedStudentRevision;
+      if (studentId != null) {
+        expectedStudentRevision = _promotionRevisions[draftKey];
+        if (expectedStudentRevision == null) {
+          final detail = await widget.ministry.getStudent(
+            congregationId: selected.congregationId,
+            studentId: studentId,
+          );
+          if (!mounted) return;
+          expectedStudentRevision = detail.revision;
+          _promotionRevisions[draftKey] = expectedStudentRevision;
+        }
+      }
       final result = await widget.handoff.promote(
         operationId: op,
         convertId: selected.convertId,
         congregationId: selected.congregationId,
         studentId: studentId,
+        expectedStudentRevision: expectedStudentRevision,
       );
       if (!mounted) return;
       setState(() {
@@ -257,6 +273,12 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
       await _loadClasses();
     } catch (error) {
       if (!mounted) return;
+      if (studentId != null &&
+          error is DataFailure &&
+          error.code == 'stale_revision') {
+        _promotionRevisions.remove(draftKey);
+        _promotionOps.remove(draftKey);
+      }
       setState(() {
         _busy = false;
         _retryAction = _RetryAction.promotion;
@@ -283,16 +305,13 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
       _retryAction = _RetryAction.enrollment;
     });
     try {
-      await widget.ministry.command(
-        name: 'enroll_student',
+      await widget.ministry.enrollStudent(
         operationId: op,
-        payload: {
-          'id': enrollmentId,
-          'congregation_id': linked.congregationId,
-          'class_id': classId,
-          'student_id': linked.studentId,
-          'start_date': date,
-        },
+        id: enrollmentId,
+        congregationId: linked.congregationId,
+        classId: classId,
+        personId: linked.personId,
+        startDate: CalendarDate.parse(date),
       );
       if (mounted) {
         setState(() {
@@ -315,6 +334,8 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
   String _friendly(Object error) => switch (error) {
     DataFailure(code: 'permission') =>
       'Seu acesso mudou. Atualize a sessão para continuar.',
+    DataFailure(code: 'stale_revision') =>
+      'Os dados do aluno mudaram. Atualize a lista e tente novamente.',
     DataFailure(code: 'unavailable') => 'Serviço indisponível. O rascunho e o código de operação foram mantidos; tente novamente.',
     DataFailure(code: 'invalid') =>
       'O registro não está mais disponível para esta ação. Atualize a lista.',

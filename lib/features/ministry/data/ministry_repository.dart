@@ -26,6 +26,172 @@ class MinistryRepository {
     },
   );
 
+  Future<MinistryStudentDetail> getStudent({
+    required String congregationId,
+    required String studentId,
+  }) async {
+    _uuid(congregationId);
+    _uuid(studentId);
+    final result = await _read('ministry_get_student', {
+      'congregation_id': congregationId,
+      'student_id': studentId,
+    });
+    try {
+      final student = decodeMinistryStudentDetail(result);
+      if (student.id != studentId || student.congregationId != congregationId) {
+        throw const MinistryDataException('Student scope does not match.');
+      }
+      return student;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryTeacherContactDetail> getTeacherContact({
+    required String congregationId,
+    required String contactId,
+  }) async {
+    _uuid(congregationId);
+    _uuid(contactId);
+    final result = await _read('ministry_get_teacher_contact', {
+      'congregation_id': congregationId,
+      'contact_id': contactId,
+    });
+    try {
+      final contact = decodeTeacherContactDetail(result);
+      if (contact.id != contactId || contact.congregationId != congregationId) {
+        throw const MinistryDataException(
+          'Teacher contact scope does not match.',
+        );
+      }
+      return contact;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  /// Edits only academic fields. Canonical name and contact data use
+  /// [savePerson] with its independent person revision.
+  Future<MinistryCommandResult> saveStudent({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required int expectedRevision,
+    required String? education,
+    required String? maritalStatus,
+    required bool? newConvert,
+    required bool? waterBaptized,
+    required bool? wantsBaptism,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(congregationId);
+    if (expectedRevision < 1 ||
+        (waterBaptized == true && wantsBaptism == true)) {
+      throw const DataFailure('invalid');
+    }
+    final result = await command(
+      name: 'save_student',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'expected_revision': expectedRevision,
+        'education': education,
+        'marital_status': maritalStatus,
+        'new_convert': newConvert,
+        'water_baptized': waterBaptized,
+        'wants_baptism': wantsBaptism,
+      },
+    );
+    if (result.revision != expectedRevision + 1) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<MinistryCommandResult> saveTeacherContact({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required String name,
+    required String? phoneE164,
+    required CalendarDate? birthDate,
+    int? expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(congregationId);
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty ||
+        normalizedName.length > 200 ||
+        name != normalizedName ||
+        (phoneE164 != null &&
+            !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phoneE164)) ||
+        (expectedRevision != null && expectedRevision < 1)) {
+      throw const DataFailure('invalid');
+    }
+    final payload = <String, Object?>{
+      'id': id,
+      'scope': 'congregation',
+      'congregation_id': congregationId,
+      'name': normalizedName,
+      'role_code': 'teacher',
+      'phone_e164': phoneE164,
+      'birth_date': birthDate?.toString(),
+      if (expectedRevision != null) 'expected_revision': expectedRevision,
+    };
+    final result = await command(
+      name: 'save_contact',
+      operationId: operationId,
+      payload: payload,
+    );
+    if (result.revision !=
+        (expectedRevision == null ? 1 : expectedRevision + 1)) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  Future<MinistryEnrollmentResult> enrollStudent({
+    required String operationId,
+    required String id,
+    required String congregationId,
+    required String classId,
+    required String personId,
+    required CalendarDate startDate,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    _uuid(congregationId);
+    _uuid(classId);
+    _uuid(personId);
+    final commandResult = await command(
+      name: 'enroll_student',
+      operationId: operationId,
+      payload: {
+        'id': id,
+        'congregation_id': congregationId,
+        'class_id': classId,
+        'person_id': personId,
+        'start_date': startDate.toString(),
+      },
+    );
+    try {
+      return decodeMinistryEnrollmentResult(
+        {
+          'id': commandResult.id,
+          'revision': commandResult.revision,
+          ...commandResult.fields,
+        },
+        expectedId: id,
+        expectedPersonId: personId,
+      );
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
   Future<MinistryPerson> getPerson({
     required String congregationId,
     required String personId,

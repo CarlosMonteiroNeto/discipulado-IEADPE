@@ -15,6 +15,7 @@ import '../../../domain/business_calendar.dart';
 import '../../../domain/models.dart' as app_models;
 import '../data/ministry_repository.dart';
 import '../../people/person_fields.dart';
+import 'student_detail_page.dart';
 
 class StudentsPage extends StatefulWidget {
   const StudentsPage({
@@ -37,6 +38,7 @@ class _StudentsPageState extends State<StudentsPage> {
   MinistryPage<MinistryStudentSummary>? _page;
   String? _error;
   bool _loading = false;
+  int _loadGeneration = 0;
   @override
   void initState() {
     super.initState();
@@ -49,25 +51,40 @@ class _StudentsPageState extends State<StudentsPage> {
     super.dispose();
   }
 
+  @override
+  void didUpdateWidget(covariant StudentsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.congregationId != widget.congregationId) {
+      _loadGeneration++;
+      _search.clear();
+      _page = null;
+      _load();
+    }
+  }
+
   Future<void> _load({String? cursor}) async {
+    final generation = ++_loadGeneration;
+    final congregationId = widget.congregationId;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
       final result = await widget.repository.listStudents(
-        congregationId: widget.congregationId,
+        congregationId: congregationId,
         namePrefix: _search.text.trim().isEmpty ? null : _search.text.trim(),
         cursor: cursor,
       );
-      if (mounted) {
+      if (mounted &&
+          generation == _loadGeneration &&
+          congregationId == widget.congregationId) {
         setState(() {
           _page = result;
           _loading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && generation == _loadGeneration) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar os alunos. Tente novamente.';
@@ -174,14 +191,36 @@ class _StudentsPageState extends State<StudentsPage> {
                   ),
                 ),
               if (!_loading && _error == null && _page?.items.isEmpty == true)
-                const Base44Panel(child: Text('Nenhum aluno encontrado.')),
+                Base44Panel(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        _search.text.trim().isEmpty
+                            ? 'Nenhum aluno cadastrado nesta congregação.'
+                            : 'Nenhum aluno encontrado com esse nome.',
+                      ),
+                      if (_search.text.trim().isEmpty &&
+                          widget.onRegister != null) ...[
+                        const SizedBox(height: 12),
+                        FilledButton.icon(
+                          onPressed: widget.onRegister,
+                          icon: const Icon(Icons.person_add_alt_1),
+                          label: const Text('Registrar primeiro aluno'),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
               for (final student
                   in _page?.items ?? const <MinistryStudentSummary>[])
                 Card(
                   child: ListTile(
                     title: Text(student.name, softWrap: true),
                     subtitle: Text(
-                      student.linkState == PersonLinkState.linked
+                      student.archivedAt != null
+                          ? 'Arquivado · ${student.linkState == PersonLinkState.linked ? 'identidade canônica vinculada' : 'identidade pendente de revisão'}'
+                          : student.linkState == PersonLinkState.linked
                           ? 'Identidade canônica vinculada'
                           : 'Identidade pendente de revisão',
                       softWrap: true,
@@ -192,13 +231,19 @@ class _StudentsPageState extends State<StudentsPage> {
                           : Icons.school_outlined,
                       color: UnifiedColors.brandNavy,
                     ),
-                    trailing: student.phone == null
+                    trailing: student.archivedAt != null
+                        ? const Tooltip(
+                            message: 'Aluno arquivado',
+                            child: Icon(Icons.archive_outlined),
+                          )
+                        : student.phone == null
                         ? null
                         : const Tooltip(
                             message: 'Telefone cadastrado',
                             child: Icon(Icons.phone_outlined),
                           ),
                     minVerticalPadding: 12,
+                    onTap: () => _openStudent(student),
                   ),
                 ),
               if (_page?.nextCursor != null)
@@ -223,6 +268,20 @@ class _StudentsPageState extends State<StudentsPage> {
       ),
     ),
   );
+
+  Future<void> _openStudent(MinistryStudentSummary student) async {
+    final repository = MinistryRepository(widget.repository.gateway);
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => StudentDetailPage(
+          repository: repository,
+          congregationId: widget.congregationId,
+          studentId: student.id,
+        ),
+      ),
+    );
+    if (mounted) _load();
+  }
 }
 
 /// One atomic canonical-person plus student registration form.
@@ -261,6 +320,34 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
   bool _busy = false;
   String? _error;
   String? _signature, _operationId, _studentId, _personId;
+
+  @override
+  void didUpdateWidget(covariant StudentRegistrationPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.congregationId != widget.congregationId) {
+      for (final controller in [
+        _name,
+        _phone,
+        _birthDate,
+        _street,
+        _district,
+        _city,
+        _postalCode,
+        _stateCode,
+        _education,
+        _maritalStatus,
+      ]) {
+        controller.clear();
+      }
+      _waterBaptized = null;
+      _wantsBaptism = null;
+      _signature = null;
+      _operationId = null;
+      _studentId = null;
+      _personId = null;
+      _error = null;
+    }
+  }
 
   @override
   void initState() {

@@ -310,6 +310,155 @@ MinistryPerson decodeMinistryPersonDetail(Object? raw) {
   return MinistryPerson.fromJson(person, revision: revision);
 }
 
+MinistryStudentDetail decodeMinistryStudentDetail(Object? raw) {
+  final envelope = _object(raw);
+  _exactKeys(envelope, {'student'});
+  final row = _object(envelope['student']);
+  _exactKeys(row, {
+    'id',
+    'person_id',
+    'congregation_id',
+    'name',
+    'normalized_name',
+    'phone_e164',
+    'birth_date',
+    'address',
+    'education',
+    'marital_status',
+    'new_convert',
+    'water_baptized',
+    'wants_baptism',
+    'archived_at',
+    'revision',
+    'person_revision',
+    'link_state',
+    'created_at',
+    'updated_at',
+    'updated_by',
+  });
+  final revision = row['revision'];
+  final rawPersonRevision = row['person_revision'];
+  if (revision is! int ||
+      revision < 1 ||
+      (rawPersonRevision != null &&
+          (rawPersonRevision is! int || rawPersonRevision < 1))) {
+    _invalid();
+  }
+  final personId = _optionalUuid(row['person_id']);
+  final personRevision = rawPersonRevision as int?;
+  final linkState = switch (_text(row['link_state'])) {
+    'linked' => PersonLinkState.linked,
+    'unlinked' => PersonLinkState.unlinked,
+    _ => _invalid(),
+  };
+  if ((personId != null) != (linkState == PersonLinkState.linked) ||
+      (personId == null) != (personRevision == null)) {
+    _invalid();
+  }
+  final name = _text(row['name']);
+  final normalizedName = _text(row['normalized_name']);
+  if (name != name.trim() || normalizedName != name.toLowerCase()) _invalid();
+  final rawAddress = row['address'];
+  if (rawAddress != null) {
+    final address = _object(rawAddress);
+    _exactKeys(address, {
+      'street',
+      'district',
+      'city',
+      'postal_code',
+      'state_code',
+    });
+  }
+  final waterBaptized = _nullableBool(row['water_baptized']);
+  final wantsBaptism = _nullableBool(row['wants_baptism']);
+  final newConvert = _nullableBool(row['new_convert']);
+  if (waterBaptized == true && wantsBaptism == true) _invalid();
+  return MinistryStudentDetail(
+    id: _uuid(row['id']),
+    personId: personId,
+    congregationId: _uuid(row['congregation_id']),
+    name: name,
+    normalizedName: normalizedName,
+    phoneE164: _optionalPhoneText(row['phone_e164']),
+    birthDate: row['birth_date'] == null
+        ? null
+        : CalendarDate.parse(_text(row['birth_date'])),
+    address: rawAddress == null
+        ? null
+        : Address.fromJson(Map<String, Object?>.from(rawAddress as Map)),
+    education: _optionalText(row['education']),
+    maritalStatus: _optionalText(row['marital_status']),
+    newConvert: newConvert,
+    waterBaptized: waterBaptized,
+    wantsBaptism: wantsBaptism,
+    archivedAt: _optionalTimestamp(row['archived_at']),
+    revision: revision,
+    personRevision: personRevision,
+    linkState: linkState,
+    createdAt: _requiredTimestamp(row['created_at']),
+    updatedAt: _requiredTimestamp(row['updated_at']),
+    updatedBy: _optionalUuid(row['updated_by']),
+  );
+}
+
+MinistryTeacherContactDetail decodeTeacherContactDetail(Object? raw) {
+  final envelope = _object(raw);
+  _exactKeys(envelope, {'contact'});
+  final row = _object(envelope['contact']);
+  _exactKeys(row, {
+    'id',
+    'congregation_id',
+    'name',
+    'phone_e164',
+    'birth_date',
+    'revision',
+  });
+  final revision = row['revision'];
+  if (revision is! int || revision < 1) _invalid();
+  return MinistryTeacherContactDetail(
+    id: _uuid(row['id']),
+    congregationId: _uuid(row['congregation_id']),
+    name: _text(row['name']),
+    phoneE164: _optionalPhoneText(row['phone_e164']),
+    birthDate: row['birth_date'] == null
+        ? null
+        : CalendarDate.parse(_text(row['birth_date'])),
+    revision: revision,
+  );
+}
+
+MinistryEnrollmentResult decodeMinistryEnrollmentResult(
+  Object? raw, {
+  required String expectedId,
+  required String expectedPersonId,
+}) {
+  final row = _object(raw);
+  _exactKeys(row, {
+    'id',
+    'student_id',
+    'person_id',
+    'revision',
+    'student_revision',
+  });
+  final revision = row['revision'];
+  final studentRevision = row['student_revision'];
+  if (revision is! int ||
+      revision < 1 ||
+      studentRevision is! int ||
+      studentRevision < 1 ||
+      row['id'] != expectedId ||
+      row['person_id'] != expectedPersonId) {
+    _invalid();
+  }
+  return MinistryEnrollmentResult(
+    id: _uuid(row['id']),
+    studentId: _uuid(row['student_id']),
+    personId: _uuid(row['person_id']),
+    revision: revision,
+    studentRevision: studentRevision,
+  );
+}
+
 /// Decode the explicit identity-link result without collapsing either row's
 /// revision into the generic `{id, revision}` command shape.
 StudentPersonLinkResult decodeStudentPersonLinkResult(
@@ -427,6 +576,22 @@ String? _optionalPhoneText(Object? value) {
   if (value == null) return null;
   if (value is! String) _invalid();
   return value;
+}
+
+bool? _nullableBool(Object? value) {
+  if (value == null) return null;
+  if (value is! bool) _invalid();
+  return value;
+}
+
+DateTime? _optionalTimestamp(Object? value) =>
+    value == null ? null : _requiredTimestamp(value);
+
+DateTime _requiredTimestamp(Object? value) {
+  final text = _text(value);
+  final parsed = DateTime.tryParse(text);
+  if (parsed == null || !text.contains('T')) _invalid();
+  return parsed.toUtc();
 }
 
 String _uuid(Object? value) {

@@ -9,6 +9,7 @@ import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 
 const _convert = '11111111-1111-4111-8111-111111111111';
 const _student = '22222222-2222-4222-8222-222222222222';
+const _person = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const _scope = '33333333-3333-4333-8333-333333333333';
 const _operation = '44444444-4444-4444-8444-444444444444';
 
@@ -82,11 +83,13 @@ void main() {
           'convert_id': _convert,
           'congregation_id': _scope,
           'student_id': _student,
+          'expected_student_revision': 7,
         },
       });
       await _respond(request, {
         'convert_id': _convert,
         'student_id': _student,
+        'person_id': _person,
         'congregation_id': _scope,
         'status': 'linked',
       });
@@ -110,9 +113,11 @@ void main() {
       convertId: _convert,
       congregationId: _scope,
       studentId: _student,
+      expectedStudentRevision: 7,
     );
 
     expect(result.studentId, _student);
+    expect(result.personId, _person);
     expect(result.status, 'linked');
   });
 
@@ -137,6 +142,7 @@ void main() {
       () => decodePromotionResult({
         'convert_id': _convert,
         'student_id': _student,
+        'person_id': _person,
         'congregation_id': _scope,
         'status': 'created',
       }),

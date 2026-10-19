@@ -128,6 +128,15 @@ class SupabaseGateway
         return result;
       } catch (error) {
         ensureCurrent(token);
+        if (error is PostgrestException &&
+            error.code == '40001' &&
+            error.message.contains('stale_revision')) {
+          throw const DataFailure('stale_revision');
+        }
+        if (error is PostgrestException &&
+            error.message.contains('active_enrollment')) {
+          throw const DataFailure('active_enrollment');
+        }
         final transient =
             error is TimeoutException ||
             (error is PostgrestException &&
@@ -498,6 +507,8 @@ class SupabaseGateway
       },
       'ministry_get_convert': {'congregation_id', 'convert_id'},
       'ministry_get_person': {'congregation_id', 'person_id'},
+      'ministry_get_student': {'congregation_id', 'student_id'},
+      'ministry_get_teacher_contact': {'congregation_id', 'contact_id'},
       'ministry_list_directory': {
         'scope',
         'congregation_id',
@@ -547,6 +558,8 @@ class SupabaseGateway
       'ministry_list_converts': {'limit'},
       'ministry_get_convert': {'congregation_id', 'convert_id'},
       'ministry_get_person': {'congregation_id', 'person_id'},
+      'ministry_get_student': {'congregation_id', 'student_id'},
+      'ministry_get_teacher_contact': {'congregation_id', 'contact_id'},
       'ministry_list_students': {'congregation_id', 'limit'},
       'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
     };
@@ -640,7 +653,7 @@ class SupabaseGateway
         'id',
         'congregation_id',
         'class_id',
-        'student_id',
+        'person_id',
         'start_date',
       },
       'close_enrollment': {
@@ -716,7 +729,7 @@ class SupabaseGateway
         'id',
         'congregation_id',
         'class_id',
-        'student_id',
+        'person_id',
         'start_date',
       },
       'close_enrollment': {
@@ -744,6 +757,7 @@ class SupabaseGateway
       'congregation_id',
       'class_id',
       'student_id',
+      'person_id',
       'session_id',
       'previous_contact_id',
     ]) {
@@ -825,6 +839,13 @@ class SupabaseGateway
           .retry(enabled: false, requestTimeout: requestTimeout),
     );
     const resultFields = <String, Set<String>>{
+      'enroll_student': {
+        'id',
+        'student_id',
+        'person_id',
+        'revision',
+        'student_revision',
+      },
       'replace_role_holder': {
         'id',
         'revision',
@@ -952,14 +973,29 @@ class SupabaseGateway
     Map<String, Object?> payload,
   ) async {
     validateUuid(operationId);
+    const allowed = {
+      'convert_id',
+      'congregation_id',
+      'student_id',
+      'expected_student_revision',
+    };
     const required = {'convert_id', 'congregation_id', 'student_id'};
-    if (payload.keys.toSet().difference(required).isNotEmpty ||
-        !payload.keys.toSet().containsAll(required)) {
+    if (payload.keys.toSet().difference(allowed).isNotEmpty ||
+        !payload.keys.toSet().containsAll(required) ||
+        (payload['student_id'] == null &&
+            payload.containsKey('expected_student_revision')) ||
+        (payload['student_id'] != null &&
+            !payload.containsKey('expected_student_revision'))) {
       throw const DataFailure('invalid');
     }
     validateUuid(payload['convert_id']);
     validateUuid(payload['congregation_id']);
     if (payload['student_id'] != null) validateUuid(payload['student_id']);
+    if (payload['expected_student_revision'] != null &&
+        (payload['expected_student_revision'] is! int ||
+            (payload['expected_student_revision'] as int) < 1)) {
+      throw const DataFailure('invalid');
+    }
     final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;
     final token = context;
     final value = await _run(
@@ -971,17 +1007,25 @@ class SupabaseGateway
           )
           .retry(enabled: false, requestTimeout: requestTimeout),
     );
-    const expected = {'convert_id', 'student_id', 'congregation_id', 'status'};
+    const expected = {
+      'convert_id',
+      'student_id',
+      'person_id',
+      'congregation_id',
+      'status',
+    };
     if (value is! Map<String, dynamic> ||
         value.keys.toSet().difference(expected).isNotEmpty ||
         !value.keys.toSet().containsAll(expected) ||
         value['convert_id'] != payload['convert_id'] ||
         value['congregation_id'] != payload['congregation_id'] ||
         value['student_id'] is! String ||
+        value['person_id'] != null && value['person_id'] is! String ||
         value['status'] != 'linked') {
       throw const DataFailure('invalid_response');
     }
     validateUuid(value['student_id']);
+    validateUuid(value['person_id']);
     return Map<String, dynamic>.unmodifiable(value);
   }
 

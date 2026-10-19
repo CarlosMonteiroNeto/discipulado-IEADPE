@@ -213,6 +213,187 @@ void main() {
   );
 
   test(
+    'student and teacher details decode their exact scoped projections',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final serving = server.listen((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join());
+        if (request.uri.path == '/rest/v1/rpc/ieadpe_ministry_get_student') {
+          expect(body, {
+            'request': {'congregation_id': _scope, 'student_id': _id},
+          });
+          await _respond(request, {
+            'student': {
+              'id': _id,
+              'person_id': _person,
+              'congregation_id': _scope,
+              'name': 'Ana Silva',
+              'normalized_name': 'ana silva',
+              'phone_e164': '+5511999990000',
+              'birth_date': '1990-02-28',
+              'address': null,
+              'education': 'Médio',
+              'marital_status': null,
+              'new_convert': false,
+              'water_baptized': null,
+              'wants_baptism': true,
+              'archived_at': null,
+              'revision': 3,
+              'person_revision': 7,
+              'link_state': 'linked',
+              'created_at': '2026-10-16T12:00:00Z',
+              'updated_at': '2026-10-17T12:00:00Z',
+              'updated_by': null,
+            },
+          });
+        } else {
+          expect(
+            request.uri.path,
+            '/rest/v1/rpc/ieadpe_ministry_get_teacher_contact',
+          );
+          expect(body, {
+            'request': {'congregation_id': _scope, 'contact_id': _id},
+          });
+          await _respond(request, {
+            'contact': {
+              'id': _id,
+              'congregation_id': _scope,
+              'name': 'Professora Ana',
+              'phone_e164': null,
+              'birth_date': '1980-04-03',
+              'revision': 2,
+            },
+          });
+        }
+      });
+      final client = SupabaseClient(
+        'http://127.0.0.1:${server.port}',
+        'test',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(() async {
+        await client.dispose();
+        await serving.cancel();
+        await server.close(force: true);
+      });
+      final repository = MinistryRepository(
+        SupabaseGateway(client, ProtectedDataBoundary()),
+      );
+
+      final student = await repository.getStudent(
+        congregationId: _scope,
+        studentId: _id,
+      );
+      final teacher = await repository.getTeacherContact(
+        congregationId: _scope,
+        contactId: _id,
+      );
+
+      expect(student.revision, 3);
+      expect(student.personRevision, 7);
+      expect(student.name, 'Ana Silva');
+      expect(teacher.revision, 2);
+      expect(teacher.birthDate.toString(), '1980-04-03');
+      expect(
+        () => decodeTeacherContactDetail({
+          'contact': {
+            'id': _id,
+            'congregation_id': _scope,
+            'name': 'Professora Ana',
+            'phone_e164': null,
+            'birth_date': null,
+            'revision': 2,
+            'email': 'unexpected@example.test',
+          },
+        }),
+        throwsA(isA<MinistryDataException>()),
+      );
+    },
+  );
+
+  test(
+    'teacher update preserves birth date and enrollment sends person ID',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final serving = server.listen((request) async {
+        final body = jsonDecode(await utf8.decoder.bind(request).join());
+        if (request.uri.path == '/rest/v1/rpc/ieadpe_ministry_save_contact') {
+          expect(body, {
+            'operation_id': _op,
+            'payload': {
+              'id': _id,
+              'scope': 'congregation',
+              'congregation_id': _scope,
+              'name': 'Professora Ana',
+              'role_code': 'teacher',
+              'phone_e164': '+5511999990000',
+              'birth_date': '1980-04-03',
+              'expected_revision': 4,
+            },
+          });
+          await _respond(request, {'id': _id, 'revision': 5});
+        } else {
+          expect(
+            request.uri.path,
+            '/rest/v1/rpc/ieadpe_ministry_enroll_student',
+          );
+          expect(body, {
+            'operation_id': _op,
+            'payload': {
+              'id': _id,
+              'congregation_id': _scope,
+              'class_id': _id,
+              'person_id': _person,
+              'start_date': '2026-10-19',
+            },
+          });
+          await _respond(request, {
+            'id': _id,
+            'student_id': '55555555-5555-4555-8555-555555555555',
+            'person_id': _person,
+            'revision': 1,
+            'student_revision': 3,
+          });
+        }
+      });
+      final client = SupabaseClient(
+        'http://127.0.0.1:${server.port}',
+        'test',
+        authOptions: const AuthClientOptions(autoRefreshToken: false),
+      );
+      addTearDown(() async {
+        await client.dispose();
+        await serving.cancel();
+        await server.close(force: true);
+      });
+      final repository = MinistryRepository(
+        SupabaseGateway(client, ProtectedDataBoundary()),
+      );
+
+      final saved = await repository.saveTeacherContact(
+        operationId: _op,
+        id: _id,
+        congregationId: _scope,
+        name: 'Professora Ana',
+        phoneE164: '+5511999990000',
+        birthDate: CalendarDate(1980, 4, 3),
+        expectedRevision: 4,
+      );
+      final enrollment = await repository.enrollStudent(
+        operationId: _op,
+        id: _id,
+        congregationId: _scope,
+        classId: _id,
+        personId: _person,
+        startDate: CalendarDate(2026, 10, 19),
+      );
+      expect(saved.revision, 5);
+      expect(enrollment.personId, _person);
+      expect(enrollment.studentRevision, 3);
+    },
+  );
+
+  test(
     'canonical person save sends the exact nested payload and next revision',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -809,7 +990,7 @@ void main() {
           'id': _id,
           'congregation_id': _scope,
           'class_id': _id,
-          'student_id': _id,
+          'person_id': _person,
           'start_date': '2026-01-01',
         },
         'close_enrollment': {
@@ -853,6 +1034,13 @@ void main() {
         ) as Map<String, dynamic>;
         expect(body.keys.toSet(), {'operation_id', 'payload'});
         final response = switch (command) {
+          'enroll_student' => {
+            'id': _id,
+            'student_id': '55555555-5555-4555-8555-555555555555',
+            'person_id': _person,
+            'revision': 2,
+            'student_revision': 3,
+          },
           'replace_role_holder' => {
             'id': _id,
             'revision': 2,

@@ -29,16 +29,25 @@ INSERT INTO public.ministry_grants(user_id,congregation_id,role,active) VALUES
  ('a1000000-0000-0000-0000-000000000004','a2000000-0000-0000-0000-000000000001','ministry_staff',true);
 INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
  ('link-campaign@example.test','a1000000-0000-0000-0000-000000000003','Membro da direção da campanha','a2000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,phone,address,updated_by) VALUES
+ ('a6000000-0000-0000-0000-000000000001','a2000000-0000-0000-0000-000000000001','Rosa Silva','rosa silva','+5511999999999',
+  '{"street":"Rua Um, 10","district":null,"city":null,"postal_code":null,"state_code":null}','a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000002','a2000000-0000-0000-0000-000000000001','Rosa Silva','rosa silva',NULL,NULL,'a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000003','a2000000-0000-0000-0000-000000000001','Davi','davi',NULL,NULL,'a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000004','a2000000-0000-0000-0000-000000000001','Deleted','deleted',NULL,NULL,'a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000006','a2000000-0000-0000-0000-000000000001','Bad Phone','bad phone',NULL,NULL,'a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000007','a2000000-0000-0000-0000-000000000001','Deviated','deviated',NULL,NULL,'a1000000-0000-0000-0000-000000000001'),
+ ('a6000000-0000-0000-0000-000000000008','a2000000-0000-0000-0000-000000000002','Other Scope','other scope',NULL,NULL,'a1000000-0000-0000-0000-000000000002');
 INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,
- address,phone,is_discipleship_completed,deleted_at) VALUES
- ('a3000000-0000-0000-0000-000000000001','link-active','Rosa Silva','Praça','female','2026-10-01','Culto','a2000000-0000-0000-0000-000000000001','Rua Um, 10','+5511999999999',false,NULL),
- ('a3000000-0000-0000-0000-000000000002','link-terminal','Rosa Silva','Praça','female','2026-10-02','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,true,NULL),
- ('a3000000-0000-0000-0000-000000000003','link-deviated','Davi','Praça','male','2026-10-03','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL),
- ('a3000000-0000-0000-0000-000000000004','link-deleted','Deleted','Praça','male','2026-10-04','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,now()),
- ('a3000000-0000-0000-0000-000000000005','link-unassigned','Unassigned','Praça','male','2026-10-05','Culto',NULL,NULL,NULL,false,NULL),
- ('a3000000-0000-0000-0000-000000000006','link-invalid-phone','Bad Phone','Praça','male','2026-10-06','Culto','a2000000-0000-0000-0000-000000000001',NULL,'(11) 99999-9999',false,NULL),
- ('a3000000-0000-0000-0000-000000000007','link-deviated-2','Deviated','Praça','male','2026-10-07','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL),
- ('a3000000-0000-0000-0000-000000000008','link-other-scope','Other Scope','Praça','female','2026-10-08','Culto','a2000000-0000-0000-0000-000000000002',NULL,NULL,false,NULL);
+ address,phone,is_discipleship_completed,deleted_at,person_id) VALUES
+ ('a3000000-0000-0000-0000-000000000001','link-active','Rosa Silva','Praça','female','2026-10-01','Culto','a2000000-0000-0000-0000-000000000001','Rua Um, 10','+5511999999999',false,NULL,'a6000000-0000-0000-0000-000000000001'),
+ ('a3000000-0000-0000-0000-000000000002','link-terminal','Rosa Silva','Praça','female','2026-10-02','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,true,NULL,'a6000000-0000-0000-0000-000000000002'),
+ ('a3000000-0000-0000-0000-000000000003','link-deviated','Davi','Praça','male','2026-10-03','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL,'a6000000-0000-0000-0000-000000000003'),
+ ('a3000000-0000-0000-0000-000000000004','link-deleted','Deleted','Praça','male','2026-10-04','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,now(),'a6000000-0000-0000-0000-000000000004'),
+ ('a3000000-0000-0000-0000-000000000005','link-unassigned','Unassigned','Praça','male','2026-10-05','Culto',NULL,NULL,NULL,false,NULL,NULL),
+ ('a3000000-0000-0000-0000-000000000006','link-invalid-phone','Bad Phone','Praça','male','2026-10-06','Culto','a2000000-0000-0000-0000-000000000001',NULL,'(11) 99999-9999',false,NULL,'a6000000-0000-0000-0000-000000000006'),
+ ('a3000000-0000-0000-0000-000000000007','link-deviated-2','Deviated','Praça','male','2026-10-07','Culto','a2000000-0000-0000-0000-000000000001',NULL,NULL,false,NULL,'a6000000-0000-0000-0000-000000000007'),
+ ('a3000000-0000-0000-0000-000000000008','link-other-scope','Other Scope','Praça','female','2026-10-08','Culto','a2000000-0000-0000-0000-000000000002',NULL,NULL,false,NULL,'a6000000-0000-0000-0000-000000000008');
 UPDATE public.converts SET is_deviated=true WHERE id='a3000000-0000-0000-0000-000000000007';
 INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,phone_e164,address,education,
  new_convert,updated_by) VALUES
@@ -82,7 +91,8 @@ DO $$ DECLARE page jsonb; page2 jsonb; page3 jsonb; result jsonb; BEGIN
  result:=public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000001',
   '{"convert_id":"a3000000-0000-0000-0000-000000000001","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
  PERFORM pg_temp.assert_true(result=jsonb_build_object('convert_id','a3000000-0000-0000-0000-000000000001',
-  'student_id',result->>'student_id','congregation_id','a2000000-0000-0000-0000-000000000001','status','linked'),
+  'student_id',result->>'student_id','person_id','a6000000-0000-0000-0000-000000000001',
+  'congregation_id','a2000000-0000-0000-0000-000000000001','status','linked'),
   'new student promotion returns only safe minimal identifiers');
  PERFORM pg_temp.assert_true(pg_temp.assert_link_snapshot('a3000000-0000-0000-0000-000000000001',
   '+5511999999999','{"name":"Rosa Silva","phone":"+5511999999999","address":"Rua Um, 10"}'::jsonb,NULL,
@@ -103,18 +113,20 @@ DO $$ DECLARE page jsonb; page2 jsonb; page3 jsonb; result jsonb; BEGIN
   '{"name":"Bad Phone","phone":"(11) 99999-9999","address":null}'::jsonb,NULL,NULL),
   'non-E.164 source phone remains exact in provenance and student phone stays null');
  result:=public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000003',
-  '{"convert_id":"a3000000-0000-0000-0000-000000000002","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000001"}'::jsonb);
+  '{"convert_id":"a3000000-0000-0000-0000-000000000002","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000001","expected_student_revision":1}'::jsonb);
+ PERFORM pg_temp.assert_true(result->>'person_id'='a6000000-0000-0000-0000-000000000002',
+  'existing-student promotion returns the canonical person ID');
  PERFORM pg_temp.assert_true(pg_temp.assert_link_snapshot('a3000000-0000-0000-0000-000000000002',
   '+5511888888888','{"name":"Rosa Silva","phone":null,"address":null}'::jsonb,'Higher',
   '{"street":"Student address"}'::jsonb), 'explicit existing-student link preserves all owned fields');
  BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000004',
-  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000002"}'::jsonb);
+  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000002","expected_student_revision":1}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: out-of-scope candidate accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000011',
-  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000003"}'::jsonb);
+  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000003","expected_student_revision":1}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: archived candidate accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  BEGIN PERFORM public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000012',
-  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000001"}'::jsonb);
+  '{"convert_id":"a3000000-0000-0000-0000-000000000003","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":"a4000000-0000-0000-0000-000000000001","expected_student_revision":2}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: already-linked candidate accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
  result:=public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000013',
   '{"convert_id":"a3000000-0000-0000-0000-000000000007","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb);
@@ -147,8 +159,10 @@ DO $$ BEGIN
 END $$;
 SELECT set_config('request.jwt.claim.sub','a1000000-0000-0000-0000-000000000003',true);
 RESET ROLE;
-INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id)
- VALUES('a3000000-0000-0000-0000-000000000009','link-direction-promotion','Direction Promotion','Praça','female','2026-10-09','Culto','a2000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by)
+ VALUES('a6000000-0000-0000-0000-000000000009','a2000000-0000-0000-0000-000000000001','Direction Promotion','direction promotion','a1000000-0000-0000-0000-000000000003');
+INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,person_id)
+ VALUES('a3000000-0000-0000-0000-000000000009','link-direction-promotion','Direction Promotion','Praça','female','2026-10-09','Culto','a2000000-0000-0000-0000-000000000001','a6000000-0000-0000-0000-000000000009');
 SET LOCAL ROLE authenticated;
 DO $$ DECLARE result jsonb; BEGIN
  result:=public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000006',

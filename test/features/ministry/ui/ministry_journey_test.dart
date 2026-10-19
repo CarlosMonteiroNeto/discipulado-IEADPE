@@ -29,16 +29,20 @@ class _Gateway
     implements ReadRpcGateway, HandoffCommandGateway, MinistryCommandGateway {
   final boundaryValue = ProtectedDataBoundary();
   final List<String> operationIds = [];
+  final List<Map<String, Object?>> promotionPayloads = [];
   final List<Map<String, Object?>> enrollmentPayloads = [];
   int referralReads = 0;
   int promotions = 0;
   int candidateReads = 0;
+  int studentDetailReads = 0;
+  int studentRevision = 1;
   int classReads = 0;
   int enrollments = 0;
   bool pagingEnabled = false;
   bool failCandidateRead = false;
   bool failEnrollmentOnce = false;
   bool failFirstPromotion = true;
+  bool staleFirstPromotion = false;
   List<Map<String, dynamic>> studentRows = const [];
   Completer<Map<String, dynamic>>? promotionCompleter;
   @override
@@ -181,6 +185,33 @@ class _Gateway
     if (rpc == 'ministry_list_students') {
       return {'items': studentRows, 'next_cursor': null};
     }
+    if (rpc == 'ministry_get_student') {
+      studentDetailReads++;
+      return {
+        'student': {
+          'id': parameters['student_id'],
+          'person_id': _person,
+          'congregation_id': parameters['congregation_id'],
+          'name': 'Ana Maria Silva',
+          'normalized_name': 'ana maria silva',
+          'phone_e164': '+5511999990000',
+          'birth_date': null,
+          'address': null,
+          'education': null,
+          'marital_status': null,
+          'new_convert': null,
+          'water_baptized': null,
+          'wants_baptism': null,
+          'archived_at': null,
+          'revision': studentRevision,
+          'person_revision': 1,
+          'link_state': 'linked',
+          'created_at': '2026-10-01T00:00:00Z',
+          'updated_at': '2026-10-01T00:00:00Z',
+          'updated_by': null,
+        },
+      };
+    }
     if (rpc == 'ministry_list_directory') {
       return {'items': [], 'next_cursor': null};
     }
@@ -255,14 +286,19 @@ class _Gateway
     Map<String, Object?> payload,
   ) async {
     operationIds.add(operationId);
+    promotionPayloads.add(Map.of(payload));
     promotions++;
     if (promotionCompleter != null) return promotionCompleter!.future;
+    if (staleFirstPromotion && promotions == 1) {
+      throw const DataFailure('stale_revision');
+    }
     if (failFirstPromotion && promotions == 1) {
       throw const DataFailure('unavailable');
     }
     return {
       'convert_id': _convert,
       'student_id': _student,
+      'person_id': _person,
       'congregation_id': _scope,
       'status': 'linked',
     };
@@ -281,7 +317,13 @@ class _Gateway
       throw const DataFailure('unavailable');
     }
     enrollmentPayloads.add(Map.of(payload));
-    return {'id': payload['id'], 'revision': 1};
+    return {
+      'id': payload['id'],
+      'student_id': _student,
+      'person_id': payload['person_id'],
+      'revision': 1,
+      'student_revision': 1,
+    };
   }
 
   @override
@@ -305,6 +347,7 @@ Widget _app(
   required Size size,
   double textScale = 1,
   bool reducedMotion = false,
+  String Function()? createOperationId,
 }) => MaterialApp(
   home: MediaQuery(
     data: MediaQueryData(
@@ -318,7 +361,8 @@ Widget _app(
       handoff: MinistryHandoffRepository(gateway),
       browser: MinistryBrowserRepository(gateway),
       ministry: MinistryRepository(gateway),
-      createOperationId: () => '66666666-6666-4666-8666-666666666666',
+      createOperationId:
+          createOperationId ?? () => '66666666-6666-4666-8666-666666666666',
     ),
   ),
 );
@@ -465,8 +509,76 @@ void main() {
       await tester.tap(enroll);
       await tester.pumpAndSettle();
       expect(gateway.enrollmentPayloads, hasLength(1));
-      expect(gateway.enrollmentPayloads.single['student_id'], _student);
+      expect(gateway.enrollmentPayloads.single['person_id'], _person);
+      expect(gateway.enrollmentPayloads.single['student_id'], isNull);
       expect(gateway.enrollmentPayloads.single['class_id'], _classId);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'stale promotion retry reloads student revision and operation ID',
+    (tester) async {
+      final gateway = _Gateway()
+        ..failFirstPromotion = false
+        ..staleFirstPromotion = true;
+      final operationIds = <String>[
+        '66666666-6666-4666-8666-666666666666',
+        '77777777-7777-4777-8777-777777777777',
+      ];
+      var nextOperationId = 0;
+      await tester.binding.setSurfaceSize(const Size(768, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        _app(
+          gateway,
+          authorized: true,
+          size: const Size(768, 900),
+          createOperationId: () => operationIds[nextOperationId++],
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('handoff-referral-$_convert')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField), 'Ana');
+      await tester.tap(find.text('Buscar possíveis alunos'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ana Maria Silva'));
+      await tester.pumpAndSettle();
+      final link = find.text('Vincular ao aluno selecionado');
+      await tester.scrollUntilVisible(
+        link,
+        300,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(link);
+      await tester.pumpAndSettle();
+
+      expect(gateway.studentDetailReads, 1);
+      expect(gateway.operationIds, ['66666666-6666-4666-8666-666666666666']);
+      expect(gateway.promotionPayloads.single['expected_student_revision'], 1);
+      expect(
+        find.text(
+          'Os dados do aluno mudaram. Atualize a lista e tente novamente.',
+        ),
+        findsOneWidget,
+      );
+
+      gateway.studentRevision = 2;
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+
+      expect(gateway.studentDetailReads, 2);
+      expect(gateway.operationIds, operationIds);
+      expect(gateway.operationIds[0], isNot(gateway.operationIds[1]));
+      expect(
+        gateway.promotionPayloads
+            .map((payload) => payload['expected_student_revision'])
+            .toList(),
+        [1, 2],
+      );
+      expect(find.textContaining('Vínculo confirmado'), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -712,6 +824,7 @@ void main() {
     gateway.promotionCompleter!.complete({
       'convert_id': _convert,
       'student_id': _student,
+      'person_id': _person,
       'congregation_id': _scope,
       'status': 'linked',
     });

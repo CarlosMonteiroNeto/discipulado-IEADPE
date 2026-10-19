@@ -354,6 +354,89 @@ class MinistryPersonDraft {
   };
 }
 
+/// Full scoped student projection. Canonical identity and academic state keep
+/// separate revisions so either edit path can detect stale writes safely.
+class MinistryStudentDetail {
+  const MinistryStudentDetail({
+    required this.id,
+    required this.personId,
+    required this.congregationId,
+    required this.name,
+    required this.normalizedName,
+    required this.phoneE164,
+    required this.birthDate,
+    required this.address,
+    required this.education,
+    required this.maritalStatus,
+    required this.newConvert,
+    required this.waterBaptized,
+    required this.wantsBaptism,
+    required this.archivedAt,
+    required this.revision,
+    required this.personRevision,
+    required this.linkState,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.updatedBy,
+  });
+
+  final String id;
+  final String? personId;
+  final String congregationId;
+  final String name;
+  final String normalizedName;
+  final String? phoneE164;
+  final CalendarDate? birthDate;
+  final Address? address;
+  final String? education;
+  final String? maritalStatus;
+  final bool? newConvert;
+  final bool? waterBaptized;
+  final bool? wantsBaptism;
+  final DateTime? archivedAt;
+  final int revision;
+  final int? personRevision;
+  final PersonLinkState linkState;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final String? updatedBy;
+}
+
+/// The minimal teacher contact projection returned to the editor.
+class MinistryTeacherContactDetail {
+  const MinistryTeacherContactDetail({
+    required this.id,
+    required this.congregationId,
+    required this.name,
+    required this.phoneE164,
+    required this.birthDate,
+    required this.revision,
+  });
+
+  final String id;
+  final String congregationId;
+  final String name;
+  final String? phoneE164;
+  final CalendarDate? birthDate;
+  final int revision;
+}
+
+class MinistryEnrollmentResult {
+  const MinistryEnrollmentResult({
+    required this.id,
+    required this.studentId,
+    required this.personId,
+    required this.revision,
+    required this.studentRevision,
+  });
+
+  final String id;
+  final String studentId;
+  final String personId;
+  final int revision;
+  final int studentRevision;
+}
+
 class StudentPersonLinkResult {
   const StudentPersonLinkResult({
     required this.studentId,

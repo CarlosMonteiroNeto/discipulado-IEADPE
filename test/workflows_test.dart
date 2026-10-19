@@ -23,6 +23,7 @@ class LoopbackHttp extends HttpOverrides {}
 class RootFixture {
   static const scopeId = '33333333-3333-4333-8333-333333333333';
   static const syntheticStudentId = '22222222-2222-4222-8222-222222222222';
+  static const syntheticPersonId = '77777777-7777-4777-8777-777777777777';
   static const classId = '44444444-4444-4444-8444-444444444444';
   static const sessionId = '55555555-5555-4555-8555-555555555555';
   static const enrollmentRecordId = '66666666-6666-4666-8666-666666666666';
@@ -91,7 +92,12 @@ class RootFixture {
       if (rpc == 'ieadpe_create_convert') {
         convertId = '11111111-1111-4111-8111-111111111111';
         convertPayload = payload;
-        value = {'id': convertId};
+        value = {
+          'id': convertId,
+          'person_id': syntheticPersonId,
+          'revision': 1,
+          'person_revision': 1,
+        };
       }
       if (rpc == 'ieadpe_promote_convert_to_student') {
         promotionCount++;
@@ -101,6 +107,7 @@ class RootFixture {
         value = {
           'convert_id': payload['convert_id'],
           'student_id': studentId,
+          'person_id': syntheticPersonId,
           'congregation_id': payload['congregation_id'],
           'status': 'linked',
         };
@@ -113,10 +120,16 @@ class RootFixture {
                   {
                     'convert_id': convertId,
                     'congregation_id': scopeId,
-                    'name': convertPayload?['name'],
-                    'phone': convertPayload?['phone'],
-                    'address': convertPayload?['address'],
-                    'conversion_date': convertPayload?['conversion_date'],
+                    'name': (convertPayload?['person'] as Map?)?['name'],
+                    'phone': (convertPayload?['person'] as Map?)?['phone'],
+                    'address':
+                        (convertPayload?['person'] as Map?)?['address'] is Map
+                        ? ((convertPayload?['person'] as Map)['address']
+                              as Map)['street']
+                        : null,
+                    'conversion_date':
+                        (convertPayload?['convert']
+                            as Map?)?['conversion_date'],
                   },
                 ],
           'next_cursor': null,
@@ -140,7 +153,13 @@ class RootFixture {
       if (rpc == 'ieadpe_ministry_enroll_student') {
         enrollmentPayload = payload;
         enrollmentId = payload['id'] as String;
-        value = {'id': enrollmentId, 'revision': 1};
+        value = {
+          'id': enrollmentId,
+          'student_id': studentId,
+          'person_id': payload['person_id'],
+          'revision': 1,
+          'student_revision': 1,
+        };
       }
       if (rpc == 'ieadpe_ministry_list_pending_sessions') {
         value = {
@@ -182,7 +201,7 @@ class RootFixture {
               'enrollment_id': enrollmentId,
               'session_id': sessionId,
               'student_id': studentId,
-              'student_name': convertPayload?['name'],
+              'student_name': (convertPayload?['person'] as Map?)?['name'],
               'status': attendanceFinalized ? 'present' : 'unmarked',
             },
           ],
@@ -370,6 +389,7 @@ void main() {
       );
       expect(promotion?.convertId, fixture.convertId);
       expect(promotion?.studentId, RootFixture.syntheticStudentId);
+      expect(promotion?.personId, RootFixture.syntheticPersonId);
       final enrollment = await tester.runAsync(
         () => handoffPage.ministry.command(
           name: 'enroll_student',
@@ -378,7 +398,7 @@ void main() {
             'id': RootFixture.enrollmentRecordId,
             'congregation_id': RootFixture.scopeId,
             'class_id': RootFixture.classId,
-            'student_id': promotion!.studentId,
+            'person_id': promotion!.personId,
             'start_date': '2026-10-17',
           },
         ),
@@ -408,7 +428,10 @@ void main() {
       expect(fixture.promotionPayload?['student_id'], isNull);
       expect(fixture.studentId, isNotNull);
       expect(fixture.studentId, RootFixture.syntheticStudentId);
-      expect(fixture.enrollmentPayload?['student_id'], fixture.studentId);
+      expect(
+        fixture.enrollmentPayload?['person_id'],
+        RootFixture.syntheticPersonId,
+      );
       expect(fixture.enrollmentPayload?['class_id'], RootFixture.classId);
       expect(fixture.enrollmentPayload?['id'], RootFixture.enrollmentRecordId);
       expect(

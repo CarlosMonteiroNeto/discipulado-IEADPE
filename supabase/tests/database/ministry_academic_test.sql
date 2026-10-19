@@ -15,19 +15,28 @@ INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,star
  VALUES('94000000-0000-0000-0000-000000000040','94000000-0000-0000-0000-000000000002','Other Class','other class','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000060','94000000-0000-0000-0000-000000000006','Academic B Class','academic b class','2026-01-01','94000000-0000-0000-0000-000000000001');
-INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by) VALUES
- ('94000000-0000-0000-0000-000000000004','94000000-0000-0000-0000-000000000002','Learner A','learner a','94000000-0000-0000-0000-000000000001'),
- ('94000000-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','Learner B','learner b','94000000-0000-0000-0000-000000000001'),
- ('94000000-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000006','Academic B Learner A','academic b learner a','94000000-0000-0000-0000-000000000001'),
- ('94000000-0000-0000-0000-000000000062','94000000-0000-0000-0000-000000000006','Academic B Learner B','academic b learner b','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by) VALUES
+ ('94000001-0000-0000-0000-000000000004','94000000-0000-0000-0000-000000000002','Learner A','learner a','94000000-0000-0000-0000-000000000001'),
+ ('94000001-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','Learner B','learner b','94000000-0000-0000-0000-000000000001'),
+ ('94000001-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000006','Academic B Learner A','academic b learner a','94000000-0000-0000-0000-000000000001'),
+ ('94000001-0000-0000-0000-000000000062','94000000-0000-0000-0000-000000000006','Academic B Learner B','academic b learner b','94000000-0000-0000-0000-000000000001');
+INSERT INTO public.ministry_students(id,congregation_id,person_id,name,normalized_name,updated_by) VALUES
+ ('94000000-0000-0000-0000-000000000004','94000000-0000-0000-0000-000000000002','94000001-0000-0000-0000-000000000004','Learner A','learner a','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000005','94000000-0000-0000-0000-000000000002','94000001-0000-0000-0000-000000000005','Learner B','learner b','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000006','94000001-0000-0000-0000-000000000061','Academic B Learner A','academic b learner a','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000062','94000000-0000-0000-0000-000000000006','94000001-0000-0000-0000-000000000062','Academic B Learner B','academic b learner b','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000063','94000000-0000-0000-0000-000000000006',
   '94000000-0000-0000-0000-000000000061','94000000-0000-0000-0000-000000000060','2026-01-01','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_sessions(id,congregation_id,class_id,session_date,updated_by)
  VALUES('94000000-0000-0000-0000-000000000064','94000000-0000-0000-0000-000000000006',
   '94000000-0000-0000-0000-000000000060','2026-10-17','94000000-0000-0000-0000-000000000001');
-INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by)
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by)
+ SELECT ('94010000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'94000000-0000-0000-0000-000000000002',
+  'Capacity Learner '||n,'capacity learner '||n,'94000000-0000-0000-0000-000000000001' FROM generate_series(1001,1101) n;
+INSERT INTO public.ministry_students(id,congregation_id,person_id,name,normalized_name,updated_by)
  SELECT ('94000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'94000000-0000-0000-0000-000000000002',
+  ('94010000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,
   'Capacity Learner '||n,'capacity learner '||n,'94000000-0000-0000-0000-000000000001' FROM generate_series(1001,1101) n;
 INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date,status,end_date,updated_by)
  SELECT ('94100000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'94000000-0000-0000-0000-000000000002',
@@ -48,21 +57,23 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; BEGIN
   '{"id":"94000000-0000-0000-0000-000000000070","congregation_id":"94000000-0000-0000-0000-000000000006","name":"Command Class","teacher_contact_id":null,"start_date":"2026-01-01","end_date":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: direction created a class in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  result:=public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000011',
-  '{"id":"94000000-0000-0000-0000-000000000011","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","student_id":"94000000-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
- PERFORM pg_temp.assert_true(result->>'revision'='1','enrollment created');
+  '{"id":"94000000-0000-0000-0000-000000000011","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","person_id":"94000001-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
+ PERFORM pg_temp.assert_true(result=jsonb_build_object('id','94000000-0000-0000-0000-000000000011',
+  'student_id','94000000-0000-0000-0000-000000000004','person_id','94000001-0000-0000-0000-000000000004',
+  'revision',1,'student_revision',1),'enrollment returns both linked IDs and revisions');
  BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000071',
-  '{"id":"94000000-0000-0000-0000-000000000071","congregation_id":"94000000-0000-0000-0000-000000000006","class_id":"94000000-0000-0000-0000-000000000060","student_id":"94000000-0000-0000-0000-000000000062","start_date":"2026-01-01"}'::jsonb);
+  '{"id":"94000000-0000-0000-0000-000000000071","congregation_id":"94000000-0000-0000-0000-000000000006","class_id":"94000000-0000-0000-0000-000000000060","person_id":"94000001-0000-0000-0000-000000000062","start_date":"2026-01-01"}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: direction enrolled a student in congregation B'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000014',
-  '{"id":"94000000-0000-0000-0000-000000000014","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","student_id":"94000000-0000-0000-0000-000000000005","start_date":"2026-01-01"}'::jsonb);
+  '{"id":"94000000-0000-0000-0000-000000000014","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000003","person_id":"94000001-0000-0000-0000-000000000005","start_date":"2026-01-01"}'::jsonb);
  BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000017',
-  '{"id":"94000000-0000-0000-0000-000000000017","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000040","student_id":"94000000-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
+  '{"id":"94000000-0000-0000-0000-000000000017","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000040","person_id":"94000001-0000-0000-0000-000000000004","start_date":"2026-01-01"}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: second active enrollment accepted'; EXCEPTION WHEN unique_violation THEN NULL; END;
  PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000021',
-  '{"id":"94000000-0000-0000-0000-000000000021","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000020","student_id":"94000000-0000-0000-0000-000000001100","start_date":"2026-01-01"}'::jsonb);
+  '{"id":"94000000-0000-0000-0000-000000000021","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000020","person_id":"94010000-0000-0000-0000-000000001100","start_date":"2026-01-01"}'::jsonb);
  PERFORM pg_temp.assert_true((SELECT count(*)=100 FROM public.ministry_enrollments WHERE class_id='94000000-0000-0000-0000-000000000020'),'99 to 100 historical enrollments allowed');
  BEGIN PERFORM public.ieadpe_ministry_enroll_student('94000000-0000-0000-0000-000000000022',
-  '{"id":"94000000-0000-0000-0000-000000000022","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000020","student_id":"94000000-0000-0000-0000-000000001101","start_date":"2026-01-01"}'::jsonb);
+  '{"id":"94000000-0000-0000-0000-000000000022","congregation_id":"94000000-0000-0000-0000-000000000002","class_id":"94000000-0000-0000-0000-000000000020","person_id":"94010000-0000-0000-0000-000000001101","start_date":"2026-01-01"}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: enrollment 101 exceeded capacity'; EXCEPTION WHEN check_violation OR invalid_parameter_value THEN NULL; END;
  PERFORM pg_temp.assert_true((SELECT count(*)=100 FROM public.ministry_enrollments WHERE class_id='94000000-0000-0000-0000-000000000020'),'capacity rejection left no enrollment');
  result:=public.ieadpe_ministry_create_session('94000000-0000-0000-0000-000000000012',
