@@ -71,10 +71,18 @@ C1 policy defaults do not establish hosted state. Hosted migration/function/scop
 
 ## P1 — Canonical identity/link migration
 
-- Base: `7fd79d5`; implementation commit recorded in the next ledger update.
+- Base: `7fd79d5`; implementation commit: `d25a7481a490532327b1859f2c50babe78735108`.
 - Implementer/reviewers: requested writer `gpt-6-luna` / `max`; reviewers `gpt-6.1-sol` / `low`; actual runtime metadata unavailable.
 - Files: the P1 manifest files and migration/seed scenarios. User-owned untracked plan, spec, and design documents were left untouched.
 - Review history: first Sol review found three Important and two Minor issues (revision/scope constraints, long-name preservation, migration timestamps, and seed-path validation). A fresh Luna fix pass addressed them. The next Sol review found phone round-trip, address type, and optional SQL-filter gaps; a fresh Luna pass fixed them. A third Sol review found the optional gateway-filter gap; fresh Luna added separate required-key validation while retaining allowlist rejection. Final Sol re-review found zero Critical, Important, and Minor issues.
 - RED/GREEN: each reported defect was reproduced before its fix, including a 244-character legacy name, blank phone decoding, malformed address values, omitted SQL filters, and omitted gateway filters. Targeted regressions then passed.
 - Final checks: `flutter test --concurrency=1 test/features/ministry/data/ministry_repository_test.dart` (15 tests), `flutter test --concurrency=1 test/features/ministry/domain/ministry_models_test.dart` (14), `flutter test --concurrency=1 test/features/ministry/ui/ministry_browser_repository_test.dart` (9), `flutter test --concurrency=1 test/features/ministry/ui/ministry_journey_test.dart` (17), and `python scripts/test_database.py canonical_person_link_test.sql --seed-before-migration 202610190001_ministry_people_identity.sql --seed-scenario canonical_person_link_legacy_seed.sql` all exited 0. `dart format --output=none --set-exit-if-changed` on all 10 changed Dart files and `git diff --check` also exited 0.
 - Result: P1 local implementation is reviewed clean. No hosted migration, production-data read/import, or device build/install occurred. Before P2 dispatch, its contract must preserve complete over-200-character canonical names and avoid submitting an unchanged legacy name through the 1–200-character save path; explicit shortening remains required to edit that name.
+
+## P2 contract supplement — inherited long canonical names
+
+- Basis: P1 commit `d25a7481a490532327b1859f2c50babe78735108` and the reviewed C1 nested convert edit contract.
+- Change: require P2 reads and unrelated convert edits to preserve names over 200 characters exactly, preserve `person_revision`, and bypass the capped canonical save when the identity is unchanged. Changing the name requires deliberate shortening to 1–200 characters.
+- Review: fresh `gpt-6.1-sol` / `low` review found zero Critical, Important, or Minor findings. Actual runtime metadata unavailable.
+- Checks: documentation-only gate; no tests. `git diff --check` is run before commit.
+- Dispatch: this review closes the long-name prerequisite for P2. Hosted state remains unknown.
