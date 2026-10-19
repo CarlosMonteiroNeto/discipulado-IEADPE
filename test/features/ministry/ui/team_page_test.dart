@@ -41,6 +41,28 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
         },
       };
     }
+    if (rpc == 'ministry_get_contact') {
+      return {
+        'contact': {
+          'id': _contactId,
+          'name': 'Ana Silva',
+          'normalized_name': 'ana silva',
+          'scope': 'congregation',
+          'congregation_id': _scope,
+          'role_code': 'teacher',
+          'phone_e164': '+5511999990000',
+          'birth_date': '1982-02-03',
+          'email': 'ana@example.test',
+          'archived_at': null,
+          'revision': 4,
+          'user_access_id': null,
+          'created_at': '2026-10-19T00:00:00Z',
+          'updated_at': '2026-10-19T00:00:00Z',
+          'updated_by': _contactId,
+        },
+        'access': null,
+      };
+    }
     return {
       'items': [
         {
@@ -51,6 +73,11 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
           'congregation_id': _scope,
           'role_code': 'teacher',
           'phone_e164': '+5511999990000',
+          'birth_date': '1982-02-03',
+          'email': 'ana@example.test',
+          'archived_at': null,
+          'revision': 4,
+          'user_access_id': null,
         },
       ],
       'next_cursor': null,
@@ -136,11 +163,13 @@ void main() {
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
 
+    expect(gateway.reads, contains('ministry_get_contact'));
     final save = gateway.writes.single;
     expect(save.$1, 'save_contact');
     expect(save.$2['phone_e164'], '+5511999990001');
     expect(save.$2['birth_date'], '1982-02-03');
     expect(save.$2['expected_revision'], 4);
+    expect(save.$2['email'], 'ana@example.test');
     expect(save.$2['name'], 'Ana Silva');
   });
 }

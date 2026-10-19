@@ -1,6 +1,8 @@
 /// Pure domain values for the ministry Supabase boundary.
 library;
 
+import '../../../domain/models.dart' show AccessRole;
+
 typedef MinistryJson = Map<String, Object?>;
 
 class MinistryDataException implements Exception {
@@ -172,6 +174,8 @@ class MinistryContact extends MinistryRecord {
     required this.phoneE164,
     required this.birthDate,
     required this.archived,
+    required this.email,
+    required this.userAccessId,
   });
 
   final String name;
@@ -181,6 +185,8 @@ class MinistryContact extends MinistryRecord {
   final String? phoneE164;
   final CalendarDate? birthDate;
   final bool archived;
+  final String? email;
+  final String? userAccessId;
 
   factory MinistryContact.fromJson(MinistryJson json) {
     _checkKeys(json, const <String>{
@@ -192,6 +198,8 @@ class MinistryContact extends MinistryRecord {
       'phone_e164',
       'birth_date',
       'archived',
+      'email',
+      'user_access_id',
     });
     final metadata = CommonMetadata.fromJson(json);
     final scope = ContactScope.fromWire(_requiredText(json, 'scope'));
@@ -215,6 +223,56 @@ class MinistryContact extends MinistryRecord {
       phoneE164: _optionalText(json, 'phone_e164'),
       birthDate: _optionalDate(json, 'birth_date'),
       archived: _requiredBool(json, 'archived'),
+      email: _optionalNormalizedEmail(json, 'email'),
+      userAccessId: _optionalUuid(json, 'user_access_id'),
+    );
+  }
+}
+
+/// Login authority remains distinct from a ministry contact's directory role.
+class TeamAccessAssignment {
+  const TeamAccessAssignment({
+    required this.id,
+    required this.userEmail,
+    required this.role,
+    required this.congregationId,
+    required this.boundUserId,
+  });
+
+  final String id;
+  final String userEmail;
+  final AccessRole role;
+  final String? congregationId;
+  final String? boundUserId;
+
+  factory TeamAccessAssignment.fromJson(MinistryJson json) {
+    _checkExactKeys(json, const <String>{
+      'id',
+      'user_email',
+      'role',
+      'congregation_id',
+      'user_id',
+    });
+    late final AccessRole role;
+    try {
+      role = AccessRole.fromWire(_requiredText(json, 'role'));
+    } on FormatException {
+      throw const MinistryDataException('Unknown access role.');
+    }
+    final congregationId = _optionalUuid(json, 'congregation_id');
+    if ((role == AccessRole.direction) != (congregationId != null)) {
+      throw const MinistryDataException('Access role and scope disagree.');
+    }
+    final email = _requiredText(json, 'user_email');
+    if (email != email.trim().toLowerCase() || !email.contains('@')) {
+      throw const MinistryDataException('Access email is not normalized.');
+    }
+    return TeamAccessAssignment(
+      id: _uuid(json, 'id'),
+      userEmail: email,
+      role: role,
+      congregationId: congregationId,
+      boundUserId: _optionalUuid(json, 'user_id'),
     );
   }
 }
@@ -885,6 +943,15 @@ String? _optionalText(MinistryJson json, String key) {
   if (value == null) return null;
   if (value is String) return value;
   throw MinistryDataException('Invalid optional text field: $key.');
+}
+
+String? _optionalNormalizedEmail(MinistryJson json, String key) {
+  final value = _optionalText(json, key);
+  if (value != null &&
+      (value != value.trim().toLowerCase() || !value.contains('@'))) {
+    throw MinistryDataException('Invalid normalized email field: $key.');
+  }
+  return value;
 }
 
 bool _requiredBool(MinistryJson json, String key) {

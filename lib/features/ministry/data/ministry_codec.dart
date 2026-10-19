@@ -1,4 +1,5 @@
 import '../domain/ministry_models.dart';
+import '../../../domain/models.dart' show AccessRole;
 
 /// Safe, transport-independent values returned by ministry read RPCs.
 class MinistryDirectoryEntry {
@@ -10,9 +11,18 @@ class MinistryDirectoryEntry {
     required this.congregationId,
     required this.roleCode,
     required this.phoneE164,
+    required this.birthDate,
+    required this.archivedAt,
+    required this.revision,
+    required this.email,
+    required this.userAccessId,
   });
   final String id, name, normalizedName, scope;
   final String? congregationId, roleCode, phoneE164;
+  final CalendarDate? birthDate;
+  final DateTime? archivedAt;
+  final int revision;
+  final String? email, userAccessId;
 }
 
 class MinistryPage<T> {
@@ -54,6 +64,37 @@ class MinistryCommandResult {
   final Map<String, Object?> fields;
 }
 
+class MinistryContactDetail {
+  const MinistryContactDetail({required this.contact, required this.access});
+
+  final MinistryContact contact;
+  final TeamAccessAssignment? access;
+}
+
+class MinistryContactAccessResult {
+  const MinistryContactAccessResult({
+    required this.id,
+    required this.revision,
+    required this.accessId,
+  });
+
+  final String id;
+  final int revision;
+  final String accessId;
+}
+
+class MinistryContactAccessRevocationResult {
+  const MinistryContactAccessRevocationResult({
+    required this.id,
+    required this.revision,
+    required this.revokedAccessId,
+  });
+
+  final String id;
+  final int revision;
+  final String revokedAccessId;
+}
+
 class MinistryRoster {
   const MinistryRoster({required this.session, required this.marks});
   final Session session;
@@ -88,7 +129,7 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
   final decoded = items
       .map((item) {
         final row = _object(item);
-        _keys(row, {
+        _exactKeys(row, {
           'id',
           'name',
           'normalized_name',
@@ -96,6 +137,11 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
           'congregation_id',
           'role_code',
           'phone_e164',
+          'birth_date',
+          'email',
+          'archived_at',
+          'revision',
+          'user_access_id',
         });
         final id = _uuid(row['id']);
         final scope = _text(row['scope']);
@@ -113,6 +159,8 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
             _invalid();
           }
         }
+        final revision = row['revision'];
+        if (revision is! int || revision < 1) _invalid();
         return MinistryDirectoryEntry(
           id: id,
           name: _text(row['name']),
@@ -121,6 +169,13 @@ MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
           congregationId: congregation,
           roleCode: roleCode,
           phoneE164: _optionalText(row['phone_e164']),
+          birthDate: row['birth_date'] == null
+              ? null
+              : CalendarDate.parse(_text(row['birth_date'])),
+          archivedAt: _optionalTimestamp(row['archived_at']),
+          revision: revision,
+          email: _optionalNormalizedEmail(row['email']),
+          userAccessId: _optionalUuid(row['user_access_id']),
         );
       })
       .toList(growable: false);
@@ -427,6 +482,91 @@ MinistryTeacherContactDetail decodeTeacherContactDetail(Object? raw) {
   );
 }
 
+MinistryContactDetail decodeMinistryContactDetail(Object? raw) {
+  final envelope = _object(raw);
+  _exactKeys(envelope, {'contact', 'access'});
+  final contactJson = _object(envelope['contact']);
+  _exactKeys(contactJson, {
+    'id',
+    'name',
+    'normalized_name',
+    'scope',
+    'congregation_id',
+    'role_code',
+    'phone_e164',
+    'birth_date',
+    'email',
+    'archived_at',
+    'revision',
+    'user_access_id',
+    'created_at',
+    'updated_at',
+    'updated_by',
+  });
+  final archivedAt = _optionalTimestamp(contactJson['archived_at']);
+  final modelJson = <String, Object?>{
+    ...contactJson,
+    'archived': archivedAt != null,
+  }..remove('archived_at');
+  final contact = MinistryContact.fromJson(modelJson);
+  final rawAccess = envelope['access'];
+  final access = rawAccess == null
+      ? null
+      : TeamAccessAssignment.fromJson(_object(rawAccess));
+  if ((contact.userAccessId == null) != (access == null) ||
+      (access != null &&
+          (access.id != contact.userAccessId ||
+              access.userEmail != contact.email ||
+              (contact.scope == ContactScope.congregation) !=
+                  (access.role == AccessRole.direction) ||
+              access.congregationId != contact.congregationId))) {
+    _invalid();
+  }
+  return MinistryContactDetail(contact: contact, access: access);
+}
+
+MinistryContactAccessResult decodeMinistryContactAccessResult(
+  Object? raw, {
+  String? expectedId,
+  int? expectedRevision,
+}) {
+  final json = _object(raw);
+  _exactKeys(json, {'id', 'revision', 'access_id'});
+  final revision = json['revision'];
+  if (revision is! int ||
+      revision < 1 ||
+      (expectedId != null && json['id'] != expectedId) ||
+      (expectedRevision != null && revision != expectedRevision)) {
+    _invalid();
+  }
+  return MinistryContactAccessResult(
+    id: _uuid(json['id']),
+    revision: revision,
+    accessId: _uuid(json['access_id']),
+  );
+}
+
+MinistryContactAccessRevocationResult
+decodeMinistryContactAccessRevocationResult(
+  Object? raw, {
+  required String expectedId,
+  required int expectedRevision,
+}) {
+  final json = _object(raw);
+  _exactKeys(json, {'id', 'revision', 'revoked_access_id'});
+  final revision = json['revision'];
+  if (json['id'] != expectedId ||
+      revision is! int ||
+      revision != expectedRevision) {
+    _invalid();
+  }
+  return MinistryContactAccessRevocationResult(
+    id: _uuid(json['id']),
+    revision: revision,
+    revokedAccessId: _uuid(json['revoked_access_id']),
+  );
+}
+
 MinistryEnrollmentResult decodeMinistryEnrollmentResult(
   Object? raw, {
   required String expectedId,
@@ -570,6 +710,15 @@ String _text(Object? value) {
 String? _optionalText(Object? value) {
   if (value == null) return null;
   return _text(value);
+}
+
+String? _optionalNormalizedEmail(Object? value) {
+  final email = _optionalText(value);
+  if (email != null &&
+      (email != email.trim().toLowerCase() || !email.contains('@'))) {
+    _invalid();
+  }
+  return email;
 }
 
 String? _optionalPhoneText(Object? value) {

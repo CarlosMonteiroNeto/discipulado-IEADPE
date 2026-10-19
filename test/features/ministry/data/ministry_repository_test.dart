@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
+import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_codec.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart';
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
@@ -17,6 +18,111 @@ Future<void> _respond(HttpRequest request, Object value) async {
   request.response.headers.contentType = ContentType.json;
   request.response.write(jsonEncode(value));
   await request.response.close();
+}
+
+class _TeacherRetryGateway implements ReadRpcGateway, MinistryCommandGateway {
+  @override
+  final boundary = ProtectedDataBoundary();
+
+  String email = 'ana@example.test';
+  final contactReads = <String>[];
+  final operationIds = <String>[];
+  final payloads = <Map<String, Object?>>[];
+  String? receiptOperationId;
+  Map<String, Object?>? receiptPayload;
+
+  @override
+  String get context => boundary.generation;
+
+  @override
+  void ensureCurrent(String context) {
+    if (context != this.context) throw const DataFailure('stale');
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> read(
+    String table, {
+    required String context,
+    String? afterId,
+    Map<String, Object> equals = const {},
+    String? name,
+    bool excludeDeleted = false,
+  }) async => [];
+
+  @override
+  Future<MutationResult<String>> command(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => throw UnimplementedError();
+
+  @override
+  Future<Map<String, dynamic>> readRpc(
+    String rpc, {
+    required String context,
+    Map<String, Object?> parameters = const {},
+  }) async {
+    ensureCurrent(context);
+    if (rpc != 'ministry_get_contact') throw UnimplementedError(rpc);
+    contactReads.add(rpc);
+    return {
+      'contact': {
+        'id': _id,
+        'name': 'Ana Silva',
+        'normalized_name': 'ana silva',
+        'scope': 'congregation',
+        'congregation_id': _scope,
+        'role_code': 'teacher',
+        'phone_e164': '+5511999990000',
+        'birth_date': '1982-02-03',
+        'email': email,
+        'archived_at': null,
+        'revision': 4,
+        'user_access_id': null,
+        'created_at': '2026-10-19T00:00:00Z',
+        'updated_at': '2026-10-19T00:00:00Z',
+        'updated_by': _op,
+      },
+      'access': null,
+    };
+  }
+
+  @override
+  Future<Map<String, dynamic>> ministryCommand(
+    String command,
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    expect(command, 'save_contact');
+    operationIds.add(operationId);
+    payloads.add(Map<String, Object?>.of(payload));
+
+    if (receiptPayload == null) {
+      // Simulate the database committing a receipt before its response is lost.
+      receiptOperationId = operationId;
+      receiptPayload = Map<String, Object?>.of(payload);
+      throw const DataFailure('response_lost');
+    }
+
+    if (operationId != receiptOperationId || !_samePayload(payload)) {
+      throw const DataFailure('operation_conflict');
+    }
+    return {'id': _id, 'revision': 5};
+  }
+
+  bool _samePayload(Map<String, Object?> payload) {
+    final receipt = receiptPayload!;
+    return receipt.length == payload.length &&
+        receipt.keys.every(
+          (key) => payload.containsKey(key) && receipt[key] == payload[key],
+        );
+  }
+
+  @override
+  Future<Map<String, dynamic>> linkStudentPerson(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async => throw UnimplementedError();
 }
 
 void main() {
@@ -311,85 +417,157 @@ void main() {
     },
   );
 
-  test(
-    'teacher update preserves birth date and enrollment sends person ID',
-    () async {
-      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-      final serving = server.listen((request) async {
-        final body = jsonDecode(await utf8.decoder.bind(request).join());
-        if (request.uri.path == '/rest/v1/rpc/ieadpe_ministry_save_contact') {
-          expect(body, {
-            'operation_id': _op,
-            'payload': {
-              'id': _id,
-              'scope': 'congregation',
-              'congregation_id': _scope,
-              'name': 'Professora Ana',
-              'role_code': 'teacher',
-              'phone_e164': '+5511999990000',
-              'birth_date': '1980-04-03',
-              'expected_revision': 4,
-            },
-          });
-          await _respond(request, {'id': _id, 'revision': 5});
-        } else {
-          expect(
-            request.uri.path,
-            '/rest/v1/rpc/ieadpe_ministry_enroll_student',
-          );
-          expect(body, {
-            'operation_id': _op,
-            'payload': {
-              'id': _id,
-              'congregation_id': _scope,
-              'class_id': _id,
-              'person_id': _person,
-              'start_date': '2026-10-19',
-            },
-          });
-          await _respond(request, {
+  test('teacher update resubmits current email and birth date, enrollment sends person ID', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final serving = server.listen((request) async {
+      final body = jsonDecode(await utf8.decoder.bind(request).join());
+      if (request.uri.path == '/rest/v1/rpc/ieadpe_ministry_get_contact') {
+        expect(body, {
+          'request': {
+            'scope': 'congregation',
+            'congregation_id': _scope,
+            'contact_id': _id,
+          },
+        });
+        await _respond(request, {
+          'contact': {
             'id': _id,
-            'student_id': '55555555-5555-4555-8555-555555555555',
+            'name': 'Professora Ana',
+            'normalized_name': 'professora ana',
+            'scope': 'congregation',
+            'congregation_id': _scope,
+            'role_code': 'teacher',
+            'phone_e164': '+5511999990000',
+            'birth_date': '1980-04-03',
+            'email': 'ana@example.test',
+            'archived_at': null,
+            'revision': 4,
+            'user_access_id': null,
+            'created_at': '2026-10-19T00:00:00Z',
+            'updated_at': '2026-10-19T00:00:00Z',
+            'updated_by': _op,
+          },
+          'access': null,
+        });
+      } else if (request.uri.path ==
+          '/rest/v1/rpc/ieadpe_ministry_save_contact') {
+        expect(body, {
+          'operation_id': _op,
+          'payload': {
+            'id': _id,
+            'scope': 'congregation',
+            'congregation_id': _scope,
+            'name': 'Professora Ana',
+            'role_code': 'teacher',
+            'phone_e164': '+5511999990000',
+            'birth_date': '1980-04-03',
+            'email': 'ana@example.test',
+            'expected_revision': 4,
+          },
+        });
+        await _respond(request, {'id': _id, 'revision': 5});
+      } else {
+        expect(request.uri.path, '/rest/v1/rpc/ieadpe_ministry_enroll_student');
+        expect(body, {
+          'operation_id': _op,
+          'payload': {
+            'id': _id,
+            'congregation_id': _scope,
+            'class_id': _id,
             'person_id': _person,
-            'revision': 1,
-            'student_revision': 3,
-          });
-        }
-      });
-      final client = SupabaseClient(
-        'http://127.0.0.1:${server.port}',
-        'test',
-        authOptions: const AuthClientOptions(autoRefreshToken: false),
-      );
-      addTearDown(() async {
-        await client.dispose();
-        await serving.cancel();
-        await server.close(force: true);
-      });
-      final repository = MinistryRepository(
-        SupabaseGateway(client, ProtectedDataBoundary()),
+            'start_date': '2026-10-19',
+          },
+        });
+        await _respond(request, {
+          'id': _id,
+          'student_id': '55555555-5555-4555-8555-555555555555',
+          'person_id': _person,
+          'revision': 1,
+          'student_revision': 3,
+        });
+      }
+    });
+    final client = SupabaseClient(
+      'http://127.0.0.1:${server.port}',
+      'test',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+    addTearDown(() async {
+      await client.dispose();
+      await serving.cancel();
+      await server.close(force: true);
+    });
+    final repository = MinistryRepository(
+      SupabaseGateway(client, ProtectedDataBoundary()),
+    );
+
+    final saved = await repository.saveTeacherContact(
+      operationId: _op,
+      id: _id,
+      congregationId: _scope,
+      name: 'Professora Ana',
+      phoneE164: '+5511999990000',
+      birthDate: CalendarDate(1980, 4, 3),
+      expectedRevision: 4,
+    );
+    final enrollment = await repository.enrollStudent(
+      operationId: _op,
+      id: _id,
+      congregationId: _scope,
+      classId: _id,
+      personId: _person,
+      startDate: CalendarDate(2026, 10, 19),
+    );
+    expect(saved.revision, 5);
+    expect(enrollment.personId, _person);
+    expect(enrollment.studentRevision, 3);
+  });
+
+  test(
+    'teacher retry replays the committed payload after email reassignment',
+    () async {
+      final gateway = _TeacherRetryGateway();
+      final repository = MinistryRepository(gateway);
+
+      await expectLater(
+        repository.saveTeacherContact(
+          operationId: _op,
+          id: _id,
+          congregationId: _scope,
+          name: 'Ana Silva',
+          phoneE164: '+5511999990001',
+          birthDate: CalendarDate(1982, 2, 3),
+          expectedRevision: 4,
+        ),
+        throwsA(isA<DataFailure>()),
       );
 
+      gateway.email = 'reassigned@example.test';
       final saved = await repository.saveTeacherContact(
         operationId: _op,
         id: _id,
         congregationId: _scope,
-        name: 'Professora Ana',
-        phoneE164: '+5511999990000',
-        birthDate: CalendarDate(1980, 4, 3),
+        name: 'Ana Silva',
+        phoneE164: '+5511999990001',
+        birthDate: CalendarDate(1982, 2, 3),
         expectedRevision: 4,
       );
-      final enrollment = await repository.enrollStudent(
-        operationId: _op,
-        id: _id,
-        congregationId: _scope,
-        classId: _id,
-        personId: _person,
-        startDate: CalendarDate(2026, 10, 19),
-      );
+
       expect(saved.revision, 5);
-      expect(enrollment.personId, _person);
-      expect(enrollment.studentRevision, 3);
+      expect(gateway.contactReads, hasLength(1));
+      expect(gateway.operationIds, [_op, _op]);
+      expect(gateway.payloads[0], {
+        'id': _id,
+        'scope': 'congregation',
+        'congregation_id': _scope,
+        'name': 'Ana Silva',
+        'role_code': 'teacher',
+        'phone_e164': '+5511999990001',
+        'birth_date': '1982-02-03',
+        'email': 'ana@example.test',
+        'expected_revision': 4,
+      });
+      expect(gateway.payloads[1], gateway.payloads[0]);
     },
   );
 
@@ -939,6 +1117,7 @@ void main() {
           'role_code': null,
           'phone_e164': null,
           'birth_date': null,
+          'email': null,
         },
         'replace_role_holder': {
           'scope': 'supervision',

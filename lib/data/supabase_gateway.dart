@@ -509,6 +509,7 @@ class SupabaseGateway
       'ministry_get_person': {'congregation_id', 'person_id'},
       'ministry_get_student': {'congregation_id', 'student_id'},
       'ministry_get_teacher_contact': {'congregation_id', 'contact_id'},
+      'ministry_get_contact': {'scope', 'congregation_id', 'contact_id'},
       'ministry_list_directory': {
         'scope',
         'congregation_id',
@@ -560,6 +561,7 @@ class SupabaseGateway
       'ministry_get_person': {'congregation_id', 'person_id'},
       'ministry_get_student': {'congregation_id', 'student_id'},
       'ministry_get_teacher_contact': {'congregation_id', 'contact_id'},
+      'ministry_get_contact': {'scope', 'contact_id'},
       'ministry_list_students': {'congregation_id', 'limit'},
       'ministry_list_class_students': {'congregation_id', 'class_id', 'limit'},
     };
@@ -599,6 +601,25 @@ class SupabaseGateway
         'role_code',
         'phone_e164',
         'birth_date',
+        'email',
+        'expected_revision',
+      },
+      'save_contact_with_access': {
+        'id',
+        'expected_revision',
+        'scope',
+        'congregation_id',
+        'name',
+        'role_code',
+        'phone_e164',
+        'birth_date',
+        'email',
+        'access',
+      },
+      'revoke_contact_access': {
+        'id',
+        'scope',
+        'congregation_id',
         'expected_revision',
       },
       'replace_role_holder': {
@@ -686,6 +707,23 @@ class SupabaseGateway
         'role_code',
         'phone_e164',
         'birth_date',
+        'email',
+      },
+      'save_contact_with_access': {
+        'scope',
+        'congregation_id',
+        'name',
+        'role_code',
+        'phone_e164',
+        'birth_date',
+        'email',
+        'access',
+      },
+      'revoke_contact_access': {
+        'id',
+        'scope',
+        'congregation_id',
+        'expected_revision',
       },
       'replace_role_holder': {
         'scope',
@@ -808,6 +846,113 @@ class SupabaseGateway
         }
       }
     }
+    if (command == 'save_contact_with_access') {
+      final id = payload['id'];
+      final expectedRevision = payload['expected_revision'];
+      final scope = payload['scope'];
+      final congregationId = payload['congregation_id'];
+      final name = payload['name'];
+      final roleCode = payload['role_code'];
+      final phone = payload['phone_e164'];
+      final birthDate = payload['birth_date'];
+      final email = payload['email'];
+      final rawAccess = payload['access'];
+      if ((payload.containsKey('id') && id is! String) ||
+          (payload.containsKey('expected_revision') &&
+              (expectedRevision is! int ||
+                  expectedRevision < 1 ||
+                  id == null)) ||
+          (scope != 'congregation' && scope != 'supervision') ||
+          (scope == 'congregation' && congregationId is! String) ||
+          (scope == 'supervision' && congregationId != null) ||
+          name is! String ||
+          name.isEmpty ||
+          name != name.trim() ||
+          name.length > 200 ||
+          (roleCode != null && roleCode is! String) ||
+          (roleCode is String &&
+              !(scope == 'congregation'
+                  ? const {
+                      'congregationAssistant',
+                      'campaignLeader',
+                      'campaignDeputyLeader',
+                      'teacher',
+                      'discipleshipSecretary',
+                      'discipleshipDeputySecretary',
+                    }.contains(roleCode)
+                  : const {
+                      'campaignSupervisor',
+                      'campaignDeputy',
+                      'discipleshipCoordinator',
+                      'discipleshipDeputy',
+                      'coordinationSecretary',
+                      'coordinationDeputySecretary',
+                    }.contains(roleCode))) ||
+          (phone != null &&
+              (phone is! String ||
+                  !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phone))) ||
+          (birthDate != null &&
+              (birthDate is! String || !_isIsoDate(birthDate))) ||
+          email is! String ||
+          email.isEmpty ||
+          email != email.trim().toLowerCase() ||
+          !email.contains('@') ||
+          rawAccess is! Map) {
+        throw const DataFailure('invalid');
+      }
+      final access = Map<String, Object?>.from(rawAccess as Map);
+      const accessFields = {'id', 'user_email', 'role', 'congregation_id'};
+      if (access.keys.toSet().difference(accessFields).isNotEmpty ||
+          !access.keys.toSet().containsAll({
+            'user_email',
+            'role',
+            'congregation_id',
+          }) ||
+          (access.containsKey('id') && access['id'] is! String) ||
+          access['user_email'] != email ||
+          access['role'] is! String ||
+          (access['congregation_id'] != null &&
+              access['congregation_id'] is! String)) {
+        throw const DataFailure('invalid');
+      }
+      final accessRole = access['role'];
+      final accessScope = access['congregation_id'];
+      if ((scope == 'congregation' &&
+              (accessRole != 'Membro da direção da campanha' ||
+                  accessScope != congregationId)) ||
+          (scope == 'supervision' &&
+              (accessRole != 'Membro da supervisão das campanhas' ||
+                  accessScope != null))) {
+        throw const DataFailure('invalid');
+      }
+      if (access['id'] != null) validateUuid(access['id']);
+      if (accessScope != null) validateUuid(accessScope);
+    }
+    if (command == 'revoke_contact_access') {
+      final scope = payload['scope'];
+      final congregationId = payload['congregation_id'];
+      final revision = payload['expected_revision'];
+      if ((scope != 'congregation' && scope != 'supervision') ||
+          (scope == 'congregation' && congregationId is! String) ||
+          (scope == 'supervision' && congregationId != null) ||
+          revision is! int ||
+          revision < 1) {
+        throw const DataFailure('invalid');
+      }
+    }
+    if (command == 'save_contact') {
+      final email = payload['email'];
+      if ((email != null &&
+              (email is! String ||
+                  email.isEmpty ||
+                  email != email.trim().toLowerCase() ||
+                  !email.contains('@'))) ||
+          (payload['expected_revision'] != null &&
+              (payload['expected_revision'] is! int ||
+                  (payload['expected_revision'] as int) < 1))) {
+        throw const DataFailure('invalid');
+      }
+    }
     if (command == 'save_student') {
       final revision = payload['expected_revision'];
       if (revision is! int ||
@@ -839,6 +984,8 @@ class SupabaseGateway
           .retry(enabled: false, requestTimeout: requestTimeout),
     );
     const resultFields = <String, Set<String>>{
+      'save_contact_with_access': {'id', 'revision', 'access_id'},
+      'revoke_contact_access': {'id', 'revision', 'revoked_access_id'},
       'enroll_student': {
         'id',
         'student_id',
@@ -880,6 +1027,24 @@ class SupabaseGateway
       throw const DataFailure('invalid_response');
     }
     validateUuid(value['id']);
+    if (command == 'save_contact_with_access') {
+      validateUuid(value['access_id']);
+      if (payload['id'] != null && value['id'] != payload['id']) {
+        throw const DataFailure('invalid_response');
+      }
+      final expectedRevision = payload['expected_revision'];
+      if (value['revision'] !=
+          (expectedRevision == null ? 1 : (expectedRevision as int) + 1)) {
+        throw const DataFailure('invalid_response');
+      }
+    }
+    if (command == 'revoke_contact_access') {
+      validateUuid(value['revoked_access_id']);
+      if (value['id'] != payload['id'] ||
+          value['revision'] != (payload['expected_revision'] as int) + 1) {
+        throw const DataFailure('invalid_response');
+      }
+    }
     if (value.containsKey('previous_contact_id')) {
       validateUuid(value['previous_contact_id']);
       if (value['previous_revision'] is! int ||

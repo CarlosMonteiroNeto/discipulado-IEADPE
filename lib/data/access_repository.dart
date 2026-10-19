@@ -1,9 +1,27 @@
 import '../domain/models.dart';
+import '../features/ministry/domain/ministry_models.dart';
 import 'supabase_gateway.dart';
 
 class AccessRepository {
   AccessRepository(this.gateway);
   final Gateway gateway;
+
+  Future<Page<TeamAccessAssignment>> listAssignments([String? cursor]) async {
+    final page = await list(cursor);
+    return Page(
+      items: page.items.map(
+        (assignment) => TeamAccessAssignment(
+          id: assignment.id,
+          userEmail: assignment.userEmail,
+          role: assignment.role,
+          congregationId: assignment.congregationId,
+          boundUserId: assignment.userId,
+        ),
+      ),
+      nextCursor: page.nextCursor,
+    );
+  }
+
   Future<Page<UserAccess>> list([String? cursor]) async {
     final token = gateway.context;
     final after = decodeCursor(cursor, token, 'user_access');

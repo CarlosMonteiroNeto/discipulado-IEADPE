@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../../data/supabase_gateway.dart';
 import '../../../domain/models.dart';
 import '../domain/ministry_models.dart';
@@ -8,6 +10,7 @@ import 'ministry_codec.dart';
 class MinistryRepository {
   MinistryRepository(this.gateway);
   final ReadRpcGateway gateway;
+  final _teacherContactSaves = <String, _PendingTeacherContactSave>{};
 
   Future<MinistryCommandResult> setStudentArchived({
     required String operationId,
@@ -65,6 +68,153 @@ class MinistryRepository {
         );
       }
       return contact;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryContactDetail> getContact({
+    required ContactScope scope,
+    String? congregationId,
+    required String contactId,
+  }) async {
+    _uuid(contactId);
+    if ((scope == ContactScope.congregation) != (congregationId != null)) {
+      throw const DataFailure('invalid');
+    }
+    if (congregationId != null) _uuid(congregationId);
+    final result = await _read('ministry_get_contact', {
+      'scope': scope.wire,
+      'congregation_id': congregationId,
+      'contact_id': contactId,
+    });
+    try {
+      final detail = decodeMinistryContactDetail(result);
+      if (detail.contact.id != contactId ||
+          detail.contact.scope != scope ||
+          detail.contact.congregationId != congregationId) {
+        throw const MinistryDataException('Contact scope does not match.');
+      }
+      return detail;
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryContactAccessResult> saveContactWithAccess({
+    required String operationId,
+    String? id,
+    int? expectedRevision,
+    required ContactScope scope,
+    String? congregationId,
+    required String name,
+    required RoleCode? roleCode,
+    required String? phoneE164,
+    required CalendarDate? birthDate,
+    required String email,
+    String? accessId,
+    required AccessRole accessRole,
+    String? accessCongregationId,
+  }) async {
+    _uuid(operationId);
+    if (id != null) _uuid(id);
+    if (accessId != null) _uuid(accessId);
+    if (congregationId != null) _uuid(congregationId);
+    if (accessCongregationId != null) _uuid(accessCongregationId);
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        (expectedRevision != null && (id == null || expectedRevision < 1)) ||
+        name.isEmpty ||
+        name != name.trim() ||
+        name.length > 200 ||
+        (roleCode != null && roleCode.scope != scope) ||
+        (phoneE164 != null &&
+            !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phoneE164)) ||
+        email.isEmpty ||
+        email != email.trim().toLowerCase() ||
+        !email.contains('@') ||
+        (accessRole == AccessRole.direction &&
+            accessCongregationId != congregationId) ||
+        (accessRole == AccessRole.supervision &&
+            accessCongregationId != null) ||
+        (scope == ContactScope.congregation &&
+            accessRole != AccessRole.direction) ||
+        (scope == ContactScope.supervision &&
+            accessRole != AccessRole.supervision)) {
+      throw const DataFailure('invalid');
+    }
+    final transport = gateway;
+    if (transport is! MinistryCommandGateway) {
+      throw const DataFailure('unavailable');
+    }
+    final commandGateway = transport as MinistryCommandGateway;
+    final payload = <String, Object?>{
+      if (id != null) 'id': id,
+      if (expectedRevision != null) 'expected_revision': expectedRevision,
+      'scope': scope.wire,
+      'congregation_id': congregationId,
+      'name': name,
+      'role_code': roleCode?.wire,
+      'phone_e164': phoneE164,
+      'birth_date': birthDate?.toString(),
+      'email': email,
+      'access': <String, Object?>{
+        if (accessId != null) 'id': accessId,
+        'user_email': email,
+        'role': accessRole.wireValue,
+        'congregation_id': accessCongregationId,
+      },
+    };
+    try {
+      final result = await commandGateway.ministryCommand(
+        'save_contact_with_access',
+        operationId,
+        payload,
+      );
+      return decodeMinistryContactAccessResult(
+        result,
+        expectedId: id,
+        expectedRevision: expectedRevision == null ? 1 : expectedRevision + 1,
+      );
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<MinistryContactAccessRevocationResult> revokeContactAccess({
+    required String operationId,
+    required String id,
+    required ContactScope scope,
+    String? congregationId,
+    required int expectedRevision,
+  }) async {
+    _uuid(operationId);
+    _uuid(id);
+    if (congregationId != null) _uuid(congregationId);
+    if ((scope == ContactScope.congregation) != (congregationId != null) ||
+        expectedRevision < 1) {
+      throw const DataFailure('invalid');
+    }
+    final transport = gateway;
+    if (transport is! MinistryCommandGateway) {
+      throw const DataFailure('unavailable');
+    }
+    final commandGateway = transport as MinistryCommandGateway;
+    try {
+      final result = await commandGateway.ministryCommand(
+        'revoke_contact_access',
+        operationId,
+        {
+          'id': id,
+          'scope': scope.wire,
+          'congregation_id': congregationId,
+          'expected_revision': expectedRevision,
+        },
+      );
+      return decodeMinistryContactAccessRevocationResult(
+        result,
+        expectedId: id,
+        expectedRevision: expectedRevision + 1,
+      );
     } on MinistryDataException {
       throw const DataFailure('invalid_response');
     }
@@ -131,16 +281,43 @@ class MinistryRepository {
         (expectedRevision != null && expectedRevision < 1)) {
       throw const DataFailure('invalid');
     }
-    final payload = <String, Object?>{
-      'id': id,
-      'scope': 'congregation',
-      'congregation_id': congregationId,
-      'name': normalizedName,
-      'role_code': 'teacher',
-      'phone_e164': phoneE164,
-      'birth_date': birthDate?.toString(),
-      if (expectedRevision != null) 'expected_revision': expectedRevision,
-    };
+    final signature = jsonEncode([
+      id,
+      congregationId,
+      normalizedName,
+      phoneE164,
+      birthDate?.toString(),
+      expectedRevision,
+    ]);
+    final previous = _teacherContactSaves[operationId];
+    if (previous != null && previous.signature != signature) {
+      throw const DataFailure('operation_conflict');
+    }
+    final pending =
+        previous ??
+        _teacherContactSaves.putIfAbsent(
+          operationId,
+          () => _PendingTeacherContactSave(
+            signature: signature,
+            payload: _buildTeacherContactPayload(
+              id: id,
+              congregationId: congregationId,
+              name: normalizedName,
+              phoneE164: phoneE164,
+              birthDate: birthDate,
+              expectedRevision: expectedRevision,
+            ),
+          ),
+        );
+    late final Map<String, Object?> payload;
+    try {
+      payload = await pending.payload;
+    } catch (_) {
+      if (identical(_teacherContactSaves[operationId], pending)) {
+        _teacherContactSaves.remove(operationId);
+      }
+      rethrow;
+    }
     final result = await command(
       name: 'save_contact',
       operationId: operationId,
@@ -150,7 +327,36 @@ class MinistryRepository {
         (expectedRevision == null ? 1 : expectedRevision + 1)) {
       throw const DataFailure('invalid_response');
     }
+    _teacherContactSaves.remove(operationId);
     return result;
+  }
+
+  Future<Map<String, Object?>> _buildTeacherContactPayload({
+    required String id,
+    required String congregationId,
+    required String name,
+    required String? phoneE164,
+    required CalendarDate? birthDate,
+    required int? expectedRevision,
+  }) async {
+    final email = expectedRevision == null
+        ? null
+        : (await getContact(
+            scope: ContactScope.congregation,
+            congregationId: congregationId,
+            contactId: id,
+          )).contact.email;
+    return Map<String, Object?>.unmodifiable({
+      'id': id,
+      'scope': 'congregation',
+      'congregation_id': congregationId,
+      'name': name,
+      'role_code': 'teacher',
+      'phone_e164': phoneE164,
+      'birth_date': birthDate?.toString(),
+      'email': email,
+      if (expectedRevision != null) 'expected_revision': expectedRevision,
+    });
   }
 
   Future<MinistryEnrollmentResult> enrollStudent({
@@ -541,4 +747,14 @@ class MinistryRepository {
       throw const DataFailure('invalid');
     }
   }
+}
+
+class _PendingTeacherContactSave {
+  const _PendingTeacherContactSave({
+    required this.signature,
+    required this.payload,
+  });
+
+  final String signature;
+  final Future<Map<String, Object?>> payload;
 }
