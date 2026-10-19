@@ -70,10 +70,13 @@ def check_convert_student_concurrency(psql, connection):
        ('race-link-b@example.test','{actor_b}','Membro da direção da campanha','{scope}');
       INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES
        ('{actor_a}','{scope}','ministry_staff'),('{actor_b}','{scope}','ministry_staff');
-      INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,phone)
+      INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,phone) VALUES
+       ('a6500000-0000-0000-0000-000000000001','{scope}','Race One','race one','+5511999999901'),
+       ('a6500000-0000-0000-0000-000000000002','{scope}','Race Two','race two','+5511999999902');
+      INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,phone,person_id)
        VALUES
-       ('a6300000-0000-0000-0000-000000000001','link-race-one','Race One','Place','female','2026-10-01','Service','{scope}','+5511999999901'),
-       ('a6300000-0000-0000-0000-000000000002','link-race-two','Race Two','Place','male','2026-10-02','Service','{scope}','+5511999999902');
+       ('a6300000-0000-0000-0000-000000000001','link-race-one','Race One','Place','female','2026-10-01','Service','{scope}','+5511999999901','a6500000-0000-0000-0000-000000000001'),
+       ('a6300000-0000-0000-0000-000000000002','link-race-two','Race Two','Place','male','2026-10-02','Service','{scope}','+5511999999902','a6500000-0000-0000-0000-000000000002');
     """)
     try:
         for index, first_is_a in enumerate((True, False), start=1):
