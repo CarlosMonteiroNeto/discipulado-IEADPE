@@ -1624,6 +1624,41 @@ void main() {
     expect(page.nextCursor, isNull);
   });
 
+  test('class session topics preserve nullable string values', () async {
+    for (final topic in ['', '   ']) {
+      final wire = _classSessionWire();
+      final item = Map<String, dynamic>.from(
+        (wire['items'] as List).first as Map,
+      )..['topic'] = topic;
+      wire['items'] = [item];
+      final repository = MinistryRepository(_ClassSessionGateway(wire));
+      final page = await repository.listClassSessions(
+        congregationId: _sessionCongregationId,
+        classId: _sessionClassId,
+      );
+      expect(page.items.single.topic, topic);
+    }
+
+    final wire = _classSessionWire();
+    final item = Map<String, dynamic>.from((wire['items'] as List).first as Map)
+      ..['topic'] = 7;
+    wire['items'] = [item];
+    final repository = MinistryRepository(_ClassSessionGateway(wire));
+    await expectLater(
+      repository.listClassSessions(
+        congregationId: _sessionCongregationId,
+        classId: _sessionClassId,
+      ),
+      throwsA(
+        isA<DataFailure>().having(
+          (error) => error.code,
+          'code',
+          'invalid_response',
+        ),
+      ),
+    );
+  });
+
   test('class sessions reject foreign item and invalid wire data', () async {
     Map<String, dynamic> responseWith({
       String? id,

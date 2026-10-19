@@ -771,7 +771,9 @@ MinistryPage<MinistrySessionSummary> decodeClassSessions(
           _invalid();
         }
         final status = _text(row['status']);
-        final topic = _optionalText(row['topic']);
+        final rawTopic = row['topic'];
+        if (rawTopic != null && rawTopic is! String) _invalid();
+        final topic = rawTopic as String?;
         try {
           return MinistrySessionSummary(
             id: _uuid(row['id']),
