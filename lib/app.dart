@@ -165,7 +165,9 @@ class ProtectedApplication extends StatefulWidget {
 
 class _ProtectedApplicationState extends State<ProtectedApplication> {
   final _boundary = ProtectedDataBoundary();
-  final _protectedNavigatorKey = GlobalKey<NavigatorState>();
+  GlobalKey<NavigatorState> _protectedNavigatorKey =
+      GlobalKey<NavigatorState>();
+  int? _protectedNavigatorGeneration;
   late final SupabaseGateway _gateway;
   late final SessionRouter _router;
   late final ConvertRepository _converts;
@@ -238,6 +240,11 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
 
   @override
   Widget build(BuildContext context) {
+    final generation = _router.protectedGeneration;
+    if (_protectedNavigatorGeneration != generation) {
+      _protectedNavigatorKey = GlobalKey<NavigatorState>();
+      _protectedNavigatorGeneration = generation;
+    }
     final scope = _router.scope;
     if (scope == null) {
       if (_router.isChecking) {

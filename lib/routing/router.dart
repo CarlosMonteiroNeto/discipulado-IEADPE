@@ -88,6 +88,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   bool get unavailable => _unavailable;
   bool _unavailable = false;
   List<String> get allowedRoutes => _scope == null ? [] : routesFor(_scope!);
+  int get protectedGeneration => _generation;
 
   void _invalidate() {
     _generation++;

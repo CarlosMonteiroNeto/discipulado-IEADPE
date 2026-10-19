@@ -15,6 +15,22 @@ import 'package:ieadpe_converts/features/ministry/ui/session_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_list.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
 
+Future<void> _expectTabFocus(WidgetTester tester, Finder target) async {
+  final button = tester.widget<FilledButton>(target);
+  expect(button.onPressed, isNotNull, reason: 'primary action must be enabled');
+  for (var index = 0; index < 20; index++) {
+    final focused = FocusManager.instance.primaryFocus?.context
+        ?.findAncestorWidgetOfExactType<FilledButton>();
+    if (identical(focused, button)) {
+      expect(focused, same(button));
+      return;
+    }
+    await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+    await tester.pump();
+  }
+  fail('Tab traversal did not reach the enabled ${button.child} action.');
+}
+
 const _congregation = '33333333-3333-4333-8333-333333333333';
 const _class = '22222222-2222-4222-8222-222222222222';
 const _session = '55555555-5555-4555-8555-555555555555';
@@ -264,9 +280,7 @@ void main() {
       await tester.ensureVisible(save);
       expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(save).width, greaterThanOrEqualTo(48));
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
-      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await _expectTabFocus(tester, save);
       expect(tester.takeException(), isNull);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
@@ -293,6 +307,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(tester.getSize(create).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(create).width, greaterThanOrEqualTo(48));
+      await _expectTabFocus(tester, create);
       expect(tester.takeException(), isNull);
 
       final cancel = find.byKey(
@@ -312,6 +327,7 @@ void main() {
       await tester.ensureVisible(approve);
       expect(tester.getSize(approve).height, greaterThanOrEqualTo(48));
       expect(tester.getSize(approve).width, greaterThanOrEqualTo(48));
+      await _expectTabFocus(tester, approve);
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
       expect(tester.takeException(), isNull);

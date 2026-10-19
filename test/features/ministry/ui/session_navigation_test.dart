@@ -26,6 +26,7 @@ const congregationId = '33333333-3333-4333-8333-333333333333';
 const classAId = '22222222-2222-4222-8222-222222222222';
 const classBId = '99999999-9999-4999-8999-999999999997';
 const sessionId = '55555555-5555-4555-8555-555555555555';
+const sessionBId = '55555555-5555-4555-8555-555555555556';
 const enrollmentId = '66666666-6666-4666-8666-666666666666';
 const studentId = '77777777-7777-4777-8777-777777777777';
 const actorId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -46,7 +47,17 @@ class _NavigationGateway implements ReadRpcGateway, MinistryCommandGateway {
   final calls = <({String rpc, Map<String, Object?> payload})>[];
   String detailClassId = classAId;
   String detailCongregationId = congregationId;
+  final detailGates = <int, Completer<Map<String, dynamic>>>{};
+  final detailTopics = <String, String>{};
+  final detailCongregations = <String, String>{};
+  final detailClasses = <String, String>{};
+  final detailStatuses = <String, String>{};
+  int detailFailures = 0;
   final sessions = <Map<String, Object?>>[];
+
+  int get pendingCalls => calls
+      .where((call) => call.rpc == 'ministry_list_pending_sessions')
+      .length;
 
   @override
   Future<Map<String, dynamic>> readRpc(
@@ -60,33 +71,21 @@ class _NavigationGateway implements ReadRpcGateway, MinistryCommandGateway {
       return {'items': sessions, 'next_cursor': null};
     }
     if (rpc == 'ministry_get_session_attendance') {
-      return {
-        'session': {
-          'id': parameters['session_id'],
-          'congregation_id': detailCongregationId,
-          'revision': 1,
-          'created_at': '2026-10-15T10:00:00Z',
-          'updated_at': '2026-10-15T10:00:00Z',
-          'updated_by': actorId,
-          'class_id': detailClassId,
-          'date': '2026-12-20',
-          'topic': 'Tema da turma B protegida',
-          'status': 'open',
-          'roster_frozen': true,
-          'lesson_index': null,
-          'lesson_part': null,
-          'lesson_finished': false,
-        },
-        'roster': [
-          {
-            'enrollment_id': enrollmentId,
-            'session_id': parameters['session_id'],
-            'student_id': studentId,
-            'student_name': 'Pessoa B protegida',
-            'status': 'unmarked',
-          },
-        ],
-      };
+      final callIndex = calls.length - 1;
+      final gate = detailGates[callIndex];
+      if (gate != null) return await gate.future;
+      if (detailFailures > 0) {
+        detailFailures--;
+        throw const DataFailure('network');
+      }
+      final selectedId = parameters['session_id']! as String;
+      return _detailResponse(
+        selectedId,
+        classId: detailClasses[selectedId] ?? detailClassId,
+        congregation: detailCongregations[selectedId] ?? detailCongregationId,
+        topic: detailTopics[selectedId] ?? 'Tema da turma B protegida',
+        status: detailStatuses[selectedId] ?? 'unmarked',
+      );
     }
     throw UnimplementedError(rpc);
   }
@@ -122,6 +121,40 @@ class _NavigationGateway implements ReadRpcGateway, MinistryCommandGateway {
   ) async => throw UnimplementedError();
 }
 
+Map<String, dynamic> _detailResponse(
+  String selectedId, {
+  String classId = classAId,
+  String congregation = congregationId,
+  String topic = 'Sessão protegida',
+  String status = 'unmarked',
+}) => {
+  'session': {
+    'id': selectedId,
+    'congregation_id': congregation,
+    'revision': 1,
+    'created_at': '2026-10-15T10:00:00Z',
+    'updated_at': '2026-10-15T10:00:00Z',
+    'updated_by': actorId,
+    'class_id': classId,
+    'date': '2026-12-20',
+    'topic': topic,
+    'status': 'open',
+    'roster_frozen': true,
+    'lesson_index': null,
+    'lesson_part': null,
+    'lesson_finished': false,
+  },
+  'roster': [
+    {
+      'enrollment_id': enrollmentId,
+      'session_id': selectedId,
+      'student_id': studentId,
+      'student_name': 'Aluno $topic',
+      'status': status,
+    },
+  ],
+};
+
 Widget _attendance(
   _NavigationGateway gateway, {
   SessionNavigationContext? selected,
@@ -142,6 +175,7 @@ class _RootNavigationFixture {
   late final AuthRepository auth;
   final sessionRows = <Map<String, Object?>>[];
   final listCalls = <Map<String, Object?>>[];
+  final classListCalls = <Map<String, Object?>>[];
   final detailCalls = <Map<String, Object?>>[];
   final commandCalls = <Map<String, Object?>>[];
   int pendingCalls = 0;
@@ -150,6 +184,10 @@ class _RootNavigationFixture {
   Completer<void>? createGate;
   bool mismatchDetail = false;
   bool twoCongregations = false;
+  List<String> ministryScopes = [congregationId];
+
+  List<String> get availableMinistryScopes =>
+      twoCongregations ? [congregationId, otherCongregationId] : ministryScopes;
 
   Future<void> initialize() async {
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -174,27 +212,32 @@ class _RootNavigationFixture {
           'is_supervision': false,
           'congregation_ids': <String>[],
           'ministry_supervision': false,
-          'ministry_congregation_ids': twoCongregations
-              ? [congregationId, otherCongregationId]
-              : [congregationId],
+          'ministry_congregation_ids': availableMinistryScopes,
         };
       } else if (request.uri.path == '/rest/v1/congregations') {
         value = <Object>[];
       } else if (rpc == 'ieadpe_ministry_list_congregations') {
         value = {
           'items': [
-            {'id': congregationId, 'name': 'Congregação protegida'},
-            if (twoCongregations)
-              {'id': otherCongregationId, 'name': 'Outra congregação'},
+            for (final id in availableMinistryScopes)
+              {
+                'id': id,
+                'name': id == otherCongregationId
+                    ? 'Nova congregação autorizada'
+                    : 'Congregação protegida',
+              },
           ],
           'next_cursor': null,
         };
       } else if (rpc == 'ieadpe_ministry_list_classes') {
+        classListCalls.add(Map.of(read));
+        final selectedCongregation = read['congregation_id'];
+        final changed = selectedCongregation == otherCongregationId;
         value = {
           'items': [
             {
-              'id': classAId,
-              'name': 'Turma A protegida',
+              'id': changed ? classBId : classAId,
+              'name': changed ? 'Turma B da nova scope' : 'Turma A protegida',
               'status': 'active',
               'start_date': '2026-10-01',
               'end_date': null,
@@ -617,6 +660,96 @@ void main() {
     await tester.runAsync(fixture.close);
   });
 
+  testWidgets('same-scope resume preserves nested selected session route', (
+    tester,
+  ) async {
+    final fixture = _RootNavigationFixture()
+      ..sessionRows.add({
+        'id': sessionId,
+        'class_id': classAId,
+        'congregation_id': congregationId,
+        'date': '2026-12-20',
+        'topic': 'Sessão autorizada permanece',
+        'status': 'open',
+        'revision': 1,
+      });
+    await tester.runAsync(fixture.initialize);
+    await _pumpProtectedApp(tester, fixture);
+    await _openClassSessions(tester);
+    await tester.tap(find.text('20/12/2026'));
+    await _drain(tester);
+    expect(find.byType(AttendancePage), findsOneWidget);
+    expect(find.text('Aluno protegido'), findsOneWidget);
+    final detailReadCount = fixture.detailCalls.length;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await _drain(tester);
+
+    expect(find.byType(AttendancePage), findsOneWidget);
+    expect(find.text('Aluno protegido'), findsOneWidget);
+    expect(fixture.detailCalls, hasLength(detailReadCount));
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(fixture.close);
+  });
+
+  testWidgets(
+    'resume revalidation replaces protected nested stack when congregation scope changes',
+    (tester) async {
+      final fixture = _RootNavigationFixture()
+        ..blockDetail = true
+        ..detailGate = Completer<void>()
+        ..sessionRows.add({
+          'id': sessionId,
+          'class_id': classAId,
+          'congregation_id': congregationId,
+          'date': '2026-12-20',
+          'topic': 'Sessão da congregação antiga',
+          'status': 'open',
+          'revision': 1,
+        });
+      await tester.runAsync(fixture.initialize);
+      await _pumpProtectedApp(tester, fixture);
+      await _openClassSessions(tester);
+      await tester.tap(find.text('20/12/2026'));
+      await tester.pump(const Duration(milliseconds: 500));
+      await _drain(tester);
+      expect(find.byType(AttendancePage), findsOneWidget);
+      expect(fixture.detailCalls.single, {
+        'congregation_id': congregationId,
+        'session_id': sessionId,
+      });
+
+      fixture.ministryScopes = [otherCongregationId];
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await _drain(tester);
+      await tester.pump(const Duration(milliseconds: 500));
+      await _drain(tester);
+
+      expect(find.byType(AttendancePage), findsNothing);
+      expect(find.byType(SessionListPage), findsNothing);
+      expect(find.byType(ClassDetailPage), findsNothing);
+      expect(find.byType(SessionForm), findsNothing);
+      expect(find.text('Turma B da nova scope'), findsOneWidget);
+      expect(
+        fixture.classListCalls.last['congregation_id'],
+        otherCongregationId,
+      );
+
+      fixture.detailGate!.complete();
+      fixture.detailGate = null;
+      await _drain(tester);
+      expect(find.byType(AttendancePage), findsNothing);
+      expect(find.text('Sessão da congregação antiga'), findsNothing);
+      expect(find.text('Aluno protegido'), findsNothing);
+      expect(find.text('Turma B da nova scope'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(fixture.close);
+    },
+  );
+
   testWidgets(
     'selected session uses exact context and rejects foreign detail',
     (tester) async {
@@ -651,6 +784,267 @@ void main() {
       );
     },
   );
+
+  testWidgets('selected detail failure retries its exact selected context', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()..detailFailures = 1;
+    final selected = SessionNavigationContext(
+      congregationId: congregationId,
+      classId: classAId,
+      sessionId: sessionId,
+    );
+    await tester.pumpWidget(_attendance(gateway, selected: selected));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Não foi possível abrir a chamada. Tente novamente.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pumpAndSettle();
+
+    final details = gateway.calls
+        .where((call) => call.rpc == 'ministry_get_session_attendance')
+        .toList();
+    expect(details, hasLength(2));
+    expect(
+      details.map((call) => call.payload),
+      everyElement({
+        'congregation_id': congregationId,
+        'session_id': sessionId,
+      }),
+    );
+    expect(
+      gateway.calls.where(
+        (call) => call.rpc == 'ministry_list_pending_sessions',
+      ),
+      isEmpty,
+    );
+    expect(find.text('Aluno Tema da turma B protegida'), findsOneWidget);
+  });
+
+  testWidgets('mismatched selected detail retry keeps selected context', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()..detailClassId = classBId;
+    final selected = SessionNavigationContext(
+      congregationId: congregationId,
+      classId: classAId,
+      sessionId: sessionId,
+    );
+    await tester.pumpWidget(_attendance(gateway, selected: selected));
+    await tester.pumpAndSettle();
+    expect(
+      find.text('Não foi possível abrir a chamada. Tente novamente.'),
+      findsOneWidget,
+    );
+    gateway.detailClassId = classAId;
+
+    await tester.tap(find.text('Tentar novamente'));
+    await tester.pumpAndSettle();
+
+    final details = gateway.calls
+        .where((call) => call.rpc == 'ministry_get_session_attendance')
+        .toList();
+    expect(details, hasLength(2));
+    expect(
+      details.map((call) => call.payload),
+      everyElement({
+        'congregation_id': congregationId,
+        'session_id': sessionId,
+      }),
+    );
+    expect(
+      gateway.calls.where(
+        (call) => call.rpc == 'ministry_list_pending_sessions',
+      ),
+      isEmpty,
+    );
+    expect(find.text('Aluno Tema da turma B protegida'), findsOneWidget);
+  });
+
+  testWidgets('late selected A success cannot replace selected B', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()
+      ..detailTopics[sessionId] = 'Dados antigos da sessão A'
+      ..detailTopics[sessionBId] = 'Dados atuais da sessão B'
+      ..detailClasses[sessionId] = classAId
+      ..detailClasses[sessionBId] = classBId
+      ..detailStatuses[sessionId] = 'absent'
+      ..detailStatuses[sessionBId] = 'present';
+    final oldResponse = Completer<Map<String, dynamic>>();
+    gateway.detailGates[0] = oldResponse;
+    SessionNavigationContext context(String id, String classId) =>
+        SessionNavigationContext(
+          congregationId: congregationId,
+          classId: classId,
+          sessionId: id,
+        );
+
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionId, classAId)),
+    );
+    await tester.pump();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsNothing);
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionBId, classBId)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsOneWidget);
+    expect(find.text('Presente'), findsOneWidget);
+    expect(
+      gateway.calls
+          .where((call) => call.rpc == 'ministry_get_session_attendance')
+          .map((call) => call.payload),
+      [
+        {'congregation_id': congregationId, 'session_id': sessionId},
+        {'congregation_id': congregationId, 'session_id': sessionBId},
+      ],
+    );
+
+    oldResponse.complete(
+      _detailResponse(
+        sessionId,
+        classId: classAId,
+        topic: 'Dados antigos da sessão A',
+        status: 'absent',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsOneWidget);
+    expect(find.text('Aluno Dados antigos da sessão A'), findsNothing);
+    expect(find.text('Presente'), findsOneWidget);
+    expect(find.text('Ausente'), findsNothing);
+    expect(gateway.pendingCalls, 0);
+  });
+
+  testWidgets('late selected A failure cannot replace selected B', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()
+      ..detailTopics[sessionBId] = 'Dados atuais da sessão B'
+      ..detailClasses[sessionBId] = classBId
+      ..detailStatuses[sessionId] = 'absent'
+      ..detailStatuses[sessionBId] = 'present';
+    final oldResponse = Completer<Map<String, dynamic>>();
+    gateway.detailGates[0] = oldResponse;
+    SessionNavigationContext context(String id, String classId) =>
+        SessionNavigationContext(
+          congregationId: congregationId,
+          classId: classId,
+          sessionId: id,
+        );
+
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionId, classAId)),
+    );
+    await tester.pump();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsNothing);
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionBId, classBId)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsOneWidget);
+    expect(find.text('Presente'), findsOneWidget);
+
+    oldResponse.completeError(const DataFailure('late_failure'));
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Dados atuais da sessão B'), findsOneWidget);
+    expect(find.text('Presente'), findsOneWidget);
+    expect(find.text('Ausente'), findsNothing);
+    expect(
+      find.text('Não foi possível abrir a chamada. Tente novamente.'),
+      findsNothing,
+    );
+    expect(gateway.pendingCalls, 0);
+  });
+
+  testWidgets('selected context update clears previous roster and marks', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()
+      ..detailTopics[sessionId] = 'Aluno selecionado A'
+      ..detailTopics[sessionBId] = 'Aluno selecionado B'
+      ..detailClasses[sessionId] = classAId
+      ..detailClasses[sessionBId] = classBId
+      ..detailStatuses[sessionId] = 'present'
+      ..detailStatuses[sessionBId] = 'absent';
+    final nextResponse = Completer<Map<String, dynamic>>();
+    gateway.detailGates[1] = nextResponse;
+    SessionNavigationContext context(String id, String classId) =>
+        SessionNavigationContext(
+          congregationId: congregationId,
+          classId: classId,
+          sessionId: id,
+        );
+
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionId, classAId)),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Aluno selecionado A'), findsOneWidget);
+    expect(find.text('Presente'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _attendance(gateway, selected: context(sessionBId, classBId)),
+    );
+    await tester.pump();
+    expect(find.text('Aluno Aluno selecionado A'), findsNothing);
+    expect(find.text('Presente'), findsNothing);
+    expect(find.text('Aluno Aluno selecionado B'), findsNothing);
+
+    nextResponse.complete(
+      _detailResponse(
+        sessionBId,
+        classId: classBId,
+        topic: 'Aluno selecionado B',
+        status: 'absent',
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Aluno Aluno selecionado B'), findsOneWidget);
+    expect(find.text('Ausente'), findsOneWidget);
+    expect(find.text('Presente'), findsNothing);
+    expect(gateway.pendingCalls, 0);
+  });
+
+  testWidgets('selected to pending context ignores the old selected response', (
+    tester,
+  ) async {
+    final gateway = _NavigationGateway()
+      ..sessions.add({
+        'id': sessionBId,
+        'class_id': classBId,
+        'class_name': 'Turma B pendente',
+        'congregation_id': congregationId,
+        'date': '2026-12-21',
+        'topic': 'Sessão pendente B',
+        'status': 'open',
+      });
+    final oldResponse = Completer<Map<String, dynamic>>();
+    gateway.detailGates[0] = oldResponse;
+    final selected = SessionNavigationContext(
+      congregationId: congregationId,
+      classId: classAId,
+      sessionId: sessionId,
+    );
+    await tester.pumpWidget(_attendance(gateway, selected: selected));
+    await tester.pump();
+    await tester.pumpWidget(_attendance(gateway));
+    await tester.pumpAndSettle();
+    expect(find.text('Turma B pendente'), findsOneWidget);
+    expect(gateway.pendingCalls, 1);
+
+    oldResponse.complete(
+      _detailResponse(sessionId, topic: 'Sessão selecionada antiga'),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Turma B pendente'), findsOneWidget);
+    expect(find.text('Sessão selecionada antiga'), findsNothing);
+    expect(gateway.pendingCalls, 1);
+  });
 
   testWidgets('pending queue route remains available without session context', (
     tester,

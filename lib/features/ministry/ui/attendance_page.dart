@@ -34,6 +34,7 @@ class _AttendancePageState extends State<AttendancePage> {
   bool _saving = false;
   String? _retryCursor;
   String? _operationId;
+  int _requestGeneration = 0;
   final Map<String, AttendanceStatus> _marks = {};
   @override
   void initState() {
@@ -50,8 +51,14 @@ class _AttendancePageState extends State<AttendancePage> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedSession != widget.selectedSession ||
         oldWidget.congregationId != widget.congregationId) {
+      _requestGeneration++;
       _page = null;
       _roster = null;
+      _error = null;
+      _loading = false;
+      _saving = false;
+      _retryCursor = null;
+      _operationId = null;
       _marks.clear();
       if (widget.selectedSession case final selected?) {
         _loadSelected(selected);
@@ -62,7 +69,19 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   String _newOperation() => widget.createOperationId?.call() ?? _uuid.v4();
+
+  bool _isCurrent(int generation) =>
+      mounted && generation == _requestGeneration;
+
+  Future<void> _retryLoad() {
+    if (widget.selectedSession case final selected?) {
+      return _loadSelected(selected);
+    }
+    return _load(cursor: _retryCursor);
+  }
+
   Future<void> _load({String? cursor}) async {
+    final generation = ++_requestGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -73,7 +92,7 @@ class _AttendancePageState extends State<AttendancePage> {
         congregationId: widget.congregationId,
         cursor: cursor,
       );
-      if (mounted) {
+      if (_isCurrent(generation) && widget.selectedSession == null) {
         setState(() {
           _page = cursor == null || _page == null
               ? page
@@ -85,7 +104,7 @@ class _AttendancePageState extends State<AttendancePage> {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (_isCurrent(generation) && widget.selectedSession == null) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível carregar as chamadas. Tente novamente.';
@@ -95,6 +114,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<void> _loadSelected(SessionNavigationContext selected) async {
+    final generation = ++_requestGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -113,7 +133,7 @@ class _AttendancePageState extends State<AttendancePage> {
           session.congregationId != selected.congregationId) {
         throw const DataFailure('invalid_response');
       }
-      if (!mounted) return;
+      if (!_isCurrent(generation) || widget.selectedSession != selected) return;
       setState(() {
         _roster = roster;
         _loading = false;
@@ -122,7 +142,7 @@ class _AttendancePageState extends State<AttendancePage> {
         }
       });
     } catch (_) {
-      if (mounted) {
+      if (_isCurrent(generation) && widget.selectedSession == selected) {
         setState(() {
           _loading = false;
           _roster = null;
@@ -134,6 +154,7 @@ class _AttendancePageState extends State<AttendancePage> {
   }
 
   Future<void> _open(PendingMinistrySession item) async {
+    final generation = ++_requestGeneration;
     setState(() {
       _loading = true;
       _error = null;
@@ -146,7 +167,7 @@ class _AttendancePageState extends State<AttendancePage> {
         congregationId: item.congregationId,
         sessionId: item.id,
       );
-      if (mounted) {
+      if (_isCurrent(generation) && widget.selectedSession == null) {
         setState(() {
           _roster = roster;
           _loading = false;
@@ -156,7 +177,7 @@ class _AttendancePageState extends State<AttendancePage> {
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (_isCurrent(generation) && widget.selectedSession == null) {
         setState(() {
           _loading = false;
           _error = 'Não foi possível abrir a chamada. Tente novamente.';
@@ -168,6 +189,7 @@ class _AttendancePageState extends State<AttendancePage> {
   Future<void> _save({required bool finalize}) async {
     final roster = _roster;
     if (roster == null) return;
+    final generation = _requestGeneration;
     final congregationId = roster.session.metadata.congregationId;
     if (congregationId == null) return;
     final operation = _operationId ??= _newOperation();
@@ -191,23 +213,28 @@ class _AttendancePageState extends State<AttendancePage> {
           'finalize': finalize,
         },
       );
-      if (!mounted) return;
+      if (!_isCurrent(generation)) return;
       setState(() {
         _saving = false;
         _operationId = null;
       });
-      await _open(
-        PendingMinistrySession(
-          id: roster.session.id,
-          classId: roster.session.classId,
-          className: roster.session.classId,
-          congregationId: congregationId,
-          date: roster.session.date,
-          topic: roster.session.topic,
-        ),
-      );
+      final selected = widget.selectedSession;
+      if (selected != null) {
+        await _loadSelected(selected);
+      } else {
+        await _open(
+          PendingMinistrySession(
+            id: roster.session.id,
+            classId: roster.session.classId,
+            className: roster.session.classId,
+            congregationId: congregationId,
+            date: roster.session.date,
+            topic: roster.session.topic,
+          ),
+        );
+      }
     } catch (error) {
-      if (mounted) {
+      if (_isCurrent(generation)) {
         setState(() {
           _saving = false;
           _error = error is DataFailure && error.code == 'permission'
@@ -249,7 +276,7 @@ class _AttendancePageState extends State<AttendancePage> {
                         const SizedBox(height: 8),
                         TextButton.icon(
                           onPressed: _roster == null
-                              ? () => _load(cursor: _retryCursor)
+                              ? _retryLoad
                               : () => _save(finalize: false),
                           icon: const Icon(Icons.refresh),
                           label: const Text('Tentar novamente'),
