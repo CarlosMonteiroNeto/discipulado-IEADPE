@@ -44,7 +44,9 @@ DO $$ DECLARE active boolean; visited boolean; days integer; threshold integer; 
   FOR visited IN SELECT unnest(ARRAY[false,true]) LOOP
    threshold:=CASE WHEN NOT visited THEN 1 WHEN active THEN 30 ELSE 7 END;
    FOR days IN threshold-1..threshold LOOP
-    UPDATE public.converts SET was_visited_once=visited,is_in_discipleship=active,last_visit_date=private.business_today()-days;
+    UPDATE public.converts SET was_visited_once=visited,is_in_discipleship=active,
+     last_visit_date=CASE WHEN visited THEN private.business_today()-days ELSE NULL END,
+     conversion_date=CASE WHEN visited THEN conversion_date ELSE private.business_today()-days END;
     IF days<threshold THEN
      PERFORM pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"visit"}','visit_not_due');
     ELSE

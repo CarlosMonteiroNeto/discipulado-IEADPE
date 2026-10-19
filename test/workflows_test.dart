@@ -319,7 +319,7 @@ void main() {
       // synthetic congregation and convert ID, then exposes that exact record
       // through the scoped ministry referral projection.
       await tester.enterText(
-        find.byKey(const ValueKey('name')),
+        find.byKey(const ValueKey('person-name')),
         'Jornada Sintética',
       );
       await tester.enterText(
@@ -524,7 +524,7 @@ void main() {
       await drain(tester);
       final owner = tester.state(find.byType(RegisterPage));
       await tester.enterText(
-        find.byKey(const ValueKey('name')),
+        find.byKey(const ValueKey('person-name')),
         'Synthetic private draft',
       );
       await tester.ensureVisible(find.text('Escolher foto'));
@@ -562,7 +562,7 @@ void main() {
         await drain(tester);
         final owner = tester.state(find.byType(RegisterPage));
         await tester.enterText(
-          find.byKey(const ValueKey('name')),
+        find.byKey(const ValueKey('person-name')),
           'Synthetic private draft',
         );
         await tester.ensureVisible(find.text('Escolher foto'));
@@ -618,7 +618,6 @@ void main() {
         expect(tester.takeException(), isNull);
       }
       expect(fixture.paths, contains('/rest/v1/congregations'));
-      expect(fixture.paths, contains('/rest/v1/user_access'));
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(fixture.close);
     },

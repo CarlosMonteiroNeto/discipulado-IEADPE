@@ -71,6 +71,11 @@ def check_ministry_academic_concurrency(psql, connection):
       INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by)
        SELECT ('97000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'{scope}','Learner '||n,'learner '||n,'{actor}'
        FROM generate_series(1,105) n;
+      INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by)
+       SELECT ('97300000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'{scope}','Learner '||n,'learner '||n,'{actor}'
+       FROM generate_series(1,105) n;
+      UPDATE public.ministry_students s SET person_id=('97300000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid
+       FROM generate_series(1,105) n WHERE s.id=('97000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid;
       INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date,end_date,status,updated_by)
        SELECT ('97100000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'{scope}',
         ('97000000-0000-0000-0000-'||lpad(n::text,12,'0'))::uuid,'{cap_class}','2026-01-01','2026-06-01','completed','{actor}'
@@ -78,7 +83,8 @@ def check_ministry_academic_concurrency(psql, connection):
     """)
     auth = f"BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','{actor}',true);"
     def enroll(operation, clazz, student):
-        return f"public.ieadpe_ministry_enroll_student('{operation}','{{\"id\":\"{operation}\",\"congregation_id\":\"{scope}\",\"class_id\":\"{clazz}\",\"student_id\":\"{student}\",\"start_date\":\"2026-01-01\"}}'::jsonb)"
+        person = f"97300000-0000-0000-0000-{int(student.rsplit('-', 1)[1]):012d}"
+        return f"public.ieadpe_ministry_enroll_student('{operation}','{{\"id\":\"{operation}\",\"congregation_id\":\"{scope}\",\"class_id\":\"{clazz}\",\"person_id\":\"{person}\",\"start_date\":\"2026-01-01\"}}'::jsonb)"
 
     try:
         first_student = "97000000-0000-0000-0000-000000000100"
@@ -98,8 +104,8 @@ def check_ministry_academic_concurrency(psql, connection):
         assert query(f"SELECT count(*) FROM public.ministry_enrollments WHERE class_id='{cap_class}'") == "100"
 
         for index, enrollment_first in enumerate((True, False), start=1):
-            roster_first_student = f"97000000-0000-0000-0000-{index + 101:012d}"
-            roster_second_student = f"97000000-0000-0000-0000-{index + 103:012d}"
+            roster_first_student = f"97000000-0000-0000-0000-{index + 201:012d}"
+            roster_second_student = f"97000000-0000-0000-0000-{index + 203:012d}"
             clazz = f"97000000-0000-0000-0000-{index + 10:012d}"
             base_enrollment = f"97000000-0000-0000-0000-{index + 20:012d}"
             session_id = f"97000000-0000-0000-0000-{index + 30:012d}"
@@ -107,6 +113,12 @@ def check_ministry_academic_concurrency(psql, connection):
             query(f"""
               INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
                VALUES('{clazz}','{scope}','Roster Race {index}','roster race {index}','2026-01-01','{actor}');
+              INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name,updated_by)
+               VALUES(('97300000-0000-0000-0000-'||lpad('{index + 201}'::text,12,'0'))::uuid,'{scope}','Roster learner {index}','roster learner {index}','{actor}'),
+                (('97300000-0000-0000-0000-'||lpad('{index + 203}'::text,12,'0'))::uuid,'{scope}','Roster learner next {index}','roster learner next {index}','{actor}');
+              INSERT INTO public.ministry_students(id,congregation_id,person_id,name,normalized_name,updated_by)
+               VALUES('{roster_first_student}','{scope}',('97300000-0000-0000-0000-'||lpad('{index + 201}'::text,12,'0'))::uuid,'Roster learner {index}','roster learner {index}','{actor}'),
+                ('{roster_second_student}','{scope}',('97300000-0000-0000-0000-'||lpad('{index + 203}'::text,12,'0'))::uuid,'Roster learner next {index}','roster learner next {index}','{actor}');
               INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date,updated_by)
                VALUES('{base_enrollment}','{scope}','{roster_first_student}','{clazz}','2026-01-01','{actor}');
             """)

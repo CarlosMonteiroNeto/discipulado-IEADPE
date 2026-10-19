@@ -8,9 +8,22 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
  ('80000000-0000-0000-0000-000000000002','manager@example.test',now()),
  ('80000000-0000-0000-0000-000000000003','other@example.test',now());
 INSERT INTO private.admin_allowlist VALUES('80000000-0000-0000-0000-000000000002');
+INSERT INTO public.congregations(id,name) VALUES('81000000-0000-0000-0000-810000000001','Photo fixture');
 CREATE TEMP TABLE photos(label text PRIMARY KEY,id uuid,path text);
 CREATE TEMP TABLE target(id uuid);
 GRANT ALL ON photos,target TO authenticated;
+CREATE FUNCTION pg_temp.edit_convert_photo(operation uuid,convert_id uuid,asset_id uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$ DECLARE c public.converts; p public.ministry_people; BEGIN
+ SELECT * INTO c FROM public.converts WHERE id=convert_id;
+ SELECT * INTO p FROM public.ministry_people WHERE id=c.person_id;
+ RETURN public.ieadpe_edit_convert(operation,jsonb_build_object(
+  'id',c.id,'congregation_id',c.congregation_id,'expected_revision',c.revision,
+  'expected_person_revision',p.revision,
+  'person',jsonb_build_object('name',p.name,'phone',p.phone,'birth_date',p.birth_date,'address',p.address),
+  'convert',jsonb_build_object('landmark',c.landmark,'gender',c.gender,
+   'conversion_date',c.conversion_date,'worship_type',c.worship_type,'age',c.age,
+   'photo_asset_id',asset_id)));
+END $$;
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
 SET LOCAL ROLE authenticated;
 INSERT INTO photos(label,id) SELECT 'old',(public.ieadpe_create_photo_draft('81000000-0000-0000-0000-000000000001','{}')->>'id')::uuid;
@@ -43,8 +56,10 @@ DO $$ BEGIN
 END $$;
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
 INSERT INTO target SELECT (public.ieadpe_create_convert(gen_random_uuid(),jsonb_build_object(
- 'name','Synthetic','landmark','Square','gender','male','conversion_date','2020-01-01','worship_type','01',
- 'photo_asset_id',(SELECT id FROM photos WHERE label='old')))->>'id')::uuid;
+ 'congregation_id','81000000-0000-0000-0000-810000000001',
+ 'person',jsonb_build_object('name','Synthetic','phone',NULL,'birth_date',NULL,'address',NULL),
+ 'convert',jsonb_build_object('landmark','Square','gender','male','conversion_date','2020-01-01','worship_type','01',
+  'photo_asset_id',(SELECT id FROM photos WHERE label='old'))))->>'id')::uuid;
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects), 'registrar loses photo ownership read after attach');
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.photo_assets), 'registrar cannot read attached metadata');
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000002',true);
@@ -61,7 +76,7 @@ DO $$ DECLARE bad_id uuid; kind text; old_id uuid:=(SELECT id FROM photos WHERE 
    auth.uid()::text||'/'||bad_id::text||'.jpg', CASE WHEN kind='state' THEN 'detached' ELSE 'pending' END,
    now()+CASE WHEN kind='expiry' THEN interval '-1 second' ELSE interval '1 hour' END);
   IF kind<>'object' THEN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',auth.uid()::text||'/'||bad_id::text||'.jpg','{"size":123,"mimetype":"image/jpeg"}'); END IF;
-  BEGIN PERFORM public.ieadpe_edit_convert(gen_random_uuid(),jsonb_build_object('id',convert_id,'photo_asset_id',bad_id));
+  BEGIN PERFORM pg_temp.edit_convert_photo(gen_random_uuid(),convert_id,bad_id);
    RAISE EXCEPTION 'ASSERTION: invalid attachment accepted: %',kind; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   PERFORM pg_temp.assert_true((SELECT photo_asset_id=old_id FROM public.converts WHERE id=convert_id), 'failed replacement preserves old photo: '||kind);
  END LOOP;
@@ -70,7 +85,7 @@ SET LOCAL ROLE authenticated;
 INSERT INTO photos(label,id) SELECT 'new',(public.ieadpe_create_photo_draft(gen_random_uuid(),'{}')->>'id')::uuid;
 UPDATE photos SET path=(SELECT a.path FROM public.photo_assets a WHERE a.id=photos.id) WHERE label='new';
 INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"size":123,"mimetype":"image/jpeg"}' FROM photos WHERE label='new';
-SELECT public.ieadpe_edit_convert(gen_random_uuid(),jsonb_build_object('id',(SELECT id FROM target),'photo_asset_id',(SELECT id FROM photos WHERE label='new')));
+SELECT pg_temp.edit_convert_photo(gen_random_uuid(),(SELECT id FROM target),(SELECT id FROM photos WHERE label='new'));
 SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM storage.objects WHERE name=(SELECT path FROM photos WHERE label='old')), 'replacement hides detached old bytes');
 RESET ROLE;
 DELETE FROM private.admin_allowlist WHERE user_id='80000000-0000-0000-0000-000000000002';

@@ -79,8 +79,10 @@ def check_catalog_concurrency(psql, connection):
         return authenticated(manager) + f"SELECT public.ieadpe_archive_congregation('{operation}','{{\"id\":\"{scope}\"}}'::jsonb);"
 
     def selection(kind, operation):
-        payload = (dict(name="Synthetic catalog race", landmark="Square", gender="male",
-                        conversion_date="2026-01-01", worship_type="01 - Oração", congregation_id=scope)
+        payload = (dict(congregation_id=scope,
+                        person=dict(name="Synthetic catalog race"),
+                        convert=dict(landmark="Square", gender="male",
+                                     conversion_date="2026-01-01", worship_type="01 - Oração"))
                    if kind == "create_convert" else dict(user_email="catalog-race-grant@example.test",
                         role="Membro da direção da campanha", congregation_id=scope))
         return f"public.ieadpe_{kind}('{operation}','{json.dumps(payload, ensure_ascii=False)}'::jsonb)"
