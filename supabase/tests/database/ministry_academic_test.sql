@@ -19,7 +19,12 @@ INSERT INTO public.ministry_contacts(id,congregation_id,name,normalized_name,sco
  ('94000000-0000-0000-0000-000000000100','94000000-0000-0000-0000-000000000002','Local Teacher','local teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
  ('94000000-0000-0000-0000-000000000101','94000000-0000-0000-0000-000000000002','Local Assistant','local assistant','congregation','congregationAssistant','94000000-0000-0000-0000-000000000001',NULL),
  ('94000000-0000-0000-0000-000000000102','94000000-0000-0000-0000-000000000006','Foreign Teacher','foreign teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
- ('94000000-0000-0000-0000-000000000103','94000000-0000-0000-0000-000000000002','Archived Teacher','archived teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',now());
+ ('94000000-0000-0000-0000-000000000103','94000000-0000-0000-0000-000000000002','Archived Teacher','archived teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',now()),
+ ('94000000-0000-0000-0000-000000000104','94000000-0000-0000-0000-000000000002','Archive Lifecycle Teacher','archive lifecycle teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL),
+ ('94000000-0000-0000-0000-000000000105','94000000-0000-0000-0000-000000000002','Role Change Teacher','role change teacher','congregation','teacher','94000000-0000-0000-0000-000000000001',NULL);
+INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,teacher_contact_id,updated_by) VALUES
+ ('94000000-0000-0000-0000-000000000085','94000000-0000-0000-0000-000000000002','Archived Teacher Lifecycle','archived teacher lifecycle','2026-01-01','94000000-0000-0000-0000-000000000104','94000000-0000-0000-0000-000000000001'),
+ ('94000000-0000-0000-0000-000000000086','94000000-0000-0000-0000-000000000002','Role Changed Teacher Lifecycle','role changed teacher lifecycle','2026-01-01','94000000-0000-0000-0000-000000000105','94000000-0000-0000-0000-000000000001');
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by) VALUES
  ('94000000-0000-0000-0000-000000000080','94000000-0000-0000-0000-000000000002','Open Session Class','open session class','2026-01-01','94000000-0000-0000-0000-000000000001'),
  ('94000000-0000-0000-0000-000000000081','94000000-0000-0000-0000-000000000002','Active Enrollment Class','active enrollment class','2026-01-01','94000000-0000-0000-0000-000000000001'),
@@ -65,6 +70,40 @@ INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,s
   '94000000-0000-0000-0000-000000000001' FROM generate_series(1001,1099) n;
 SELECT set_config('request.jwt.claim.sub','94000000-0000-0000-0000-000000000001',true);
 DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; class_row jsonb; BEGIN
+ result:=public.ieadpe_ministry_set_contact_archived('94000000-0000-0000-0000-000000000130',
+  '{"id":"94000000-0000-0000-0000-000000000104","scope":"congregation","congregation_id":"94000000-0000-0000-0000-000000000002","archived":true,"expected_revision":1}'::jsonb);
+ PERFORM pg_temp.assert_true(result->>'revision'='2','assigned teacher can be archived without deleting its historical class reference');
+ class_result:=public.ieadpe_ministry_set_class_status('94000000-0000-0000-0000-000000000131',
+  '{"id":"94000000-0000-0000-0000-000000000085","congregation_id":"94000000-0000-0000-0000-000000000002","status":"archived","expected_revision":1}'::jsonb);
+ PERFORM pg_temp.assert_true(class_result->>'revision'='2' AND
+  (SELECT status='archived' AND teacher_contact_id='94000000-0000-0000-0000-000000000104' FROM public.ministry_classes WHERE id='94000000-0000-0000-0000-000000000085'),
+  'active class can archive while preserving its archived teacher reference');
+ class_result:=public.ieadpe_ministry_set_class_status('94000000-0000-0000-0000-000000000132',
+  '{"id":"94000000-0000-0000-0000-000000000085","congregation_id":"94000000-0000-0000-0000-000000000002","status":"active","expected_revision":2}'::jsonb);
+ PERFORM pg_temp.assert_true(class_result->>'revision'='3' AND
+  (SELECT status='active' AND teacher_contact_id='94000000-0000-0000-0000-000000000104' FROM public.ministry_classes WHERE id='94000000-0000-0000-0000-000000000085'),
+  'archived class can reactivate while preserving its archived teacher reference');
+
+ result:=public.ieadpe_ministry_save_contact('94000000-0000-0000-0000-000000000133',
+  '{"id":"94000000-0000-0000-0000-000000000105","scope":"congregation","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Role Change Teacher","role_code":"congregationAssistant","phone_e164":null,"birth_date":null,"email":null,"expected_revision":1}'::jsonb);
+ PERFORM pg_temp.assert_true(result->>'revision'='2','assigned teacher can lose teacher role while preserving its historical class reference');
+ class_result:=public.ieadpe_ministry_set_class_status('94000000-0000-0000-0000-000000000134',
+  '{"id":"94000000-0000-0000-0000-000000000086","congregation_id":"94000000-0000-0000-0000-000000000002","status":"completed","expected_revision":1}'::jsonb);
+ PERFORM pg_temp.assert_true(class_result->>'revision'='2' AND
+  (SELECT status='completed' AND teacher_contact_id='94000000-0000-0000-0000-000000000105' FROM public.ministry_classes WHERE id='94000000-0000-0000-0000-000000000086'),
+  'active class can complete after its assigned contact loses the teacher role');
+ class_result:=public.ieadpe_ministry_set_class_status('94000000-0000-0000-0000-000000000135',
+  '{"id":"94000000-0000-0000-0000-000000000086","congregation_id":"94000000-0000-0000-0000-000000000002","status":"archived","expected_revision":2}'::jsonb);
+ PERFORM pg_temp.assert_true(class_result->>'revision'='3' AND
+  (SELECT status='archived' AND teacher_contact_id='94000000-0000-0000-0000-000000000105' FROM public.ministry_classes WHERE id='94000000-0000-0000-0000-000000000086'),
+  'completed class can archive after its assigned contact loses the teacher role');
+ BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000136',
+  '{"id":"94000000-0000-0000-0000-000000000040","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Other Class","teacher_contact_id":"94000000-0000-0000-0000-000000000104","start_date":"2026-01-01","end_date":null,"expected_revision":1}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: archived teacher assigned to a class'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000137',
+  '{"id":"94000000-0000-0000-0000-000000000040","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Other Class","teacher_contact_id":"94000000-0000-0000-0000-000000000105","start_date":"2026-01-01","end_date":null,"expected_revision":1}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: non-teacher contact assigned to a class'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+
  class_result:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000030',
   '{"id":"94000000-0000-0000-0000-000000000030","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Command Class","teacher_contact_id":null,"start_date":"2026-01-01","end_date":null}'::jsonb);
  PERFORM pg_temp.assert_true(class_result->>'revision'='1','class create starts revision');

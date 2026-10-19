@@ -112,31 +112,11 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
   }
 
   Future<bool> _confirmStatus(ClassStatus next) async {
-    final archived = next == ClassStatus.archived;
-    final completed = next == ClassStatus.completed;
     final accepted = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(archived ? 'Arquivar turma?' : 'Concluir turma?'),
-        content: Text(
-          archived ? 'Os registros e o histórico da turma serão mantidos.' : 'Após concluir, os dados da turma ficam somente leitura. A conclusão exige que não haja matrículas ativas nem chamadas abertas.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(
-              archived
-                  ? 'Confirmar arquivamento'
-                  : completed
-                  ? 'Confirmar conclusão'
-                  : 'Confirmar',
-            ),
-          ),
-        ],
+      builder: (_) => ClassStatusConfirmationDialog(
+        archived: next == ClassStatus.archived,
+        completed: next == ClassStatus.completed,
       ),
     );
     return accepted == true;
@@ -317,6 +297,44 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
           ),
         ),
       ),
+    ),
+  );
+}
+
+class ClassStatusConfirmationDialog extends StatelessWidget {
+  const ClassStatusConfirmationDialog({
+    super.key,
+    required this.archived,
+    required this.completed,
+  });
+
+  final bool archived;
+  final bool completed;
+
+  @override
+  Widget build(BuildContext context) => RepaintBoundary(
+    key: const Key('class-status-confirmation-dialog'),
+    child: AlertDialog(
+      title: Text(archived ? 'Arquivar turma?' : 'Concluir turma?'),
+      content: Text(
+        archived ? 'Os registros e o histórico da turma serão mantidos.' : 'Após concluir, os dados da turma ficam somente leitura. A conclusão exige que não haja matrículas ativas nem chamadas abertas.',
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, true),
+          child: Text(
+            archived
+                ? 'Confirmar arquivamento'
+                : completed
+                ? 'Confirmar conclusão'
+                : 'Confirmar',
+          ),
+        ),
+      ],
     ),
   );
 }

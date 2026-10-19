@@ -39,6 +39,7 @@ class _ClassGateway implements ReadRpcGateway, MinistryCommandGateway {
       <({String name, String operationId, Map<String, Object?> payload})>[];
   DataFailure? teacherReadFailure;
   DataFailure? commandFailure;
+  DataFailure? loseNextCommandResponse;
   int commandRevision = 1;
 
   final teacherChoices = <Map<String, dynamic>>[
@@ -146,6 +147,10 @@ class _ClassGateway implements ReadRpcGateway, MinistryCommandGateway {
       operationId: operationId,
       payload: Map.of(payload),
     ));
+    if (loseNextCommandResponse case final failure?) {
+      loseNextCommandResponse = null;
+      throw failure;
+    }
     return {'id': payload['id'], 'revision': commandRevision};
   }
 
@@ -365,7 +370,8 @@ void main() {
       final helperText = tester.renderObject<RenderParagraph>(
         find.text('Apenas professores ativos desta congregação.'),
       );
-      expect(helperText.maxLines, 2);
+      expect(helperText.maxLines, isNull);
+      expect(helperText.softWrap, isTrue);
 
       expect(gateway.readRequests.single.rpc, 'ministry_list_directory');
       expect(gateway.readRequests.single.parameters, {
@@ -420,6 +426,78 @@ void main() {
       expect(gateway.commands.single.payload['teacher_contact_id'], _teacherId);
       expect(gateway.commands.single.payload['start_date'], '2026-10-01');
       expect(gateway.commands.single.payload['end_date'], '2026-12-31');
+    },
+  );
+
+  testWidgets(
+    'retries a class create with the same payload after a lost response',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 900);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final gateway = _ClassGateway()
+        ..loseNextCommandResponse = const DataFailure('unavailable');
+      var saved = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => Scaffold(
+              body: Center(
+                child: TextButton(
+                  key: const Key('open-class-form'),
+                  onPressed: () => Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ClassForm(
+                        repository: MinistryRepository(gateway),
+                        congregationId: _scope,
+                        onSaved: (_) => saved = true,
+                        onCancel: () {},
+                      ),
+                    ),
+                  ),
+                  child: const Text('Open class form'),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('open-class-form')));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byKey(const Key('class-name')), 'Original');
+      await tester.enterText(
+        find.byKey(const Key('class-start-date')),
+        '2026-10-01',
+      );
+      await tester.tap(find.text('Salvar turma'));
+      await tester.pumpAndSettle();
+
+      expect(gateway.commands, hasLength(1));
+      expect(
+        find.text(
+          'Não foi possível confirmar o salvamento. Tente novamente sem alterar os dados.',
+        ),
+        findsOneWidget,
+      );
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      expect(find.byType(ClassForm), findsOneWidget);
+
+      final nameField = find.byKey(const Key('class-name'));
+      await tester.enterText(nameField, 'Changed after the response was lost');
+      await tester.pump();
+      expect(tester.widget<TextFormField>(nameField).enabled, isFalse);
+
+      await tester.tap(find.byType(FilledButton).last);
+      await tester.pumpAndSettle();
+
+      expect(gateway.commands, hasLength(2));
+      expect(gateway.commands[1].operationId, gateway.commands[0].operationId);
+      expect(gateway.commands[1].payload, gateway.commands[0].payload);
+      expect(gateway.commands[1].payload['name'], 'Original');
+      expect(saved, isTrue);
     },
   );
 

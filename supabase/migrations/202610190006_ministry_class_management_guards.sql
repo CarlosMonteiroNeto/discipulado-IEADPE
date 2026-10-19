@@ -16,7 +16,8 @@ BEGIN
   RAISE EXCEPTION 'class_identity_immutable' USING ERRCODE='23514';
  END IF;
 
- IF NEW.teacher_contact_id IS NOT NULL THEN
+ IF NEW.teacher_contact_id IS DISTINCT FROM OLD.teacher_contact_id AND
+    NEW.teacher_contact_id IS NOT NULL THEN
   PERFORM 1 FROM public.ministry_contacts c
   WHERE c.id=NEW.teacher_contact_id AND c.congregation_id=NEW.congregation_id
    AND c.scope='congregation' AND c.role_code='teacher' AND c.archived_at IS NULL

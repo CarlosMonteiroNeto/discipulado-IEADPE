@@ -45,15 +45,18 @@ class _ClassFormState extends State<ClassForm> {
   List<MinistryDirectoryEntry> _teachers = const [];
   bool _loadingTeachers = false;
   bool _busy = false;
+  bool _mutationAttempted = false;
   String? _teacherError;
   String? _error;
   String? _saveSignature;
   String? _saveOperationId;
+  _PendingClassSave? _pendingMutation;
 
   bool get _editing => widget.initialClass != null;
   bool get _editable =>
       widget.initialClass == null ||
       widget.initialClass!.status == ClassStatus.active;
+  bool get _fieldsEnabled => _editable && !_busy && !_mutationAttempted;
 
   @override
   void initState() {
@@ -192,217 +195,319 @@ class _ClassFormState extends State<ClassForm> {
       'end_date': end?.toString(),
       'expected_revision': widget.initialClass?.revision,
     });
-    if (_saveSignature != signature) {
+    final pending = _pendingMutation;
+    if (pending != null && pending.signature != signature) {
+      setState(() {
+        _error = 'O envio anterior ainda está pendente. Tente novamente sem alterar os dados.';
+      });
+      return;
+    }
+    if (pending == null && _saveSignature != signature) {
       _saveSignature = signature;
       _saveOperationId = _uuid.v4();
     }
+    final mutation =
+        pending ??
+        _PendingClassSave(
+          signature: signature,
+          operationId: _saveOperationId!,
+          id: _classId,
+          congregationId: widget.congregationId,
+          name: name,
+          teacherContactId: teacherId,
+          startDate: start,
+          endDate: end,
+          expectedRevision: widget.initialClass?.revision,
+        );
     setState(() {
       _busy = true;
+      _mutationAttempted = true;
       _error = null;
     });
     try {
       final result = await widget.repository.saveClass(
-        operationId: _saveOperationId!,
-        id: _classId,
-        congregationId: widget.congregationId,
-        name: name,
-        teacherContactId: teacherId,
-        startDate: start,
-        endDate: end,
-        expectedRevision: widget.initialClass?.revision,
+        operationId: mutation.operationId,
+        id: mutation.id,
+        congregationId: mutation.congregationId,
+        name: mutation.name,
+        teacherContactId: mutation.teacherContactId,
+        startDate: mutation.startDate,
+        endDate: mutation.endDate,
+        expectedRevision: mutation.expectedRevision,
       );
       if (!mounted) return;
-      setState(() => _busy = false);
+      setState(() {
+        _busy = false;
+        _mutationAttempted = false;
+        _pendingMutation = null;
+      });
       final initial = widget.initialClass;
       widget.onSaved(
         MinistryClassSummary(
           id: result.id,
-          name: name,
+          name: mutation.name,
           status: initial?.status ?? ClassStatus.active,
-          startDate: start.toString(),
-          endDate: end?.toString(),
+          startDate: mutation.startDate.toString(),
+          endDate: mutation.endDate?.toString(),
           revision: result.revision,
-          teacherContactId: teacherId,
+          teacherContactId: mutation.teacherContactId,
         ),
       );
     } catch (error) {
       if (!mounted) return;
+      final ambiguous = _isAmbiguousMutationFailure(error);
       setState(() {
         _error = error is DataFailure && error.code == 'stale_revision'
             ? 'A turma foi alterada por outra pessoa. Atualize a lista antes de tentar novamente.'
+            : ambiguous
+            ? 'Não foi possível confirmar o salvamento. Tente novamente sem alterar os dados.'
             : 'Não foi possível salvar a turma. Confira os dados e tente novamente.';
         _busy = false;
+        _mutationAttempted = ambiguous;
+        _pendingMutation = ambiguous ? mutation : null;
       });
     }
   }
 
+  bool _isAmbiguousMutationFailure(Object error) =>
+      error is! DataFailure ||
+      !const {'invalid', 'permission', 'stale_revision'}.contains(error.code);
+
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.transparent,
-    appBar: AppBar(title: Text(_editing ? 'Editar turma' : 'Nova turma')),
-    body: SafeArea(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 720),
-          child: ListView(
-            padding: const EdgeInsets.all(UnifiedSpace.x4),
-            children: [
-              Base44PageHeading(
-                title: _editing ? 'Editar turma' : 'Nova turma',
-                icon: Icons.groups_outlined,
-                subtitle: 'As alterações ficam registradas na congregação selecionada.',
-              ),
-              const SizedBox(height: UnifiedSpace.x4),
-              Base44Panel(
-                child: Form(
-                  key: _form,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextFormField(
-                        key: const Key('class-name'),
-                        controller: _name,
-                        enabled: _editable && !_busy,
-                        maxLength: 200,
-                        textCapitalization: TextCapitalization.sentences,
-                        decoration: const InputDecoration(
-                          labelText: 'Nome da turma',
-                          prefixIcon: Icon(Icons.groups_outlined),
-                        ),
-                        validator: (value) {
-                          final name = value?.trim() ?? '';
-                          if (name.isEmpty) return 'Informe o nome da turma.';
-                          if (name.length > 200)
-                            return 'Use até 200 caracteres.';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: UnifiedSpace.fieldGap),
-                      DropdownButtonFormField<String>(
-                        key: const Key('class-teacher-dropdown'),
-                        initialValue: _teacherChoice,
-                        isExpanded: true,
-                        decoration: InputDecoration(
-                          labelText: 'Professor',
-                          prefixIcon: const Icon(Icons.person_outline),
-                          helperMaxLines: 2,
-                          helperText: _loadingTeachers
-                              ? 'Carregando professores…'
-                              : 'Apenas professores ativos desta congregação.',
-                        ),
-                        items: [
-                          const DropdownMenuItem(
-                            value: _noTeacher,
-                            child: Text('Sem professor definido'),
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: !_mutationAttempted,
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      appBar: AppBar(title: Text(_editing ? 'Editar turma' : 'Nova turma')),
+      body: SafeArea(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: ListView(
+              padding: const EdgeInsets.all(UnifiedSpace.x4),
+              children: [
+                Base44PageHeading(
+                  title: _editing ? 'Editar turma' : 'Nova turma',
+                  icon: Icons.groups_outlined,
+                  subtitle: 'As alterações ficam registradas na congregação selecionada.',
+                ),
+                const SizedBox(height: UnifiedSpace.x4),
+                Base44Panel(
+                  child: Form(
+                    key: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          key: const Key('class-name'),
+                          controller: _name,
+                          enabled: _fieldsEnabled,
+                          maxLength: 200,
+                          textCapitalization: TextCapitalization.sentences,
+                          decoration: const InputDecoration(
+                            labelText: 'Nome da turma',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            prefixIcon: Icon(Icons.groups_outlined),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: UnifiedSpace.x4,
+                              vertical: UnifiedSpace.x4,
+                            ),
                           ),
-                          if (widget.initialClass?.teacherContactId != null &&
-                              !_teachers.any(
-                                (teacher) =>
-                                    teacher.id ==
-                                    widget.initialClass!.teacherContactId,
-                              ))
-                            DropdownMenuItem(
-                              value: widget.initialClass!.teacherContactId!,
-                              child: Text(
-                                _loadingTeachers
-                                    ? 'Carregando professor atual…'
-                                    : 'Professor atual indisponível',
+                          validator: (value) {
+                            final name = value?.trim() ?? '';
+                            if (name.isEmpty) return 'Informe o nome da turma.';
+                            if (name.length > 200)
+                              return 'Use até 200 caracteres.';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: UnifiedSpace.fieldGap),
+                        DropdownButtonFormField<String>(
+                          key: const Key('class-teacher-dropdown'),
+                          initialValue: _teacherChoice,
+                          isExpanded: true,
+                          decoration: InputDecoration(
+                            labelText: 'Professor',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            prefixIcon: const Icon(Icons.person_outline),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: UnifiedSpace.x4,
+                              vertical: UnifiedSpace.x4,
+                            ),
+                          ),
+                          items: [
+                            const DropdownMenuItem(
+                              value: _noTeacher,
+                              child: Text('Sem professor definido'),
+                            ),
+                            if (widget.initialClass?.teacherContactId != null &&
+                                !_teachers.any(
+                                  (teacher) =>
+                                      teacher.id ==
+                                      widget.initialClass!.teacherContactId,
+                                ))
+                              DropdownMenuItem(
+                                value: widget.initialClass!.teacherContactId!,
+                                child: Text(
+                                  _loadingTeachers
+                                      ? 'Carregando professor atual…'
+                                      : 'Professor atual indisponível',
+                                ),
+                              ),
+                            for (final teacher in _teachers)
+                              DropdownMenuItem(
+                                value: teacher.id,
+                                child: Text(teacher.name, softWrap: true),
+                              ),
+                          ],
+                          onChanged:
+                              _busy ||
+                                  _mutationAttempted ||
+                                  _loadingTeachers ||
+                                  !_editable
+                              ? null
+                              : (value) {
+                                  if (value != null) {
+                                    setState(() => _teacherChoice = value);
+                                  }
+                                },
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.only(
+                            left: UnifiedSpace.x4,
+                            top: UnifiedSpace.x2,
+                          ),
+                          child: Text(
+                            _loadingTeachers ? 'Carregando professores…' : 'Apenas professores ativos desta congregação.',
+                          ),
+                        ),
+                        if (_teacherError != null) ...[
+                          const SizedBox(height: UnifiedSpace.x2),
+                          Text(
+                            _teacherError!,
+                            style: const TextStyle(
+                              color: UnifiedColors.warning,
+                            ),
+                          ),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _loadingTeachers
+                                  ? null
+                                  : _loadTeachers,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Tentar carregar novamente'),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: UnifiedSpace.fieldGap),
+                        TextFormField(
+                          key: const Key('class-start-date'),
+                          controller: _startDate,
+                          enabled: _fieldsEnabled,
+                          keyboardType: TextInputType.datetime,
+                          decoration: const InputDecoration(
+                            labelText: 'Data de início',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            hintText: 'AAAA-MM-DD',
+                            prefixIcon: Icon(Icons.calendar_today_outlined),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: UnifiedSpace.x4,
+                              vertical: UnifiedSpace.x4,
+                            ),
+                          ),
+                          validator: _requiredDate,
+                        ),
+                        const SizedBox(height: UnifiedSpace.fieldGap),
+                        TextFormField(
+                          key: const Key('class-end-date'),
+                          controller: _endDate,
+                          enabled: _fieldsEnabled,
+                          keyboardType: TextInputType.datetime,
+                          decoration: const InputDecoration(
+                            labelText: 'Data de término',
+                            floatingLabelBehavior: FloatingLabelBehavior.always,
+                            hintText: 'AAAA-MM-DD',
+                            prefixIcon: Icon(Icons.event_available_outlined),
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: UnifiedSpace.x4,
+                              vertical: UnifiedSpace.x4,
+                            ),
+                          ),
+                          validator: _optionalDate,
+                        ),
+                        if (_error != null) ...[
+                          const SizedBox(height: UnifiedSpace.x2),
+                          Text(
+                            _error!,
+                            style: const TextStyle(color: UnifiedColors.error),
+                          ),
+                        ],
+                        const SizedBox(height: UnifiedSpace.sectionGap),
+                        Wrap(
+                          spacing: UnifiedSpace.x2,
+                          runSpacing: UnifiedSpace.x2,
+                          alignment: WrapAlignment.end,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _busy || _mutationAttempted
+                                  ? null
+                                  : widget.onCancel,
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _busy || !_editable ? null : _save,
+                              icon: _busy
+                                  ? const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.save_outlined),
+                              label: Text(
+                                _busy
+                                    ? 'Salvando…'
+                                    : _pendingMutation == null
+                                    ? 'Salvar turma'
+                                    : 'Tentar novamente',
                               ),
                             ),
-                          for (final teacher in _teachers)
-                            DropdownMenuItem(
-                              value: teacher.id,
-                              child: Text(teacher.name, softWrap: true),
-                            ),
-                        ],
-                        onChanged: _busy || _loadingTeachers || !_editable
-                            ? null
-                            : (value) {
-                                if (value != null) {
-                                  setState(() => _teacherChoice = value);
-                                }
-                              },
-                      ),
-                      if (_teacherError != null) ...[
-                        const SizedBox(height: UnifiedSpace.x2),
-                        Text(
-                          _teacherError!,
-                          style: const TextStyle(color: UnifiedColors.warning),
-                        ),
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: TextButton.icon(
-                            onPressed: _loadingTeachers ? null : _loadTeachers,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Tentar carregar novamente'),
-                          ),
+                          ],
                         ),
                       ],
-                      const SizedBox(height: UnifiedSpace.fieldGap),
-                      TextFormField(
-                        key: const Key('class-start-date'),
-                        controller: _startDate,
-                        enabled: _editable && !_busy,
-                        keyboardType: TextInputType.datetime,
-                        decoration: const InputDecoration(
-                          labelText: 'Data de início',
-                          hintText: 'AAAA-MM-DD',
-                          prefixIcon: Icon(Icons.calendar_today_outlined),
-                        ),
-                        validator: _requiredDate,
-                      ),
-                      const SizedBox(height: UnifiedSpace.fieldGap),
-                      TextFormField(
-                        key: const Key('class-end-date'),
-                        controller: _endDate,
-                        enabled: _editable && !_busy,
-                        keyboardType: TextInputType.datetime,
-                        decoration: const InputDecoration(
-                          labelText: 'Data de término (opcional)',
-                          hintText: 'AAAA-MM-DD',
-                          prefixIcon: Icon(Icons.event_available_outlined),
-                        ),
-                        validator: _optionalDate,
-                      ),
-                      if (_error != null) ...[
-                        const SizedBox(height: UnifiedSpace.x2),
-                        Text(
-                          _error!,
-                          style: const TextStyle(color: UnifiedColors.error),
-                        ),
-                      ],
-                      const SizedBox(height: UnifiedSpace.sectionGap),
-                      Wrap(
-                        spacing: UnifiedSpace.x2,
-                        runSpacing: UnifiedSpace.x2,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          OutlinedButton(
-                            onPressed: _busy ? null : widget.onCancel,
-                            child: const Text('Cancelar'),
-                          ),
-                          FilledButton.icon(
-                            onPressed: _busy || !_editable ? null : _save,
-                            icon: _busy
-                                ? const SizedBox.square(
-                                    dimension: 18,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Icon(Icons.save_outlined),
-                            label: Text(_busy ? 'Salvando…' : 'Salvar turma'),
-                          ),
-                        ],
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     ),
   );
+}
+
+class _PendingClassSave {
+  const _PendingClassSave({
+    required this.signature,
+    required this.operationId,
+    required this.id,
+    required this.congregationId,
+    required this.name,
+    required this.teacherContactId,
+    required this.startDate,
+    required this.endDate,
+    required this.expectedRevision,
+  });
+
+  final String signature;
+  final String operationId;
+  final String id;
+  final String congregationId;
+  final String name;
+  final String? teacherContactId;
+  final CalendarDate startDate;
+  final CalendarDate? endDate;
+  final int? expectedRevision;
 }
