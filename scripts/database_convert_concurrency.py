@@ -85,9 +85,12 @@ def check_convert_concurrency(psql, connection):
                 f"SELECT set_config('request.jwt.claim.sub','{actor}',true);")
 
     def create(operation):
-        payload = json.dumps(dict(name="Synthetic race", landmark="Square", gender="male",
-                                  conversion_date=week, worship_type="01 - Oração",
-                                  congregation_id=scope), ensure_ascii=False)
+        payload = json.dumps(dict(
+            congregation_id=scope,
+            person=dict(name="Synthetic race", phone=None, birth_date=None, address=None),
+            convert=dict(landmark="Square", gender="male", conversion_date=week,
+                         worship_type="01 - Oração", age=None, photo_asset_id=None)),
+            ensure_ascii=False)
         return (authenticated(registrar) +
                 f"SELECT public.ieadpe_create_convert('{operation}','{payload}'::jsonb);")
 

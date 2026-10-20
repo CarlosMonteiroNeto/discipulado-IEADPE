@@ -9,7 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 
 import '../../data/repositories_test.dart'
-    show fixture, respond, id, row, scopeId;
+    show fixture, respond, id, convertProjection, scopeId;
 
 void main() {
   test('actual export traverses records and preserves archived congregation labels', () async {
@@ -26,11 +26,17 @@ void main() {
         return;
       }
       calls++;
-      final after = request.uri.queryParameters['id'];
-      await respond(
-        request,
-        after == null ? [for (var i = 1; i <= 100; i++) row(i)] : [row(101)],
-      );
+      final body =
+          jsonDecode(await utf8.decoder.bind(request).join())
+              as Map<String, dynamic>;
+      final payload = Map<String, dynamic>.from(body['request'] as Map);
+      final cursor = payload['cursor'] as String?;
+      await respond(request, {
+        'items': cursor == null
+            ? [for (var i = 1; i <= 100; i++) convertProjection(i)]
+            : [convertProjection(101)],
+        'next_cursor': cursor == null ? 'opaque-cursor-1' : null,
+      });
     });
     final bytes = await BackupRepository(
       gateway,

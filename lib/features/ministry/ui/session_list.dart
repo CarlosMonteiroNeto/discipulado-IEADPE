@@ -105,6 +105,64 @@ class _SessionListPageState extends State<SessionListPage> {
     }
   }
 
+  Future<void> _refreshLoadedSessions() async {
+    final token = ++_loadToken;
+    // Claim ownership from any in-flight load: the invalidated request bails on
+    // its token check, so the flags it set must not stay stuck.
+    setState(() {
+      _loading = false;
+      _loadingMore = false;
+    });
+    final targetCount = _sessions.length;
+    final previousOffset = _scrollController.hasClients
+        ? _scrollController.offset
+        : 0.0;
+    try {
+      final refreshed = <MinistrySessionSummary>[];
+      final ids = <String>{};
+      String? cursor;
+      String? nextCursor;
+      do {
+        final page = await widget.repository.listClassSessions(
+          congregationId: widget.congregationId,
+          classId: widget.classSummary.id,
+          limit: 50,
+          cursor: cursor,
+        );
+        if (!mounted || token != _loadToken) return;
+        for (final item in page.items) {
+          if (ids.add(item.id)) refreshed.add(item);
+        }
+        nextCursor = page.nextCursor;
+        cursor = nextCursor;
+        if (page.items.isEmpty) break;
+      } while (nextCursor != null && refreshed.length < targetCount);
+      setState(() {
+        _sessions
+          ..clear()
+          ..addAll(refreshed);
+        _nextCursor = nextCursor;
+        _error = null;
+      });
+      if (previousOffset > 0) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              token != _loadToken ||
+              !_scrollController.hasClients) {
+            return;
+          }
+          final max = _scrollController.position.maxScrollExtent;
+          _scrollController.jumpTo(previousOffset > max ? max : previousOffset);
+        });
+      }
+    } catch (_) {
+      if (!mounted || token != _loadToken) return;
+      setState(
+        () => _error = 'Não foi possível carregar as aulas. Tente novamente.',
+      );
+    }
+  }
+
   Future<void> _create() async {
     if (_busy ||
         _pendingCancel != null ||
@@ -123,13 +181,13 @@ class _SessionListPageState extends State<SessionListPage> {
     );
     if (!mounted || id == null) return;
     await widget.onOpenSession(id);
-    if (mounted) await _load();
+    if (mounted) await _refreshLoadedSessions();
   }
 
   Future<void> _open(MinistrySessionSummary session) async {
     try {
       await widget.onOpenSession(session.id);
-      if (mounted) await _load();
+      if (mounted) await _refreshLoadedSessions();
     } catch (_) {
       if (mounted) {
         setState(
@@ -158,6 +216,18 @@ class _SessionListPageState extends State<SessionListPage> {
     }
     if (!mounted) return;
     final session = roster.session;
+    if (session.id != item.id ||
+        item.classId != widget.classSummary.id ||
+        item.congregationId != widget.congregationId ||
+        session.classId != item.classId ||
+        session.classId != widget.classSummary.id ||
+        session.congregationId != item.congregationId ||
+        session.congregationId != widget.congregationId) {
+      setState(
+        () => _error = 'A aula retornada não corresponde ao contexto atual. Atualize os dados e tente novamente.',
+      );
+      return;
+    }
     final approved = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(

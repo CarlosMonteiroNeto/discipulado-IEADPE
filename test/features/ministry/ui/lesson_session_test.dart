@@ -16,6 +16,33 @@ const sessionId = '55555555-5555-4555-8555-555555555555';
 const otherSessionId = '77777777-7777-4777-8777-777777777777';
 const opId = '88888888-8888-4888-8888-888888888888';
 const actorId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+const otherCongregationId = '44444444-4444-4444-8444-444444444444';
+const attendanceMismatchError =
+    'A aula retornada não corresponde ao contexto atual. Atualize os dados e tente novamente.';
+
+DateTime lessonDate(int index) =>
+    DateTime.utc(2026, 1, 1).add(Duration(days: index));
+
+String wireDate(DateTime date) =>
+    '${date.year}-${date.month.toString().padLeft(2, '0')}-'
+    '${date.day.toString().padLeft(2, '0')}';
+
+String displayDate(DateTime date) =>
+    '${date.day.toString().padLeft(2, '0')}/'
+    '${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+String lessonId(int index) =>
+    '${(index + 1).toString().padLeft(8, '0')}-0000-4000-8000-000000000000';
+
+Map<String, dynamic> lesson(int index) => {
+  'id': lessonId(index),
+  'class_id': classAId,
+  'congregation_id': congregationId,
+  'date': wireDate(lessonDate(index)),
+  'topic': 'Lição $index',
+  'status': 'open',
+  'revision': 1,
+};
 
 typedef Captured = ({String operationId, Map<String, Object?> payload});
 
@@ -37,9 +64,15 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
   String? rejection;
   bool lostResponse = false;
   bool failAttendance = false;
+  String? attendanceSessionId;
+  String? attendanceClassId;
+  String? attendanceCongregationId;
   final failListReads = <int>{};
   int revision = 7;
   int pageReads = 0;
+  int listPageSize = 1;
+  bool overlapPages = false;
+  Completer<void>? delayedAppendRead;
 
   Map<String, dynamic> session(String id, {String status = 'open'}) => {
     'id': id,
@@ -65,15 +98,21 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
         throw const DataFailure('unavailable');
       }
       final cursor = parameters['cursor'];
-      if (cursor == 'next') {
-        return {
-          'items': List<Map<String, dynamic>>.from(sessions),
-          'next_cursor': null,
-        };
+      if (cursor != null) {
+        final delay = delayedAppendRead;
+        if (delay != null) {
+          delayedAppendRead = null;
+          await delay.future;
+        }
       }
+      final offset = cursor == null ? 0 : int.parse(cursor as String);
+      final start = overlapPages && offset > 0 ? offset - 1 : offset;
+      final end = offset + listPageSize < sessions.length
+          ? offset + listPageSize
+          : sessions.length;
       return {
-        'items': List<Map<String, dynamic>>.from(sessions.take(1)),
-        'next_cursor': sessions.length > 1 ? 'next' : null,
+        'items': List<Map<String, dynamic>>.from(sessions.sublist(start, end)),
+        'next_cursor': end < sessions.length ? '$end' : null,
       };
     }
     if (rpc == 'ministry_get_session_attendance') {
@@ -87,9 +126,9 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
       );
       return {
         'session': {
-          'id': current['id'],
-          'congregation_id': congregationId,
-          'class_id': classAId,
+          'id': attendanceSessionId ?? current['id'],
+          'congregation_id': attendanceCongregationId ?? congregationId,
+          'class_id': attendanceClassId ?? classAId,
           'date': current['date'],
           'topic': current['topic'],
           'status': current['status'],
@@ -675,6 +714,7 @@ void main() {
     tester,
   ) async {
     final gateway = _SessionGateway()
+      ..overlapPages = true
       ..sessions.add({
         'id': sessionId,
         'class_id': classAId,
@@ -702,5 +742,170 @@ void main() {
     expect(find.text('20/12/2026'), findsOneWidget);
     expect(find.text('21/12/2026'), findsOneWidget);
     expect(find.textContaining('Outra lição'), findsOneWidget);
+  });
+
+  testWidgets('open return refreshes through loaded pages and keeps offset', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()..listPageSize = 50;
+    for (var index = 0; index < 60; index++) {
+      gateway.sessions.add(lesson(index));
+    }
+    final opened = <String>[];
+    await tester.pumpWidget(
+      listApp(gateway, opened: (id) async => opened.add(id)),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.pageReads, 1);
+    await tester.scrollUntilVisible(
+      find.text('Carregar mais'),
+      400,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.tap(find.text('Carregar mais'));
+    await tester.pumpAndSettle();
+    expect(gateway.pageReads, 2);
+
+    final laterDate = displayDate(lessonDate(55));
+    await tester.scrollUntilVisible(
+      find.text(laterDate),
+      300,
+      scrollable: find.byType(Scrollable),
+    );
+    await tester.pumpAndSettle();
+    final offsetBefore = tester
+        .state<ScrollableState>(find.byType(Scrollable))
+        .position
+        .pixels;
+    expect(offsetBefore, greaterThan(0));
+    final readsBefore = gateway.readRequests
+        .where((request) => request['rpc'] == 'ministry_list_class_sessions')
+        .length;
+
+    await tester.tap(find.text(laterDate));
+    await tester.pumpAndSettle();
+
+    expect(opened, [lessonId(55)]);
+    final refreshReads = gateway.readRequests
+        .where((request) => request['rpc'] == 'ministry_list_class_sessions')
+        .skip(readsBefore)
+        .toList();
+    expect(refreshReads.map((request) => request['cursor']), [null, '50']);
+    expect(find.text(laterDate), findsOneWidget);
+    expect(
+      tester.state<ScrollableState>(find.byType(Scrollable)).position.pixels,
+      offsetBefore,
+    );
+  });
+
+  testWidgets(
+    'open during pending append restores refresh and pagination controls',
+    (tester) async {
+      final gateway = _SessionGateway()..listPageSize = 2;
+      for (var index = 0; index < 4; index++) {
+        gateway.sessions.add(lesson(index));
+      }
+      final opened = <String>[];
+      await tester.pumpWidget(
+        listApp(gateway, opened: (id) async => opened.add(id)),
+      );
+      await tester.pumpAndSettle();
+      expect(gateway.pageReads, 1);
+
+      final appendGate = Completer<void>();
+      gateway.delayedAppendRead = appendGate;
+      await tester.tap(find.text('Carregar mais'));
+      await tester.pump();
+      expect(gateway.pageReads, 2);
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Carregar mais'),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(find.text(displayDate(lessonDate(0))));
+      await tester.pumpAndSettle();
+      expect(opened, [lessonId(0)]);
+      // Refresh re-reads only the rows already loaded.
+      expect(gateway.pageReads, 3);
+
+      appendGate.complete();
+      await tester.pumpAndSettle();
+
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Atualizar aulas'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.widgetWithText(TextButton, 'Carregar mais'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(find.text(displayDate(lessonDate(3))), findsNothing);
+
+      await tester.tap(find.text('Carregar mais'));
+      await tester.pumpAndSettle();
+      expect(gateway.pageReads, 4);
+      await tester.scrollUntilVisible(
+        find.text(displayDate(lessonDate(3))),
+        200,
+        scrollable: find.byType(Scrollable),
+      );
+      expect(find.text(displayDate(lessonDate(3))), findsOneWidget);
+      expect(find.text('Carregar mais'), findsNothing);
+    },
+  );
+
+  testWidgets('cancellation rejects attendance for another session id', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()..attendanceSessionId = otherSessionId;
+    gateway.sessions.add(gateway.session(sessionId));
+    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(gateway.cancelCalls, isEmpty);
+    expect(find.text(attendanceMismatchError), findsOneWidget);
+  });
+
+  testWidgets('cancellation rejects attendance for another class', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()..attendanceClassId = classBId;
+    gateway.sessions.add(gateway.session(sessionId));
+    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(gateway.cancelCalls, isEmpty);
+    expect(find.text(attendanceMismatchError), findsOneWidget);
+  });
+
+  testWidgets('cancellation rejects attendance for another congregation', (
+    tester,
+  ) async {
+    final gateway = _SessionGateway()
+      ..attendanceCongregationId = otherCongregationId;
+    gateway.sessions.add(gateway.session(sessionId));
+    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
+    await tester.pumpAndSettle();
+    expect(find.byType(AlertDialog), findsNothing);
+    expect(gateway.cancelCalls, isEmpty);
+    expect(find.text(attendanceMismatchError), findsOneWidget);
   });
 }

@@ -35,16 +35,27 @@ SELECT pg_temp.assert_true((public.ieadpe_weekly_overview()->>'global')::boolean
  AND NOT (public.ieadpe_weekly_overview()->'rows'->1->>'confirmed')::boolean,'global overview includes confirmed and waiting');
 RESET ROLE;
 -- Actual command mutation paths update overview, including moving between weeks.
-DO $$ DECLARE created jsonb; BEGIN
- created:=public.ieadpe_create_convert(gen_random_uuid(),'{"name":"Synthetic weekly","landmark":"Square","gender":"male","conversion_date":"2026-10-05","worship_type":"Prayer","congregation_id":"72000000-0000-0000-0000-000000000001"}');
+DO $$ DECLARE created jsonb; payload jsonb; edit_payload jsonb; BEGIN
+ payload:=jsonb_build_object(
+  'congregation_id','72000000-0000-0000-0000-000000000001',
+  'person',jsonb_build_object('name','Synthetic weekly','phone',NULL,'birth_date',NULL,'address',NULL),
+  'convert',jsonb_build_object('landmark','Square','gender','male','conversion_date','2026-10-05',
+   'worship_type','Prayer','age',NULL,'photo_asset_id',NULL));
+ created:=public.ieadpe_create_convert(gen_random_uuid(),payload);
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_weekly_overview()->'rows')=1,'create removes zero congregation from overview');
  PERFORM pg_temp.assert_true(NOT EXISTS(SELECT FROM public.weekly_reports),'create removes zero receipt report atomically');
- PERFORM public.ieadpe_edit_convert(gen_random_uuid(),created||'{"congregation_id":"72000000-0000-0000-0000-000000000002"}');
- PERFORM pg_temp.assert_true(public.ieadpe_weekly_overview()->'rows'->0->>'id'='72000000-0000-0000-0000-000000000001','move restores source and excludes destination');
- PERFORM public.ieadpe_edit_convert(gen_random_uuid(),created||'{"conversion_date":"2026-09-28"}');
+ edit_payload:=jsonb_build_object('id',created->>'id',
+  'congregation_id','72000000-0000-0000-0000-000000000001',
+  'expected_revision',1,'expected_person_revision',1,
+  'person',payload->'person',
+  'convert',jsonb_set(payload->'convert','{conversion_date}','"2026-09-28"'::jsonb));
+ PERFORM public.ieadpe_edit_convert(gen_random_uuid(),edit_payload);
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_weekly_overview()->'rows')=2,'date move restores previous week');
- PERFORM public.ieadpe_edit_convert(gen_random_uuid(),created||'{"conversion_date":"2026-10-05"}');
- PERFORM public.ieadpe_delete_convert(gen_random_uuid(),created);
+ edit_payload:=jsonb_set(edit_payload,'{expected_revision}','2'::jsonb);
+ edit_payload:=jsonb_set(edit_payload,'{convert,conversion_date}','"2026-10-05"'::jsonb);
+ PERFORM public.ieadpe_edit_convert(gen_random_uuid(),edit_payload);
+ PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_weekly_overview()->'rows')=1,'date move forward removes zero congregation again');
+ PERFORM public.ieadpe_delete_convert(gen_random_uuid(),jsonb_build_object('id',created->>'id'));
  PERFORM pg_temp.assert_true(jsonb_array_length(public.ieadpe_weekly_overview()->'rows')=2,'delete restores zero congregation');
  PERFORM pg_temp.assert_true((SELECT sum(conversion_count)=0 FROM private.congregation_week_guards),'all affected guards return to zero');
 END $$;
