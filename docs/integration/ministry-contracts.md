@@ -1,5 +1,7 @@
 # Ministry contracts for the Supabase port
 
+> Historical contract baseline. The independent campaign/ministry grant assumptions below were superseded by 202610180003_base44_unified_access.sql and the approved unified-access design. The shared-person and Team completion work must publish docs/integration/ministry-completion-contracts.md after investigation; do not implement new completion features from obsolete authority/identity assumptions in this baseline. Existing RPC shapes remain reference evidence until replaced by reviewed forward-compatible contracts.
+
 Status: task 1 contract baseline. Sources: `discipulado-IEADPE` `main@4acb563` (`docs/superpowers/specs/discipulado-ieadpe-spec.md`, `lib/domain/*.dart`, `functions/src/*/service.ts`) and the completed convert app `implementation/supabase-free@642047f` (`supabase/migrations/202610140002_schema.sql`, `202610140003_access.sql`, and `202610140004_convert_commands.sql`). This document resolves the port boundary for plan tasks 2–5. It does not authorize identity cutover or historical import.
 
 ## Decisions and authority boundary
