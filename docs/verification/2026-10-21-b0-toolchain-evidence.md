@@ -51,13 +51,29 @@ Child versions observed in every process: Flutter 3.47.7, Dart 3.13.5, Python 3.
 | JDK | Temurin 25.0.4+7 LTS, `JAVA_HOME` set | present; Gradle/AGP compatibility not exercised (no build) |
 | Gradle wrapper | `gradle-9.3.1-all.zip` | configured only |
 | Android SDK | platform 36, build-tools 36.0.0, platforms 33/34/35/36, cmdline-tools latest | present |
-| Android emulator | 33.1.24.0; AVDs `codex_android_smoke_api31`, `codex_android_smoke_api34` | bootable state not established; no device attached |
+| Android emulator | 33.1.24.0; AVDs `codex_android_smoke_api31`, `codex_android_smoke_api34` | emulator boot not established; superseded for connectivity by the physical target below |
 | Emulator acceleration | HAXM 7.6.5 installed and usable; HAXM deprecation warning | boot/ADB still unproven |
 | Android licenses | some not accepted (`flutter doctor`) | prerequisite gap, not a product failure |
 | Chrome | 155.0.8059.85 | present |
 | ChromeDriver | 155.0.8059.84 | major version matches Chrome; patch build differs by one |
 | Supabase CLI | 2.121.0 | version only; no credential/status probe |
 | Docker engine | `docker info` timed out with no output | BLOCKED; prior evidence records WSL Virtual Machine Platform disabled |
+
+## Physical Android target over the tailnet
+
+The user supplied a Tailscale-reachable Android device and a current Wireless debugging pairing code. `adb pair` returned `Successfully paired` (exit 0), `adb connect` returned `connected` (exit 0), and `adb devices -l` reported the device as `device` rather than `offline`. The exact tailnet endpoint and pairing code are intentionally not retained in this tracked record because the endpoint is ephemeral and the code is single-use.
+
+| Property | Observed value |
+| --- | --- |
+| Manufacturer / model | Xiaomi / `2109119DG` |
+| Device / build | `lisa_eea`; `Xiaomi/lisa_eea/lisa:14/UKQ1.240624.001/OS2.0.5.0.UKOEUXM:user/release-keys` |
+| Android | 14 (API 34) |
+| ABI | `arm64-v8a` |
+| Physical display | 1080×2400 at 440 dpi (≈393×873 logical px) |
+| System font scale | 1.0 |
+| Pinned Flutter detection | `flutter devices` (3.47.7) exit 0: `2109119DG` as `android-arm64`, Android 14 (API 34) |
+
+This resolves the **bootable/attached Android target** prerequisite only. No APK was built, installed or launched, so no app, device-rendering, accessibility, persistence or release acceptance is claimed. Android delivery remains gated by the standing build/signing approvals.
 
 ## Evidence archive validation
 
@@ -101,7 +117,8 @@ Explicit absences retained, not reconstructed: individual durable final reviews 
 
 - Pinned toolchain and evidence identity: **resolved** for this candidate.
 - Docker/owned local Supabase: **BLOCKED** (`docker info` timed out; prior WSL Virtual Machine Platform root cause remains the recorded evidence).
-- Bootable Android target: **BLOCKED** (no attached device; both AVDs exist but prior boot attempts stayed ADB `offline`; licenses not fully accepted). No APK was built or installed.
+- Bootable Android target: **RESOLVED for connectivity** (physical Xiaomi `2109119DG`, Android 14/API 34, paired and `device` over the user's tailnet; both local AVDs remain unproven). No APK was built or installed, so application acceptance is not claimed.
+- Android delivery: still **BLOCKED** by the standing build/signing and explicit approval gates.
 - PowerShell gate: **adapted, not blocked** — see ruling below.
 
 Ruling: `$MinistryPwsh` is Windows PowerShell 5.1 because `pwsh` is not installed and 5.1 rejects `-CommandWithArgs`; gate scripts must use `-NoProfile -File` or an explicit `-Command` argument array, and `scripts/verify_unified.ps1` already documents 5.1 handling. Cost if wrong: a PS7-only construct would fail visibly at the gate; no product result is inferred.
