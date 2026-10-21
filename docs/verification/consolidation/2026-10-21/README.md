@@ -4,7 +4,7 @@ The user explicitly authorized preserving and committing the local work and merg
 
 ## Canonical workspace
 
-Use `C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion` for subsequent work. Two independent clones of the same GitHub repository caused the workspace ambiguity:
+Use the app-managed worktree `C:/Users/Carlos_Neto/.codex/worktrees/ministry-supabase-config/App discipulado` for subsequent work on `codex/ministry-production-completion`. The consolidation was assembled in `C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion` and transferred by fast-forward to the worktree already attached to this conversation. The source worktree is retained for recovery. Two independent clones of the same GitHub repository caused the workspace ambiguity:
 
 - `C:/Users/Carlos_Neto/FlutterProjects/discipulado-IEADPE` owns the canonical worktree and its branch refs.
 - `C:/Users/Carlos_Neto/FlutterProjects/App discipulado` owns the older `flutter-supabase`, `implementation/supabase-free` and `ministry-supabase-config/App discipulado` checkouts.

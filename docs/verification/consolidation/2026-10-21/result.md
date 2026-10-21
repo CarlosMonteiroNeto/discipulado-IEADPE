@@ -1,6 +1,6 @@
 # Consolidation result
 
-Canonical worktree: `C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion`.
+Canonical active worktree: `C:/Users/Carlos_Neto/.codex/worktrees/ministry-supabase-config/App discipulado`, already attached to this conversation. The commits were assembled in `C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion` and transferred here by fast-forward. The source worktree is retained as a recovery copy.
 
 Destination branch: `codex/ministry-production-completion`.
 
