@@ -456,7 +456,11 @@ class _AdminPageState extends State<AdminPage> {
                       _mutate((op) => repository.archive(op, id)),
                 )
               else if (_selected == 1)
-                AccessPanel(onOpenTeam: widget.onOpenTeam)
+                AccessPanel(
+                  canOpenTeam: widget.scope.hasMinistryAccess,
+                  onOpenTeam: widget.onOpenTeam,
+                  onScopeRefresh: widget.onScopeRefresh,
+                )
               else if (_selected == 2)
                 _later(widget.reportBuilder, 'O relatório')
               else if (_selected == 3)

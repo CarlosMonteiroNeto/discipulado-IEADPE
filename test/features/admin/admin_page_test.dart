@@ -132,10 +132,44 @@ void main() {
     expect(gateway.commands, ['archive_congregation']);
     expect(gateway.payloads.single, {'id': catalogId});
   });
+  testWidgets(
+    'admin without Ministry scope stays in Admin and can refresh access',
+    (t) async {
+      final gateway = AdminGateway();
+      var refreshed = 0;
+      var opened = 0;
+      await t.pumpWidget(
+        app(
+          gateway,
+          scope: AccessScope(isAdmin: true),
+          refresh: () async => refreshed++,
+          openTeam: () => opened++,
+        ),
+      );
+      await t.pumpAndSettle();
+      await press(t, 'Acessos');
+      expect(
+        find.text(
+          'O servidor não confirmou acesso à equipe. Atualize seu acesso para tentar novamente.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Atualizar acesso'), findsOneWidget);
+      await press(t, 'Atualizar acesso');
+      expect(refreshed, 1);
+      expect(opened, 0);
+    },
+  );
   testWidgets('Admin access tab opens the unified Team workflow', (t) async {
     final gateway = AdminGateway();
     var opened = 0;
-    await t.pumpWidget(app(gateway, openTeam: () => opened++));
+    await t.pumpWidget(
+      app(
+        gateway,
+        scope: AccessScope(isSupervision: true, isMinistrySupervision: true),
+        openTeam: () => opened++,
+      ),
+    );
     await t.pumpAndSettle();
     await press(t, 'Acessos');
     expect(find.text('Abrir equipe'), findsOneWidget);

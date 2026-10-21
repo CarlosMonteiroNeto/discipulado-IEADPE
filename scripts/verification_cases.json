@@ -1,0 +1,128 @@
+{
+  "version": 1,
+  "sql": [
+    {
+      "scenario": "access_test.sql"
+    },
+    {
+      "scenario": "attendance_integrity_test.sql"
+    },
+    {
+      "scenario": "attendance_roster_preview_test.sql"
+    },
+    {
+      "scenario": "base44_history_test.sql"
+    },
+    {
+      "scenario": "base44_unified_access_test.sql"
+    },
+    {
+      "scenario": "canonical_handoff_reads_test.sql"
+    },
+    {
+      "scenario": "canonical_person_link_test.sql",
+      "seed_before_migration": "202610200002_canonical_handoff_reads.sql",
+      "seed_scenario": "canonical_person_link_test.sql"
+    },
+    {
+      "scenario": "catalog_test.sql"
+    },
+    {
+      "scenario": "convert_commands_test.sql"
+    },
+    {
+      "scenario": "convert_student_link_test.sql"
+    },
+    {
+      "scenario": "feedback_test.sql"
+    },
+    {
+      "scenario": "import_revision_compatibility_test.sql"
+    },
+    {
+      "scenario": "import_test.sql"
+    },
+    {
+      "scenario": "lifecycle_test.sql"
+    },
+    {
+      "scenario": "ministry_academic_test.sql"
+    },
+    {
+      "scenario": "ministry_access_test.sql"
+    },
+    {
+      "scenario": "ministry_congregations_test.sql"
+    },
+    {
+      "scenario": "ministry_contact_access_link_test.sql"
+    },
+    {
+      "scenario": "ministry_follow_up_test.sql"
+    },
+    {
+      "scenario": "ministry_registry_test.sql"
+    },
+    {
+      "scenario": "ministry_session_management_test.sql",
+      "seed_before_migration": "202610190009_ministry_session_management.sql",
+      "seed_scenario": "ministry_session_management_test.sql"
+    },
+    {
+      "scenario": "ministry_student_registration_test.sql"
+    },
+    {
+      "scenario": "ministry_ui_reads_test.sql"
+    },
+    {
+      "scenario": "photos_test.sql"
+    },
+    {
+      "scenario": "student_academic_link_test.sql"
+    },
+    {
+      "scenario": "student_enrollment_history_test.sql"
+    },
+    {
+      "scenario": "teacher_contact_detail_test.sql"
+    },
+    {
+      "scenario": "unified_scope_test.sql"
+    },
+    {
+      "scenario": "weekly_imported_convert_test.sql"
+    },
+    {
+      "scenario": "weekly_test.sql"
+    }
+  ],
+  "concurrency": [
+    {
+      "flag": "--catalog-concurrency"
+    },
+    {
+      "flag": "--access-concurrency"
+    },
+    {
+      "flag": "--convert-concurrency"
+    },
+    {
+      "flag": "--import-concurrency"
+    },
+    {
+      "flag": "--lifecycle-concurrency"
+    },
+    {
+      "flag": "--ministry-registry-concurrency"
+    },
+    {
+      "flag": "--ministry-academic-concurrency"
+    },
+    {
+      "flag": "--convert-student-concurrency"
+    },
+    {
+      "flag": "--ministry-follow-up-concurrency"
+    }
+  ]
+}

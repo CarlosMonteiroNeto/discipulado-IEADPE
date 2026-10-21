@@ -106,6 +106,8 @@ def check_import_concurrency(psql, connection):
         creator.finish()
         assert query("SELECT count(*) FROM public.weekly_reports") == "0", "ASSERTION: create must remove committed zero"
         assert query("SELECT conversion_count FROM private.congregation_week_guards") == "1", "ASSERTION: count must be one"
+        assert query("SELECT revision FROM public.converts") == "1", "ASSERTION: imported revision must be one"
+        assert query("SELECT person_id IS NULL FROM public.converts") == "t", "ASSERTION: imported legacy row must stay unlinked"
         query("TRUNCATE public.converts CASCADE; DELETE FROM public.weekly_reports; DELETE FROM private.congregation_week_guards;")
 
         creator = Session("ieadpe_create_first", create("53000000-0000-0000-0000-000000000006"))
@@ -126,6 +128,8 @@ def check_import_concurrency(psql, connection):
         zero.finish()
         assert query("SELECT count(*) FROM public.weekly_reports") == "0", "ASSERTION: no false zero may remain"
         assert query("SELECT conversion_count FROM private.congregation_week_guards") == "1", "ASSERTION: concurrent count must be one"
+        assert query("SELECT revision FROM public.converts") == "1", "ASSERTION: concurrent import revision must be one"
+        assert query("SELECT person_id IS NULL FROM public.converts") == "t", "ASSERTION: concurrent import must stay unlinked"
         assert query("SELECT count(*) FROM private.mutation_receipts WHERE operation_id='53000000-0000-0000-0000-000000000007'") == "0", "ASSERTION: rejected zero must leave no receipt"
         # Different global users and operation IDs race on one legacy key.
         query("TRUNCATE public.converts CASCADE; DELETE FROM public.weekly_reports; DELETE FROM private.congregation_week_guards;")
@@ -141,6 +145,8 @@ def check_import_concurrency(psql, connection):
         second.finish()
         assert query("SELECT count(*) FROM public.converts") == "1", "ASSERTION: competing import duplicated legacy ID"
         assert query("SELECT conversion_count FROM private.congregation_week_guards") == "1", "ASSERTION: duplicate incremented guard"
+        assert query("SELECT revision FROM public.converts") == "1", "ASSERTION: duplicate reset revision"
+        assert query("SELECT person_id IS NULL FROM public.converts") == "t", "ASSERTION: duplicate created a person link"
         assert query("SELECT result->>'status' FROM private.mutation_receipts WHERE operation_id='53000000-0000-0000-0000-000000000009'") == "duplicate", "ASSERTION: competing import must report skipped"
         assert query("SELECT count(*) FROM public.convert_events") == "0", "ASSERTION: import invented events"
         print("PASS: import/confirm-zero serialize on week guard in both commit orders", flush=True)

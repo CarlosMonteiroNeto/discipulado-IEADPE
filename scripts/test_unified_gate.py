@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 
 
@@ -32,7 +33,17 @@ class GateHarness:
         scripts.mkdir()
         shutil.copy2(REPOSITORY / "scripts" / "verify_unified.ps1", scripts)
         shutil.copy2(REPOSITORY / "scripts" / "verify_unified.sh", scripts)
+        shutil.copy2(REPOSITORY / "scripts" / "verification_cases.py", scripts)
+        shutil.copy2(REPOSITORY / "scripts" / "verification_cases.json", scripts)
         shutil.copy2(GUARD, scripts)
+        database_dir = self.root / "supabase" / "tests" / "database"
+        database_dir.mkdir(parents=True)
+        for scenario in (REPOSITORY / "supabase/tests/database").glob("*_test.sql"):
+            (database_dir / scenario.name).touch()
+        migrations_dir = self.root / "supabase" / "migrations"
+        migrations_dir.mkdir(parents=True)
+        for migration in (REPOSITORY / "supabase/migrations").glob("*.sql"):
+            (migrations_dir / migration.name).touch()
         self.log_path = self.root / "stub-processes.jsonl"
         self.curl_path = self.root / "curl-calls.txt"
         dispatcher = self.root / "stub_dispatch.py"
@@ -52,6 +63,10 @@ if tool == 'curl':
 if tool in ('python', 'python3'):
     if args and args[0] == '-c':
         raise SystemExit(subprocess.call([sys.executable, *args]))
+    if args and os.path.basename(args[0]) == 'verification_cases.py':
+        raise SystemExit(subprocess.call([sys.executable, *args]))
+    if args and os.path.basename(args[0]) == 'test_database.py':
+        raise SystemExit(int(os.environ.get('STUB_DATABASE_EXIT', '0')))
     if any(os.path.basename(value) == 'run_unified_journey.py' for value in args):
         raise SystemExit(int(os.environ.get('STUB_RUNNER_EXIT', '0')))
 raise SystemExit(0)
@@ -200,6 +215,73 @@ raise SystemExit(0)
 
 
 class UnifiedGateContractTests(unittest.TestCase):
+    def test_gate_executes_every_standalone_sql_case_and_all_manifest_races(self) -> None:
+        for shell in self.available_shells():
+            with self.subTest(shell=shell):
+                harness = GateHarness(shell, runner_exit=2, supabase_url=None)
+                try:
+                    result = harness.run()
+                    self.assertIn(result.returncode, (0, 2), result.stdout + result.stderr)
+                    calls = harness.process_calls()
+                    database_calls = [row[2:] for row in calls
+                                      if len(row) >= 2 and row[0] in ("python", "python3")
+                                      and row[1] == "scripts/test_database.py"]
+                    observed_sql = {argv[0] for argv in database_calls
+                                    if argv and argv[0].endswith("_test.sql")}
+                    expected_sql = {path.name for path in (REPOSITORY / "supabase/tests/database").glob("*_test.sql")}
+                    self.assertSetEqual(observed_sql, expected_sql,
+                                        "verification gate omitted or added a standalone SQL scenario")
+                    observed_races = {argv[0] for argv in database_calls
+                                      if argv and argv[0].startswith("--")}
+                    self.assertSetEqual(observed_races, {
+                        "--catalog-concurrency", "--access-concurrency", "--convert-concurrency",
+                        "--import-concurrency", "--lifecycle-concurrency",
+                        "--ministry-registry-concurrency", "--ministry-academic-concurrency",
+                        "--convert-student-concurrency", "--ministry-follow-up-concurrency",
+                    }, "verification gate omitted or added a concurrency suite")
+                    canonical = next(argv for argv in database_calls
+                                     if argv and argv[0] == "canonical_person_link_test.sql")
+                    self.assertEqual(canonical[1:], ["--seed-before-migration",
+                        "202610200002_canonical_handoff_reads.sql", "--seed-scenario",
+                        "canonical_person_link_test.sql"])
+                finally:
+                    harness.close()
+
+    def test_both_platform_gates_consume_the_shared_argv_generator(self) -> None:
+        bash = (REPOSITORY / "scripts" / "verify_unified.sh").read_text(encoding="utf-8")
+        powershell = (REPOSITORY / "scripts" / "verify_unified.ps1").read_text(encoding="utf-8")
+        self.assertIn("scripts/verification_cases.py --cases-lines", bash)
+        self.assertIn("scripts/verification_cases.py' '--cases-lines'", powershell)
+        self.assertNotIn("sql=(access_test.sql", bash)
+        self.assertNotIn("$sqlNames = @(", powershell)
+
+    def test_database_child_failure_is_retained_as_its_exact_exit_code(self) -> None:
+        for shell in self.available_shells():
+            with self.subTest(shell=shell):
+                harness = GateHarness(shell, runner_exit=2, supabase_url=None)
+                try:
+                    result = harness.run({"STUB_DATABASE_EXIT": "19"})
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    self.assertRegex(harness.report, r"SQL canonical_person_link_test\.sql \| FAIL \| 19 \|")
+                finally:
+                    harness.close()
+
+    def test_invalid_manifest_stops_sql_probes_on_both_platform_gates(self) -> None:
+        for shell in self.available_shells():
+            with self.subTest(shell=shell):
+                harness = GateHarness(shell, runner_exit=2, supabase_url=None)
+                try:
+                    (harness.root / "scripts" / "verification_cases.json").write_text("{}", encoding="utf-8")
+                    result = harness.run()
+                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                    database_calls = [row for row in harness.process_calls()
+                                      if len(row) >= 2 and row[0] in ("python", "python3")
+                                      and row[1] == "scripts/test_database.py"]
+                    self.assertEqual(database_calls, [], "invalid manifest reached a database scenario")
+                    self.assertRegex(harness.report, r"Verification case manifest \| FAIL \|")
+                finally:
+                    harness.close()
+
     def test_runner_blocked_is_recorded_as_incomplete(self) -> None:
         for shell in self.available_shells():
             with self.subTest(shell=shell):
@@ -283,6 +365,113 @@ class UnifiedGateContractTests(unittest.TestCase):
         self.assertIn('status.get("ANON_KEY")', status_step)
         self.assertNotIn("SERVICE_ROLE_KEY", status_step)
         self.assertNotIn("DB_URL", status_step)
+
+    def test_workflow_pins_flutter_font_hashes_and_compatible_browser_pair(self) -> None:
+        workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
+        self.assertIn("flutter-version: '3.47.7'", workflow)
+        self.assertIn("chrome-version: '139.0.7258.154'", workflow)
+        self.assertIn("chromedriver-version: '139.0.7258.154'", workflow)
+        self.assertIn("79e851404657dac2106b3d22ad256d47824a9a5765458edb72c9102a45816d95", workflow)
+        self.assertIn("d9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453", workflow)
+
+    def test_workflow_uses_action_chrome_path_when_preinstalled_binary_conflicts(self) -> None:
+        workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
+        lines = workflow.splitlines()
+        step_start = lines.index("      - name: Verify pinned Flutter fonts and ChromeDriver")
+        run_start = lines.index("        run: |", step_start)
+        script_lines = []
+        for line in lines[run_start + 1:]:
+            if line.startswith("      - "):
+                break
+            script_lines.append(line[10:] if line.startswith("          ") else "")
+        script = "\n".join(script_lines)
+
+        flutter = shutil.which("flutter")
+        if not flutter:
+            self.skipTest("Flutter SDK fonts are unavailable")
+        source_fonts = Path(flutter).resolve().parent.parent / "bin/cache/artifacts/material_fonts"
+        with tempfile.TemporaryDirectory(prefix="pinned-chrome-contract-") as temporary:
+            root = Path(temporary)
+            sdk_bin = root / "sdk" / "bin"
+            font_dir = sdk_bin / "cache/artifacts/material_fonts"
+            fake_bin = root / "preinstalled-bin"
+            action_dir = root / "action"
+            font_dir.mkdir(parents=True)
+            fake_bin.mkdir()
+            action_dir.mkdir()
+            for filename in ("Roboto-Regular.ttf", "MaterialIcons-Regular.otf"):
+                shutil.copy2(source_fonts / filename, font_dir / filename)
+            (sdk_bin / "flutter").write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+            (sdk_bin / "flutter").chmod(0o755)
+            system_marker = root / "system-chrome-used"
+            action_marker = root / "action-chrome-used"
+            (fake_bin / "google-chrome").write_text(
+                f"#!/bin/sh\nprintf called >> '{system_marker}'\necho 'Google Chrome 140.0.7339.0'\n",
+                encoding="utf-8",
+            )
+            (fake_bin / "google-chrome").chmod(0o755)
+            pinned = action_dir / "chrome"
+            pinned.write_text(
+                f"#!/bin/sh\nprintf called >> '{action_marker}'\necho 'Google Chrome for Testing 139.0.7258.154'\n",
+                encoding="utf-8",
+            )
+            pinned.chmod(0o755)
+            (fake_bin / "chromedriver").write_text(
+                "#!/bin/sh\necho 'ChromeDriver 139.0.7258.154 (synthetic)'\n", encoding="utf-8"
+            )
+            (fake_bin / "chromedriver").chmod(0o755)
+            env = os.environ.copy()
+            env["PATH"] = f"{sdk_bin}:{fake_bin}:/usr/bin:/bin"
+            env["CHROME_EXECUTABLE"] = str(pinned)
+            result = subprocess.run(
+                ["bash", "-e", "-u", "-o", "pipefail", "-c", script],
+                env=env, text=True, capture_output=True, check=False,
+            )
+            self.assertFalse(system_marker.exists(), "a conflicting preinstalled Chrome shadowed the pinned path")
+            self.assertTrue(action_marker.exists(), "the setup action's chrome-path was not executed")
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            system_marker.unlink(missing_ok=True)
+            action_marker.unlink(missing_ok=True)
+            missing_env = env.copy()
+            missing_env.pop("CHROME_EXECUTABLE")
+            missing = subprocess.run(
+                ["bash", "-e", "-u", "-o", "pipefail", "-c", script],
+                env=missing_env, text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(missing.returncode, 0, "missing action output must fail closed")
+            self.assertFalse(system_marker.exists(), "missing output fell back to a PATH Chrome")
+
+            wrong_marker = root / "wrong-action-chrome-used"
+            wrong_pinned = action_dir / "wrong-chrome"
+            wrong_pinned.write_text(
+                f"#!/bin/sh\nprintf called >> '{wrong_marker}'\necho 'Google Chrome 140.0.7339.0'\n",
+                encoding="utf-8",
+            )
+            wrong_pinned.chmod(0o755)
+            good_system_bin = root / "good-system-bin"
+            good_system_bin.mkdir()
+            good_system_marker = root / "good-system-chrome-used"
+            (good_system_bin / "google-chrome").write_text(
+                f"#!/bin/sh\nprintf called >> '{good_system_marker}'\necho 'Google Chrome 139.0.7258.154'\n",
+                encoding="utf-8",
+            )
+            (good_system_bin / "google-chrome").chmod(0o755)
+            wrong_env = env.copy()
+            wrong_env["CHROME_EXECUTABLE"] = str(wrong_pinned)
+            wrong_env["PATH"] = f"{sdk_bin}:{good_system_bin}:/usr/bin:/bin"
+            wrong = subprocess.run(
+                ["bash", "-e", "-u", "-o", "pipefail", "-c", script],
+                env=wrong_env, text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(wrong.returncode, 0, "wrong action version must fail closed")
+            self.assertTrue(wrong_marker.exists(), "version check did not inspect the action output")
+            self.assertFalse(good_system_marker.exists(), "wrong action version fell back to a system Chrome")
+
+        self.assertIn("id: pinned-chrome", workflow)
+        action_output = "${{ steps.pinned-chrome.outputs.chrome-path }}"
+        self.assertGreaterEqual(workflow.count(f"CHROME_EXECUTABLE: {action_output}"), 2)
+        self.assertIn('chrome_bin="$CHROME_EXECUTABLE"', workflow)
 
     def test_supabase_start_output_is_redacted_and_pipeline_preserves_failure(self) -> None:
         workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
@@ -370,7 +559,7 @@ class UnifiedGateContractTests(unittest.TestCase):
     @staticmethod
     def available_shells() -> list[str]:
         shells = ["bash"] if (shutil.which("bash.exe") or shutil.which("bash")) else []
-        if os.name == "nt" and (shutil.which("pwsh.exe") or shutil.which("pwsh") or shutil.which("powershell.exe")):
+        if shutil.which("pwsh.exe") or shutil.which("pwsh") or shutil.which("powershell.exe"):
             shells.append("powershell")
         return shells
 

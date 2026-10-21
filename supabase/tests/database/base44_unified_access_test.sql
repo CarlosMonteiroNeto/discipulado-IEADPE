@@ -269,15 +269,24 @@ SELECT set_config('request.jwt.claim.sub','a1700000-0000-0000-0000-000000000008'
 SET LOCAL ROLE authenticated;
 DO $$ DECLARE scope jsonb; BEGIN
  scope:=public.ieadpe_get_scope();
- PERFORM pg_temp.assert_true(NOT private.ministry_can_access('a2700000-0000-0000-0000-000000000001') AND
-  scope->'ministry_congregation_ids'='[]'::jsonb AND
-  scope->'congregation_ids'='["a2700000-0000-0000-0000-000000000001"]'::jsonb,
-  'archived direction retains campaign field but loses ministry scope');
+ PERFORM pg_temp.assert_true(scope->'congregation_ids'='["a2700000-0000-0000-0000-000000000001"]'::jsonb,
+  'archived direction assignment remains in campaign scope');
+ PERFORM pg_temp.assert_true(scope->'ministry_congregation_ids'='[]'::jsonb AND
+  scope->'ministry_supervision'='false'::jsonb AND
+  NOT private.ministry_can_access('a2700000-0000-0000-0000-000000000001'),
+  'archived direction assignment is excluded from ministry scope');
  BEGIN PERFORM public.ieadpe_ministry_list_congregations('{"limit":10,"cursor":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: archived-only direction listed the active catalog';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN PERFORM public.ieadpe_ministry_save_contact('a6700000-0000-0000-0000-000000000001',
+  '{"id":"a6700000-0000-0000-0000-000000000001","scope":"congregation","congregation_id":"a2700000-0000-0000-0000-000000000001","name":"Archived Write","role_code":"teacher","phone_e164":null,"birth_date":null,"email":null}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: archived-only direction wrote to the archived congregation';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 RESET ROLE;
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM public.ministry_contacts
+ WHERE id='a6700000-0000-0000-0000-000000000001'),
+ 'denied archived-congregation write created no contact');
 SELECT set_config('request.jwt.claim.sub','a1700000-0000-0000-0000-000000000001',true);
 SET LOCAL ROLE authenticated;
 DO $$ DECLARE page jsonb; BEGIN

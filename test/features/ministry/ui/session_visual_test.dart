@@ -11,9 +11,16 @@ import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart';
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
+import 'package:ieadpe_converts/features/ministry/domain/session_navigation_context.dart';
+import 'package:ieadpe_converts/features/ministry/ui/attendance_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_list.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
+
+import '../../../support/sdk_fonts.dart';
+
+const _captureRoot =
+    'build/verification/corrective-release/task4/session-captures';
 
 Future<void> _expectTabFocus(WidgetTester tester, Finder target) async {
   final button = tester.widget<FilledButton>(target);
@@ -49,6 +56,7 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
   bool empty = false;
   bool fail = false;
   Completer<Map<String, dynamic>>? pendingList;
+  final attendanceStatuses = <String, String>{};
   @override
   Future<Map<String, dynamic>> readRpc(
     String rpc, {
@@ -60,7 +68,7 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
     if (rpc == 'ministry_list_class_sessions' && pendingList != null) {
       return pendingList!.future;
     }
-    if (rpc == 'ministry_list_class_sessions')
+    if (rpc == 'ministry_list_class_sessions') {
       return {
         'items': empty
             ? <Object>[]
@@ -73,6 +81,8 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
                   'topic': 'Uma lição sobre perseverança, serviço e cuidado pastoral em comunidade',
                   'status': 'canceled',
                   'revision': 2,
+                  'replaces_session_id': null,
+                  'replacement_session_id': null,
                 },
                 {
                   'id': '77777777-7777-4777-8777-777777777777',
@@ -82,6 +92,8 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
                   'topic': 'Tema longo para verificar a adaptação do conteúdo em telas estreitas',
                   'status': 'finalized',
                   'revision': 3,
+                  'replaces_session_id': null,
+                  'replacement_session_id': null,
                 },
                 {
                   'id': '88888888-8888-4888-8888-888888888888',
@@ -91,10 +103,13 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
                   'topic': 'Registro histórico adicional para conferir a rolagem da lista',
                   'status': 'canceled',
                   'revision': 4,
+                  'replaces_session_id': null,
+                  'replacement_session_id': null,
                 },
               ],
         'next_cursor': null,
       };
+    }
     if (rpc == 'ministry_get_session_attendance') {
       final id = parameters['session_id'] as String;
       final first = id == _session;
@@ -107,17 +122,33 @@ class _VisualGateway implements ReadRpcGateway, MinistryCommandGateway {
           'topic': first
               ? 'Uma lição sobre perseverança, serviço e cuidado pastoral em comunidade'
               : 'Tema longo para verificar a adaptação do conteúdo em telas estreitas',
-          'status': 'open',
+          'status': attendanceStatuses[id] ?? 'open',
           'roster_frozen': false,
           'lesson_index': null,
           'lesson_part': null,
           'lesson_finished': false,
           'revision': 2,
+          'replaces_session_id': null,
+          'replacement_session_id': null,
           'created_at': '2026-10-01T00:00:00Z',
           'updated_at': '2026-10-01T00:00:00Z',
           'updated_by': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         },
-        'roster': <Object>[],
+        'roster': <Map<String, Object?>>[
+          {
+            'enrollment_id': '66666666-6666-4666-8666-666666666661',
+            'student_id': '77777777-7777-4777-8777-777777777771',
+            'student_name':
+                'Ana da Silva e Albuquerque com um nome suficientemente longo',
+            'status': 'present',
+          },
+          {
+            'enrollment_id': '66666666-6666-4666-8666-666666666662',
+            'student_id': '77777777-7777-4777-8777-777777777772',
+            'student_name': 'Bento Souza',
+            'status': 'absent',
+          },
+        ],
       };
     }
     throw UnimplementedError(rpc);
@@ -160,15 +191,23 @@ void main() {
 
   for (final spec in <({String name, Size size, double scale})>[
     (name: '360x900', size: const Size(360, 900), scale: 1),
+    (name: '768x900', size: const Size(768, 900), scale: 1),
     (name: '1440x900', size: const Size(1440, 900), scale: 1),
     (name: '360x900-text-200', size: const Size(360, 900), scale: 2),
+    (name: '768x900-text-200', size: const Size(768, 900), scale: 2),
+    (name: '1440x900-text-200', size: const Size(1440, 900), scale: 2),
   ]) {
     testWidgets('session surfaces visual ${spec.name}', (tester) async {
       await tester.runAsync(() async {
-        await _loadFont(_font, 'roboto-regular.ttf');
-        await _loadFont('MaterialIcons', 'materialicons-regular.otf');
+        await loadSdkFont(_font, const [
+          'Roboto-Regular.ttf',
+          'roboto-regular.ttf',
+        ]);
+        await loadSdkFont('MaterialIcons', const [
+          'MaterialIcons-Regular.otf',
+          'materialicons-regular.otf',
+        ]);
       });
-      // TEMP_PROGRESS
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = spec.size;
       addTearDown(tester.view.resetPhysicalSize);
@@ -189,7 +228,10 @@ void main() {
       late Future<void> Function(String captureName) capture;
       capture = (String captureName) async {
         final output = File(
-          'docs/verification/l1/$captureName-${spec.name}.png',
+          <String>[
+            _captureRoot,
+            '$captureName-${spec.name}.png',
+          ].join(Platform.pathSeparator),
         );
         await tester.runAsync(() async {
           await output.parent.create(recursive: true);
@@ -285,6 +327,39 @@ void main() {
       await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
       await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
 
+      await mount(
+        SessionForm(
+          repository: repository,
+          congregationId: _congregation,
+          classSummary: klass,
+          replacesSessionId: _session,
+          initialDate: CalendarDate(2026, 12, 20),
+        ),
+        'session-replacement',
+      );
+      expect(find.text('Substituir aula cancelada'), findsOneWidget);
+      expect(
+        find.textContaining('A substituta mantém a turma e a data'),
+        findsOneWidget,
+      );
+      final replacementDate = tester.widget<TextField>(
+        find.byKey(const Key('session-date')),
+      );
+      expect(replacementDate.controller!.text, '20/12/2026');
+      expect(replacementDate.readOnly, isTrue);
+      final replacementSave = find.widgetWithText(FilledButton, 'Salvar');
+      await tester.scrollUntilVisible(
+        find.text('Salvar'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(replacementSave).height, greaterThanOrEqualTo(48));
+      await _expectTabFocus(tester, replacementSave);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      expect(tester.takeException(), isNull);
+
       gateway.empty = false;
       await mount(
         SessionListPage(
@@ -342,7 +417,10 @@ void main() {
         findsOneWidget,
       );
       final output = File(
-        'docs/verification/l1/session-cancel-dialog-${spec.name}.png',
+        <String>[
+          _captureRoot,
+          'session-cancel-dialog-${spec.name}.png',
+        ].join(Platform.pathSeparator),
       );
       await tester.runAsync(() async {
         await output.parent.create(recursive: true);
@@ -359,6 +437,74 @@ void main() {
       expect(dialog, findsOneWidget);
       await tester.tap(find.widgetWithText(TextButton, 'Cancelar'));
       await tester.pumpAndSettle();
+
+      final attendanceContext = SessionNavigationContext(
+        congregationId: _congregation,
+        classId: _class,
+        sessionId: _session,
+      );
+      gateway.attendanceStatuses[_session] = 'open';
+      await mount(
+        AttendancePage(
+          repository: repository,
+          congregationId: _congregation,
+          selectedSession: attendanceContext,
+        ),
+        'attendance-open',
+      );
+      expect(find.text('Aberta'), findsOneWidget);
+      expect(
+        find.byType(DropdownButtonFormField<AttendanceStatus>),
+        findsNWidgets(2),
+      );
+      final finalizeSave = find.widgetWithText(
+        FilledButton,
+        'Salvar e finalizar',
+      );
+      await tester.scrollUntilVisible(
+        find.text('Salvar e finalizar'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getSize(finalizeSave).height, greaterThanOrEqualTo(48));
+      await _expectTabFocus(tester, finalizeSave);
+      await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+      await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+      expect(tester.takeException(), isNull);
+
+      gateway.attendanceStatuses[_session] = 'finalized';
+      await mount(
+        AttendancePage(
+          repository: repository,
+          congregationId: _congregation,
+          selectedSession: attendanceContext,
+        ),
+        'attendance-finalized',
+      );
+      expect(find.text('Finalizada'), findsOneWidget);
+      expect(find.textContaining('somente leitura'), findsOneWidget);
+      expect(
+        find.byType(DropdownButtonFormField<AttendanceStatus>),
+        findsNothing,
+      );
+      expect(find.text('Salvar chamada'), findsNothing);
+      expect(find.text('Salvar e finalizar'), findsNothing);
+      expect(tester.takeException(), isNull);
+
+      gateway.attendanceStatuses[_session] = 'canceled';
+      await mount(
+        AttendancePage(
+          repository: repository,
+          congregationId: _congregation,
+          selectedSession: attendanceContext,
+        ),
+        'attendance-canceled',
+      );
+      expect(find.text('Cancelada'), findsOneWidget);
+      expect(find.textContaining('somente leitura'), findsOneWidget);
+      expect(find.text('Salvar chamada'), findsNothing);
+      expect(tester.takeException(), isNull);
 
       gateway.empty = true;
       await mount(
@@ -389,27 +535,4 @@ void main() {
       semantics.dispose();
     });
   }
-}
-
-Future<void> _loadFont(String family, String fileName) async {
-  var directory = File(Platform.resolvedExecutable).parent;
-  File? font;
-  while (true) {
-    final candidate = File(
-      '${directory.path}${Platform.pathSeparator}bin${Platform.pathSeparator}cache${Platform.pathSeparator}artifacts${Platform.pathSeparator}material_fonts${Platform.pathSeparator}$fileName',
-    );
-    if (candidate.existsSync()) {
-      font = candidate;
-      break;
-    }
-    final parent = directory.parent;
-    if (parent.path == directory.path) break;
-    directory = parent;
-  }
-  if (font == null) throw StateError('Could not find $fileName.');
-  final loader = FontLoader(family)
-    ..addFont(
-      Future<ByteData>.value(ByteData.sublistView(await font.readAsBytes())),
-    );
-  await loader.load();
 }

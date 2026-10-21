@@ -130,6 +130,23 @@ void main() {
     expect(directionScope.canAccessMinistry(congregationA), isTrue);
     expect(directionScope.canAccessMinistry(congregationB), isFalse);
 
+    // A legacy campaign assignment (for example an archived congregation) may
+    // remain in campaign scope while the server excludes it from Ministry IDs.
+    response = {
+      'is_admin': false,
+      'is_supervision': false,
+      'congregation_ids': [congregationA, congregationB],
+      'ministry_supervision': false,
+      'ministry_congregation_ids': [congregationA],
+    };
+    final campaignOnlyScope = await repository.loadScope();
+    expect(campaignOnlyScope.congregationIds, {congregationA, congregationB});
+    expect(campaignOnlyScope.ministryCongregationIds, {congregationA});
+    expect(campaignOnlyScope.canAccessMinistry(congregationB), isFalse);
+    final campaignOnlyRoutes = routesFor(campaignOnlyScope);
+    expect(campaignOnlyRoutes, contains('/ministry/students'));
+    expect(campaignOnlyRoutes, isNot(contains('/admin')));
+
     response = snapshots[3];
     final revokedScope = await repository.loadScope();
     expect(revokedScope.isAdmin, isFalse);

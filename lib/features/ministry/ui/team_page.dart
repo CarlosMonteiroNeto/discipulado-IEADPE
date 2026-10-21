@@ -171,6 +171,7 @@ class _TeamPageState extends State<TeamPage> {
       setState(() => _detailLoading = false);
     }
     if (!_isScopeCurrent(scope, congregationId)) return;
+    if (!mounted) return;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {

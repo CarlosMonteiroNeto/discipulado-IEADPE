@@ -520,8 +520,9 @@ class _ConvertFormState extends State<ConvertForm> {
                   keyboard: TextInputType.datetime,
                   validator: (v) {
                     final d = _parsedDate();
-                    if (d == null)
+                    if (d == null) {
                       return 'Informe uma data válida (aaaa-mm-dd)';
+                    }
                     return d.compareTo(BusinessCalendar().today(widget.now())) >
                             0
                         ? 'A data não pode ser futura'

@@ -9,6 +9,15 @@ import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
 
+/// Result returned to the session list after the form closes.
+class SessionFormResult {
+  const SessionFormResult.created(String this.sessionId) : conflict = false;
+  const SessionFormResult.conflict() : sessionId = null, conflict = true;
+
+  final String? sessionId;
+  final bool conflict;
+}
+
 class SessionForm extends StatefulWidget {
   const SessionForm({
     super.key,
@@ -16,22 +25,35 @@ class SessionForm extends StatefulWidget {
     required this.congregationId,
     required this.classSummary,
     this.existingSessions = const [],
+    this.replacesSessionId,
+    this.initialDate,
   });
   final MinistryRepository repository;
   final String congregationId;
   final MinistryClassSummary classSummary;
   final List<MinistrySessionSummary> existingSessions;
+  final String? replacesSessionId;
+  final CalendarDate? initialDate;
+  bool get isReplacement => replacesSessionId != null;
   @override
   State<SessionForm> createState() => _SessionFormState();
 }
 
 class _SessionFormState extends State<SessionForm> {
   final _uuid = const Uuid();
-  final _date = TextEditingController();
+  late final TextEditingController _date;
   final _topic = TextEditingController();
   _PendingCreate? _pending;
   bool _busy = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _date = TextEditingController(
+      text: widget.initialDate == null ? '' : _displayDate(widget.initialDate!),
+    );
+  }
 
   @override
   void dispose() {
@@ -51,6 +73,10 @@ class _SessionFormState extends State<SessionForm> {
     }
   }
 
+  String _displayDate(CalendarDate date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/${date.year}';
+
   Future<void> _save() async {
     if (_busy) return;
     final date = _parseDate(_date.text);
@@ -58,15 +84,24 @@ class _SessionFormState extends State<SessionForm> {
       setState(() => _error = 'Informe uma data válida.');
       return;
     }
+    final fixedDate = widget.initialDate;
+    if (widget.isReplacement != (fixedDate != null) ||
+        (fixedDate != null && date.compareTo(fixedDate) != 0)) {
+      setState(
+        () => _error = 'A substituta precisa manter a mesma turma e a mesma data da aula cancelada.',
+      );
+      return;
+    }
     if (widget.classSummary.status != ClassStatus.active) {
       setState(() => _error = 'Esta turma não está ativa.');
       return;
     }
-    if (widget.existingSessions.any(
-      (item) =>
-          item.date.compareTo(date) == 0 &&
-          item.status != SessionStatus.canceled,
-    )) {
+    if (!widget.isReplacement &&
+        widget.existingSessions.any(
+          (item) =>
+              item.date.compareTo(date) == 0 &&
+              item.status != SessionStatus.canceled,
+        )) {
       setState(() => _error = 'Já existe uma aula nesta data.');
       return;
     }
@@ -75,6 +110,7 @@ class _SessionFormState extends State<SessionForm> {
       widget.classSummary.id,
       date.toString(),
       _topic.text.trim(),
+      widget.replacesSessionId,
     ]);
     final pending = _pending;
     if (pending != null && pending.signature != signature) {
@@ -93,6 +129,7 @@ class _SessionFormState extends State<SessionForm> {
           widget.classSummary.id,
           date,
           _topic.text.trim().isEmpty ? null : _topic.text.trim(),
+          widget.replacesSessionId,
           signature,
         );
     _pending ??= request;
@@ -113,12 +150,20 @@ class _SessionFormState extends State<SessionForm> {
         classId: request.classId,
         date: request.date,
         topic: request.topic,
+        replacesSessionId: request.replacesSessionId,
       );
       if (identical(_pending, request)) _pending = null;
-      if (mounted) Navigator.of(context).pop(request.id);
+      if (mounted) {
+        Navigator.of(context).pop(SessionFormResult.created(request.id));
+      }
     } catch (error) {
       if (!mounted) return;
-      if (error is DataFailure &&
+      final code = error is DataFailure ? error.code : null;
+      final ambiguousReplacement =
+          widget.isReplacement &&
+          (code == 'invalid' || code == 'operation_conflict');
+      if (code != null &&
+          !ambiguousReplacement &&
           const {
             'invalid',
             'permission',
@@ -128,12 +173,22 @@ class _SessionFormState extends State<SessionForm> {
             'academic_invalid',
             'academic_conflict',
             'operation_conflict',
-          }.contains(error.code) &&
-          identical(_pending, request))
+          }.contains(code) &&
+          identical(_pending, request)) {
         _pending = null;
+      }
+      if (widget.isReplacement &&
+          (code == 'academic_conflict' || code == 'academic_invalid')) {
+        Navigator.of(context).pop(const SessionFormResult.conflict());
+        return;
+      }
       setState(() {
         _busy = false;
-        _error = error is DataFailure && error.code == 'academic_conflict'
+        _error = ambiguousReplacement
+            ? 'Não foi possível confirmar se a substituta foi registrada. '
+                  '“Repetir criação pendente” reenvia exatamente a mesma '
+                  'solicitação.'
+            : code == 'academic_conflict'
             ? 'Já existe uma aula nesta data.'
             : 'Não foi possível salvar a aula. Tente novamente.';
       });
@@ -142,15 +197,34 @@ class _SessionFormState extends State<SessionForm> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-    appBar: AppBar(title: const Text('Nova aula')),
+    appBar: AppBar(
+      title: Text(
+        widget.isReplacement ? 'Substituir aula cancelada' : 'Nova aula',
+      ),
+    ),
     body: SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(24),
         children: [
           Text('Turma: ${widget.classSummary.name}'),
+          if (widget.isReplacement) ...[
+            const SizedBox(height: 8),
+            const Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: EdgeInsets.all(12),
+                child: Text(
+                  'A substituta mantém a turma e a data da aula cancelada. '
+                  'A lista de alunos será congelada no primeiro salvamento e '
+                  'pode refletir matrículas atuais.',
+                ),
+              ),
+            ),
+          ],
           TextField(
             key: const Key('session-date'),
             controller: _date,
+            readOnly: widget.isReplacement,
             decoration: const InputDecoration(
               labelText: 'Data',
               helperText: 'Formato: DD/MM/AAAA',
@@ -194,9 +268,11 @@ class _PendingCreate {
     this.classId,
     this.date,
     this.topic,
+    this.replacesSessionId,
     this.signature,
   );
   final String operationId, id, congregationId, classId, signature;
   final CalendarDate date;
   final String? topic;
+  final String? replacesSessionId;
 }

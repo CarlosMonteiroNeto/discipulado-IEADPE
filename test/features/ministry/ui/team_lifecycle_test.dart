@@ -1,9 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
@@ -11,6 +10,8 @@ import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart'
 import 'package:ieadpe_converts/features/ministry/ui/team_contact_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/team_page.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
+
+import '../../../support/sdk_fonts.dart';
 
 const _congregationId = '22222222-2222-4222-8222-222222222222';
 const _contactId = '11111111-1111-4111-8111-111111111111';
@@ -31,6 +32,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
 
   final bool globalManager;
   final List<Map<String, Object?>> accessCandidates;
+  @override
   final boundary = ProtectedDataBoundary();
   final _contacts = <String, Map<String, Object?>>{};
   final reads = <(String, Map<String, Object?>)>[];
@@ -39,6 +41,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   final _receipts = <String, _TeamReceipt>{};
   String? failBeforeCommandOnce;
   String? dropResponseAfterCommitOnce;
+  Completer<void>? detailGate;
 
   @override
   String get context => boundary.generation;
@@ -56,6 +59,8 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   }) async {
     reads.add((rpc, Map.of(parameters)));
     if (rpc == 'ministry_get_contact') {
+      final gate = detailGate;
+      if (gate != null) await gate.future;
       final id = parameters['contact_id']! as String;
       final contact = _contacts[id]!;
       final accessId = globalManager
@@ -385,8 +390,14 @@ Future<void> _tapAndSettle(WidgetTester tester, Finder finder) async {
 
 void main() {
   setUpAll(() async {
-    await _loadTeamFont(_teamGoldenFontFamily, 'roboto-regular.ttf');
-    await _loadTeamFont('MaterialIcons', 'materialicons-regular.otf');
+    await loadSdkFont(_teamGoldenFontFamily, const [
+      'Roboto-Regular.ttf',
+      'roboto-regular.ttf',
+    ]);
+    await loadSdkFont('MaterialIcons', const [
+      'MaterialIcons-Regular.otf',
+      'materialicons-regular.otf',
+    ]);
   });
 
   testWidgets('directory-only contact has no login', (tester) async {
@@ -427,6 +438,28 @@ void main() {
     expect(gateway.writes.single.$1, 'save_contact');
     expect(gateway.writes.single.$2['expected_revision'], 4);
     expect(gateway.writes.single.$2['birth_date'], '1982-02-03');
+  });
+
+  testWidgets('pending contact detail cannot open after page disposal', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(contacts: [_contact()]);
+    gateway.detailGate = Completer<void>();
+    await _pumpTeam(tester, gateway);
+
+    await tester.tap(find.byTooltip('Editar contato'));
+    await tester.pump();
+    expect(
+      gateway.reads.map((read) => read.$1),
+      contains('ministry_get_contact'),
+    );
+
+    await tester.pumpWidget(const MaterialApp(home: SizedBox()));
+    gateway.detailGate!.complete();
+    await tester.pumpAndSettle();
+
+    expect(find.byType(TeamContactForm), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('global manager explicitly selects the returned assignment ID', (
@@ -911,7 +944,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await expectLater(
         find.byType(AlertDialog),
-        matchesGoldenFile('goldens/$golden'),
+        matchesGoldenFile(_teamGoldenPath(golden)),
       );
       await _tapAndSettle(tester, find.text('Cancelar'));
     }
@@ -948,31 +981,11 @@ void main() {
   });
 }
 
-Future<void> _loadTeamFont(String family, String fileName) async {
-  final fontFile = _findTeamFont(fileName);
-  final fontBytes = await fontFile.readAsBytes();
-  final loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(ByteData.sublistView(fontBytes)));
-  await loader.load();
-}
-
-File _findTeamFont(String fileName) {
-  var directory = File(Platform.resolvedExecutable).parent;
-  while (true) {
-    final candidate = File(
-      <String>[
-        directory.path,
-        'bin',
-        'cache',
-        'artifacts',
-        'material_fonts',
-        fileName,
-      ].join(Platform.pathSeparator),
-    );
-    if (candidate.existsSync()) return candidate;
-    final parent = directory.parent;
-    if (parent.path == directory.path) break;
-    directory = parent;
+String _teamGoldenPath(String fileName) {
+  final captureRoot = Platform.environment['MINISTRY_GOLDEN_CAPTURE_ROOT']
+      ?.trim();
+  if (captureRoot == null || captureRoot.isEmpty) {
+    return 'goldens/$fileName';
   }
-  throw StateError('Could not find $fileName in the Flutter SDK fonts.');
+  return <String>[captureRoot, 'team', fileName].join(Platform.pathSeparator);
 }

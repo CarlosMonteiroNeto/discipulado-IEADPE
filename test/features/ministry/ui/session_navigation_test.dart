@@ -10,7 +10,6 @@ import 'package:ieadpe_converts/app.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/auth/auth_repository.dart';
-import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
 import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart';
 import 'package:ieadpe_converts/features/ministry/domain/session_navigation_context.dart';
 import 'package:ieadpe_converts/features/ministry/ui/attendance_page.dart';
@@ -19,7 +18,6 @@ import 'package:ieadpe_converts/features/ministry/ui/classes_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/ministry_home_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_list.dart';
-import 'package:ieadpe_converts/ui/base44_widgets.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
 
 const congregationId = '33333333-3333-4333-8333-333333333333';
@@ -305,6 +303,8 @@ class _RootNavigationFixture {
           'topic': payload['topic'],
           'status': 'open',
           'revision': 1,
+          'replaces_session_id': null,
+          'replacement_session_id': null,
         });
         value = {'id': payload['id'], 'revision': 1, 'status': 'open'};
       }
@@ -506,6 +506,34 @@ void main() {
     await tester.runAsync(fixture.close);
   });
 
+  testWidgets('system back pops only the protected nested route', (
+    tester,
+  ) async {
+    final fixture = _RootNavigationFixture();
+    await tester.runAsync(fixture.initialize);
+    await _pumpProtectedApp(tester, fixture);
+    tester
+        .widget<AppShell>(find.byType(AppShell))
+        .onNavigate('/ministry/classes');
+    await _drain(tester);
+    await tester.tap(find.text('Turma A protegida'));
+    await _drain(tester);
+    await tester.pump(const Duration(milliseconds: 500));
+    expect(find.byType(ClassDetailPage), findsOneWidget);
+
+    final handled = await tester.binding.handlePopRoute();
+    await tester.pump(const Duration(milliseconds: 500));
+    await _drain(tester);
+    await tester.pumpAndSettle();
+
+    expect(handled, isTrue);
+    expect(find.byType(ClassDetailPage), findsNothing);
+    expect(find.byType(ClassesPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(fixture.close);
+  });
+
   testWidgets('mismatched session detail is rejected in the app route', (
     tester,
   ) async {
@@ -519,6 +547,8 @@ void main() {
         'topic': 'Lição protegida',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     await tester.runAsync(fixture.initialize);
     await _pumpProtectedApp(tester, fixture);
@@ -552,6 +582,8 @@ void main() {
         'topic': 'Lição protegida',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     await tester.runAsync(fixture.initialize);
     await _pumpProtectedApp(tester, fixture);
@@ -638,6 +670,8 @@ void main() {
         'topic': 'Lição protegida',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     await tester.runAsync(fixture.initialize);
     await _pumpProtectedApp(tester, fixture);
@@ -672,6 +706,8 @@ void main() {
         'topic': 'Sessão autorizada permanece',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     await tester.runAsync(fixture.initialize);
     await _pumpProtectedApp(tester, fixture);
@@ -707,6 +743,8 @@ void main() {
           'topic': 'Sessão da congregação antiga',
           'status': 'open',
           'revision': 1,
+          'replaces_session_id': null,
+          'replacement_session_id': null,
         });
       await tester.runAsync(fixture.initialize);
       await _pumpProtectedApp(tester, fixture);

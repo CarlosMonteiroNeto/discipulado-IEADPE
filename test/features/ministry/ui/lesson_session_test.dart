@@ -42,6 +42,8 @@ Map<String, dynamic> lesson(int index) => {
   'topic': 'Lição $index',
   'status': 'open',
   'revision': 1,
+  'replaces_session_id': null,
+  'replacement_session_id': null,
 };
 
 typedef Captured = ({String operationId, Map<String, Object?> payload});
@@ -82,6 +84,8 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
     'topic': 'Lição',
     'status': status,
     'revision': revision,
+    'replaces_session_id': null,
+    'replacement_session_id': null,
   };
 
   @override
@@ -175,10 +179,12 @@ class _SessionGateway implements ReadRpcGateway, MinistryCommandGateway {
     if (name == 'create_session' &&
         sessions.any(
           (s) => s['date'] == payload['date'] && s['status'] != 'canceled',
-        ))
+        )) {
       throw const DataFailure('academic_conflict');
-    if (name == 'create_session')
+    }
+    if (name == 'create_session') {
       sessions.add(session(payload['id']! as String));
+    }
     if (name == 'cancel_session') {
       final target = sessions.firstWhere((s) => s['id'] == payload['id']);
       target['status'] = 'canceled';
@@ -221,7 +227,7 @@ MinistryClassSummary cls(
   teacherContactId: null,
 );
 
-Widget listApp(
+Widget _listApp(
   _SessionGateway gateway, {
   MinistryClassSummary? classSummary,
   Future<void> Function(String)? opened,
@@ -243,7 +249,7 @@ void main() {
     final gateway = _SessionGateway();
     final opened = <String>[];
     await tester.pumpWidget(
-      listApp(gateway, opened: (id) async => opened.add(id)),
+      _listApp(gateway, opened: (id) async => opened.add(id)),
     );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
@@ -262,7 +268,7 @@ void main() {
 
   testWidgets('session uses selected class', (tester) async {
     final gateway = _SessionGateway();
-    await tester.pumpWidget(listApp(gateway, classSummary: cls(classBId)));
+    await tester.pumpWidget(_listApp(gateway, classSummary: cls(classBId)));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -274,7 +280,7 @@ void main() {
 
   testWidgets('future lesson remains listed after reload', (tester) async {
     final gateway = _SessionGateway();
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -282,7 +288,7 @@ void main() {
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     expect(find.text('20/12/2026'), findsOneWidget);
   });
@@ -297,8 +303,10 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -319,8 +327,10 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 7,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -345,7 +355,7 @@ void main() {
 
   testWidgets('ambiguous create retains exact request', (tester) async {
     final gateway = _SessionGateway()..lostResponse = true;
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -372,8 +382,10 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 7,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -412,10 +424,12 @@ void main() {
               'topic': 'Lição',
               'status': sessionStatus,
               'revision': 7,
+              'replaces_session_id': null,
+              'replacement_session_id': null,
             });
           await tester.pumpWidget(const SizedBox());
           await tester.pumpWidget(
-            listApp(gateway, classSummary: cls(classAId, status: status)),
+            _listApp(gateway, classSummary: cls(classAId, status: status)),
           );
           await tester.pumpAndSettle();
           expect(find.text('20/12/2026'), findsOneWidget);
@@ -456,8 +470,10 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     expect(
       find.text('Não foi possível carregar as aulas. Tente novamente.'),
@@ -482,8 +498,10 @@ void main() {
           'topic': 'Lição',
           'status': 'open',
           'revision': 1,
+          'replaces_session_id': null,
+          'replacement_session_id': null,
         });
-      await tester.pumpWidget(listApp(gateway));
+      await tester.pumpWidget(_listApp(gateway));
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
       await tester.pumpAndSettle();
@@ -509,7 +527,7 @@ void main() {
   );
 
   testWidgets('empty class shows an explicit empty state', (tester) async {
-    await tester.pumpWidget(listApp(_SessionGateway()));
+    await tester.pumpWidget(_listApp(_SessionGateway()));
     await tester.pumpAndSettle();
     expect(find.text('Nenhuma aula registrada nesta turma.'), findsOneWidget);
   });
@@ -526,10 +544,12 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     var failDetail = true;
     await tester.pumpWidget(
-      listApp(
+      _listApp(
         gateway,
         opened: (_) async {
           if (failDetail) throw const DataFailure('unavailable');
@@ -568,8 +588,10 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 7,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -616,9 +638,11 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
     final callback = Completer<void>();
-    await tester.pumpWidget(listApp(gateway, opened: (_) => callback.future));
+    await tester.pumpWidget(_listApp(gateway, opened: (_) => callback.future));
     await tester.pumpAndSettle();
     await tester.tap(find.text('20/12/2026'));
     await tester.pump();
@@ -632,7 +656,7 @@ void main() {
     tester,
   ) async {
     final gateway = _SessionGateway()..lostResponse = true;
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -658,7 +682,7 @@ void main() {
 
   testWidgets('definite rejection permits corrected input', (tester) async {
     final gateway = _SessionGateway()..rejection = 'invalid';
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
@@ -689,10 +713,12 @@ void main() {
           'topic': 'Lição',
           'status': 'finalized',
           'revision': 1,
+          'replaces_session_id': null,
+          'replacement_session_id': null,
         });
       final opened = <String>[];
       await tester.pumpWidget(
-        listApp(
+        _listApp(
           gateway,
           classSummary: cls(classAId, status: status),
           opened: (id) async => opened.add(id),
@@ -705,7 +731,7 @@ void main() {
       expect(opened, [sessionId]);
     }
     final gateway = _SessionGateway();
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     expect(find.text('Nova aula'), findsOneWidget);
   });
@@ -723,6 +749,8 @@ void main() {
         'topic': 'Lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       })
       ..sessions.add({
         'id': otherSessionId,
@@ -732,8 +760,10 @@ void main() {
         'topic': 'Outra lição',
         'status': 'open',
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       });
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Carregar mais'));
     await tester.pumpAndSettle();
@@ -753,7 +783,7 @@ void main() {
     }
     final opened = <String>[];
     await tester.pumpWidget(
-      listApp(gateway, opened: (id) async => opened.add(id)),
+      _listApp(gateway, opened: (id) async => opened.add(id)),
     );
     await tester.pumpAndSettle();
     expect(gateway.pageReads, 1);
@@ -807,7 +837,7 @@ void main() {
       }
       final opened = <String>[];
       await tester.pumpWidget(
-        listApp(gateway, opened: (id) async => opened.add(id)),
+        _listApp(gateway, opened: (id) async => opened.add(id)),
       );
       await tester.pumpAndSettle();
       expect(gateway.pageReads, 1);
@@ -871,7 +901,7 @@ void main() {
   ) async {
     final gateway = _SessionGateway()..attendanceSessionId = otherSessionId;
     gateway.sessions.add(gateway.session(sessionId));
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -885,7 +915,7 @@ void main() {
   ) async {
     final gateway = _SessionGateway()..attendanceClassId = classBId;
     gateway.sessions.add(gateway.session(sessionId));
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();
@@ -900,7 +930,7 @@ void main() {
     final gateway = _SessionGateway()
       ..attendanceCongregationId = otherCongregationId;
     gateway.sessions.add(gateway.session(sessionId));
-    await tester.pumpWidget(listApp(gateway));
+    await tester.pumpWidget(_listApp(gateway));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('cancel-session-$sessionId')));
     await tester.pumpAndSettle();

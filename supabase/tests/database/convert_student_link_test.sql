@@ -96,7 +96,8 @@ DO $$ DECLARE page jsonb; page2 jsonb; page3 jsonb; result jsonb; BEGIN
   'new student promotion returns only safe minimal identifiers');
  PERFORM pg_temp.assert_true(pg_temp.assert_link_snapshot('a3000000-0000-0000-0000-000000000001',
   '+5511999999999','{"name":"Rosa Silva","phone":"+5511999999999","address":"Rua Um, 10"}'::jsonb,NULL,
-  '{"street":"Rua Um, 10"}'::jsonb),'promotion creates only initial snapshot and provenance');
+  '{"street":"Rua Um, 10","district":null,"city":null,"postal_code":null,"state_code":null}'::jsonb),
+  'promotion preserves the exact source snapshot and copies the canonical structured address');
  PERFORM pg_temp.assert_true(public.ieadpe_promote_convert_to_student('a5000000-0000-0000-0000-000000000001',
   '{"convert_id":"a3000000-0000-0000-0000-000000000001","congregation_id":"a2000000-0000-0000-0000-000000000001","student_id":null}'::jsonb)=result,
   'lost-response retry replays the exact result');

@@ -85,10 +85,11 @@ BEGIN
    'id','ab300000-0000-4000-8000-000000000001','scope','congregation',
    'congregation_id','ab200000-0000-4000-8000-000000000001','name','Teacher One',
    'role_code','teacher','phone_e164','+5511888880002',
-   'birth_date',detail->'contact'->>'birth_date','expected_revision',
+   'birth_date',detail->'contact'->>'birth_date','email',NULL,'expected_revision',
    (detail->'contact'->>'revision')::integer));
  PERFORM pg_temp.assert_true(saved->>'revision'='2' AND
-  (SELECT phone_e164='+5511888880002' AND birth_date='1980-04-03' AND revision=2
+  (SELECT phone_e164='+5511888880002' AND birth_date='1980-04-03' AND email IS NULL
+   AND revision=2
    FROM public.ministry_contacts WHERE id='ab300000-0000-4000-8000-000000000001'),
   'phone-only teacher edit preserves birth date with the fetched revision');
  BEGIN
@@ -97,7 +98,7 @@ BEGIN
     'id','ab300000-0000-4000-8000-000000000001','scope','congregation',
     'congregation_id','ab200000-0000-4000-8000-000000000001','name','Stale Edit',
     'role_code','teacher','phone_e164','+5511888880099','birth_date','1980-04-03',
-    'expected_revision',1));
+    'email',NULL,'expected_revision',1));
   RAISE EXCEPTION 'ASSERTION: stale teacher edit overwrote current contact';
  EXCEPTION WHEN serialization_failure THEN NULL; END;
  PERFORM pg_temp.assert_true((SELECT name='Teacher One' AND phone_e164='+5511888880002'
@@ -109,7 +110,7 @@ BEGIN
   'ab400000-0000-4000-8000-000000000003',jsonb_build_object(
    'id','ab300000-0000-4000-8000-000000000005','scope','congregation',
    'congregation_id','ab200000-0000-4000-8000-000000000001','name','New Teacher',
-   'role_code','teacher','phone_e164',NULL,'birth_date',NULL));
+   'role_code','teacher','phone_e164',NULL,'birth_date',NULL,'email',NULL));
  PERFORM pg_temp.assert_true(saved->>'revision'='1' AND
   (SELECT scope='congregation' AND congregation_id='ab200000-0000-4000-8000-000000000001'
    AND role_code='teacher' AND archived_at IS NULL

@@ -31,3 +31,8 @@ Regressions cover named/missing/malformed metadata, valid admin+Ministry navigat
 Build a local Android APK from the reviewed source with the existing approved configuration process; record source SHA plus working-tree changes, version and SHA-256. Never embed service credentials. Real Google-admin verification must confirm the intended backend, greeting, convert read result and Team entry. Until that and the hosted contract gate succeed, label the APK a local candidate and retain the existing L1 release blockers. No publish, signing-policy change or hosted rollout is included.
 
 Self-review: no product-policy or permission expansion; source facts and hosted hypotheses are separated; the independent UI change is executable while diagnostic access is unavailable. The remaining decision is user review of this bounded design.
+
+
+## 2026-10-20 ownership clarification
+
+This bounded draft remains historical diagnosis and a valid reference for the greeting/Team contract. Its implementation is owned by Task 8 of the in-flight [corrective plan](../plans/2026-10-20-ministry-corrective-release-plan.md); do not execute it as a parallel workstream or regenerate its completed code. The corrective plan's completion assessment and delivery addendum govern complete functional-APK work. Its former OpenCode method/build suggestion is superseded by the user's native Luna Medium implementer / Sol 6.1 low task-review method and explicit no-build-now instruction. No APK was produced by the interrupted debug build (exit 143); it was aborted, not a failed build/test.

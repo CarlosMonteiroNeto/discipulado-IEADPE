@@ -67,3 +67,8 @@
 - [ ] Verify with the real Google-admin session against the intended backend: appropriate greeting, authorized convert read result and Team entry. If hosted compatibility or session access is unavailable, report a candidate plus the exact pending gate; do not claim the data-loading problem resolved.
 
 Self-review: each known local defect has an independent regression task; hosted diagnosis is evidence collection with a bounded deliverable, not an unspecified product fix. The user has already selected the execution method; request review of the concrete design and plan before dispatching implementation.
+
+
+## 2026-10-20 ownership clarification
+
+Retain this bounded draft as historical/reference material, not an additional executable queue. Task 8 in the [existing corrective plan](2026-10-20-ministry-corrective-release-plan.md) owns greeting/Team work; Tasks 12/H1/H2/H3/D1 own compatibility/recovery/activation/legacy/Android. See that plan's completion map and bounded delivery addendum before execution. OpenCode and the premature candidate-build step above are superseded by the user's native Luna Medium implementation / native Sol 6.1 low review pipeline and no-build-now instruction. Review documents first. No commit/push is authorized.

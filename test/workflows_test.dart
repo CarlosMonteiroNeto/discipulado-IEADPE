@@ -4,6 +4,8 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:http/io_client.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,9 +18,24 @@ import 'package:ieadpe_converts/widgets/app_shell.dart';
 import 'package:ieadpe_converts/features/auth/auth_repository.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
+import 'package:ieadpe_converts/features/ministry/data/ministry_browser_repository.dart';
+import 'package:ieadpe_converts/features/ministry/data/ministry_codec.dart';
+import 'package:ieadpe_converts/features/ministry/ui/students_page.dart';
+import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/features/ministry/ui/convert_handoff_page.dart';
+import 'package:ieadpe_converts/features/home/home_page.dart';
+import 'package:ieadpe_converts/ui/unified_theme.dart';
+
+import '../integration_test/unified_journey_test.dart' as journey;
 
 class LoopbackHttp extends HttpOverrides {}
+
+http.Request _studentRegistrationRequest(Map<String, String> ids) {
+  return http.Request(
+    'POST',
+    Uri.parse('http://127.0.0.1/rest/v1/rpc/ieadpe_ministry_register_student'),
+  )..body = jsonEncode({'payload': ids});
+}
 
 class RootFixture {
   static const scopeId = '33333333-3333-4333-8333-333333333333';
@@ -32,6 +49,7 @@ class RootFixture {
   late HttpClient http;
   late AuthRepository auth;
   bool admin = true, failScope = false;
+  String? displayName;
   Completer<void>? scopeGate;
   final paths = <String>[];
   String? convertId;
@@ -41,6 +59,7 @@ class RootFixture {
   Map<String, Object?>? promotionPayload;
   Map<String, Object?>? enrollmentPayload;
   Map<String, Object?>? attendancePayload;
+  Map<String, Object?>? studentRegistrationPayload;
   String? rosterStudentId;
   bool attendanceFinalized = false;
   int promotionCount = 0;
@@ -110,6 +129,15 @@ class RootFixture {
           'person_id': syntheticPersonId,
           'congregation_id': payload['congregation_id'],
           'status': 'linked',
+        };
+      }
+      if (rpc == 'ieadpe_ministry_register_student') {
+        studentRegistrationPayload = payload;
+        value = {
+          'id': payload['id'],
+          'person_id': payload['person_id'],
+          'revision': 1,
+          'person_revision': 1,
         };
       }
       if (rpc == 'ieadpe_ministry_list_convert_referrals') {
@@ -254,7 +282,7 @@ class RootFixture {
         'aud': 'authenticated',
         'created_at': '2026-10-15T00:00:00Z',
         'app_metadata': <String, Object>{},
-        'user_metadata': <String, Object>{},
+        'user_metadata': <String, Object>{'full_name': ?displayName},
       },
     }),
   );
@@ -281,7 +309,205 @@ Future<void> settleLoopback(WidgetTester tester) async {
   await tester.pump();
 }
 
+class DelayedScopeStudentsRepository extends MinistryBrowserRepository {
+  DelayedScopeStudentsRepository(super.gateway);
+
+  final oldScopeRequestStarted = Completer<void>();
+  final oldScopeResponse = Completer<MinistryPage<MinistryStudentSummary>>();
+
+  @override
+  Future<MinistryPage<MinistryStudentSummary>> listStudents({
+    required String congregationId,
+    String? namePrefix,
+    int limit = 50,
+    String? cursor,
+  }) {
+    if (congregationId == RootFixture.scopeId) {
+      if (!oldScopeRequestStarted.isCompleted) {
+        oldScopeRequestStarted.complete();
+      }
+      return oldScopeResponse.future;
+    }
+    return Future.value(
+      MinistryPage(
+        items: [
+          const MinistryStudentSummary(
+            id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+            personId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+            congregationId: '99999999-9999-4999-8999-999999999999',
+            name: 'Student from current scope',
+            phone: null,
+            birthDate: null,
+            address: null,
+            education: null,
+            maritalStatus: null,
+            newConvert: false,
+            waterBaptized: null,
+            wantsBaptism: null,
+            archivedAt: null,
+            revision: 1,
+            personRevision: 1,
+            linkState: PersonLinkState.linked,
+          ),
+        ],
+        nextCursor: null,
+      ),
+    );
+  }
+}
+
 void main() {
+  testWidgets(
+    'students page discards a late list response after congregation scope changes',
+    (tester) async {
+      final fixture = RootFixture();
+      await tester.runAsync(fixture.initialize);
+      final repository = DelayedScopeStudentsRepository(
+        SupabaseGateway(fixture.client, ProtectedDataBoundary()),
+      );
+      var selectedScope = RootFixture.scopeId;
+
+      Widget page() => MaterialApp(
+        home: StudentsPage(
+          repository: repository,
+          congregationId: selectedScope,
+          onOpenHandoff: () {},
+        ),
+      );
+
+      await tester.pumpWidget(page());
+      await repository.oldScopeRequestStarted.future;
+      selectedScope = '99999999-9999-4999-8999-999999999999';
+      await tester.pumpWidget(page());
+      await tester.pump();
+      expect(find.text('Student from current scope'), findsOneWidget);
+
+      repository.oldScopeResponse.complete(
+        MinistryPage(
+          items: [
+            const MinistryStudentSummary(
+              id: RootFixture.syntheticStudentId,
+              personId: RootFixture.syntheticPersonId,
+              congregationId: RootFixture.scopeId,
+              name: 'Stale student from previous scope',
+              phone: null,
+              birthDate: null,
+              address: null,
+              education: null,
+              maritalStatus: null,
+              newConvert: false,
+              waterBaptized: null,
+              wantsBaptism: null,
+              archivedAt: null,
+              revision: 1,
+              personRevision: 1,
+              linkState: PersonLinkState.linked,
+            ),
+          ],
+          nextCursor: null,
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Student from current scope'), findsOneWidget);
+      expect(find.text('Stale student from previous scope'), findsNothing);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(fixture.close);
+    },
+  );
+  test(
+    'journey observer ignores denied fixture identity and reports UI identity',
+    () async {
+      final observer = journey.JourneyHttpObserver(
+        MockClient((_) async => http.Response('{}', 200)),
+        excludedStudentIds: {RootFixture.syntheticStudentId},
+      );
+      final deniedFixtureIds = {
+        'id': RootFixture.syntheticStudentId,
+        'person_id': RootFixture.syntheticPersonId,
+      };
+      await observer.send(_studentRegistrationRequest(deniedFixtureIds));
+      expect(observer.ownedIdentityReported, isFalse);
+
+      final rejectedObserver = journey.JourneyHttpObserver(
+        MockClient((_) async => http.Response('{}', 403)),
+      );
+      await rejectedObserver.send(
+        _studentRegistrationRequest({
+          'id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+          'person_id': 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+        }),
+      );
+      expect(rejectedObserver.ownedIdentityReported, isFalse);
+      expect(rejectedObserver.reportedStudentId, isNull);
+      rejectedObserver.close();
+
+      const uiStudentId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const uiPersonId = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      await observer.send(
+        _studentRegistrationRequest({
+          'id': uiStudentId,
+          'person_id': uiPersonId,
+        }),
+      );
+      expect(observer.ownedIdentityReported, isTrue);
+      expect(observer.reportedStudentId, uiStudentId);
+      expect(observer.reportedPersonId, uiPersonId);
+      observer.close();
+    },
+  );
+  test('journey observer records the successful finalize receipt after a draft', () async {
+    final observer = journey.JourneyHttpObserver(
+      MockClient((request) async {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        final finalize = (payload['payload'] as Map)['finalize'] as bool;
+        return http.Response(
+          jsonEncode({'status': finalize ? 'finalized' : 'open'}),
+          200,
+        );
+      }),
+    );
+    final sessionId = RootFixture.sessionId;
+    final enrollmentId = RootFixture.enrollmentRecordId;
+
+    Future<void> saveAttendance({required bool finalize}) async {
+      final request =
+          http.Request(
+              'POST',
+              Uri.parse(
+                'http://127.0.0.1/rest/v1/rpc/ieadpe_ministry_save_attendance',
+              ),
+            )
+            ..body = jsonEncode({
+              'operation_id': finalize
+                  ? '88888888-8888-4888-8888-888888888888'
+                  : '99999999-9999-4999-8999-999999999999',
+              'payload': {
+                'congregation_id': RootFixture.scopeId,
+                'session_id': sessionId,
+                'expected_revision': finalize ? 2 : 1,
+                'marks': {enrollmentId: 'present'},
+                'finalize': finalize,
+              },
+            });
+      await observer.send(request);
+    }
+
+    await saveAttendance(finalize: false);
+    expect(observer.attendanceOperationId, isNull);
+    expect(observer.attendancePayload, isNull);
+    expect(observer.attendanceReceipt, isNull);
+    await saveAttendance(finalize: true);
+    expect(
+      observer.attendanceOperationId,
+      '88888888-8888-4888-8888-888888888888',
+    );
+    expect(observer.attendancePayload?['finalize'], isTrue);
+    expect(observer.attendanceReceipt, {'status': 'finalized'});
+    observer.close();
+  });
+
   testWidgets(
     'production root mounts Google login for configured SDK without a session',
     (tester) async {
@@ -420,6 +646,13 @@ void main() {
       await tester.tap(find.text('Presente').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('Salvar e finalizar'));
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(AlertDialog),
+          matching: find.text('Finalizar chamada'),
+        ),
+      );
       await drain(tester);
 
       expect(fixture.convertId, isNotNull);
@@ -445,6 +678,44 @@ void main() {
       expect(fixture.attendanceFinalized, isTrue);
       expect(fixture.promotionCount, 1);
       expect(fixture.studentIdentityCount, 1);
+
+      // The protected production registration route creates a canonical
+      // person plus an independent non-convert student record.
+      tester.widget<AppShell>(find.byType(AppShell)).onNavigate('/ministry');
+      await drain(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('app-shell-ministry-selector')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Alunos').last);
+      await drain(tester);
+      await tester.tap(find.text('Registrar aluno').last);
+      await drain(tester);
+      expect(find.byKey(const ValueKey('student-education')), findsOneWidget);
+      await tester.enterText(
+        find.byKey(const ValueKey('person-name')),
+        'Cadastro sem conversão',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('student-education')),
+        'Ensino médio',
+      );
+      final registerStudentSubmit = find.widgetWithText(
+        FilledButton,
+        'Cadastrar aluno',
+      );
+      await tester.ensureVisible(registerStudentSubmit);
+      await tester.pumpAndSettle();
+      await tester.tap(registerStudentSubmit);
+      await drain(tester);
+      expect(fixture.studentRegistrationPayload, isNotNull);
+      final registration = fixture.studentRegistrationPayload!;
+      expect(registration['congregation_id'], RootFixture.scopeId);
+      expect((registration['person'] as Map)['name'], 'Cadastro sem conversão');
+      expect((registration['academic'] as Map)['new_convert'], isFalse);
+      expect(registration.containsKey('convert_id'), isFalse);
+      expect(registration.containsKey('conversion_date'), isFalse);
+
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(fixture.close);
@@ -562,7 +833,7 @@ void main() {
         await drain(tester);
         final owner = tester.state(find.byType(RegisterPage));
         await tester.enterText(
-        find.byKey(const ValueKey('person-name')),
+          find.byKey(const ValueKey('person-name')),
           'Synthetic private draft',
         );
         await tester.ensureVisible(find.text('Escolher foto'));
@@ -618,6 +889,43 @@ void main() {
         expect(tester.takeException(), isNull);
       }
       expect(fixture.paths, contains('/rest/v1/congregations'));
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(fixture.close);
+    },
+  );
+  testWidgets(
+    'SDK root renders session greeting without framework exceptions and clears old home state on identity switch',
+    (tester) async {
+      final fixture = RootFixture()..displayName = ' Maria Silva ';
+      await tester.runAsync(fixture.initialize);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: buildUnifiedTheme(),
+          home: ProtectedApplication(repository: fixture.auth),
+        ),
+      );
+      await drain(tester);
+      tester.widget<AppShell>(find.byType(AppShell)).onNavigate('/home');
+      await drain(tester);
+      expect(find.text('Olá, Maria Silva!'), findsOneWidget);
+      final oldHomeState = tester.state(find.byType(HomePage));
+      expect(
+        tester.takeException(),
+        isNull,
+        reason:
+            'the production themed Home root must not emit Flutter exceptions',
+      );
+
+      fixture.displayName = 'Ana Souza';
+      await tester.runAsync(
+        () => fixture.identity('22222222-2222-2222-2222-222222222222'),
+      );
+      await drain(tester);
+      expect(find.text('Olá, Ana Souza!'), findsOneWidget);
+      expect(find.text('Olá, Maria Silva!'), findsNothing);
+      expect(tester.state(find.byType(HomePage)), isNot(same(oldHomeState)));
+      expect(tester.takeException(), isNull);
+
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(fixture.close);
     },

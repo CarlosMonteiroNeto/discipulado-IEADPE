@@ -85,6 +85,7 @@ Map<String, dynamic> _legacyProjection() => {
 };
 
 class _ReadGateway implements ReadRpcGateway {
+  @override
   final boundary = ProtectedDataBoundary();
   final calls = <({String rpc, Map<String, Object?> parameters})>[];
 

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
-import '../../../domain/models.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
@@ -316,8 +315,9 @@ class _ClassFormState extends State<ClassForm> {
                           validator: (value) {
                             final name = value?.trim() ?? '';
                             if (name.isEmpty) return 'Informe o nome da turma.';
-                            if (name.length > 200)
+                            if (name.length > 200) {
                               return 'Use até 200 caracteres.';
+                            }
                             return null;
                           },
                         ),
@@ -379,7 +379,7 @@ class _ClassFormState extends State<ClassForm> {
                             top: UnifiedSpace.x2,
                           ),
                           child: Text(
-                            'Professor selecionado: ${_selectedTeacherLabel}',
+                            'Professor selecionado: $_selectedTeacherLabel',
                           ),
                         ),
                         Padding(

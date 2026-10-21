@@ -1,6 +1,6 @@
 # Unified verification matrix
 
-This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `scripts/verify_unified.sh` on macOS/Linux) and CI job (`.github/workflows/verify-unified.yml`). Both invoke the same Flutter, PostgreSQL harness, SQL scenarios, concurrency checks, guarded local HTTP health probes, browser adapter smokes, and `scripts/run_unified_journey.py`. Each invocation writes `build/verification/unified-report.md` and `build/verification/unified-commands.log`.
+This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `scripts/verify_unified.sh` on macOS/Linux) and CI job (`.github/workflows/verify-unified.yml`). Both gates ask `scripts/verification_cases.py` for validated platform-neutral argv rows from `scripts/verification_cases.json`, then invoke the same Flutter, PostgreSQL harness, SQL scenarios, concurrency checks, guarded local HTTP health probes, browser adapter smokes, and `scripts/run_unified_journey.py`. The validator compares manifest coverage against every current standalone `supabase/tests/database/*_test.sql` file and fails closed for missing, duplicate, stale, unsafe, or mis-seeded cases. Each invocation writes `build/verification/unified-report.md` and `build/verification/unified-commands.log`.
 
 ## Result contract
 
@@ -11,7 +11,7 @@ This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `sc
 | BLOCKED | A required executable, local service, database, or browser prerequisite was absent; the integrated runner also returns exit 2 for this state. | Overall **INCOMPLETE**; process exits 2. |
 | INCOMPLETE | An optional tool/version probe was unavailable. | Overall **INCOMPLETE**; process exits 2. |
 
-The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local Supabase stack. Locally, the operator must start those services and set `IEADPE_DATABASE_URL` to a loopback database. `SUPABASE_URL` and `SUPABASE_ANON_KEY` are not required to launch the scripts; if unset, the separate health probes are recorded as `BLOCKED`, so the overall result remains **INCOMPLETE**. When set, the shared Python guard accepts only localhost or a literal loopback address before either probe. The integrated runner reads API and database credentials from local `supabase status`, never from hosted environment fallbacks. CI exports only its local API URL and anon key to the gate process. No cloud endpoint, production account, migration, or record is targeted. Missing local service prerequisites never become a successful release check.
+The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local Supabase stack. It pins Flutter 3.47.7 (including the SDK Roboto and Material Icons files by SHA-256), Chrome 139.0.7258.154, and its matching ChromeDriver. Locally, the operator must start those services and set `IEADPE_DATABASE_URL` to a loopback database. `SUPABASE_URL` and `SUPABASE_ANON_KEY` are not required to launch the scripts; if unset, the separate health probes are recorded as `BLOCKED`, so the overall result remains **INCOMPLETE**. When set, the shared Python guard accepts only localhost or a literal loopback address before either probe. The integrated runner reads API and database credentials from local `supabase status`, never from hosted environment fallbacks. CI exports only its local API URL and anon key to the gate process. No cloud endpoint, production account, migration, or record is targeted. Missing local service prerequisites never become a successful release check.
 
 ## Executed command inventory
 
@@ -32,13 +32,15 @@ The workflow starts a PostgreSQL 17 service at loopback port 54329 and a local S
 
 Exact database files, one process each:
 
-`access_test.sql`, `base44_unified_access_test.sql`, `catalog_test.sql`, `convert_commands_test.sql`, `convert_student_link_test.sql`, `feedback_test.sql`, `import_test.sql`, `lifecycle_test.sql`, `ministry_academic_test.sql`, `ministry_access_test.sql`, `ministry_congregations_test.sql`, `ministry_registry_test.sql`, `ministry_ui_reads_test.sql`, `photos_test.sql`, `unified_scope_test.sql`, and `weekly_test.sql`.
+`access_test.sql`, `attendance_integrity_test.sql`, `base44_history_test.sql`, `base44_unified_access_test.sql`, `canonical_handoff_reads_test.sql`, `canonical_person_link_test.sql`, `catalog_test.sql`, `convert_commands_test.sql`, `convert_student_link_test.sql`, `feedback_test.sql`, `import_revision_compatibility_test.sql`, `import_test.sql`, `lifecycle_test.sql`, `ministry_academic_test.sql`, `ministry_access_test.sql`, `ministry_congregations_test.sql`, `ministry_contact_access_link_test.sql`, `ministry_follow_up_test.sql`, `ministry_registry_test.sql`, `ministry_session_management_test.sql`, `ministry_student_registration_test.sql`, `ministry_ui_reads_test.sql`, `photos_test.sql`, `student_academic_link_test.sql`, `student_enrollment_history_test.sql`, `teacher_contact_detail_test.sql`, `unified_scope_test.sql`, `weekly_imported_convert_test.sql`, and `weekly_test.sql`.
+
+Two upgrade checks seed historical rows immediately before the migration under test: `canonical_person_link_test.sql` runs before `202610200002_canonical_handoff_reads.sql`, and `ministry_session_management_test.sql` runs before `202610190009_ministry_session_management.sql`. The harness then continues every migration in lexical order and runs the acceptance scenario against the finished schema.
 
 Exact independent-session race checks, one process each:
 
-`--catalog-concurrency`, `--access-concurrency`, `--convert-concurrency`, `--convert-student-concurrency`, `--import-concurrency`, `--lifecycle-concurrency`, `--ministry-registry-concurrency`, and `--ministry-academic-concurrency`.
+`--catalog-concurrency`, `--access-concurrency`, `--convert-concurrency`, `--import-concurrency`, `--lifecycle-concurrency`, `--ministry-registry-concurrency`, `--ministry-academic-concurrency`, `--convert-student-concurrency`, and `--ministry-follow-up-concurrency`.
 
-The matrix intentionally names files and flags instead of using a broad discovery command: the report can therefore show which security scenario ran or failed. The SQL harness applies current migration files and synthetic fixtures; these checks are local PostgreSQL evidence, not a hosted Supabase migration rehearsal.
+The manifest intentionally names files and flags instead of using a broad execution discovery command: the report can therefore show which security scenario ran or failed. Its coverage validator still discovers the file set only to reject unlisted or stale standalone tests. The academic concurrency suite contains the attendance/enrollment serialization race and linked replacement race; the other eight named flags exercise their corresponding independent-session contracts. The SQL harness applies current migration files and synthetic fixtures; these checks are local PostgreSQL evidence, not a hosted Supabase migration rehearsal. `test/operations/corrective_gate_test.dart` invokes both Python verification test modules through the resolved Flutter test runtime.
 
 ## Traceability, partitions, and boundaries
 

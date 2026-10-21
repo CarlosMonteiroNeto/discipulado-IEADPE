@@ -100,6 +100,9 @@ class _StudentGateway implements ReadRpcGateway, MinistryCommandGateway {
         'person_revision': 4,
       };
     }
+    if (rpc == 'ministry_list_student_enrollments') {
+      return {'items': [], 'next_cursor': null};
+    }
     throw StateError('Unexpected RPC: $rpc');
   }
 
@@ -201,7 +204,7 @@ void main() {
     expect(save.$2['expected_revision'], 2);
 
     final archive = find.text('Arquivar aluno');
-    await tester.ensureVisible(archive);
+    await tester.scrollUntilVisible(archive, 300, scrollable: detailScroll);
     await tester.tap(archive);
     await tester.pumpAndSettle();
     final archiveError = find.text(

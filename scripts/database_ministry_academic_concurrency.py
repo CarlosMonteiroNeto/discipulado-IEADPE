@@ -58,14 +58,24 @@ def check_ministry_academic_concurrency(psql, connection):
         raise AssertionError("Timed out waiting for " + description)
 
     actor = "97000000-0000-0000-0000-000000000001"
+    actor2 = "97000000-0000-0000-0000-000000000009"
     scope = "97000000-0000-0000-0000-000000000002"
     cap_class = "97000000-0000-0000-0000-000000000003"
+    replacement_class = "97000000-0000-0000-0000-000000000060"
+    predecessor = "97000000-0000-0000-0000-000000000061"
     query(f"""
-      INSERT INTO auth.users(id,email,email_confirmed_at) VALUES('{actor}','academic-race@example.test',now());
+      INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
+       ('{actor}','academic-race@example.test',now()),('{actor2}','academic-race-b@example.test',now());
       INSERT INTO public.congregations(id,name) VALUES('{scope}','Academic race');
       INSERT INTO public.user_access(user_email,user_id,role,congregation_id)
-       VALUES('academic-race@example.test','{actor}','Membro da direção da campanha','{scope}');
-      INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES('{actor}','{scope}','ministry_staff');
+       VALUES('academic-race@example.test','{actor}','Membro da direção da campanha','{scope}'),
+             ('academic-race-b@example.test','{actor2}','Membro da direção da campanha','{scope}');
+      INSERT INTO public.ministry_grants(user_id,congregation_id,role) VALUES
+       ('{actor}','{scope}','ministry_staff'),('{actor2}','{scope}','ministry_staff');
+      INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
+       VALUES('{replacement_class}','{scope}','Replacement Race','replacement race','2026-01-01','{actor}');
+      INSERT INTO public.ministry_sessions(id,congregation_id,class_id,session_date,status,updated_by)
+       VALUES('{predecessor}','{scope}','{replacement_class}','2026-10-16','canceled','{actor}');
       INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date,updated_by)
        VALUES('{cap_class}','{scope}','Capacity Race','capacity race','2026-01-01','{actor}');
       INSERT INTO public.ministry_students(id,congregation_id,name,normalized_name,updated_by)
@@ -82,6 +92,7 @@ def check_ministry_academic_concurrency(psql, connection):
        FROM generate_series(1,99) n;
     """)
     auth = f"BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','{actor}',true);"
+    auth2 = f"BEGIN; SET LOCAL ROLE authenticated; SELECT set_config('request.jwt.claim.sub','{actor2}',true);"
     def enroll(operation, clazz, student):
         person = f"97300000-0000-0000-0000-{int(student.rsplit('-', 1)[1]):012d}"
         return f"public.ieadpe_ministry_enroll_student('{operation}','{{\"id\":\"{operation}\",\"congregation_id\":\"{scope}\",\"class_id\":\"{clazz}\",\"person_id\":\"{person}\",\"start_date\":\"2026-01-01\"}}'::jsonb)"
@@ -153,7 +164,33 @@ def check_ministry_academic_concurrency(psql, connection):
                 assert query(f"SELECT status FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{base_enrollment}'") == "present"
                 assert query(f"SELECT count(*) FROM public.ministry_session_roster WHERE session_id='{session_id}' AND enrollment_id='{new_enrollment}'") == "0"
                 assert query(f"SELECT count(*) FROM public.ministry_attendance WHERE session_id='{session_id}' AND enrollment_id='{new_enrollment}'") == "0"
-        print("PASS: class cap race and both enrollment/roster-freeze serialization orders", flush=True)
+        # Distinct actors lock separate access_versions rows, so the loser waits
+        # on the predecessor class lock, then rechecks the direct-child index.
+        def replacement_sql(operation, child):
+            return (f"SELECT public.ieadpe_ministry_create_session('{operation}',"
+                    f"'{{\"id\":\"{child}\",\"congregation_id\":\"{scope}\","
+                    f"\"class_id\":\"{replacement_class}\",\"date\":\"2026-10-16\","
+                    f"\"topic\":null,\"replaces_session_id\":\"{predecessor}\"}}'::jsonb);")
+
+        first_child = "97000000-0000-0000-0000-000000000062"
+        second_child = "97000000-0000-0000-0000-000000000063"
+        first = Session("ministry_replacement_first", auth +
+                        replacement_sql("97200000-0000-0000-0000-000000000061", first_child))
+        wait_for("first replacement claim", lambda: first.state().get("state") == "idle in transaction")
+        pid = first.state()["pid"]
+        second = Session("ministry_replacement_second", auth2 + f"""
+          DO $$ BEGIN BEGIN {replacement_sql('97200000-0000-0000-0000-000000000062', second_child)}
+           RAISE EXCEPTION 'ASSERTION: concurrent replacement created a fork';
+           EXCEPTION WHEN SQLSTATE '23505' THEN IF SQLERRM<>'academic_conflict' THEN RAISE; END IF; END; END $$;
+        """)
+        wait_for("second replacement waits for predecessor class lock",
+                 lambda: pid in second.state().get("blockers", []))
+        first.finish()
+        wait_for("replacement loser rechecks direct child", lambda: second.state().get("state") == "idle in transaction")
+        second.finish()
+        assert query(f"SELECT count(*) FROM public.ministry_sessions WHERE replaces_session_id='{predecessor}'") == "1"
+        assert query(f"SELECT id FROM public.ministry_sessions WHERE replaces_session_id='{predecessor}'") == first_child
+        print("PASS: class cap race, both enrollment/roster-freeze orders, and one linked replacement", flush=True)
     finally:
         for session in reversed(sessions):
             if session.process.poll() is None:

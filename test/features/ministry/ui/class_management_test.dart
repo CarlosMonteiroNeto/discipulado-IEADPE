@@ -1,11 +1,8 @@
-import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
@@ -17,6 +14,9 @@ import 'package:ieadpe_converts/features/ministry/ui/class_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/classes_page.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
 
+import '../../../support/sdk_fonts.dart';
+
+const _captureRoot = 'build/verification/corrective-release/B2/class-captures';
 const _scope = '33333333-3333-4333-8333-333333333333';
 const _otherScope = '77777777-7777-4777-8777-777777777777';
 const _classId = '22222222-2222-4222-8222-222222222222';
@@ -518,8 +518,14 @@ void main() {
     tester,
   ) async {
     await tester.runAsync(() async {
-      await _loadClassGoldenFont(_classGoldenFont, 'roboto-regular.ttf');
-      await _loadClassGoldenFont('MaterialIcons', 'materialicons-regular.otf');
+      await loadSdkFont(_classGoldenFont, const [
+        'Roboto-Regular.ttf',
+        'roboto-regular.ttf',
+      ]);
+      await loadSdkFont('MaterialIcons', const [
+        'MaterialIcons-Regular.otf',
+        'materialicons-regular.otf',
+      ]);
     });
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = const Size(360, 900);
@@ -563,7 +569,10 @@ void main() {
       final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
       if (bytes == null) throw StateError('Could not encode form capture.');
       final output = File(
-        '.superpowers/sdd/2026-10-18-ministry-production-completion-plan/a1-visual-evidence/class-form-360x900-text-200-selected.png',
+        <String>[
+          _captureRoot,
+          'class-form-360x900-text-200-selected.png',
+        ].join(Platform.pathSeparator),
       );
       await output.parent.create(recursive: true);
       await output.writeAsBytes(
@@ -638,33 +647,4 @@ ThemeData _classCaptureTheme() {
       fontFamily: _classGoldenFont,
     ),
   );
-}
-
-Future<void> _loadClassGoldenFont(String family, String fileName) async {
-  var directory = File(Platform.resolvedExecutable).parent;
-  File? font;
-  while (true) {
-    final candidate = File(
-      <String>[
-        directory.path,
-        'bin',
-        'cache',
-        'artifacts',
-        'material_fonts',
-        fileName,
-      ].join(Platform.pathSeparator),
-    );
-    if (candidate.existsSync()) {
-      font = candidate;
-      break;
-    }
-    final parent = directory.parent;
-    if (parent.path == directory.path) break;
-    directory = parent;
-  }
-  if (font == null) throw StateError('Could not find $fileName.');
-  final bytes = await font.readAsBytes();
-  final loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(ByteData.sublistView(bytes)));
-  await loader.load();
 }

@@ -5,6 +5,10 @@ import os
 from pathlib import Path
 import tempfile
 import threading
+import uuid
+from contextlib import redirect_stderr
+from io import StringIO
+from types import SimpleNamespace
 import unittest
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest import mock
@@ -167,6 +171,29 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         request_json.assert_not_called()
         run_sql.assert_not_called()
 
+    def test_missing_prerequisite_diagnostic_names_unavailable_service(self):
+        self.require_runner()
+        stderr = StringIO()
+        with (
+            redirect_stderr(stderr),
+            mock.patch.object(
+                runner,
+                "read_supabase_status",
+                side_effect=runner.PrerequisiteBlocked("Supabase CLI is unavailable."),
+            ),
+        ):
+            result = runner.run_journey()
+        self.assertEqual(result, runner.BLOCKED)
+        self.assertIn("prerequisite:Supabase CLI is unavailable.", stderr.getvalue())
+
+    def test_failure_diagnostic_hides_external_error_message(self):
+        self.require_runner()
+        stderr = StringIO()
+        with redirect_stderr(stderr):
+            runner._write_failure("primary", RuntimeError("secret synthetic marker"))
+        self.assertIn("primary:RuntimeError", stderr.getvalue())
+        self.assertNotIn("secret synthetic marker", stderr.getvalue())
+
     def test_service_role_key_never_enters_flutter_settings(self):
         self.require_runner()
         service_role = "super-secret-service-role-value"
@@ -195,7 +222,10 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertIn(fixture.congregation_a_id, sql)
         self.assertIn(fixture.congregation_b_id, sql)
         self.assertIn(fixture.class_id, sql)
-        self.assertIn(fixture.session_id, sql)
+        self.assertRegex(
+            sql,
+            rf"(?is)journey_owned_sessions.*?s\.congregation_id={runner._sql_uuid(fixture.congregation_a_id)}.*?s\.class_id={runner._sql_uuid(fixture.class_id)}",
+        )
         selector_start = sql.index("SELECT c.id FROM public.converts c")
         selector_end = sql.index(");", selector_start)
         convert_selector = sql[selector_start:selector_end]
@@ -212,6 +242,265 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertNotRegex(sql, r"(?is)DELETE\s+FROM\s+(?:public\.)?congregations\s*;")
         with self.assertRaises(ValueError):
             runner.make_fixture("congregation-a; DROP TABLE public.user_access;--")
+
+    def test_cleanup_includes_run_owned_canonical_and_replacement_dependencies(self):
+        self.require_runner()
+        fixture = runner.make_fixture(
+            "17b98af0-dfd2-4ae0-94cc-c44eb7258f9a",
+            password_factory=lambda: "synthetic-only-password",
+        )
+        sql = runner.cleanup_sql(fixture)
+        expected_student_id = str(uuid.uuid5(uuid.UUID(fixture.run_id), "ieadpe-unified-journey:student"))
+        expected_person_id = str(uuid.uuid5(uuid.UUID(fixture.run_id), "ieadpe-unified-journey:person"))
+        self.assertIn(expected_student_id, sql)
+        self.assertIn(expected_person_id, sql)
+        self.assertIn("public.ministry_people", sql)
+        self.assertIn("public.ministry_session_roster", sql)
+        self.assertIn("public.ministry_attendance", sql)
+        self.assertIn("private.congregation_week_guards", sql)
+        self.assertIn("replaces_session_id", sql)
+        self.assertRegex(sql, r"(?is)GROUP BY id ORDER BY max\(depth\) DESC")
+        self.assertRegex(
+            sql,
+            r"(?is)journey_owned_people.*?SELECT s\.person_id FROM public\.ministry_students",
+        )
+        self.assertNotRegex(sql, r"(?is)DELETE\s+FROM\s+public\.ministry_people\s*;")
+        self.assertNotRegex(
+            sql, r"(?is)DELETE\s+FROM\s+private\.congregation_week_guards\s*;"
+        )
+        sentinel_id = "11111111-1111-4111-8111-111111111111"
+        self.assertNotIn(sentinel_id, sql)
+        self.assertNotRegex(sql, r"(?is)TRUNCATE")
+        self.assertNotIn("synthetic-only-password", sql)
+
+    def test_partial_setup_failure_still_cleans_owned_fixture(self):
+        self.require_runner()
+        cleanup_calls = []
+        created_user_ids = []
+        deleted_user_ids = []
+        fixture = runner.make_fixture(
+            "17b98af0-dfd2-4ae0-94cc-c44eb7258f9a",
+            password_factory=lambda: "synthetic-only-password",
+        )
+
+        def create_user(_config, user):
+            if user.id == fixture.supervisor_id:
+                raise runner.JourneyFailure("synthetic setup failure")
+            created_user_ids.append(user.id)
+
+        stderr = StringIO()
+        with (
+            redirect_stderr(stderr),
+            mock.patch.object(
+                runner,
+                "local_supabase_from_status",
+                return_value=runner.LocalSupabase(
+                    "http://127.0.0.1:54321",
+                    "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+                    "local-anon",
+                    "local-service-role",
+                ),
+            ),
+            mock.patch.object(runner, "read_supabase_status", return_value={}),
+            mock.patch.object(runner, "check_browser_prerequisites", return_value=("driver", "chrome")),
+            mock.patch.object(runner, "_preflight_local_services"),
+            mock.patch.object(runner, "make_fixture", return_value=fixture),
+            mock.patch.object(runner, "_admin_create_user", side_effect=create_user),
+            mock.patch.object(
+                runner,
+                "_admin_delete_user",
+                side_effect=lambda _config, user_id: deleted_user_ids.append(user_id),
+                create=True,
+            ),
+            mock.patch.object(runner, "run_sql", side_effect=lambda sql, _url: cleanup_calls.append(sql) or ""),
+        ):
+            result = runner.run_journey()
+        self.assertEqual(result, runner.FAIL)
+        self.assertEqual(created_user_ids, [fixture.registrar_id])
+        self.assertEqual(
+            deleted_user_ids,
+            [fixture.supervisor_id, fixture.registrar_id],
+            "teardown attempts only the exact generated IDs through the failed setup step",
+        )
+        self.assertEqual(len(cleanup_calls), 1)
+        self.assertIn(fixture.run_id, cleanup_calls[0])
+        for created_user_id in created_user_ids:
+            self.assertIn(created_user_id, cleanup_calls[0])
+        self.assertIn("primary:JourneyFailure", stderr.getvalue())
+        self.assertNotIn("synthetic setup failure", stderr.getvalue())
+
+    def test_browser_reported_student_and_person_ids_are_used_for_partial_cleanup(self):
+        self.require_runner()
+        fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
+        actual_student_id = "22222222-2222-4222-8222-222222222222"
+        actual_person_id = "77777777-7777-4777-8777-777777777777"
+        cleanup_calls = []
+
+        def report_then_fail(_config, _fixture, _driver, _chrome, **kwargs):
+            callback = kwargs.get("on_owned_identity")
+            if callback is not None:
+                callback(actual_student_id, actual_person_id)
+            raise runner.JourneyFailure("synthetic post-registration browser failure")
+
+        stderr = StringIO()
+        with (
+            redirect_stderr(stderr),
+            mock.patch.object(
+                runner,
+                "local_supabase_from_status",
+                return_value=runner.LocalSupabase(
+                    "http://127.0.0.1:54321",
+                    "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+                    "local-anon",
+                    "local-service-role",
+                ),
+            ),
+            mock.patch.object(runner, "read_supabase_status", return_value={}),
+            mock.patch.object(runner, "check_browser_prerequisites", return_value=("driver", "chrome")),
+            mock.patch.object(runner, "_preflight_local_services"),
+            mock.patch.object(runner, "make_fixture", return_value=fixture),
+            mock.patch.object(runner, "_admin_create_user"),
+            mock.patch.object(runner, "_admin_delete_user"),
+            mock.patch.object(
+                runner,
+                "run_sql",
+                side_effect=lambda sql, _url: cleanup_calls.append(sql) or "",
+            ),
+            mock.patch.object(runner, "_run_browser_journey", side_effect=report_then_fail),
+        ):
+            result = runner.run_journey()
+
+        self.assertEqual(result, runner.FAIL)
+        self.assertEqual(len(cleanup_calls), 2)
+        self.assertIn(actual_student_id, cleanup_calls[-1])
+        self.assertIn(actual_person_id, cleanup_calls[-1])
+        self.assertNotIn("synthetic post-registration browser failure", stderr.getvalue())
+
+    def test_browser_failure_releases_the_run_control(self):
+        self.require_runner()
+        fixture = runner.make_fixture(
+            "17b98af0-dfd2-4ae0-94cc-c44eb7258f9a",
+            password_factory=lambda: "synthetic-only-password",
+        )
+        config = runner.LocalSupabase(
+            "http://127.0.0.1:54321",
+            "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+            "local-anon",
+            "local-service-role",
+        )
+        closed = []
+
+        class FakeControl:
+            address = ("127.0.0.1", 43210)
+            capability = "x" * 48
+
+            def close(self):
+                closed.append(True)
+
+        with (
+            mock.patch.object(runner, "RevocationControl", return_value=FakeControl()),
+            mock.patch.object(
+                runner,
+                "_start_chromedriver",
+                side_effect=runner.PrerequisiteBlocked("synthetic browser failure"),
+            ),
+            mock.patch.object(runner, "run_sql") as run_sql,
+        ):
+            with self.assertRaises(runner.PrerequisiteBlocked):
+                runner._run_browser_journey(config, fixture, "driver", "chrome")
+        self.assertEqual(closed, [True])
+        run_sql.assert_not_called()
+
+    def test_browser_timeout_after_launch_is_journey_failure_and_releases_control(self):
+        self.require_runner()
+        fixture = runner.make_fixture(
+            "17b98af0-dfd2-4ae0-94cc-c44eb7258f9a",
+            password_factory=lambda: "synthetic-only-password",
+        )
+        config = runner.LocalSupabase(
+            "http://127.0.0.1:54321",
+            "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+            "local-anon",
+            "local-service-role",
+        )
+        closed = []
+        terminated = []
+
+        class FakeControl:
+            address = ("127.0.0.1", 43210)
+            capability = "x" * 48
+
+            def close(self):
+                closed.append(True)
+
+        class FakeProcess:
+            def poll(self):
+                return None
+
+            def terminate(self):
+                terminated.append(True)
+
+            def wait(self, timeout):
+                return 0
+
+        with (
+            mock.patch.object(runner, "_free_loopback_port", return_value=43211),
+            mock.patch.object(runner, "RevocationControl", return_value=FakeControl()),
+            mock.patch.object(runner, "_start_chromedriver", return_value=FakeProcess()),
+            mock.patch.object(runner, "_safe_environment", return_value={}),
+            mock.patch.object(runner, "_drive_command", return_value=["flutter", "drive"]),
+            mock.patch.object(
+                runner.subprocess,
+                "run",
+                side_effect=runner.subprocess.TimeoutExpired(["flutter", "drive"], 900),
+            ),
+        ):
+            with self.assertRaises(runner.JourneyFailure):
+                runner._run_browser_journey(config, fixture, "driver", "chrome")
+        self.assertEqual(closed, [True])
+        self.assertEqual(terminated, [True])
+
+    def test_cleanup_failure_cannot_report_pass_and_retains_sanitized_cause(self):
+        self.require_runner()
+        fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
+        user_count = 0
+
+        def create_user(_config, _user):
+            nonlocal user_count
+            user_count += 1
+
+        def run_sql(sql, _url):
+            if "-- run_id:" in sql:
+                raise runner.JourneyFailure("synthetic cleanup failure")
+            return ""
+
+        stderr = StringIO()
+        with (
+            redirect_stderr(stderr),
+            mock.patch.object(
+                runner,
+                "local_supabase_from_status",
+                return_value=runner.LocalSupabase(
+                    "http://127.0.0.1:54321",
+                    "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+                    "local-anon",
+                    "local-service-role",
+                ),
+            ),
+            mock.patch.object(runner, "read_supabase_status", return_value={}),
+            mock.patch.object(runner, "check_browser_prerequisites", return_value=("driver", "chrome")),
+            mock.patch.object(runner, "_preflight_local_services"),
+            mock.patch.object(runner, "make_fixture", return_value=fixture),
+            mock.patch.object(runner, "_admin_create_user", side_effect=create_user),
+            mock.patch.object(runner, "_admin_delete_user"),
+            mock.patch.object(runner, "run_sql", side_effect=run_sql),
+            mock.patch.object(runner, "_run_browser_journey"),
+        ):
+            result = runner.run_journey()
+        self.assertEqual(user_count, 4)
+        self.assertEqual(result, runner.FAIL)
+        self.assertIn("cleanup:JourneyFailure", stderr.getvalue())
+        self.assertNotIn("synthetic cleanup failure", stderr.getvalue())
 
     def test_run_sql_rejects_remote_database_before_starting_a_process(self):
         self.require_runner()
@@ -266,16 +555,34 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
             installed.parent.mkdir(parents=True)
             installed.write_bytes(b"test executable placeholder")
             with mock.patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}, clear=False):
-                with mock.patch.object(
-                    runner, "_command_exists", return_value="C:/tools/chromedriver.exe"
+                windows = SimpleNamespace(name="nt", environ=os.environ)
+                with mock.patch.object(runner, "os", windows):
+                    with mock.patch.object(
+                        runner,
+                        "_command_exists",
+                        return_value="C:/tools/chromedriver.exe",
+                    ):
+                        self.assertEqual(
+                            runner._chromedriver_executable(),
+                            "C:/tools/chromedriver.exe",
+                        )
+                    with mock.patch.object(runner, "_command_exists", return_value=None):
+                        self.assertEqual(
+                            runner._chromedriver_executable(), str(installed)
+                        )
+
+    def test_posix_chromedriver_resolution_ignores_windows_localappdata(self):
+        self.require_runner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            installed = Path(temp_dir) / "Programs" / "ChromeDriver" / "chromedriver.exe"
+            installed.parent.mkdir(parents=True)
+            installed.write_bytes(b"test executable placeholder")
+            with mock.patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}, clear=False):
+                posix = SimpleNamespace(name="posix", environ=os.environ)
+                with mock.patch.object(runner, "os", posix), mock.patch.object(
+                    runner, "_command_exists", return_value=None
                 ):
-                    self.assertEqual(
-                        runner._chromedriver_executable(), "C:/tools/chromedriver.exe"
-                    )
-                with mock.patch.object(runner, "_command_exists", return_value=None):
-                    self.assertEqual(
-                        runner._chromedriver_executable(), str(installed)
-                    )
+                    self.assertIsNone(runner._chromedriver_executable())
 
     def test_windows_browser_version_check_reads_chrome_file_metadata(self):
         self.require_runner()
@@ -321,26 +628,52 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
             installed.parent.mkdir(parents=True)
             installed.write_bytes(b"test executable placeholder")
             with mock.patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}, clear=False):
-                with mock.patch.object(
+                windows = SimpleNamespace(name="nt", environ=os.environ)
+                with mock.patch.object(runner, "os", windows):
+                    with mock.patch.object(
+                        runner,
+                        "_command_exists",
+                        side_effect=lambda name: {
+                            "supabase.exe": None,
+                            "supabase": "C:/npm/supabase.cmd",
+                        }.get(name),
+                    ):
+                        self.assertEqual(runner._supabase_executable(), str(installed))
+                    with mock.patch.object(
+                        runner,
+                        "_command_exists",
+                        side_effect=lambda name: {
+                            "supabase.exe": "C:/tools/supabase.exe",
+                            "supabase": "C:/npm/supabase.cmd",
+                        }.get(name),
+                    ):
+                        self.assertEqual(
+                            runner._supabase_executable(), "C:/tools/supabase.exe"
+                        )
+
+    def test_posix_supabase_resolution_keeps_path_when_localappdata_has_windows_binary(self):
+        self.require_runner()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            installed = (
+                Path(temp_dir)
+                / "Programs"
+                / "supabase-cli"
+                / "node_modules"
+                / "@supabase"
+                / "cli-windows-x64"
+                / "bin"
+                / "supabase.exe"
+            )
+            installed.parent.mkdir(parents=True)
+            installed.write_bytes(b"test executable placeholder")
+            with mock.patch.dict(os.environ, {"LOCALAPPDATA": temp_dir}, clear=False):
+                posix = SimpleNamespace(name="posix", environ=os.environ)
+                with mock.patch.object(runner, "os", posix), mock.patch.object(
                     runner,
                     "_command_exists",
-                    side_effect=lambda name: {
-                        "supabase.exe": None,
-                        "supabase": "C:/npm/supabase.cmd",
-                    }.get(name),
+                    side_effect=lambda name: "supabase" if name == "supabase" else None,
                 ):
-                    self.assertEqual(runner._supabase_executable(), str(installed))
-                with mock.patch.object(
-                    runner,
-                    "_command_exists",
-                    side_effect=lambda name: {
-                        "supabase.exe": "C:/tools/supabase.exe",
-                        "supabase": "C:/npm/supabase.cmd",
-                    }.get(name),
-                ):
-                    self.assertEqual(
-                        runner._supabase_executable(), "C:/tools/supabase.exe"
-                    )
+                    self.assertEqual(runner._supabase_executable(), "supabase")
 
     def test_setup_and_revoke_sql_use_only_fixture_assignments(self):
         self.require_runner()
@@ -357,6 +690,10 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertIn(fixture.direction_id, revoke)
         self.assertNotIn(fixture.out_of_scope_assignment_id, revoke)
         self.assertNotIn("synthetic-only-password", setup + revoke)
+        self.assertNotRegex(
+            setup,
+            r"(?is)INSERT\s+INTO\s+public\.ministry_(?:session_roster|attendance)",
+        )
         with self.assertRaises(ValueError):
             runner.revocation_sql(fixture, fixture.out_of_scope_assignment_id)
 

@@ -9,6 +9,7 @@ import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
+import 'enrollment_progress_panel.dart';
 
 class ClassEnrollmentPanel extends StatefulWidget {
   const ClassEnrollmentPanel({
@@ -20,6 +21,7 @@ class ClassEnrollmentPanel extends StatefulWidget {
     required this.classEndDate,
     required this.onChanged,
     this.now,
+    this.reloadToken = 0,
   });
 
   final MinistryRepository repository;
@@ -29,6 +31,7 @@ class ClassEnrollmentPanel extends StatefulWidget {
   final String? classEndDate;
   final VoidCallback onChanged;
   final DateTime Function()? now;
+  final int reloadToken;
 
   @override
   State<ClassEnrollmentPanel> createState() => _ClassEnrollmentPanelState();
@@ -47,6 +50,8 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
   int _scopeGeneration = 0;
   int _rosterGeneration = 0;
   int _peopleSearchGeneration = 0;
+  int _progressRefresh = 0;
+  String? _selectedEnrollmentId;
   _PendingEnrollment? _pendingEnrollment;
   _PendingClose? _pendingClose;
 
@@ -73,7 +78,11 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       _entries = const [];
       _people = const [];
       _selectedPersonId = null;
+      _selectedEnrollmentId = null;
       _query.clear();
+      _load();
+    } else if (oldWidget.reloadToken != widget.reloadToken) {
+      _progressRefresh++;
       _load();
     }
   }
@@ -96,6 +105,11 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       setState(() {
         _entries = page.items;
         _loading = false;
+        if (!_entries.any(
+          (entry) => entry.enrollment.id == _selectedEnrollmentId,
+        )) {
+          _selectedEnrollmentId = null;
+        }
       });
     } catch (error) {
       if (!mounted || generation != _rosterGeneration) return;
@@ -392,6 +406,61 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
         'operation_conflict',
       }.contains(error.code);
 
+  Widget _rosterRow(ClassStudentEntry entry) {
+    final enrollmentId = entry.enrollment.id;
+    final selected = _selectedEnrollmentId == enrollmentId;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            entry.student.name,
+            style: Theme.of(context).textTheme.titleSmall,
+          ),
+          const SizedBox(height: 4),
+          Text('Matriculado desde ${entry.enrollment.startDate}'),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: UnifiedSpace.x2,
+            runSpacing: UnifiedSpace.x1,
+            children: [
+              Semantics(
+                button: true,
+                label:
+                    '${selected ? 'Ocultar' : 'Ver'} progresso da matrícula de '
+                    '${entry.student.name}',
+                onTap: () => _toggleProgress(enrollmentId),
+                child: ExcludeSemantics(
+                  child: TextButton(
+                    key: Key('class-enrollment-progress-$enrollmentId'),
+                    onPressed: () => _toggleProgress(enrollmentId),
+                    child: Text(
+                      selected ? 'Ocultar progresso' : 'Ver progresso',
+                    ),
+                  ),
+                ),
+              ),
+              TextButton(
+                key: Key('close-enrollment-$enrollmentId'),
+                onPressed: _busy ? null : () => _chooseClose(entry),
+                child: const Text('Encerrar'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleProgress(String enrollmentId) {
+    setState(() {
+      _selectedEnrollmentId = _selectedEnrollmentId == enrollmentId
+          ? null
+          : enrollmentId;
+    });
+  }
+
   @override
   Widget build(BuildContext context) => Base44Panel(
     child: Column(
@@ -407,17 +476,33 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
           )
         else if (_entries.isEmpty)
           const Text('Nenhum aluno matriculado nesta turma.'),
-        for (final entry in _entries)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(entry.student.name),
-            subtitle: Text('Matriculado desde ${entry.enrollment.startDate}'),
-            trailing: TextButton(
-              key: Key('close-enrollment-${entry.enrollment.id}'),
-              onPressed: _busy ? null : () => _chooseClose(entry),
-              child: const Text('Encerrar'),
+        for (final entry in _entries) _rosterRow(entry),
+        if (_selectedEnrollmentId case final selectedEnrollmentId?) ...[
+          const Divider(height: UnifiedSpace.x6),
+          Text(
+            'Progresso da matrícula selecionada',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: UnifiedSpace.x2),
+          EnrollmentProgressPanel(
+            key: ValueKey(
+              'class-enrollment-progress-$selectedEnrollmentId-$_progressRefresh',
+            ),
+            repository: widget.repository,
+            congregationId: widget.congregationId,
+            enrollmentId: selectedEnrollmentId,
+          ),
+          const SizedBox(height: UnifiedSpace.x2),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('close-class-enrollment-progress'),
+              onPressed: () => setState(() => _selectedEnrollmentId = null),
+              icon: const Icon(Icons.arrow_back),
+              label: const Text('Voltar para a turma'),
             ),
           ),
+        ],
         const SizedBox(height: UnifiedSpace.x3),
         Text(
           'Matricular pessoa',

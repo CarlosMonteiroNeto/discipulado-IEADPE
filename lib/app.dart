@@ -31,6 +31,7 @@ import 'platform/file_exporter.dart';
 import 'platform/import_progress_store.dart';
 import 'widgets/app_shell.dart';
 import 'features/auth/auth_repository.dart';
+import 'features/auth/session_display_name.dart';
 import 'features/ministry/data/ministry_browser_repository.dart';
 import 'features/ministry/data/ministry_handoff_repository.dart';
 import 'features/ministry/data/ministry_repository.dart';
@@ -284,13 +285,17 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
             child: IgnorePointer(
               ignoring: _router.isChecking,
               child: NavigatorPopHandler<Object?>(
-                onPop: () => _protectedNavigatorKey.currentState?.maybePop(),
+                onPopWithResult: (_) =>
+                    _protectedNavigatorKey.currentState?.maybePop(),
                 child: SizedBox.expand(
                   child: Navigator(
                     key: _protectedNavigatorKey,
                     onGenerateRoute: (_) => MaterialPageRoute<void>(
                       builder: (_) => _ProtectedFeatures(
                         scope: scope,
+                        displayName: sessionDisplayName(
+                          widget.repository.currentSession?.user.userMetadata,
+                        ),
                         router: _router,
                         gateway: _gateway,
                         converts: _converts,
@@ -328,8 +333,8 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
 
 class _ProtectedFeatures extends StatefulWidget {
   const _ProtectedFeatures({
-    super.key,
     required this.scope,
+    required this.displayName,
     required this.router,
     required this.gateway,
     required this.converts,
@@ -344,6 +349,7 @@ class _ProtectedFeatures extends StatefulWidget {
     required this.onCongregationChanged,
   });
   final AccessScope scope;
+  final String? displayName;
   final SessionRouter router;
   final SupabaseGateway gateway;
   final ConvertRepository converts;
@@ -550,6 +556,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           repository: widget.home,
           weekly: widget.weekly,
           onNavigate: widget.router.go,
+          name: widget.displayName,
           isAdmin: widget.scope.isGlobalManager,
           onScopeRefresh: widget.router.refresh,
           refreshRevision: widget.router.refreshRevision,
@@ -736,7 +743,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           when scopedActionsEnabled && registrationContextValid =>
         StudentRegistrationPage(
           key: ValueKey(
-            'ministry-student-register:${registrationContext!.congregationId}',
+            'ministry-student-register:${registrationContext.congregationId}',
           ),
           repository: ministry,
           congregationId: registrationContext.congregationId,

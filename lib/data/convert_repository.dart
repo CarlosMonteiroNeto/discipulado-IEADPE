@@ -149,7 +149,7 @@ ConvertRecord decodeConvertProjection(Map<String, dynamic> row) {
     if (rawPerson != null || personRevision != null || rawLegacy is! Map) {
       throw const FormatException();
     }
-    final legacyJson = Map<String, dynamic>.from(rawLegacy as Map);
+    final legacyJson = Map<String, dynamic>.from(rawLegacy);
     const legacyKeys = {'name', 'phone', 'address'};
     if (!_hasOnly(legacyJson, legacyKeys) ||
         !legacyJson.keys.toSet().containsAll(legacyKeys)) {
@@ -168,7 +168,7 @@ ConvertRecord decodeConvertProjection(Map<String, dynamic> row) {
         personRevision < 1) {
       throw const FormatException();
     }
-    final personJson = Map<String, dynamic>.from(rawPerson as Map);
+    final personJson = Map<String, dynamic>.from(rawPerson);
     const personKeys = {
       'id',
       'congregation_id',

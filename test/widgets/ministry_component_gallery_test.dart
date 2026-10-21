@@ -1,17 +1,76 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/ui/base44_widgets.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
+
+import '../support/sdk_fonts.dart';
 
 const _galleryFontFamily = 'GalleryRoboto';
 
 void main() {
   setUpAll(() async {
-    await _loadFlutterFont(_galleryFontFamily, 'roboto-regular.ttf');
-    await _loadFlutterFont('MaterialIcons', 'materialicons-regular.otf');
+    await loadSdkFont(_galleryFontFamily, const [
+      'Roboto-Regular.ttf',
+      'roboto-regular.ttf',
+    ]);
+    await loadSdkFont('MaterialIcons', const [
+      'MaterialIcons-Regular.otf',
+      'materialicons-regular.otf',
+    ]);
+  });
+
+  test('SDK font resolver prefers real canonical filenames over aliases', () {
+    final regular = resolveSdkFontFile(_galleryFontFamily, const [
+      'Roboto-Regular.ttf',
+      'roboto-regular.ttf',
+    ]);
+    final icons = resolveSdkFontFile('MaterialIcons', const [
+      'MaterialIcons-Regular.otf',
+      'materialicons-regular.otf',
+    ]);
+
+    expect(
+      regular.absolute.path,
+      endsWith(
+        '${Platform.pathSeparator}material_fonts'
+        '${Platform.pathSeparator}Roboto-Regular.ttf',
+      ),
+    );
+    expect(
+      icons.absolute.path,
+      endsWith(
+        '${Platform.pathSeparator}material_fonts'
+        '${Platform.pathSeparator}MaterialIcons-Regular.otf',
+      ),
+    );
+    expect(FileSystemEntity.isLinkSync(regular.path), isFalse);
+    expect(FileSystemEntity.isLinkSync(icons.path), isFalse);
+  });
+
+  test('SDK font resolver names the family, candidates and search roots', () {
+    expect(
+      () => resolveSdkFontFile('MissingFamily', const ['Missing-Font.ttf']),
+      throwsA(
+        isA<StateError>()
+            .having(
+              (error) => error.message,
+              'message',
+              contains('MissingFamily'),
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('Missing-Font.ttf'),
+            )
+            .having(
+              (error) => error.message,
+              'message',
+              contains('material_fonts'),
+            ),
+      ),
+    );
   });
 
   testWidgets(
@@ -395,38 +454,19 @@ Future<void> _captureGallery(WidgetTester tester, String fileName) async {
   await tester.pump();
   await expectLater(
     find.byKey(const ValueKey('gallery-capture')),
-    matchesGoldenFile('goldens/ministry_component_gallery_$fileName'),
+    matchesGoldenFile(_galleryGoldenPath(fileName)),
   );
 }
 
-Future<void> _loadFlutterFont(String family, String fileName) async {
-  final fontFile = _findFlutterFont(fileName);
-  final fontBytes = await fontFile.readAsBytes();
-  final loader = FontLoader(family)
-    ..addFont(Future<ByteData>.value(ByteData.sublistView(fontBytes)));
-  await loader.load();
-}
-
-File _findFlutterFont(String fileName) {
-  var directory = Directory(Platform.resolvedExecutable).parent;
-  while (true) {
-    final candidate = File(
-      <String>[
-        directory.path,
-        'bin',
-        'cache',
-        'artifacts',
-        'material_fonts',
-        fileName,
-      ].join(Platform.pathSeparator),
-    );
-    if (candidate.existsSync()) return candidate;
-
-    final parent = directory.parent;
-    if (parent.path == directory.path) break;
-    directory = parent;
+String _galleryGoldenPath(String fileName) {
+  final captureRoot = Platform.environment['MINISTRY_GOLDEN_CAPTURE_ROOT']
+      ?.trim();
+  if (captureRoot == null || captureRoot.isEmpty) {
+    return 'goldens/ministry_component_gallery_$fileName';
   }
-  throw StateError(
-    'Could not find $fileName in the Flutter SDK material_fonts artifact.',
-  );
+  return <String>[
+    captureRoot,
+    'gallery',
+    'ministry_component_gallery_$fileName',
+  ].join(Platform.pathSeparator);
 }

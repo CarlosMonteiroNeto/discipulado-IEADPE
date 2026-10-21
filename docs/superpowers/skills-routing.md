@@ -1,5 +1,15 @@
 # Engineering skill routing
 
+## Corrective release adaptation — 2026-10-20
+
+For the corrective release, use [the new design](specs/2026-10-20-ministry-corrective-release-design.md), [human plan](plans/2026-10-20-ministry-corrective-release-plan.md), and [canonical JSON tasks](plans/2026-10-20-ministry-corrective-release-plan.json). The installed source was inspected at `/workspace/.config/opencode/vendor/superpowers@ace9e92ac19d7cb485e8d946ee7b828177e46d08`, including all nine domain/overlay skills listed below, both pipeline skills and their plan validator/profile resolver.
+
+The user's latest execution choice overrides the packaged Script CEO dispatch/model/commit defaults: this Codex session is strategist/director/arbiter/whole-product reviewer; OpenCode CLI `opencode/deepseek-v4.1-flash-free` is coder; a native `gpt-6.1-sol` low-effort subagent performs each stage review. Read `/workspace/.agents/skills/opencode-cli-delegation/SKILL.md` before coding delegation. Do not silently activate packaged Terra 5.6/Sol 5.6 examples or use a competing automatic controller. This is an explicit adaptation of roles and engineering gates, not evidence that the original autonomous runtime ran.
+
+The OpenCode no-tool readiness request succeeded and the corrected design/plan received proposal-level Sol review; no product implementation or hosted change was performed. Actual task/test/review evidence remains required. See [planning validation and review](../verification/2026-10-20-corrective-planning-review.md).
+
+## Earlier integration routing
+
 This routing applies to post-implementation convert alignment and the unified integration. The completed 19-task convert implementation remains the baseline. Domain checklists are sourced from `C:/Users/Carlos_Neto/superpowers-two-model-pipeline` at `origin/main@ace9e92` (resolved commit `ace9e92ac19d7cb485e8d946ee7b828177e46d08`). The installed/sourced version must be checked before claiming compliance.
 
 | Stage / process skill | When it owns the work | Domain skill and overlays | Required artifact / gate |

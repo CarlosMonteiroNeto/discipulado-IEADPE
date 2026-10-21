@@ -25,6 +25,27 @@ class MinistryDirectoryEntry {
   final String? email, userAccessId;
 }
 
+/// Strict, bounded projection of one student's enrollment history.
+class StudentEnrollmentSummary {
+  const StudentEnrollmentSummary({
+    required this.id,
+    required this.classId,
+    required this.className,
+    required this.startDate,
+    required this.endDate,
+    required this.status,
+    required this.revision,
+  });
+
+  final String id;
+  final String classId;
+  final String className;
+  final CalendarDate startDate;
+  final CalendarDate? endDate;
+  final EnrollmentStatus status;
+  final int revision;
+}
+
 class MinistryPage<T> {
   const MinistryPage({required this.items, required this.nextCursor});
   final List<T> items;
@@ -148,6 +169,8 @@ class MinistrySessionSummary {
     required this.topic,
     required this.status,
     required this.revision,
+    this.replacesSessionId,
+    this.replacementSessionId,
   });
 
   final String id;
@@ -157,6 +180,8 @@ class MinistrySessionSummary {
   final String? topic;
   final SessionStatus status;
   final int revision;
+  final String? replacesSessionId;
+  final String? replacementSessionId;
 }
 
 MinistryPage<MinistryDirectoryEntry> decodeDirectoryPage(Object? raw) {
@@ -760,6 +785,8 @@ MinistryPage<MinistrySessionSummary> decodeClassSessions(
           'topic',
           'status',
           'revision',
+          'replaces_session_id',
+          'replacement_session_id',
         });
         final rowClassId = _uuid(row['class_id']);
         final rowCongregationId = _uuid(row['congregation_id']);
@@ -783,6 +810,8 @@ MinistryPage<MinistrySessionSummary> decodeClassSessions(
             topic: topic,
             status: SessionStatus.fromWire(status),
             revision: revision,
+            replacesSessionId: _optionalUuid(row['replaces_session_id']),
+            replacementSessionId: _optionalUuid(row['replacement_session_id']),
           );
         } on MinistryDataException {
           _invalid();
@@ -792,6 +821,55 @@ MinistryPage<MinistrySessionSummary> decodeClassSessions(
   return MinistryPage(
     items: List.unmodifiable(decoded),
     nextCursor: _optionalText(json['next_cursor']),
+  );
+}
+
+MinistryPage<StudentEnrollmentSummary> decodeStudentEnrollments(Object? raw) {
+  final json = _object(raw);
+  _exactKeys(json, {'items', 'next_cursor'});
+  final items = json['items'];
+  if (items is! List || items.length > 100) _invalid();
+  final decoded = items
+      .map((item) {
+        final row = _object(item);
+        _exactKeys(row, {
+          'id',
+          'class_id',
+          'class_name',
+          'start_date',
+          'end_date',
+          'status',
+          'revision',
+        });
+        final revision = row['revision'];
+        final rawEndDate = row['end_date'];
+        if (revision is! int ||
+            revision < 1 ||
+            (rawEndDate != null && rawEndDate is! String)) {
+          _invalid();
+        }
+        try {
+          return StudentEnrollmentSummary(
+            id: _uuid(row['id']),
+            classId: _uuid(row['class_id']),
+            className: _text(row['class_name']),
+            startDate: CalendarDate.parse(_text(row['start_date'])),
+            endDate: rawEndDate == null
+                ? null
+                : CalendarDate.parse(_text(rawEndDate)),
+            status: EnrollmentStatus.fromWire(_text(row['status'])),
+            revision: revision,
+          );
+        } on MinistryDataException {
+          _invalid();
+        }
+      })
+      .toList(growable: false);
+  final nextCursor = _optionalText(json['next_cursor']);
+  if (nextCursor != null && nextCursor.length > 4096) _invalid();
+  return MinistryPage(
+    items: List.unmodifiable(decoded),
+    nextCursor: nextCursor,
   );
 }
 

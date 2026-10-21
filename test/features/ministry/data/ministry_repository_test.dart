@@ -29,6 +29,7 @@ class _ClassSessionGateway implements ReadRpcGateway, MinistryCommandGateway {
   _ClassSessionGateway(this.response);
 
   final Map<String, dynamic> response;
+  @override
   final boundary = ProtectedDataBoundary();
   final calls = <_RecordedMinistryCall>[];
 
@@ -96,7 +97,33 @@ Map<String, dynamic> _classSessionWire() => {
         'topic': null,
         'status': status,
         'revision': 1,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
       },
+  ],
+  'next_cursor': null,
+};
+
+Map<String, dynamic> _studentEnrollmentWire() => {
+  'items': [
+    {
+      'id': '99999999-9999-4999-8999-999999999999',
+      'class_id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'class_name': 'Discipulado Ativo',
+      'start_date': '2026-03-01',
+      'end_date': null,
+      'status': 'active',
+      'revision': 2,
+    },
+    {
+      'id': 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      'class_id': 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      'class_name': 'Discipulado Concluído',
+      'start_date': '2025-08-01',
+      'end_date': '2025-12-15',
+      'status': 'completed',
+      'revision': 1,
+    },
   ],
   'next_cursor': null,
 };
@@ -217,6 +244,7 @@ class _AccessCandidateGateway implements ReadRpcGateway {
   _AccessCandidateGateway(this.response);
 
   final Map<String, dynamic> response;
+  @override
   final boundary = ProtectedDataBoundary();
   String? rpc;
   Map<String, Object?>? parameters;
@@ -1621,7 +1649,38 @@ void main() {
     ]);
     expect(page.items.first.date.toString(), '2099-01-10');
     expect(page.items.first.revision, 1);
+    expect(page.items.first.replacesSessionId, isNull);
+    expect(page.items.first.replacementSessionId, isNull);
     expect(page.nextCursor, isNull);
+  });
+
+  test('class sessions decode explicit replacement linkage', () {
+    final wire = _classSessionWire();
+    final item = Map<String, dynamic>.from((wire['items'] as List).first as Map)
+      ..['replaces_session_id'] = '99999999-9999-4999-8999-999999999999'
+      ..['replacement_session_id'] = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    wire['items'] = [item];
+    final page = decodeClassSessions(
+      wire,
+      congregationId: _sessionCongregationId,
+      classId: _sessionClassId,
+    );
+    expect(page.items.single.replacesSessionId, item['replaces_session_id']);
+    expect(
+      page.items.single.replacementSessionId,
+      item['replacement_session_id'],
+    );
+
+    item['replaces_session_id'] = 'not-a-uuid';
+    wire['items'] = [item];
+    expect(
+      () => decodeClassSessions(
+        wire,
+        congregationId: _sessionCongregationId,
+        classId: _sessionClassId,
+      ),
+      throwsA(isA<MinistryDataException>()),
+    );
   });
 
   test('class session topics preserve nullable string values', () async {
@@ -1767,6 +1826,38 @@ void main() {
       'topic': null,
     });
 
+    await repository.createSession(
+      operationId: _sessionOperationId,
+      id: _sessionId,
+      congregationId: _sessionCongregationId,
+      classId: _sessionClassId,
+      date: CalendarDate.parse('2026-12-20'),
+      topic: 'Replacement',
+      replacesSessionId: '99999999-9999-4999-8999-999999999999',
+    );
+    expect(calls.last.payload, {
+      'id': _sessionId,
+      'congregation_id': _sessionCongregationId,
+      'class_id': _sessionClassId,
+      'date': '2026-12-20',
+      'topic': 'Replacement',
+      'replaces_session_id': '99999999-9999-4999-8999-999999999999',
+    });
+    expect(
+      () => repository.createSession(
+        operationId: _sessionOperationId,
+        id: _sessionId,
+        congregationId: _sessionCongregationId,
+        classId: _sessionClassId,
+        date: CalendarDate.parse('2026-12-20'),
+        topic: null,
+        replacesSessionId: 'not-a-uuid',
+      ),
+      throwsA(
+        isA<DataFailure>().having((error) => error.code, 'code', 'invalid'),
+      ),
+    );
+
     await repository.cancelSession(
       operationId: _sessionOperationId,
       id: _sessionId,
@@ -1780,5 +1871,217 @@ void main() {
       'congregation_id': _sessionCongregationId,
       'expected_revision': 7,
     });
+  });
+
+  test('student enrollment history sends the exact scope envelope and decodes dates', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final serving = server.listen((request) async {
+      expect(
+        request.uri.path,
+        '/rest/v1/rpc/ieadpe_ministry_list_student_enrollments',
+      );
+      expect(jsonDecode(await utf8.decoder.bind(request).join()), {
+        'request': {
+          'congregation_id': _scope,
+          'student_id': _person,
+          'limit': 25,
+          'cursor': 'resume-token',
+        },
+      });
+      await _respond(request, _studentEnrollmentWire());
+    });
+    final client = SupabaseClient(
+      'http://127.0.0.1:${server.port}',
+      'test',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+    addTearDown(() async {
+      await client.dispose();
+      await serving.cancel();
+      await server.close(force: true);
+    });
+    final repository = MinistryRepository(
+      SupabaseGateway(client, ProtectedDataBoundary()),
+    );
+
+    final page = await repository.listStudentEnrollments(
+      congregationId: _scope,
+      studentId: _person,
+      limit: 25,
+      cursor: 'resume-token',
+    );
+
+    expect(page.items, hasLength(2));
+    expect(page.items.first.id, '99999999-9999-4999-8999-999999999999');
+    expect(page.items.first.classId, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(page.items.first.className, 'Discipulado Ativo');
+    expect(page.items.first.startDate, CalendarDate(2026, 3, 1));
+    expect(page.items.first.endDate, isNull);
+    expect(page.items.first.status, EnrollmentStatus.active);
+    expect(page.items.first.revision, 2);
+    expect(page.items.last.endDate, CalendarDate(2025, 12, 15));
+    expect(page.items.last.status, EnrollmentStatus.completed);
+    expect(page.nextCursor, isNull);
+  });
+
+  test(
+    'student enrollment history fails closed on obsolete wire data',
+    () async {
+      Map<String, dynamic> responseWith({
+        bool omitCursor = false,
+        bool addUnknownPageKey = false,
+        bool addUnexpectedItemKey = false,
+        Object? itemId,
+        Object? classId,
+        Object? className,
+        Object? startDate,
+        Object? endDate,
+        Object? status,
+        Object? revision,
+        bool omitRevision = false,
+        Object? items,
+        Object? cursor,
+      }) {
+        final item = Map<String, dynamic>.from(
+          (_studentEnrollmentWire()['items'] as List).first as Map,
+        );
+        if (itemId != null) item['id'] = itemId;
+        if (classId != null) item['class_id'] = classId;
+        if (className != null) item['class_name'] = className;
+        if (startDate != null) item['start_date'] = startDate;
+        if (endDate != null) item['end_date'] = endDate;
+        if (status != null) item['status'] = status;
+        if (revision != null) item['revision'] = revision;
+        if (omitRevision) item.remove('revision');
+        if (addUnexpectedItemKey) item['student_id'] = _person;
+        final response = <String, dynamic>{
+          'items': items ?? [item],
+        };
+        if (!omitCursor) response['next_cursor'] = null;
+        if (cursor != null) response['next_cursor'] = cursor;
+        if (addUnknownPageKey) response['student_id'] = _person;
+        return response;
+      }
+
+      final invalidResponses = [
+        responseWith(omitCursor: true),
+        responseWith(addUnknownPageKey: true),
+        responseWith(addUnexpectedItemKey: true),
+        responseWith(itemId: 'not-a-uuid'),
+        responseWith(classId: 'not-a-uuid'),
+        responseWith(className: ''),
+        responseWith(className: 7),
+        responseWith(startDate: '2026-02-30'),
+        responseWith(startDate: '2026-03-01T00:00:00Z'),
+        responseWith(endDate: 'not-a-date'),
+        responseWith(status: 'pending'),
+        responseWith(revision: 0),
+        responseWith(revision: '1'),
+        responseWith(omitRevision: true),
+        responseWith(cursor: 'a' * 4097),
+        responseWith(cursor: 7),
+        responseWith(
+          items: List.filled(
+            101,
+            (_studentEnrollmentWire()['items'] as List).first,
+          ),
+        ),
+        responseWith(items: 'not-a-list'),
+        responseWith(items: ['not-an-object']),
+      ];
+      for (final response in invalidResponses) {
+        final repository = MinistryRepository(_ClassSessionGateway(response));
+        await expectLater(
+          repository.listStudentEnrollments(
+            congregationId: _scope,
+            studentId: _person,
+          ),
+          throwsA(
+            isA<DataFailure>().having(
+              (error) => error.code,
+              'code',
+              'invalid_response',
+            ),
+          ),
+        );
+      }
+    },
+  );
+
+  test(
+    'student enrollment history validates local scope before network',
+    () async {
+      final gateway = _ClassSessionGateway(_studentEnrollmentWire());
+      final repository = MinistryRepository(gateway);
+
+      for (final call in [
+        () => repository.listStudentEnrollments(
+          congregationId: 'not-a-uuid',
+          studentId: _person,
+        ),
+        () => repository.listStudentEnrollments(
+          congregationId: _scope,
+          studentId: 'not-a-uuid',
+        ),
+        () => repository.listStudentEnrollments(
+          congregationId: _scope,
+          studentId: _person,
+          limit: 0,
+        ),
+        () => repository.listStudentEnrollments(
+          congregationId: _scope,
+          studentId: _person,
+          limit: 101,
+        ),
+        () => repository.listStudentEnrollments(
+          congregationId: _scope,
+          studentId: _person,
+          cursor: 'a' * 4097,
+        ),
+      ]) {
+        await expectLater(
+          call(),
+          throwsA(
+            isA<DataFailure>().having((error) => error.code, 'code', 'invalid'),
+          ),
+        );
+      }
+      expect(gateway.calls, isEmpty);
+    },
+  );
+
+  test('revoked enrollment history remains a permission failure', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final serving = server.listen((request) async {
+      request.response.statusCode = 403;
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(
+        jsonEncode({'code': '42501', 'message': 'forbidden'}),
+      );
+      await request.response.close();
+    });
+    final client = SupabaseClient(
+      'http://127.0.0.1:${server.port}',
+      'test',
+      authOptions: const AuthClientOptions(autoRefreshToken: false),
+    );
+    addTearDown(() async {
+      await client.dispose();
+      await serving.cancel();
+      await server.close(force: true);
+    });
+    final repository = MinistryRepository(
+      SupabaseGateway(client, ProtectedDataBoundary()),
+    );
+
+    await expectLater(
+      repository.listStudentEnrollments(
+        congregationId: _scope,
+        studentId: _person,
+      ),
+      throwsA(
+        isA<DataFailure>().having((error) => error.code, 'code', 'permission'),
+      ),
+    );
   });
 }

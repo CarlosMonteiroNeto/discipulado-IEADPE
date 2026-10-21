@@ -142,8 +142,7 @@ class MinistryHandoffRepository {
             'convert_id': convertId,
             'congregation_id': congregationId,
             'student_id': studentId,
-            if (expectedStudentRevision != null)
-              'expected_student_revision': expectedStudentRevision,
+            'expected_student_revision': ?expectedStudentRevision,
           },
         ),
       );

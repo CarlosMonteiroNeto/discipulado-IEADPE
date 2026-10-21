@@ -121,6 +121,28 @@ def check_ministry_follow_up_concurrency(psql, connection):
         wait_for("cancel resumes after finalization", lambda: second.state().get("state") == "idle in transaction")
         second.finish()
         assert query(f"SELECT status FROM public.ministry_sessions WHERE id='{session_ids[0]}'") == "finalized"
+        marks = json.dumps({enrollment_ids[0]: "absent"})
+        query(auth(actors[1]) + f"""
+          DO $$ BEGIN
+            BEGIN PERFORM public.ieadpe_ministry_save_attendance('94900000-0000-4000-8000-000000000051',
+              '{{"congregation_id":"{scope}","session_id":"{session_ids[0]}","expected_revision":2,"marks":{marks},"finalize":false}}'::jsonb);
+              RAISE EXCEPTION 'ASSERTION: finalized session accepted a current draft';
+            EXCEPTION WHEN SQLSTATE '23514' THEN IF SQLERRM<>'session_finalized' THEN RAISE; END IF; END;
+            BEGIN PERFORM public.ieadpe_ministry_save_attendance('94900000-0000-4000-8000-000000000052',
+              '{{"congregation_id":"{scope}","session_id":"{session_ids[0]}","expected_revision":2,"marks":{marks},"finalize":true}}'::jsonb);
+              RAISE EXCEPTION 'ASSERTION: finalized session accepted a current finalize';
+            EXCEPTION WHEN SQLSTATE '23514' THEN IF SQLERRM<>'session_finalized' THEN RAISE; END IF; END;
+            BEGIN PERFORM public.ieadpe_ministry_save_attendance('94900000-0000-4000-8000-000000000053',
+              '{{"congregation_id":"{scope}","session_id":"{session_ids[0]}","expected_revision":1,"marks":{marks},"finalize":false}}'::jsonb);
+              RAISE EXCEPTION 'ASSERTION: finalized session accepted a stale draft';
+            EXCEPTION WHEN SQLSTATE '23514' THEN IF SQLERRM<>'session_finalized' THEN RAISE; END IF; END;
+            BEGIN PERFORM public.ieadpe_ministry_save_attendance('94900000-0000-4000-8000-000000000054',
+              '{{"congregation_id":"{scope}","session_id":"{session_ids[0]}","expected_revision":1,"marks":{marks},"finalize":true}}'::jsonb);
+              RAISE EXCEPTION 'ASSERTION: finalized session accepted a stale finalize';
+            EXCEPTION WHEN SQLSTATE '23514' THEN IF SQLERRM<>'session_finalized' THEN RAISE; END IF; END;
+          END $$; COMMIT;""")
+        assert query(f"SELECT status||':'||revision||':'||(SELECT count(*) FROM public.ministry_attendance WHERE session_id='{session_ids[0]}')::text "
+                     f"FROM public.ministry_sessions WHERE id='{session_ids[0]}'") == "finalized:2:1"
         query(auth(actors[0]) + f"SELECT public.ieadpe_ministry_cancel_session('94900000-0000-4000-8000-000000000041',"
               f"'{{\"id\":\"{session_ids[0]}\",\"congregation_id\":\"{scope}\",\"expected_revision\":2}}'::jsonb); COMMIT;")
         assert query(f"SELECT status||':'||(SELECT count(*) FROM public.ministry_attendance WHERE session_id='{session_ids[0]}')::text "
@@ -130,7 +152,7 @@ def check_ministry_follow_up_concurrency(psql, connection):
         first = Session("followup_cancel_first", auth(actors[0]) + cancel(1))
         wait_for("cancellation lock", lambda: first.state().get("state") == "idle in transaction")
         first_pid = first.state()["pid"]
-        second = Session("followup_finalize_second", auth(actors[1]) + f"DO $$ BEGIN BEGIN {finalize(1)} RAISE EXCEPTION 'ASSERTION: expected stale finalize'; EXCEPTION WHEN serialization_failure THEN NULL; END; END $$;")
+        second = Session("followup_finalize_second", auth(actors[1]) + f"DO $$ BEGIN BEGIN {finalize(1)} RAISE EXCEPTION 'ASSERTION: expected terminal canceled finalize'; EXCEPTION WHEN SQLSTATE '23514' THEN IF SQLERRM<>'session_canceled' THEN RAISE; END IF; END; END $$;")
         wait_for("finalize blocked by cancellation class/session locks after independent actor access locks", lambda: (
             (state := second.state()).get("wait_event_type") == "Lock" and
             first_pid in state.get("blockers", [])), second.state)

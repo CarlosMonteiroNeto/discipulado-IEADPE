@@ -105,6 +105,38 @@ void main() {
       );
     }
   }
+  testWidgets('Home greets by active display name and uses neutral fallback', (
+    t,
+  ) async {
+    final gateway = WeeklyGateway()..visible = false;
+    final repository = HomeRepository(RowsRepository(gateway, []));
+    final weekly = WeeklyRepository(gateway);
+    await t.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePage(
+            repository: repository,
+            weekly: weekly,
+            onNavigate: (_) {},
+            name: 'Maria Silva',
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Olá, Maria Silva!'), findsOneWidget);
+    await t.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: HomePage(
+            repository: repository,
+            weekly: weekly,
+            onNavigate: (_) {},
+          ),
+        ),
+      ),
+    );
+    expect(find.text('Olá!'), findsOneWidget);
+  });
   testWidgets('Home loads metrics and refreshes hidden weekly owner', (
     t,
   ) async {

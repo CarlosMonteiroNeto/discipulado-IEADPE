@@ -163,23 +163,37 @@ class _SessionListPageState extends State<SessionListPage> {
     }
   }
 
-  Future<void> _create() async {
+  Future<void> _create({MinistrySessionSummary? replaces}) async {
     if (_busy ||
         _pendingCancel != null ||
         widget.classSummary.status != ClassStatus.active) {
       return;
     }
-    final id = await Navigator.of(context).push<String>(
+    final result = await Navigator.of(context).push<SessionFormResult>(
       MaterialPageRoute(
         builder: (_) => SessionForm(
           repository: widget.repository,
           congregationId: widget.congregationId,
           classSummary: widget.classSummary,
           existingSessions: List.unmodifiable(_sessions),
+          replacesSessionId: replaces?.id,
+          initialDate: replaces?.date,
         ),
       ),
     );
-    if (!mounted || id == null) return;
+    if (!mounted || result == null) return;
+    if (result.conflict) {
+      setState(() {
+        _error = null;
+        _notice =
+            'Outra pessoa registrou uma substituta para esta aula. '
+            'A lista foi atualizada com o vínculo atual.';
+      });
+      await _refreshLoadedSessions();
+      return;
+    }
+    final id = result.sessionId;
+    if (id == null) return;
     await widget.onOpenSession(id);
     if (mounted) await _refreshLoadedSessions();
   }
@@ -208,10 +222,11 @@ class _SessionListPageState extends State<SessionListPage> {
         sessionId: item.id,
       );
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Não foi possível atualizar a aula. Atualize os dados e tente novamente.',
         );
+      }
       return;
     }
     if (!mounted) return;
@@ -292,7 +307,17 @@ class _SessionListPageState extends State<SessionListPage> {
       );
       if (identical(_pendingCancel, request)) _pendingCancel = null;
       if (mounted) {
-        setState(() => _busy = false);
+        final canceled = _loaded(request.id);
+        final identity = canceled == null
+            ? widget.classSummary.name
+            : '${widget.classSummary.name} · '
+                  '${_displayDate(canceled.date)} · '
+                  '${canceled.topic ?? 'Sem tema'}';
+        setState(() {
+          _busy = false;
+          _error = null;
+          _notice = 'Aula cancelada: $identity. O histórico foi mantido.';
+        });
         await _load();
       }
     } catch (error) {
@@ -307,8 +332,9 @@ class _SessionListPageState extends State<SessionListPage> {
             'class_not_active',
             'operation_conflict',
           }.contains(error.code) &&
-          identical(_pendingCancel, request))
+          identical(_pendingCancel, request)) {
         _pendingCancel = null;
+      }
       setState(() {
         _busy = false;
         if (error is DataFailure && error.code == 'stale_revision') {
@@ -319,6 +345,40 @@ class _SessionListPageState extends State<SessionListPage> {
       });
       if (error is DataFailure && error.code == 'stale_revision') await _load();
     }
+  }
+
+  String _displayDate(CalendarDate date) =>
+      '${date.day.toString().padLeft(2, '0')}/'
+      '${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+  MinistrySessionSummary? _loaded(String? id) {
+    if (id == null) return null;
+    for (final session in _sessions) {
+      if (session.id == id) return session;
+    }
+    return null;
+  }
+
+  String? _lineage(MinistrySessionSummary item) {
+    final parts = <String>[];
+    if (item.replacesSessionId != null) {
+      final parent = _loaded(item.replacesSessionId);
+      parts.add(
+        parent == null
+            ? 'Substituta de uma aula cancelada'
+            : 'Substituta de ${_displayDate(parent.date)}',
+      );
+    }
+    if (item.status == SessionStatus.canceled &&
+        item.replacementSessionId != null) {
+      final child = _loaded(item.replacementSessionId);
+      parts.add(
+        child == null
+            ? 'Substituição já registrada'
+            : 'Substituída pela aula de ${_displayDate(child.date)}',
+      );
+    }
+    return parts.isEmpty ? null : parts.join(' · ');
   }
 
   String _label(SessionStatus status) => switch (status) {
@@ -373,11 +433,13 @@ class _SessionListPageState extends State<SessionListPage> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ListTile(
-                    title: Text(
-                      item.date.toString().split('-').reversed.join('/'),
-                    ),
+                    title: Text(_displayDate(item.date)),
                     subtitle: Text(
-                      '${_label(item.status)}${item.topic == null ? '' : ' · ${item.topic}'}',
+                      [
+                        '${_label(item.status)}'
+                            '${item.topic == null ? '' : ' · ${item.topic}'}',
+                        ?_lineage(item),
+                      ].join(' · '),
                     ),
                     onTap: () => _open(item),
                   ),
@@ -391,6 +453,29 @@ class _SessionListPageState extends State<SessionListPage> {
                           onPressed: _busy ? null : () => _cancel(item),
                           child: const Text('Cancelar aula'),
                         ),
+                      ),
+                    )
+                  else if (item.replacementSessionId == null)
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 16,
+                        right: 8,
+                        bottom: 8,
+                      ),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: widget.classSummary.status == ClassStatus.active
+                            ? TextButton.icon(
+                                key: Key('replace-session-${item.id}'),
+                                onPressed: _busy || _pendingCancel != null
+                                    ? null
+                                    : () => _create(replaces: item),
+                                icon: const Icon(Icons.replay_outlined),
+                                label: const Text('Registrar substituta'),
+                              )
+                            : const Text(
+                                'Substituição indisponível: a turma não está ativa.',
+                              ),
                       ),
                     ),
                 ],

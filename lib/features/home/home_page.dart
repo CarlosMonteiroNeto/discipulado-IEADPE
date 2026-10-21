@@ -14,7 +14,7 @@ class HomePage extends StatefulWidget {
     required this.repository,
     required this.weekly,
     required this.onNavigate,
-    this.name = 'Visitante',
+    this.name,
     this.isAdmin = false,
     this.onScopeRefresh,
     this.refreshRevision = 0,
@@ -22,7 +22,7 @@ class HomePage extends StatefulWidget {
   final HomeRepository repository;
   final WeeklyRepository weekly;
   final ValueChanged<String> onNavigate;
-  final String name;
+  final String? name;
   final bool isAdmin;
   final Future<void> Function()? onScopeRefresh;
 
@@ -137,7 +137,7 @@ class _HomePageState extends State<HomePage> {
                     const BrandHeader(subtitle: 'Gestão de Novos Convertidos'),
                     const SizedBox(height: 16),
                     Text(
-                      'Olá, ${widget.name}!',
+                      widget.name == null ? 'Olá!' : 'Olá, ${widget.name}!',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w600,
@@ -344,15 +344,25 @@ class _HomePageState extends State<HomePage> {
                     padding: const EdgeInsets.only(top: 12),
                     child: Base44Panel(
                       padding: EdgeInsets.zero,
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.settings_outlined,
-                          color: UnifiedColors.brandNavy,
+                      child: Material(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(
+                          UnifiedRadius.standard,
                         ),
-                        title: const Text('Administração'),
-                        subtitle: const Text('Congregações e acessos'),
-                        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                        onTap: () => widget.onNavigate('/admin'),
+                        clipBehavior: Clip.antiAlias,
+                        child: ListTile(
+                          leading: const Icon(
+                            Icons.settings_outlined,
+                            color: UnifiedColors.brandNavy,
+                          ),
+                          title: const Text('Administração'),
+                          subtitle: const Text('Congregações e acessos'),
+                          trailing: const Icon(
+                            Icons.arrow_forward_ios,
+                            size: 16,
+                          ),
+                          onTap: () => widget.onNavigate('/admin'),
+                        ),
                       ),
                     ),
                   ),

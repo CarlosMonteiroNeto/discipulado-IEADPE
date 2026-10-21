@@ -759,6 +759,8 @@ class Session extends MinistryRecord {
     required this.lessonIndex,
     required this.lessonPart,
     required this.lessonFinished,
+    this.replacesSessionId,
+    this.replacementSessionId,
   });
 
   final String classId;
@@ -769,6 +771,8 @@ class Session extends MinistryRecord {
   final int? lessonIndex;
   final int? lessonPart;
   final bool lessonFinished;
+  final String? replacesSessionId;
+  final String? replacementSessionId;
 
   factory Session.fromJson(MinistryJson json) {
     _checkKeys(json, const <String>{
@@ -781,6 +785,8 @@ class Session extends MinistryRecord {
       'lesson_index',
       'lesson_part',
       'lesson_finished',
+      'replaces_session_id',
+      'replacement_session_id',
     });
     final metadata = CommonMetadata.fromJson(json);
     if (metadata.congregationId == null) {
@@ -798,6 +804,8 @@ class Session extends MinistryRecord {
       lessonIndex: lessonIndex,
       lessonPart: lessonPart,
       lessonFinished: _optionalBool(json, 'lesson_finished') ?? false,
+      replacesSessionId: _optionalUuid(json, 'replaces_session_id'),
+      replacementSessionId: _optionalUuid(json, 'replacement_session_id'),
     );
   }
 }

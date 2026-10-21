@@ -37,7 +37,7 @@ void main() {
             'congregation_id': _scope,
             'name': 'Maria da Silva',
             'phone': null,
-            'address': 'Rua das Flores',
+            'address': 'Rua das Flores, Centro, Recife, PE, 50000-000',
             'conversion_date': '2026-10-01',
           },
         ],
@@ -65,9 +65,54 @@ void main() {
 
     expect(page.items.single.convertId, _convert);
     expect(page.items.single.phone, isNull);
-    expect(page.items.single.address, 'Rua das Flores');
+    expect(
+      page.items.single.address,
+      'Rua das Flores, Centro, Recife, PE, 50000-000',
+    );
     expect(page.items.single.conversionDate, '2026-10-01');
     expect(page.nextCursor, isNull);
+  });
+
+  test('keeps candidate address structured and canonical nulls intact', () {
+    final page = decodeHandoffCandidatePage({
+      'items': [
+        {
+          'student_id': _student,
+          'name': 'Beatriz Nova',
+          'phone': null,
+          'address': {
+            'street': 'Rua Dois',
+            'district': 'Centro',
+            'city': 'Olinda',
+            'postal_code': '53000-000',
+            'state_code': 'PE',
+          },
+        },
+      ],
+      'next_cursor': null,
+    });
+
+    expect(page.items.single.name, 'Beatriz Nova');
+    expect(page.items.single.phone, isNull);
+    expect(page.items.single.address?.street, 'Rua Dois');
+    expect(page.items.single.address?.district, 'Centro');
+    expect(page.items.single.address?.city, 'Olinda');
+    expect(page.items.single.address?.postalCode, '53000-000');
+    expect(page.items.single.address?.stateCode, 'PE');
+    expect(
+      () => decodeHandoffCandidatePage({
+        'items': [
+          {
+            'student_id': _student,
+            'name': 'Beatriz Nova',
+            'phone': null,
+            'address': {'street': 'Rua Dois', 'unexpected': true},
+          },
+        ],
+        'next_cursor': null,
+      }),
+      throwsA(isA<MinistryDataException>()),
+    );
   });
 
   test('promotes using the operation ID and exact chosen student', () async {

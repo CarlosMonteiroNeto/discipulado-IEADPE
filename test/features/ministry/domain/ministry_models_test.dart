@@ -42,6 +42,54 @@ void main() {
       },
     );
 
+    test('session linkage is nullable and preserves explicit references', () {
+      final base = <String, Object?>{
+        'id': '123e4567-e89b-42d3-a456-426614174020',
+        'congregation_id': '123e4567-e89b-42d3-a456-426614174001',
+        'revision': 2,
+        'created_at': '2026-10-16T12:00:00Z',
+        'updated_at': '2026-10-16T12:30:00Z',
+        'updated_by': '123e4567-e89b-42d3-a456-426614174002',
+        'legacy_firebase_id': null,
+        'class_id': '123e4567-e89b-42d3-a456-426614174021',
+        'date': '2026-10-16',
+        'topic': null,
+        'status': 'open',
+        'roster_frozen': false,
+        'lesson_index': null,
+        'lesson_part': null,
+        'lesson_finished': false,
+      };
+
+      final historical = Session.fromJson({
+        ...base,
+        'replaces_session_id': null,
+        'replacement_session_id': null,
+      });
+      expect(historical.replacesSessionId, isNull);
+      expect(historical.replacementSessionId, isNull);
+
+      final absent = Session.fromJson(base);
+      expect(absent.replacesSessionId, isNull);
+      expect(absent.replacementSessionId, isNull);
+
+      final linked = Session.fromJson({
+        ...base,
+        'replaces_session_id': '123e4567-e89b-42d3-a456-426614174022',
+        'replacement_session_id': '123e4567-e89b-42d3-a456-426614174023',
+      });
+      expect(linked.replacesSessionId, '123e4567-e89b-42d3-a456-426614174022');
+      expect(
+        linked.replacementSessionId,
+        '123e4567-e89b-42d3-a456-426614174023',
+      );
+
+      expect(
+        () => Session.fromJson({...base, 'replaces_session_id': 'not-a-uuid'}),
+        throwsA(isA<MinistryDataException>()),
+      );
+    });
+
     test('decodes canonical person with unknown migrated attribution', () {
       final person = MinistryPerson.fromJson(<String, Object?>{
         'id': '123e4567-e89b-42d3-a456-426614174010',

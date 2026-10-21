@@ -67,7 +67,7 @@ class MinistryRepository {
         'teacher_contact_id': teacherContactId,
         'start_date': startDate.toString(),
         'end_date': endDate?.toString(),
-        if (expectedRevision != null) 'expected_revision': expectedRevision,
+        'expected_revision': ?expectedRevision,
       },
     );
     if (result.revision !=
@@ -253,8 +253,8 @@ class MinistryRepository {
     }
     final commandGateway = transport as MinistryCommandGateway;
     final payload = <String, Object?>{
-      if (id != null) 'id': id,
-      if (expectedRevision != null) 'expected_revision': expectedRevision,
+      'id': ?id,
+      'expected_revision': ?expectedRevision,
       'scope': scope.wire,
       'congregation_id': congregationId,
       'name': name,
@@ -263,7 +263,7 @@ class MinistryRepository {
       'birth_date': birthDate?.toString(),
       'email': email,
       'access': <String, Object?>{
-        if (accessId != null) 'id': accessId,
+        'id': ?accessId,
         'user_email': email,
         'role': accessRole.wireValue,
         'congregation_id': accessCongregationId,
@@ -366,7 +366,7 @@ class MinistryRepository {
         'phone_e164': phoneE164,
         'birth_date': birthDate?.toString(),
         'email': email,
-        if (expectedRevision != null) 'expected_revision': expectedRevision,
+        'expected_revision': ?expectedRevision,
       },
     );
     if (result.revision !=
@@ -589,7 +589,7 @@ class MinistryRepository {
       'phone_e164': phoneE164,
       'birth_date': birthDate?.toString(),
       'email': email,
-      if (expectedRevision != null) 'expected_revision': expectedRevision,
+      'expected_revision': ?expectedRevision,
     });
   }
 
@@ -949,6 +949,28 @@ class MinistryRepository {
     }
   }
 
+  Future<MinistryPage<StudentEnrollmentSummary>> listStudentEnrollments({
+    required String congregationId,
+    required String studentId,
+    int limit = 50,
+    String? cursor,
+  }) async {
+    _uuid(congregationId);
+    _uuid(studentId);
+    _page(limit, cursor);
+    final result = await _read('ministry_list_student_enrollments', {
+      'congregation_id': congregationId,
+      'student_id': studentId,
+      'limit': limit,
+      'cursor': cursor,
+    });
+    try {
+      return decodeStudentEnrollments(result);
+    } on MinistryDataException {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
   Future<EnrollmentProgress> getEnrollmentProgress({
     required String congregationId,
     required String enrollmentId,
@@ -1032,10 +1054,12 @@ class MinistryRepository {
     required String classId,
     required CalendarDate date,
     required String? topic,
+    String? replacesSessionId,
   }) {
     _uuid(id);
     _uuid(congregationId);
     _uuid(classId);
+    if (replacesSessionId != null) _uuid(replacesSessionId);
     return command(
       name: 'create_session',
       operationId: operationId,
@@ -1045,6 +1069,7 @@ class MinistryRepository {
         'class_id': classId,
         'date': date.toString(),
         'topic': topic,
+        'replaces_session_id': ?replacesSessionId,
       },
     );
   }

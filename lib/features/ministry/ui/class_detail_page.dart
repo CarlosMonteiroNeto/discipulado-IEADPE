@@ -42,6 +42,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
   String? _error;
   String? _statusSignature;
   String? _statusOperationId;
+  int _enrollmentReloadToken = 0;
 
   @override
   void initState() {
@@ -127,18 +128,22 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
         ),
       ),
     );
+    if (mounted) setState(() => _enrollmentReloadToken++);
   }
 
-  Future<void> _openSessions() => Navigator.of(context).push<void>(
-    MaterialPageRoute(
-      builder: (_) => SessionListPage(
-        repository: widget.repository,
-        congregationId: widget.congregationId,
-        classSummary: _classSummary,
-        onOpenSession: _openSession,
+  Future<void> _openSessions() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => SessionListPage(
+          repository: widget.repository,
+          congregationId: widget.congregationId,
+          classSummary: _classSummary,
+          onOpenSession: _openSession,
+        ),
       ),
-    ),
-  );
+    );
+    if (mounted) setState(() => _enrollmentReloadToken++);
+  }
 
   Future<bool> _confirmStatus(ClassStatus next) async {
     final accepted = await showDialog<bool>(
@@ -276,6 +281,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                   classId: _classSummary.id,
                   classStartDate: _classSummary.startDate,
                   classEndDate: _classSummary.endDate,
+                  reloadToken: _enrollmentReloadToken,
                   onChanged: widget.onChanged,
                 ),
               ],

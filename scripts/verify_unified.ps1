@@ -60,13 +60,34 @@ try {
         Invoke-Gate 'Static web preflight' 'python' @('scripts/web_preflight.py','build/web')
     } else { Invoke-Gate 'Flutter analyze' 'flutter' @('analyze') }
 
-    $sqlNames = @('access_test.sql','base44_unified_access_test.sql','catalog_test.sql','convert_commands_test.sql','convert_student_link_test.sql','feedback_test.sql','import_test.sql','lifecycle_test.sql','ministry_academic_test.sql','ministry_access_test.sql','ministry_congregations_test.sql','ministry_registry_test.sql','ministry_ui_reads_test.sql','photos_test.sql','unified_scope_test.sql','weekly_test.sql')
-    foreach ($scenario in $sqlNames) { Invoke-Gate "SQL $scenario" 'python' @('scripts/test_database.py',$scenario) }
-    Invoke-Gate 'Synthetic migration rehearsal' 'python' @('-m','unittest','discover','-s','test/migration','-p','*_test.py')
-    foreach ($race in @('catalog','access','convert','convert-student','import','lifecycle','ministry-registry','ministry-academic')) {
-        $flag = "--$race-concurrency"
-        Invoke-Gate "Concurrency $race" 'python' @('scripts/test_database.py',$flag)
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $caseLines = & python 'scripts/verification_cases.py' '--cases-lines' 2>&1
+        $manifestExit = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
     }
+    if ($manifestExit -ne 0) {
+        $detail = ($caseLines | Out-String).Trim()
+        $results.Add([pscustomobject]@{ Name='Verification case manifest'; State='FAIL'; Exit=$manifestExit; Command='python scripts/verification_cases.py --cases-lines'; Detail=$detail })
+        Add-Content $transcript "[FAIL] Verification case manifest exit=$manifestExit`n$detail"
+    } else {
+        foreach ($caseLine in $caseLines) {
+            if (-not $caseLine) { continue }
+            $fields = ([string]$caseLine).Split("`t")
+            if ($fields.Length -lt 3) {
+                $results.Add([pscustomobject]@{ Name='Verification case manifest'; State='FAIL'; Exit=1; Command='python scripts/verification_cases.py --cases-lines'; Detail='malformed case line' })
+                continue
+            }
+            $kind = $fields[0]
+            $name = $fields[1]
+            $arguments = [string[]]@('scripts/test_database.py') + [string[]]$fields[2..($fields.Length - 1)]
+            $gateName = if ($kind -eq 'sql') { "SQL $name" } else { "Concurrency $name" }
+            Invoke-Gate $gateName 'python' $arguments
+        }
+    }
+    Invoke-Gate 'Synthetic migration rehearsal' 'python' @('-m','unittest','discover','-s','test/migration','-p','*_test.py')
 
     if (-not $env:SUPABASE_URL -or -not $env:SUPABASE_ANON_KEY) {
         Add-BlockedHealthChecks 'SUPABASE_URL or SUPABASE_ANON_KEY is unset'

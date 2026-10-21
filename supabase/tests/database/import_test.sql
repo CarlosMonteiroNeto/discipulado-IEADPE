@@ -19,9 +19,11 @@ SELECT set_config('request.jwt.claim.sub','16000000-0000-0000-0000-000000000001'
 DO $$ DECLARE response jsonb; p jsonb:='{"internal_id":"legacy-16","name":"Synthetic","landmark":"Praça","gender":"male","conversion_date":"2020-01-07","worship_type":"Oração","congregation_name":"Synthetic import","age":0,"visit_count":4,"was_visited_once":true,"last_visit_date":"2020-02-01","is_in_discipleship":true,"discipleship_start_date":null}'; BEGIN
  response:=public.ieadpe_import_convert('16000000-0000-0000-0000-000000000006',p);
  PERFORM pg_temp.assert_true(response->>'status'='created','new row committed');
+ PERFORM pg_temp.assert_true((SELECT revision=1 AND person_id IS NULL FROM public.converts WHERE internal_id='legacy-16'),'new import revision defaults to one and stays unlinked');
  PERFORM pg_temp.assert_true(response=public.ieadpe_import_convert('16000000-0000-0000-0000-000000000006',p),'uncertain retry reconciles same receipt');
  PERFORM pg_temp.assert_true(public.ieadpe_import_convert(gen_random_uuid(),p)->>'status'='duplicate','reimport skips stable legacy ID');
- PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM public.converts),'one legacy row');
+ PERFORM pg_temp.assert_true((SELECT revision=1 AND person_id IS NULL FROM public.converts WHERE internal_id='legacy-16'),'duplicate keeps revision and null link');
+ PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM public.converts),'one legacy row after duplicate');
  PERFORM pg_temp.assert_true((SELECT age=0 AND visit_count=4 AND was_visited_once AND last_visit_date='2020-02-01' AND discipleship_start_date IS NULL FROM public.converts),'historical state and missing eligibility start preserved');
  PERFORM pg_temp.assert_true((SELECT count(*)=0 FROM public.convert_events),'no invented historical events');
  BEGIN PERFORM public.ieadpe_transition_convert(gen_random_uuid(),jsonb_build_object('id',response->>'id','action','complete'));
@@ -71,8 +73,15 @@ SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.weekly_reports),'faile
 -- Normal edits can move the conversion date without changing historical clocks.
 SET LOCAL ROLE authenticated;
 DO $$ DECLARE source_id uuid; imported jsonb; p jsonb; BEGIN
- source_id:=(public.ieadpe_create_convert(gen_random_uuid(),'{"name":"Synthetic edited date","landmark":"Square","gender":"male","conversion_date":"2020-01-01","worship_type":"Prayer"}')->>'id')::uuid;
- PERFORM public.ieadpe_edit_convert(gen_random_uuid(),jsonb_build_object('id',source_id,'conversion_date','2021-01-01'));
+ source_id:=(public.ieadpe_create_convert(gen_random_uuid(),jsonb_build_object(
+  'congregation_id','16000000-0000-0000-0000-000000000003',
+  'person',jsonb_build_object('name','Synthetic edited date'),
+  'convert',jsonb_build_object('landmark','Square','gender','male','conversion_date','2020-01-01','worship_type','Prayer')))->>'id')::uuid;
+ PERFORM public.ieadpe_edit_convert(gen_random_uuid(),jsonb_build_object(
+  'id',source_id,'congregation_id','16000000-0000-0000-0000-000000000003',
+  'expected_revision',1,'expected_person_revision',1,
+  'person',jsonb_build_object('name','Synthetic edited date'),
+  'convert',jsonb_build_object('landmark','Square','gender','male','conversion_date','2021-01-01','worship_type','Prayer')));
  SELECT jsonb_build_object('internal_id','edited-history-copy','name',name,'landmark',landmark,'gender',gender,
   'conversion_date',conversion_date,'worship_type',worship_type,'last_visit_date',last_visit_date,
   'discipleship_start_date',discipleship_start_date) INTO p FROM public.converts WHERE id=source_id;

@@ -154,6 +154,14 @@ class SupabaseGateway
               error.code == '401') {
             throw const DataFailure('permission');
           }
+          if (error.code == '23505' &&
+              error.message.trim() == 'academic_conflict') {
+            throw const DataFailure('academic_conflict');
+          }
+          if (error.code == '22023' &&
+              error.message.trim() == 'academic_invalid') {
+            throw const DataFailure('academic_invalid');
+          }
           if (error.code == '22023' ||
               error.code == '22P02' ||
               error.code == '23514') {
@@ -539,6 +547,12 @@ class SupabaseGateway
       },
       'ministry_get_session_attendance': {'congregation_id', 'session_id'},
       'ministry_get_enrollment_progress': {'congregation_id', 'enrollment_id'},
+      'ministry_list_student_enrollments': {
+        'congregation_id',
+        'student_id',
+        'limit',
+        'cursor',
+      },
       'ministry_get_overview': {'congregation_id'},
       'ministry_list_pending_sessions': {'congregation_id', 'limit', 'cursor'},
       'ministry_list_convert_referrals': {'congregation_id', 'limit', 'cursor'},
@@ -587,6 +601,12 @@ class SupabaseGateway
       'ministry_list_class_sessions': {
         'congregation_id',
         'class_id',
+        'limit',
+        'cursor',
+      },
+      'ministry_list_student_enrollments': {
+        'congregation_id',
+        'student_id',
         'limit',
         'cursor',
       },
@@ -710,7 +730,14 @@ class SupabaseGateway
         'end_date',
         'expected_revision',
       },
-      'create_session': {'id', 'congregation_id', 'class_id', 'date', 'topic'},
+      'create_session': {
+        'id',
+        'congregation_id',
+        'class_id',
+        'date',
+        'topic',
+        'replaces_session_id',
+      },
       'cancel_session': {'id', 'congregation_id', 'expected_revision'},
       'save_attendance': {
         'congregation_id',
@@ -816,6 +843,12 @@ class SupabaseGateway
     if (!payload.keys.toSet().containsAll(required[command]!)) {
       throw const DataFailure('invalid');
     }
+    if (command == 'create_session' &&
+        payload.containsKey('replaces_session_id') &&
+        payload['replaces_session_id'] != null &&
+        payload['replaces_session_id'] is! String) {
+      throw const DataFailure('invalid');
+    }
     for (final key in [
       'id',
       'congregation_id',
@@ -824,6 +857,7 @@ class SupabaseGateway
       'person_id',
       'session_id',
       'previous_contact_id',
+      'replaces_session_id',
     ]) {
       if (payload.containsKey(key) && payload[key] != null) {
         validateUuid(payload[key]);
@@ -926,7 +960,7 @@ class SupabaseGateway
           rawAccess is! Map) {
         throw const DataFailure('invalid');
       }
-      final access = Map<String, Object?>.from(rawAccess as Map);
+      final access = Map<String, Object?>.from(rawAccess);
       const accessFields = {'id', 'user_email', 'role', 'congregation_id'};
       if (access.keys.toSet().difference(accessFields).isNotEmpty ||
           !access.keys.toSet().containsAll({

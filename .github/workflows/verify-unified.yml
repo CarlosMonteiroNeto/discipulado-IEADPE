@@ -31,22 +31,37 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
-          channel: stable
+          flutter-version: '3.47.7'
           cache: true
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Verify runner Chrome and ChromeDriver
+      - uses: browser-actions/setup-chrome@v1
+        id: pinned-chrome
+        with:
+          chrome-version: '139.0.7258.154'
+      - uses: browser-actions/setup-chromedriver@v1
+        with:
+          chromedriver-version: '139.0.7258.154'
+      - name: Verify pinned Flutter fonts and ChromeDriver
+        env:
+          CHROME_EXECUTABLE: ${{ steps.pinned-chrome.outputs.chrome-path }}
         run: |
           set -euo pipefail
-          test -n "${CHROMEWEBDRIVER:-}"
-          driver="$CHROMEWEBDRIVER/chromedriver"
-          test -x "$driver"
-          echo "$CHROMEWEBDRIVER" >> "$GITHUB_PATH"
-          chrome_major="$(google-chrome --version | sed -E 's/.* ([0-9]+)\..*/\1/')"
-          driver_major="$("$driver" --version | sed -E 's/.*ChromeDriver ([0-9]+)\..*/\1/')"
-          test "$chrome_major" = "$driver_major"
-          echo "Chrome/ChromeDriver major version $chrome_major is compatible."
+          flutter_root="$(dirname "$(dirname "$(command -v flutter)")")"
+          font_dir="$flutter_root/bin/cache/artifacts/material_fonts"
+          printf '%s  %s\n' \
+            '79e851404657dac2106b3d22ad256d47824a9a5765458edb72c9102a45816d95' "$font_dir/Roboto-Regular.ttf" \
+            'd9865b671a09d683d13a863089d8825e0f61a37696ce5d7d448bc8023aa62453' "$font_dir/MaterialIcons-Regular.otf" \
+            | sha256sum --check --status
+          test -n "${CHROME_EXECUTABLE:-}"
+          test -x "$CHROME_EXECUTABLE"
+          chrome_bin="$CHROME_EXECUTABLE"
+          chrome_version="$("$chrome_bin" --version | sed -E 's/.* ([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+).*/\1/')"
+          test "$chrome_version" = '139.0.7258.154'
+          driver_version="$(chromedriver --version | sed -E 's/^ChromeDriver ([0-9.]+) .*/\1/')"
+          test "$driver_version" = '139.0.7258.154'
+          echo 'Pinned Flutter SDK fonts, Chrome, and ChromeDriver verified.'
       - uses: supabase/setup-cli@v1
         with:
           version: latest
@@ -69,6 +84,8 @@ jobs:
               env_file.write(f"SUPABASE_URL={api_url}\nSUPABASE_ANON_KEY={anon_key}\n")
           '
       - name: Run the unified gate
+        env:
+          CHROME_EXECUTABLE: ${{ steps.pinned-chrome.outputs.chrome-path }}
         run: bash scripts/verify_unified.sh
       - name: Publish verification report
         if: always()

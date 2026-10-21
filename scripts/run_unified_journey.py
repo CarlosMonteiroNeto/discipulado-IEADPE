@@ -22,9 +22,10 @@ import tempfile
 import threading
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 
 from local_supabase_guard import (
@@ -67,6 +68,8 @@ class JourneyFixture:
     congregation_b_id: str
     class_id: str
     session_id: str
+    student_id: str
+    person_id: str
     enrollment_id: str
     attack_enrollment_id: str
     registrar_id: str
@@ -107,6 +110,8 @@ class JourneyFixture:
             "JOURNEY_CONGREGATION_B_ID": self.congregation_b_id,
             "JOURNEY_CLASS_ID": self.class_id,
             "JOURNEY_SESSION_ID": self.session_id,
+            "JOURNEY_STUDENT_ID": self.student_id,
+            "JOURNEY_PERSON_ID": self.person_id,
             "JOURNEY_ENROLLMENT_ID": self.enrollment_id,
             "JOURNEY_ATTACK_ENROLLMENT_ID": self.attack_enrollment_id,
             "JOURNEY_REGISTRAR_EMAIL": self.registrar_email,
@@ -162,6 +167,8 @@ def make_fixture(
         congregation_b_id=id_for("congregation-b"),
         class_id=id_for("class-a"),
         session_id=id_for("session-a"),
+        student_id=id_for("student"),
+        person_id=id_for("person"),
         enrollment_id=id_for("expected-enrollment"),
         attack_enrollment_id=id_for("out-of-scope-enrollment-attempt"),
         registrar_id=id_for("registrar"),
@@ -225,29 +232,69 @@ def cleanup_sql(fixture: JourneyFixture) -> str:
     )
     return f"""-- run_id: {f.run_id}
 BEGIN;
+CREATE TEMP TABLE journey_owned_converts ON COMMIT DROP AS
+ {convert_ids};
+CREATE TEMP TABLE journey_owned_students ON COMMIT DROP AS
+ SELECT s.id FROM public.ministry_students s
+ WHERE s.congregation_id={_sql_uuid(f.congregation_a_id)}
+   AND (s.id={_sql_uuid(f.student_id)} OR s.convert_id IN (SELECT id FROM journey_owned_converts));
+CREATE TEMP TABLE journey_owned_enrollments ON COMMIT DROP AS
+ SELECT e.id FROM public.ministry_enrollments e
+ WHERE e.congregation_id={_sql_uuid(f.congregation_a_id)}
+   AND (e.class_id={_sql_uuid(f.class_id)} OR e.student_id IN (SELECT id FROM journey_owned_students));
+CREATE TEMP TABLE journey_owned_sessions ON COMMIT DROP AS
+ SELECT s.id FROM public.ministry_sessions s
+ WHERE s.congregation_id={_sql_uuid(f.congregation_a_id)}
+   AND s.class_id={_sql_uuid(f.class_id)};
+CREATE TEMP TABLE journey_owned_people ON COMMIT DROP AS
+ SELECT { _sql_uuid(f.person_id) } AS id
+ UNION
+ SELECT c.person_id FROM public.converts c
+ WHERE c.id IN (SELECT id FROM journey_owned_converts) AND c.person_id IS NOT NULL
+ UNION
+ SELECT s.person_id FROM public.ministry_students s
+ JOIN journey_owned_students owned ON owned.id=s.id
+ WHERE s.person_id IS NOT NULL;
 DELETE FROM public.ministry_attendance
- WHERE session_id={_sql_uuid(f.session_id)}
-    OR enrollment_id IN (SELECT e.id FROM public.ministry_enrollments e
-                         WHERE e.class_id={_sql_uuid(f.class_id)});
+ WHERE session_id IN (SELECT id FROM journey_owned_sessions)
+    OR enrollment_id IN (SELECT id FROM journey_owned_enrollments);
 DELETE FROM public.ministry_session_roster
- WHERE session_id={_sql_uuid(f.session_id)}
-    OR enrollment_id IN (SELECT e.id FROM public.ministry_enrollments e
-                         WHERE e.class_id={_sql_uuid(f.class_id)});
+ WHERE session_id IN (SELECT id FROM journey_owned_sessions)
+    OR enrollment_id IN (SELECT id FROM journey_owned_enrollments);
 DELETE FROM public.ministry_enrollments
- WHERE class_id={_sql_uuid(f.class_id)}
-    OR student_id IN (SELECT s.id FROM public.ministry_students s
-                      WHERE s.congregation_id={_sql_uuid(f.congregation_a_id)}
-                        AND s.convert_id IN ({convert_ids}));
-DELETE FROM public.ministry_sessions
- WHERE id={_sql_uuid(f.session_id)} AND class_id={_sql_uuid(f.class_id)}
-   AND congregation_id={_sql_uuid(f.congregation_a_id)};
+ WHERE id IN (SELECT id FROM journey_owned_enrollments);
+DO $journey_cleanup$
+DECLARE owned_session record;
+BEGIN
+ FOR owned_session IN
+  WITH RECURSIVE session_lineage(id,depth) AS (
+   SELECT s.id,0 FROM public.ministry_sessions s
+   JOIN journey_owned_sessions owned ON owned.id=s.id
+   WHERE s.replaces_session_id IS NULL OR NOT EXISTS(
+    SELECT FROM journey_owned_sessions parent WHERE parent.id=s.replaces_session_id)
+   UNION ALL
+   SELECT child.id,parent.depth+1 FROM public.ministry_sessions child
+   JOIN journey_owned_sessions owned ON owned.id=child.id
+   JOIN session_lineage parent ON child.replaces_session_id=parent.id
+  )
+  SELECT id,max(depth) AS depth FROM session_lineage
+  GROUP BY id ORDER BY max(depth) DESC
+ LOOP
+  DELETE FROM public.ministry_sessions s
+  WHERE s.id=owned_session.id AND EXISTS(
+   SELECT FROM journey_owned_sessions owned WHERE owned.id=s.id);
+ END LOOP;
+END
+$journey_cleanup$;
 DELETE FROM public.ministry_students
- WHERE congregation_id={_sql_uuid(f.congregation_a_id)}
-   AND convert_id IN ({convert_ids});
+ WHERE id IN (SELECT id FROM journey_owned_students);
 DELETE FROM public.convert_events
- WHERE convert_id IN ({convert_ids});
+ WHERE convert_id IN (SELECT id FROM journey_owned_converts);
 DELETE FROM public.converts
- WHERE id IN ({convert_ids});
+ WHERE id IN (SELECT id FROM journey_owned_converts);
+DELETE FROM public.ministry_people
+ WHERE id IN (SELECT id FROM journey_owned_people)
+   AND congregation_id={_sql_uuid(f.congregation_a_id)};
 DELETE FROM public.ministry_classes
  WHERE id={_sql_uuid(f.class_id)} AND congregation_id={_sql_uuid(f.congregation_a_id)};
 DELETE FROM public.user_access
@@ -257,6 +304,8 @@ DELETE FROM public.user_access
         AND role={_sql_text(DIRECTION_ROLE)} AND congregation_id={_sql_uuid(f.congregation_a_id)})
     OR (id={_sql_uuid(f.out_of_scope_assignment_id)} AND user_email={_sql_text(f.out_of_scope_email)}
         AND role={_sql_text(DIRECTION_ROLE)} AND congregation_id={_sql_uuid(f.congregation_b_id)});
+DELETE FROM private.congregation_week_guards
+ WHERE congregation_id IN ({_sql_uuid(f.congregation_a_id)},{_sql_uuid(f.congregation_b_id)});
 DELETE FROM private.mutation_receipts WHERE actor_uid IN (
   {_sql_uuid(f.registrar_id)},{_sql_uuid(f.supervisor_id)},
   {_sql_uuid(f.direction_id)},{_sql_uuid(f.out_of_scope_id)});
@@ -308,6 +357,8 @@ def flutter_settings(
         "JOURNEY_CONGREGATION_B_ID",
         "JOURNEY_CLASS_ID",
         "JOURNEY_SESSION_ID",
+        "JOURNEY_STUDENT_ID",
+        "JOURNEY_PERSON_ID",
         "JOURNEY_ENROLLMENT_ID",
         "JOURNEY_ATTACK_ENROLLMENT_ID",
         "JOURNEY_REGISTRAR_EMAIL",
@@ -594,6 +645,25 @@ def _admin_create_user(config: LocalSupabase, user: JourneyUser) -> None:
         raise JourneyFailure("Local Auth did not create the expected synthetic user.")
 
 
+def _admin_delete_user(config: LocalSupabase, user_id: str) -> None:
+    """Delete one exact run-generated Auth user from the validated local API."""
+
+    owned_user_id = str(_uuid(user_id))
+    try:
+        request_json(
+            config.api_url + "/auth/v1/admin/users/" + owned_user_id,
+            method="DELETE",
+            headers={
+                "apikey": config.service_role_key,
+                "Authorization": "Bearer " + config.service_role_key,
+            },
+            timeout=15,
+        )
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+
+
 def _fixture_users(fixture: JourneyFixture) -> tuple[JourneyUser, ...]:
     return (
         JourneyUser(fixture.registrar_id, fixture.registrar_email, fixture.registrar_password),
@@ -826,6 +896,8 @@ def _run_browser_journey(
     fixture: JourneyFixture,
     driver: str,
     chrome: str,
+    *,
+    on_owned_identity: Callable[[str, str], None] | None = None,
 ) -> None:
     driver_port = _free_loopback_port()
     control: RevocationControl | None = None
@@ -869,6 +941,11 @@ def _run_browser_journey(
                 timeout=900,
                 check=False,
             )
+        owned_identity = _owned_identity_from_output(
+            (result.stdout or "") + "\n" + (result.stderr or "")
+        )
+        if owned_identity is not None and on_owned_identity is not None:
+            on_owned_identity(*owned_identity)
         if result.returncode != 0:
             if any(
                 marker in (result.stdout + result.stderr).lower()
@@ -882,8 +959,19 @@ def _run_browser_journey(
             ):
                 raise PrerequisiteBlocked("Local Chromium journey could not start.")
             raise JourneyFailure("The local Chromium journey failed.")
+        if owned_identity is None:
+            raise JourneyFailure("The browser journey did not report its owned student identity.")
     except subprocess.TimeoutExpired as error:
-        raise PrerequisiteBlocked("The local Chromium journey timed out.") from error
+        output = error.stdout or ""
+        stderr = error.stderr or ""
+        if isinstance(output, bytes):
+            output = output.decode("utf-8", errors="replace")
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode("utf-8", errors="replace")
+        owned_identity = _owned_identity_from_output(str(output) + "\n" + str(stderr))
+        if owned_identity is not None and on_owned_identity is not None:
+            on_owned_identity(*owned_identity)
+        raise JourneyFailure("The local Chromium journey timed out after launch.") from error
     finally:
         if process is not None and process.poll() is None:
             process.terminate()
@@ -894,6 +982,23 @@ def _run_browser_journey(
                 process.wait(timeout=3)
         if control is not None:
             control.close()
+
+
+def _owned_identity_from_output(output: str) -> tuple[str, str] | None:
+    """Read only UUIDs emitted by the integration test for exact cleanup."""
+
+    matches = set(
+        re.findall(
+            r"T11_CLEANUP_IDS=([0-9a-fA-F-]{36}),([0-9a-fA-F-]{36})",
+            output,
+        )
+    )
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise JourneyFailure("The browser journey reported conflicting cleanup identities.")
+    student_id, person_id = next(iter(matches))
+    return str(_uuid(student_id)), str(_uuid(person_id))
 
 
 def _preflight_local_services(config: LocalSupabase) -> None:
@@ -918,39 +1023,91 @@ def _preflight_local_services(config: LocalSupabase) -> None:
 def run_journey() -> int:
     """Run one fully isolated journey and always attempt exact fixture cleanup."""
 
+    failures: list[tuple[str, str]] = []
     try:
         config = local_supabase_from_status(read_supabase_status())
-    except PrerequisiteBlocked:
+    except PrerequisiteBlocked as error:
+        _write_failure("prerequisite", error)
         return BLOCKED
-    except (UnsafeSupabaseTarget, ValueError):
+    except (UnsafeSupabaseTarget, ValueError) as error:
+        _write_failure("target", error)
         return BLOCKED
 
     try:
         driver, chrome = check_browser_prerequisites()
         _preflight_local_services(config)
-    except PrerequisiteBlocked:
+    except PrerequisiteBlocked as error:
+        _write_failure("prerequisite", error)
         return BLOCKED
 
     fixture = make_fixture()
+    cleanup_fixture = fixture
+
+    def record_owned_identity(student_id: str, person_id: str) -> None:
+        nonlocal cleanup_fixture
+        cleanup_fixture = replace(
+            fixture,
+            student_id=str(_uuid(student_id)),
+            person_id=str(_uuid(person_id)),
+        )
+
     setup_attempted = False
     primary_error: int | None = None
+    attempted_users: list[JourneyUser] = []
     try:
         setup_attempted = True
         for user in _fixture_users(fixture):
+            attempted_users.append(user)
             _admin_create_user(config, user)
         run_sql(setup_sql(fixture), config.database_url)
-        _run_browser_journey(config, fixture, driver, chrome)
-    except PrerequisiteBlocked:
+        _run_browser_journey(
+            config,
+            fixture,
+            driver,
+            chrome,
+            on_owned_identity=record_owned_identity,
+        )
+    except PrerequisiteBlocked as error:
         primary_error = BLOCKED
-    except Exception:
+        failures.append(("primary", _safe_failure_reason(error)))
+    except Exception as error:
         primary_error = FAIL
+        failures.append(("primary", type(error).__name__))
     finally:
         if setup_attempted:
             try:
-                run_sql(cleanup_sql(fixture), config.database_url)
-            except Exception:
+                run_sql(cleanup_sql(cleanup_fixture), config.database_url)
+            except Exception as error:
                 primary_error = FAIL
+                failures.append(("cleanup", type(error).__name__))
+            for user in reversed(attempted_users):
+                try:
+                    _admin_delete_user(config, user.id)
+                except Exception as error:
+                    primary_error = FAIL
+                    failures.append(("auth_cleanup", type(error).__name__))
+    if failures:
+        _write_failure_summary(failures)
     return primary_error if primary_error is not None else PASS
+
+
+def _write_failure(stage: str, error: Exception) -> None:
+    """Print safe prerequisite detail while hiding external exception text."""
+
+    _write_failure_summary([(stage, _safe_failure_reason(error))])
+
+
+def _safe_failure_reason(error: Exception) -> str:
+    """Prerequisite messages are runner-authored constants; other errors are opaque."""
+
+    if isinstance(error, PrerequisiteBlocked):
+        return str(error)
+    return type(error).__name__
+
+
+def _write_failure_summary(failures: list[tuple[str, str]]) -> None:
+    summary = ",".join(f"{stage}:{kind}" for stage, kind in failures)
+    print(f"UNIFIED_JOURNEY_FAILURES={summary}", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:

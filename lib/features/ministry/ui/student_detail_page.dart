@@ -5,10 +5,11 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
 import '../../../ui/base44_widgets.dart';
-import '../../../ui/unified_theme.dart';
 import '../../people/person_fields.dart';
+import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
+import 'enrollment_progress_panel.dart';
 
 class StudentDetailPage extends StatefulWidget {
   const StudentDetailPage({
@@ -429,8 +430,9 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
               nameValidator: (value) {
                 final name = value?.trim() ?? '';
                 if (name.isEmpty) return 'Nome é obrigatório';
-                if (name.length > 200)
+                if (name.length > 200) {
                   return 'O nome deve ter até 200 caracteres';
+                }
                 return null;
               },
               birthDateValidator: (value) =>
@@ -566,6 +568,13 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                 const SizedBox(height: 12),
                 _academicSection(student),
                 const SizedBox(height: 12),
+                _EnrollmentHistorySection(
+                  key: ValueKey('${widget.congregationId}:${widget.studentId}'),
+                  repository: widget.repository,
+                  congregationId: widget.congregationId,
+                  studentId: widget.studentId,
+                ),
+                const SizedBox(height: 12),
                 Base44Panel(
                   child: Wrap(
                     alignment: WrapAlignment.end,
@@ -607,6 +616,324 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
           ),
         ),
       ),
+    ),
+  );
+}
+
+/// Bounded, paginated enrollment history for one student.
+///
+/// Progress is fetched only for the explicitly selected enrollment. A new
+/// selection replaces the previous panel state, so an obsolete reply can never
+/// render under another student, scope or enrollment.
+class _EnrollmentHistorySection extends StatefulWidget {
+  const _EnrollmentHistorySection({
+    super.key,
+    required this.repository,
+    required this.congregationId,
+    required this.studentId,
+  });
+
+  final MinistryRepository repository;
+  final String congregationId;
+  final String studentId;
+
+  @override
+  State<_EnrollmentHistorySection> createState() =>
+      _EnrollmentHistorySectionState();
+}
+
+/// Ownership of the most recent failed enrollment-history request.
+enum _EnrollmentHistoryOperation { firstPage, more }
+
+class _EnrollmentHistorySectionState extends State<_EnrollmentHistorySection> {
+  List<StudentEnrollmentSummary> _items = const [];
+  String? _nextCursor;
+  String? _selectedEnrollmentId;
+  bool _loading = true;
+  bool _loadingMore = false;
+  String? _error;
+  _EnrollmentHistoryOperation? _failedOperation;
+  int _generation = 0;
+  int _progressGeneration = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFirst();
+  }
+
+  @override
+  void didUpdateWidget(covariant _EnrollmentHistorySection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.congregationId != widget.congregationId ||
+        oldWidget.studentId != widget.studentId) {
+      _items = const [];
+      _nextCursor = null;
+      _selectedEnrollmentId = null;
+      _error = null;
+      _failedOperation = null;
+      _loadFirst();
+    }
+  }
+
+  Future<void> _loadFirst({bool refresh = false}) async {
+    final generation = ++_generation;
+    final congregationId = widget.congregationId;
+    final studentId = widget.studentId;
+    setState(() {
+      _loading = true;
+      _loadingMore = false;
+      _error = null;
+      _failedOperation = null;
+      if (refresh) _progressGeneration++;
+    });
+    try {
+      final page = await widget.repository.listStudentEnrollments(
+        congregationId: congregationId,
+        studentId: studentId,
+        limit: 50,
+      );
+      if (!mounted ||
+          generation != _generation ||
+          congregationId != widget.congregationId ||
+          studentId != widget.studentId) {
+        return;
+      }
+      setState(() {
+        _items = page.items;
+        _nextCursor = page.nextCursor;
+        _loading = false;
+        _failedOperation = null;
+        if (!_items.any((item) => item.id == _selectedEnrollmentId)) {
+          _selectedEnrollmentId = null;
+        }
+      });
+    } catch (error) {
+      if (!mounted ||
+          generation != _generation ||
+          congregationId != widget.congregationId ||
+          studentId != widget.studentId) {
+        return;
+      }
+      setState(() {
+        _loading = false;
+        _error = _message(error);
+        _failedOperation = _EnrollmentHistoryOperation.firstPage;
+      });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loadingMore) return;
+    final generation = _generation;
+    final congregationId = widget.congregationId;
+    final studentId = widget.studentId;
+    setState(() {
+      _loadingMore = true;
+      _error = null;
+      _failedOperation = null;
+    });
+    try {
+      final page = await widget.repository.listStudentEnrollments(
+        congregationId: congregationId,
+        studentId: studentId,
+        limit: 50,
+        cursor: cursor,
+      );
+      if (!mounted ||
+          generation != _generation ||
+          congregationId != widget.congregationId ||
+          studentId != widget.studentId) {
+        return;
+      }
+      setState(() {
+        _items = List.unmodifiable([..._items, ...page.items]);
+        _nextCursor = page.nextCursor;
+        _loadingMore = false;
+        _failedOperation = null;
+      });
+    } catch (error) {
+      if (!mounted ||
+          generation != _generation ||
+          congregationId != widget.congregationId ||
+          studentId != widget.studentId) {
+        return;
+      }
+      setState(() {
+        _loadingMore = false;
+        _error = _message(error);
+        _failedOperation = _EnrollmentHistoryOperation.more;
+      });
+    }
+  }
+
+  void _retry() {
+    switch (_failedOperation) {
+      case _EnrollmentHistoryOperation.firstPage:
+        _loadFirst();
+      case _EnrollmentHistoryOperation.more:
+        _loadMore();
+      case null:
+        if (_items.isEmpty || _nextCursor == null) {
+          _loadFirst();
+        } else {
+          _loadMore();
+        }
+    }
+  }
+
+  void _toggle(String enrollmentId) {
+    setState(() {
+      _selectedEnrollmentId = _selectedEnrollmentId == enrollmentId
+          ? null
+          : enrollmentId;
+    });
+  }
+
+  String _message(Object error) {
+    if (error is DataFailure) {
+      return switch (error.code) {
+        'permission' || 'forbidden' =>
+          'Seu acesso mudou. Volte e atualize a sessão para ver o histórico.',
+        'stale' =>
+          'Sua sessão ou congregação mudou. Atualize a página para continuar.',
+        _ => 'Não foi possível carregar o histórico de matrículas.',
+      };
+    }
+    return 'Não foi possível carregar o histórico de matrículas.';
+  }
+
+  String _statusLabel(EnrollmentStatus status) => switch (status) {
+    EnrollmentStatus.active => 'Ativa',
+    EnrollmentStatus.completed => 'Concluída',
+    EnrollmentStatus.withdrawn => 'Desistência',
+  };
+
+  Widget _enrollmentRow(StudentEnrollmentSummary item) {
+    final selected = _selectedEnrollmentId == item.id;
+    final end = item.endDate?.toString() ?? 'em andamento';
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(item.className, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+          Wrap(
+            spacing: 8,
+            runSpacing: 2,
+            children: [
+              Text(_statusLabel(item.status)),
+              Text('Início: ${item.startDate}'),
+              Text('Término: $end'),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Semantics(
+              button: true,
+              label:
+                  '${selected ? 'Ocultar' : 'Ver'} progresso da matrícula em '
+                  '${item.className}',
+              onTap: () => _toggle(item.id),
+              child: ExcludeSemantics(
+                child: TextButton(
+                  key: Key('enrollment-progress-${item.id}'),
+                  onPressed: () => _toggle(item.id),
+                  child: Text(selected ? 'Ocultar progresso' : 'Ver progresso'),
+                ),
+              ),
+            ),
+          ),
+          if (selected) ...[
+            EnrollmentProgressPanel(
+              key: ValueKey(
+                'student-enrollment-progress-${item.id}-$_progressGeneration',
+              ),
+              repository: widget.repository,
+              congregationId: widget.congregationId,
+              enrollmentId: item.id,
+            ),
+            const SizedBox(height: 8),
+          ],
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => Base44Panel(
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            Text(
+              'Histórico de matrículas',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            TextButton.icon(
+              key: const Key('refresh-enrollment-history'),
+              onPressed: _loading ? null : () => _loadFirst(refresh: true),
+              icon: const Icon(Icons.refresh),
+              label: const Text('Atualizar histórico'),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'Selecione uma matrícula para consultar o progresso persistido.',
+        ),
+        const SizedBox(height: 8),
+        if (_loading && _items.isEmpty) ...[
+          const LinearProgressIndicator(
+            semanticsLabel: 'Carregando histórico de matrículas',
+          ),
+          const SizedBox(height: 8),
+          const Text('Carregando histórico de matrículas…'),
+        ],
+        if (_error != null) ...[
+          Semantics(liveRegion: true, child: Text(_error!)),
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('retry-enrollment-history'),
+              onPressed: _loading || _loadingMore ? null : _retry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Tentar novamente'),
+            ),
+          ),
+        ],
+        if (!_loading && _error == null && _items.isEmpty)
+          const Text('Nenhuma matrícula registrada para este aluno.'),
+        for (final item in _items) ...[const Divider(), _enrollmentRow(item)],
+        if (_nextCursor != null) ...[
+          const SizedBox(height: 4),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              key: const Key('load-more-enrollments'),
+              onPressed: _loading || _loadingMore ? null : _loadMore,
+              icon: const Icon(Icons.expand_more),
+              label: const Text('Carregar mais histórico'),
+            ),
+          ),
+        ],
+        if (_loadingMore)
+          const Padding(
+            padding: EdgeInsets.only(top: 8),
+            child: LinearProgressIndicator(
+              semanticsLabel: 'Carregando mais matrículas',
+            ),
+          ),
+      ],
     ),
   );
 }
