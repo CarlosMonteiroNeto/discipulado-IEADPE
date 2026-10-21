@@ -30,6 +30,47 @@ import '../integration_test/unified_journey_test.dart' as journey;
 
 class LoopbackHttp extends HttpOverrides {}
 
+class _CapturedZoneHttpClient extends http.BaseClient {
+  _CapturedZoneHttpClient(this.inner, this.zone);
+
+  final http.BaseClient inner;
+  final Zone zone;
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final response = await zone.run(() => inner.send(request));
+    late final StreamSubscription<List<int>> subscription;
+    late final StreamController<List<int>> body;
+    body = StreamController<List<int>>(
+      onListen: () {
+        zone.run(() {
+          subscription = response.stream.listen(
+            body.add,
+            onError: body.addError,
+            onDone: body.close,
+          );
+        });
+      },
+      onPause: () => subscription.pause(),
+      onResume: () => subscription.resume(),
+      onCancel: () => subscription.cancel(),
+    );
+    return http.StreamedResponse(
+      body.stream,
+      response.statusCode,
+      contentLength: response.contentLength,
+      request: response.request,
+      headers: response.headers,
+      isRedirect: response.isRedirect,
+      persistentConnection: response.persistentConnection,
+      reasonPhrase: response.reasonPhrase,
+    );
+  }
+
+  @override
+  void close() => inner.close();
+}
+
 http.Request _studentRegistrationRequest(Map<String, String> ids) {
   return http.Request(
     'POST',
@@ -51,6 +92,11 @@ class RootFixture {
   bool admin = true, failScope = false;
   String? displayName;
   Completer<void>? scopeGate;
+  Zone? _transportZone;
+  Duration requestDrainTimeout = const Duration(seconds: 5);
+  final pendingRequestHandlers = <Future<void>>{};
+  final requestHandlerErrors = <AsyncError>[];
+  final requestStages = <HttpRequest, String>{};
   final paths = <String>[];
   String? convertId;
   String? studentId;
@@ -66,8 +112,9 @@ class RootFixture {
   final linkedStudentIds = <String>{};
   int get studentIdentityCount => linkedStudentIds.length;
   Future<void> initialize() async {
+    _transportZone = Zone.current;
     server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    server.listen((request) async {
+    Future<void> handleRequest(HttpRequest request) async {
       paths.add(request.uri.path);
       final body = await utf8.decoder.bind(request).join();
       final decodedBody = body.isEmpty ? null : jsonDecode(body);
@@ -257,12 +304,34 @@ class RootFixture {
       }
       request.response.write(jsonEncode(value));
       await request.response.close();
+    }
+
+    server.listen((request) {
+      late final Future<void> handler;
+      requestStages[request] = 'reading request body for ${request.uri.path}';
+      handler = handleRequest(request)
+          .then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              requestHandlerErrors.add(AsyncError(error, stackTrace));
+            },
+          )
+          .whenComplete(() {
+            pendingRequestHandlers.remove(handler);
+            requestStages.remove(request);
+          });
+      pendingRequestHandlers.add(handler);
     });
     http = LoopbackHttp().createHttpClient(null)..idleTimeout = Duration.zero;
+    final baseHttpClient = IOClient(http);
+    final transportClient = _CapturedZoneHttpClient(
+      baseHttpClient,
+      _transportZone!,
+    );
     client = SupabaseClient(
       'http://127.0.0.1:${server.port}',
       'synthetic',
-      httpClient: IOClient(http),
+      httpClient: transportClient,
       authOptions: const AuthClientOptions(autoRefreshToken: false),
     );
     auth = AuthRepository(
@@ -289,9 +358,52 @@ class RootFixture {
   Future<void> close() async {
     scopeGate?.complete();
     scopeGate = null;
-    await client.dispose();
-    http.close(force: true);
-    await server.close(force: true);
+    var drainTimedOut = false;
+    try {
+      final deadline = DateTime.now().add(requestDrainTimeout);
+      while (pendingRequestHandlers.isNotEmpty) {
+        final remaining = deadline.difference(DateTime.now());
+        if (remaining <= Duration.zero) {
+          throw TimeoutException(
+            'Timed out waiting for ${pendingRequestHandlers.length} accepted HTTP request handler(s) to finish: ${requestStages.values.join('; ')}',
+            requestDrainTimeout,
+          );
+        }
+        await Future.wait(pendingRequestHandlers.toList()).timeout(
+          remaining,
+          onTimeout: () => throw TimeoutException(
+            'Timed out waiting for ${pendingRequestHandlers.length} accepted HTTP request handler(s) to finish: ${requestStages.values.join('; ')}',
+            requestDrainTimeout,
+          ),
+        );
+      }
+      if (requestHandlerErrors.isNotEmpty) {
+        final failure = requestHandlerErrors.first;
+        Error.throwWithStackTrace(
+          StateError('RootFixture HTTP request handler failed: ${failure.error}'),
+          failure.stackTrace,
+        );
+      }
+    } on TimeoutException {
+      drainTimedOut = true;
+      rethrow;
+    } finally {
+      await client.dispose();
+      http.close(force: true);
+      final serverClosed = server.close(force: true);
+      if (drainTimedOut) {
+        unawaited(
+          serverClosed.then<void>(
+            (_) {},
+            onError: (Object error, StackTrace stackTrace) {
+              requestHandlerErrors.add(AsyncError(error, stackTrace));
+            },
+          ),
+        );
+      } else {
+        await serverClosed;
+      }
+    }
   }
 }
 

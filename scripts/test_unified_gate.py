@@ -226,6 +226,13 @@ class UnifiedGateContractTests(unittest.TestCase):
                     database_calls = [row[2:] for row in calls
                                       if len(row) >= 2 and row[0] in ("python", "python3")
                                       and row[1] == "scripts/test_database.py"]
+                    trailing_cr = [argument for argv in database_calls
+                                   for argument in argv if argument.endswith("\r")]
+                    self.assertEqual(
+                        trailing_cr,
+                        [],
+                        "verification gate forwarded CRLF remnants to test_database.py",
+                    )
                     observed_sql = {argv[0] for argv in database_calls
                                     if argv and argv[0].endswith("_test.sql")}
                     expected_sql = {path.name for path in (REPOSITORY / "supabase/tests/database").glob("*_test.sql")}
@@ -392,6 +399,7 @@ class UnifiedGateContractTests(unittest.TestCase):
         source_fonts = Path(flutter).resolve().parent.parent / "bin/cache/artifacts/material_fonts"
         with tempfile.TemporaryDirectory(prefix="pinned-chrome-contract-") as temporary:
             root = Path(temporary)
+            bash_path = GateHarness._bash_path
             sdk_bin = root / "sdk" / "bin"
             font_dir = sdk_bin / "cache/artifacts/material_fonts"
             fake_bin = root / "preinstalled-bin"
@@ -406,13 +414,13 @@ class UnifiedGateContractTests(unittest.TestCase):
             system_marker = root / "system-chrome-used"
             action_marker = root / "action-chrome-used"
             (fake_bin / "google-chrome").write_text(
-                f"#!/bin/sh\nprintf called >> '{system_marker}'\necho 'Google Chrome 140.0.7339.0'\n",
+                f"#!/bin/sh\nprintf called >> '{bash_path(system_marker)}'\necho 'Google Chrome 140.0.7339.0'\n",
                 encoding="utf-8",
             )
             (fake_bin / "google-chrome").chmod(0o755)
             pinned = action_dir / "chrome"
             pinned.write_text(
-                f"#!/bin/sh\nprintf called >> '{action_marker}'\necho 'Google Chrome for Testing 139.0.7258.154'\n",
+                f"#!/bin/sh\nprintf called >> '{bash_path(action_marker)}'\necho 'Google Chrome for Testing 139.0.7258.154'\n",
                 encoding="utf-8",
             )
             pinned.chmod(0o755)
@@ -421,8 +429,8 @@ class UnifiedGateContractTests(unittest.TestCase):
             )
             (fake_bin / "chromedriver").chmod(0o755)
             env = os.environ.copy()
-            env["PATH"] = f"{sdk_bin}:{fake_bin}:/usr/bin:/bin"
-            env["CHROME_EXECUTABLE"] = str(pinned)
+            env["PATH"] = f"{bash_path(sdk_bin)}:{bash_path(fake_bin)}:/usr/bin:/bin"
+            env["CHROME_EXECUTABLE"] = bash_path(pinned)
             result = subprocess.run(
                 ["bash", "-e", "-u", "-o", "pipefail", "-c", script],
                 env=env, text=True, capture_output=True, check=False,
@@ -445,7 +453,7 @@ class UnifiedGateContractTests(unittest.TestCase):
             wrong_marker = root / "wrong-action-chrome-used"
             wrong_pinned = action_dir / "wrong-chrome"
             wrong_pinned.write_text(
-                f"#!/bin/sh\nprintf called >> '{wrong_marker}'\necho 'Google Chrome 140.0.7339.0'\n",
+                f"#!/bin/sh\nprintf called >> '{bash_path(wrong_marker)}'\necho 'Google Chrome 140.0.7339.0'\n",
                 encoding="utf-8",
             )
             wrong_pinned.chmod(0o755)
@@ -453,13 +461,13 @@ class UnifiedGateContractTests(unittest.TestCase):
             good_system_bin.mkdir()
             good_system_marker = root / "good-system-chrome-used"
             (good_system_bin / "google-chrome").write_text(
-                f"#!/bin/sh\nprintf called >> '{good_system_marker}'\necho 'Google Chrome 139.0.7258.154'\n",
+                f"#!/bin/sh\nprintf called >> '{bash_path(good_system_marker)}'\necho 'Google Chrome 139.0.7258.154'\n",
                 encoding="utf-8",
             )
             (good_system_bin / "google-chrome").chmod(0o755)
             wrong_env = env.copy()
-            wrong_env["CHROME_EXECUTABLE"] = str(wrong_pinned)
-            wrong_env["PATH"] = f"{sdk_bin}:{good_system_bin}:/usr/bin:/bin"
+            wrong_env["CHROME_EXECUTABLE"] = bash_path(wrong_pinned)
+            wrong_env["PATH"] = f"{bash_path(sdk_bin)}:{bash_path(good_system_bin)}:/usr/bin:/bin"
             wrong = subprocess.run(
                 ["bash", "-e", "-u", "-o", "pipefail", "-c", script],
                 env=wrong_env, text=True, capture_output=True, check=False,

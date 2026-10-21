@@ -1,0 +1,25 @@
+..........E...........................................
+======================================================================
+ERROR: test_database_child_failure_is_retained_as_its_exact_exit_code (scripts.test_unified_gate.UnifiedGateContractTests.test_database_child_failure_is_retained_as_its_exact_exit_code) (shell='bash')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "C:\Users\Carlos_Neto\.codex\worktrees\ministry-production-completion\scripts\test_unified_gate.py", line 270, in test_database_child_failure_is_retained_as_its_exact_exit_code
+    result = harness.run({"STUB_DATABASE_EXIT": "19"})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Carlos_Neto\.codex\worktrees\ministry-production-completion\scripts\test_unified_gate.py", line 196, in run
+    return subprocess.run(command, cwd=self.root, env=env, text=True, capture_output=True, timeout=90)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Carlos_Neto\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 550, in run
+    stdout, stderr = process.communicate(input, timeout=timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Carlos_Neto\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1209, in communicate
+    stdout, stderr = self._communicate(input, endtime, timeout)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Carlos_Neto\AppData\Local\Programs\Python\Python312\Lib\subprocess.py", line 1630, in _communicate
+    raise TimeoutExpired(self.args, orig_timeout)
+subprocess.TimeoutExpired: Command '['C:\\Program Files\\Git\\usr\\bin\\bash.exe', '--noprofile', '--norc', '-c', 'export PATH="$STUB_BIN_POSIX:/usr/bin:/bin"; exec "$GATE_SCRIPT_POSIX"']' timed out after 90 seconds
+
+----------------------------------------------------------------------
+Ran 54 tests in 348.596s
+
+FAILED (errors=1)

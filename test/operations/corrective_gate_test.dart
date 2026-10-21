@@ -28,8 +28,9 @@ void main() {
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
   });
 
+  // Serial Bash and PowerShell gate harnesses exceed the default test timeout.
   test('portable unified gate contracts pass', () async {
     final result = await _runPythonSuite('test_unified_gate.py');
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-  });
+  }, timeout: Timeout(Duration(minutes: 5)));
 }

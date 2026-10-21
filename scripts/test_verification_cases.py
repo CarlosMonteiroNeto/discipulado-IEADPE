@@ -74,6 +74,23 @@ class VerificationManifestTests(unittest.TestCase):
             "--convert-student-concurrency", "--ministry-follow-up-concurrency",
         })
 
+    def test_generated_case_lines_use_lf_without_carriage_returns(self) -> None:
+        result = subprocess.run(
+            [sys.executable, str(TOOL), "--cases-lines"], cwd=ROOT,
+            capture_output=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
+        self.assertNotIn(b"\r", result.stdout)
+        lines = result.stdout.decode("utf-8").splitlines()
+        expected_count = len(json.loads(MANIFEST.read_text(encoding="utf-8"))["sql"]) + 9
+        self.assertEqual(len(lines), expected_count)
+        canonical = next(line for line in lines if line.startswith("sql\tcanonical_person_link_test.sql\t"))
+        self.assertEqual(canonical.split("\t")[2:], [
+            "canonical_person_link_test.sql", "--seed-before-migration",
+            "202610200002_canonical_handoff_reads.sql", "--seed-scenario",
+            "canonical_person_link_test.sql",
+        ])
+
     def test_missing_manifest_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             result = validate(Path(directory) / "missing.json")

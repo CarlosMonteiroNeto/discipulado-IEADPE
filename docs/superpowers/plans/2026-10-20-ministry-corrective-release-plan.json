@@ -698,5 +698,37 @@
   ],
   "verification": {
     "new_test_files": []
+  },
+  "execution_amendment_2026_10_21": {
+    "goal": "Observed functional acceptance on Web and Android using the existing plan, with Windows as the execution host.",
+    "authority": "User selected functional-acceptance path 2 and directed no further Linux work; this does not authorize hosted operations, an APK or publication.",
+    "director_ruling_2026_10_21": "User selection authorizes bounded local investigation, prerequisite diagnosis, existing tests and necessary scoped corrections through the native pipeline. Earlier planning-only/no-execution stop statements are superseded only for this local Web/Android work. APK/build publication, hosted access/mutation, secret/key generation/exposure and staging/commit/push/merge remain unauthorized; existing pre-build, signing and release gates remain binding.",
+    "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
+    "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
+    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 546 passed/2 visual failures, analyzer/web build/static preflight pass. Historical 528/529 disposition, T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
+    "ordered_existing_units": [
+      "L0: review 360px Team/gallery differences and retained 528/529 root-cause disposition; fix evidenced defects or obtain reviewed visual disposition; rerun affected and required assembled pinned gates on one candidate.",
+      "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
+      "B0/T11: diagnose Windows Docker engine; prepare owned disposable loopback Supabase Auth/PostgREST/Storage and matching Chromium/ChromeDriver; execute existing SQL/concurrency/unified gates without hosted fallback.",
+      "T11/L0: execute exact current browser journey, scope denial, FK-ordered cleanup and unrelated sentinel survival; complete existing visual/accessibility/routing checks and source-bound review. Real Google/OAuth remains O1/G2 and is BLOCKED without its prerequisites/authorization.",
+      "D0/D2: only after existing predecessor gates and separate build/signing approvals, observe emulator/physical install/update and S15 A1-A8/D2 Android journey, callback, durability, revocation, Storage/SAF and exact artifact identity.",
+      "Director: obtain independent assembled review and record Web/Android/local/hosted/legacy/device dispositions separately before integration/publication."
+    ],
+    "invariants": [
+      "Finalized attendance is immutable for new commands; corrections require acknowledged cancellation and a linked replacement, preserving history and exact receipt replay.",
+      "No hosted Supabase access/change, migration, ledger repair, grants, OAuth mutation, recovery/activation, import or deployment under this amendment; separate explicit concrete authorization remains required.",
+      "No APK until all existing pre-build requirements and approvals are satisfied; G3 key/signing policy and G4 publication remain separate. No staging, commit, push or merge.",
+      "Missing prerequisites/failing checks remain BLOCKED/FAIL, never fixture PASS. H1/H2/H3 and G1/G2/G3/G4 remain open as applicable.",
+      "Native Luna Medium implements; independent Sol 6.1 low reviews; director coordinates. Historical OpenCode executor metadata does not govern current dispatch."
+    ],
+    "review_status": "approved_no_findings",
+    "independent_review": {
+      "reviewer": "GPT-6.1 Sol low",
+      "verdict": "APPROVED — no findings",
+      "reviewed_markdown_sha256": "703AB1C5A4DA9B27349FD8BEA1BF491B6330F3E7C35F99E0B78602872BB0A8C0",
+      "reviewed_json_sha256": "92E0F7D62B5259308BD2FA99BB06405A0F0F42B57701A313811298A9574428EC",
+      "scope": "Web/Android local-acceptance amendment, supersession of the planning-only stop for bounded local work, existing gates and authorization boundaries, Linux deferral, and immutable finalized attendance. This is a plan review, not execution-gate approval."
+    },
+    "validation_scope": "Documentation only; JSON parse and diff checks do not prove product/platform acceptance."
   }
 }

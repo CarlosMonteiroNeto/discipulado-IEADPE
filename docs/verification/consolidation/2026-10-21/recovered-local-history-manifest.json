@@ -1,0 +1,114 @@
+[
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/plans/2026-10-16-convert-skill-alignment-plan.json",
+    "archive_path": "old-app-clone/docs/superpowers/plans/2026-10-16-convert-skill-alignment-plan.json",
+    "sha256": "a03d6fe3175b18caf8040b754900742c9ea87c6bb4aba67e2b48d25b3fe061d2",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/plans/2026-10-16-ministry-supabase-port-plan.json",
+    "archive_path": "old-app-clone/docs/superpowers/plans/2026-10-16-ministry-supabase-port-plan.json",
+    "sha256": "6d8e741694ebbf34c53444823fb0d136d75e3adf3b4bf44a2c2ae016634cca00",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/plans/2026-10-16-unified-discipulado-integration-roadmap.md",
+    "archive_path": "old-app-clone/docs/superpowers/plans/2026-10-16-unified-discipulado-integration-roadmap.md",
+    "sha256": "24d5d08d104f1fb316923c8639c84a7f1cbf39412921727648a6773706781e47",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/plans/2026-10-16-unified-journey-plan.json",
+    "archive_path": "old-app-clone/docs/superpowers/plans/2026-10-16-unified-journey-plan.json",
+    "sha256": "7eed9f82a1531dbe1001206b2de89dcf2dd16492db474c9f8e0242f1b09317d0",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/plans/2026-10-16-unified-quality-release-plan.json",
+    "archive_path": "old-app-clone/docs/superpowers/plans/2026-10-16-unified-quality-release-plan.json",
+    "sha256": "fc19024ddb611444fe155b7ba0f708023a49ca7c3ccd26cbc53620f11a417d46",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/specs/2026-10-16-convert-skill-alignment-design.md",
+    "archive_path": "old-app-clone/docs/superpowers/specs/2026-10-16-convert-skill-alignment-design.md",
+    "sha256": "123a2dfb6fd76fa7d60a0efba6c00770b7c074fcfa015b52090ef6990a2288d8",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/specs/2026-10-16-ministry-supabase-port-design.md",
+    "archive_path": "old-app-clone/docs/superpowers/specs/2026-10-16-ministry-supabase-port-design.md",
+    "sha256": "658526440bfc68b6ec20386e3f5b7b41fcdefbb1750b932a73a008d3296fce51",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/specs/2026-10-16-unified-journey-design.md",
+    "archive_path": "old-app-clone/docs/superpowers/specs/2026-10-16-unified-journey-design.md",
+    "sha256": "98db65b9b49943923c8ef866c3bc44a5abc374f8a1a9f1c5089985d68d75aa4b",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/specs/2026-10-16-unified-quality-release-design.md",
+    "archive_path": "old-app-clone/docs/superpowers/specs/2026-10-16-unified-quality-release-design.md",
+    "sha256": "1700eab2613d15f4e88eb9b635452316a20b9ee1436a04856b7c0c40bf72083b",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "test/features/ministry/ui/ministry_handoff_repository_test.dart",
+    "archive_path": "old-app-clone/test/features/ministry/ui/ministry_handoff_repository_test.dart",
+    "sha256": "bdea1e727913879a80115d75426a119f5197811b18f0fc57fe50e5271f16c6f0",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\FlutterProjects\\App discipulado",
+    "path": "docs/superpowers/README.md",
+    "archive_path": "old-app-clone/docs/superpowers/README.md",
+    "sha256": "9dc41a9fe30c9e23832b0d64624e4c8703f02da317ac0e64dfcf18815fa007f2",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\.codex\\worktrees\\ieadpe-supabase-pipeline\\App discipulado",
+    "path": ".codex/codex_adapter.py",
+    "archive_path": "old-pipeline-worktree/.codex/codex_adapter.py",
+    "sha256": "40cb00fc1e2912e4683d4d76f9dcb7d26477c20200f48c89d652b3184b822332",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\.codex\\worktrees\\ieadpe-supabase-pipeline\\App discipulado",
+    "path": ".codex/scoped_tools.py",
+    "archive_path": "old-pipeline-worktree/.codex/scoped_tools.py",
+    "sha256": "b5751bb933adcb42f8daca0959f6695f5bcf38a906de0a2d630983e25a5d76af",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\.codex\\worktrees\\ieadpe-supabase-pipeline\\App discipulado",
+    "path": ".codex/tests/test_codex_adapter.py",
+    "archive_path": "old-pipeline-worktree/.codex/tests/test_codex_adapter.py",
+    "sha256": "48e8672b72bf69f9125b6ebb092d127f3cfea24f0d3c4b2747c9aaeed84d9500",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\.codex\\worktrees\\ieadpe-supabase-pipeline\\App discipulado",
+    "path": ".codex/tests/test_pipeline_hook.py",
+    "archive_path": "old-pipeline-worktree/.codex/tests/test_pipeline_hook.py",
+    "sha256": "cff6653636fea3695be15224a10eda065bbac69ab3811475504373185de2802a",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  },
+  {
+    "source": "C:\\Users\\Carlos_Neto\\.codex\\worktrees\\ieadpe-supabase-pipeline\\App discipulado",
+    "path": ".codex/tests/test_scoped_tools.py",
+    "archive_path": "old-pipeline-worktree/.codex/tests/test_scoped_tools.py",
+    "sha256": "c558ecb657861f16d98d1b8715c832842731d9583ed7141369af7cfe59bd1958",
+    "disposition": "historical copy; not activated; canonical implementation retained"
+  }
+]

@@ -23,8 +23,9 @@ Future<ProcessResult> _runRunnerContracts() async {
 }
 
 void main() {
+  // Windows runs both shell-gate harnesses serially and takes over two minutes.
   test('portable browser runner and gate contracts pass', () async {
     final result = await _runRunnerContracts();
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-  });
+  }, timeout: Timeout(Duration(minutes: 5)));
 }

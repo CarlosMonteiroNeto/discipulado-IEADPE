@@ -93,11 +93,39 @@ class HostedUpgradePreparationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             directory = Path(directory)
             capture = directory / "invocations.jsonl"
+            if os.name == "nt":
+                # Windows cannot execute the extensionless POSIX shebang used
+                # by the Unix fake below. A child-only sitecustomize hook lets
+                # the real test_database harness reach its psql subprocess
+                # boundary, records inherited environment/argv, then returns
+                # 78 before any executable or SQL can run.
+                hook = directory / "sitecustomize.py"
+                hook.write_text(
+                    "import json, os, subprocess\n"
+                    f"capture = {str(capture)!r}\n"
+                    "run = subprocess.run\n"
+                    "def record_psql(command, *args, **kwargs):\n"
+                    " executable = str(command[0]) if command else ''\n"
+                    " if os.path.basename(executable).lower() in ('psql', 'psql.exe'):\n"
+                    "  child_env = kwargs.get('env') or os.environ\n"
+                    "  row = {'args': [str(arg) for arg in command[1:]], 'pg': {k:v for k,v in child_env.items() if k.upper().startswith('PG')}, 'sql_executed': False, 'check': bool(kwargs.get('check'))}\n"
+                    "  if kwargs.get('check'):\n"
+                    "   row['check_exception'] = 'CalledProcessError'\n"
+                    "   with open(capture, 'a', encoding='utf-8') as stream: stream.write(json.dumps(row) + '\\n')\n"
+                    "   raise subprocess.CalledProcessError(78, command)\n"
+                    "  row['check_exception'] = None\n"
+                    "  with open(capture, 'a', encoding='utf-8') as stream: stream.write(json.dumps(row) + '\\n')\n"
+                    "  return subprocess.CompletedProcess(command, 78, stdout='', stderr='')\n"
+                    " return run(command, *args, **kwargs)\n"
+                    "subprocess.run = record_psql\n",
+                    encoding="utf-8",
+                )
+
             fake_psql = directory / "psql"
             fake_psql.write_text(
                 "#!/usr/bin/env python3\n"
                 "import json, os, sys\n"
-                f"open({str(capture)!r}, 'a').write(json.dumps({{'args':sys.argv[1:], 'pg':{{k:v for k,v in os.environ.items() if k.startswith('PG')}}}})+'\\n')\n"
+                f"open({str(capture)!r}, 'a').write(json.dumps({{'args':sys.argv[1:], 'pg':{{k:v for k,v in os.environ.items() if k.startswith('PG')}}, 'sql_executed':False}})+'\\n')\n"
                 "raise SystemExit(78)\n",
                 encoding="utf-8",
             )
@@ -109,6 +137,9 @@ class HostedUpgradePreparationTests(unittest.TestCase):
                 "PGSERVICE": "attacker", "PGSERVICEFILE": str(directory / "attacker.conf"),
                 "PGOPTIONS": "-c search_path=attacker",
             })
+            if os.name == "nt":
+                env["IEADPE_PG_BIN"] = str(directory)
+                env["PYTHONPATH"] = str(directory) + os.pathsep + env.get("PYTHONPATH", "")
             result = subprocess.run(
                 [sys.executable, str(ROOT / "scripts" / "rehearse_hosted_upgrade.py"),
                  "--database-url", "postgresql://tester@127.0.0.1:54329/postgres",
@@ -116,13 +147,36 @@ class HostedUpgradePreparationTests(unittest.TestCase):
                 cwd=ROOT, env=env, text=True, capture_output=True, timeout=20,
             )
             self.assertNotEqual(result.returncode, 0)
+            if os.name == "nt":
+                check_false_env = env.copy()
+                for key in [key for key in check_false_env if key.upper().startswith("PG")]:
+                    check_false_env.pop(key)
+                check_false_probe = subprocess.run(
+                    [sys.executable, "-c",
+                     "import subprocess; result = subprocess.run(['psql.exe', '--check-false-probe'], check=False); raise SystemExit(0 if result.returncode == 78 else 1)"],
+                    cwd=ROOT, env=check_false_env, text=True, capture_output=True, timeout=10,
+                )
+                self.assertEqual(check_false_probe.returncode, 0, check_false_probe.stderr)
             calls = [json.loads(line) for line in capture.read_text().splitlines()]
             self.assertTrue(calls)
+            if os.name == "nt":
+                checked_calls = [call for call in calls if "--check-false-probe" not in call["args"]]
+                security_calls = checked_calls
+                check_false_calls = [call for call in calls if "--check-false-probe" in call["args"]]
+                self.assertTrue(checked_calls)
+                self.assertTrue(all(call.get("check_exception") == "CalledProcessError"
+                                    for call in checked_calls))
+                self.assertEqual(len(check_false_calls), 1)
+                self.assertFalse(check_false_calls[0].get("check", True))
+                self.assertIsNone(check_false_calls[0].get("check_exception"))
+            else:
+                security_calls = calls
             self.assertTrue(all(call["pg"] == {} for call in calls))
-            self.assertTrue(all("203.0.113." not in " ".join(call["args"]) for call in calls))
-            self.assertTrue(all("127.0.0.2" not in " ".join(call["args"]) for call in calls))
+            self.assertTrue(all(not call["sql_executed"] for call in calls))
+            self.assertTrue(all("203.0.113." not in " ".join(call["args"]) for call in security_calls))
+            self.assertTrue(all("127.0.0.2" not in " ".join(call["args"]) for call in security_calls))
             self.assertTrue(all(any(arg == "postgresql://tester@127.0.0.1:54329/postgres" for arg in call["args"])
-                                or any("127.0.0.1" in arg for arg in call["args"]) for call in calls))
+                                or any("127.0.0.1" in arg for arg in call["args"]) for call in security_calls))
 
     def test_rehearsal_rejects_connection_string_override_and_password(self):
         for value in (

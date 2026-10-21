@@ -1,0 +1,110 @@
+[
+  {
+    "path": "build/verification/corrective-release/T08/captured-zone-stage-report.json",
+    "sha256": "a9fb4febe64594277a1a082458768884ad393ef6222ce2c450136e7b0768afa3"
+  },
+  {
+    "path": "build/verification/corrective-release/T09/coder-report.json",
+    "sha256": "39291ccb71088a978faadff71756d7dc186e65f886c2e1588c9385321f2d97ea"
+  },
+  {
+    "path": "build/verification/corrective-release/T10/final-candidate-report.json",
+    "sha256": "d3059daa84f9ec6655372f946e1b3c8bb3671d81faee5c887047a024c31c775b"
+  },
+  {
+    "path": "build/verification/corrective-release/T12/windows-fixture-followup/coder-report.json",
+    "sha256": "2696e86dee3feda3c8416aca8c2052a8b3c0e8864c00a881b2044294998ba124"
+  },
+  {
+    "path": "build/verification/corrective-release/T12/windows-fixture-followup/sol-final-review.md",
+    "sha256": "7d5bcf537844f5385d0aeb6ac7982f2480a82de7ab239ff8d4fa9abe2fdb6ff6"
+  },
+  {
+    "path": "build/verification/corrective-release/final-pinned-flutter-suite-after-T12.log",
+    "sha256": "264c0940f5c79db807f58122f665fd11b81f09cd8024eee82d8589068598869a"
+  },
+  {
+    "path": "build/verification/corrective-release/final-pinned-flutter-analyze.log",
+    "sha256": "07577e79616a3ceec0dc04fa39dd79f4ca2da511a1c4fb7bae8df1943b676648"
+  },
+  {
+    "path": "build/verification/corrective-release/final-pinned-web-build.log",
+    "sha256": "6391b72afef5f3deecb594090c7bb06ad0e685bc483fcd5c18aa3bb81756cf08"
+  },
+  {
+    "path": "build/verification/corrective-release/final-pinned-web-preflight.log",
+    "sha256": "ae97ab70f2f7f66c16bc589aca6a88389d245d1fcdd56038dc67772d98a961c5"
+  },
+  {
+    "path": "build/verification/corrective-release/docker-engine-final.log",
+    "sha256": "3d45b45311e83b8302dce8708c732c219ff48955de8f43077084e33464b940dc"
+  },
+  {
+    "path": "build/verification/corrective-release/final-sol-record-review.md",
+    "sha256": "cbad880e3dacf650cf04f1d6fa315421dbc41aeb90b9ec096c4023c859088ba1"
+  },
+  {
+    "path": "test/features/ministry/ui/failures/team_lifecycle_360_isolatedDiff.png",
+    "sha256": "1a1ae2f44fb4bc378da425909c66129bd04d0f422cb87eab2ce59a6262560fdc"
+  },
+  {
+    "path": "test/features/ministry/ui/failures/team_lifecycle_360_maskedDiff.png",
+    "sha256": "7336e48cb708bc22a6949733c70651e85d61eb65503ec63d1cd1d4b2669d9c5c"
+  },
+  {
+    "path": "test/features/ministry/ui/failures/team_lifecycle_360_masterImage.png",
+    "sha256": "495a9c9b5a27a94a5c963c4b735edfce8b747aeba611a57d83fc570d5f3f0dae"
+  },
+  {
+    "path": "test/features/ministry/ui/failures/team_lifecycle_360_testImage.png",
+    "sha256": "6f4b4d3dd2b4ba16d686cac49eb54662a6f80bb0a78a3b8b9329fb89f48e6dc1"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_actions_isolatedDiff.png",
+    "sha256": "caf7e3f4f5ad6848eb7eba3301ebfa8edd75c66b01c6558e9c168fefa2380242"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_actions_maskedDiff.png",
+    "sha256": "ae50d52682d64927e3a0dd7037f6ea0da964aa8cf60132683ee52efa93e088d4"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_actions_masterImage.png",
+    "sha256": "49156455c5ebb0231944f0b8d1d04c12a33ed5f16c54327d8af9ea7dfd9aa018"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_actions_testImage.png",
+    "sha256": "405f73456be3f23c88785007dd9b79ab1b67c34cc9f88263d0c7e13d602f42b7"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_loading_isolatedDiff.png",
+    "sha256": "caf7e3f4f5ad6848eb7eba3301ebfa8edd75c66b01c6558e9c168fefa2380242"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_loading_maskedDiff.png",
+    "sha256": "ae50d52682d64927e3a0dd7037f6ea0da964aa8cf60132683ee52efa93e088d4"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_loading_masterImage.png",
+    "sha256": "49156455c5ebb0231944f0b8d1d04c12a33ed5f16c54327d8af9ea7dfd9aa018"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_loading_testImage.png",
+    "sha256": "405f73456be3f23c88785007dd9b79ab1b67c34cc9f88263d0c7e13d602f42b7"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_top_isolatedDiff.png",
+    "sha256": "caf7e3f4f5ad6848eb7eba3301ebfa8edd75c66b01c6558e9c168fefa2380242"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_top_maskedDiff.png",
+    "sha256": "ae50d52682d64927e3a0dd7037f6ea0da964aa8cf60132683ee52efa93e088d4"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_top_masterImage.png",
+    "sha256": "49156455c5ebb0231944f0b8d1d04c12a33ed5f16c54327d8af9ea7dfd9aa018"
+  },
+  {
+    "path": "test/widgets/failures/ministry_component_gallery_360_top_testImage.png",
+    "sha256": "405f73456be3f23c88785007dd9b79ab1b67c34cc9f88263d0c7e13d602f42b7"
+  }
+]

@@ -143,6 +143,24 @@ def build_cases(data: dict[str, object]) -> dict[str, list[dict[str, object]]]:
     return {"sql": sql_cases, "concurrency": races}
 
 
+def _write_case_lines(cases: dict[str, list[dict[str, object]]]) -> None:
+    """Write the shell-consumed TSV with literal LF separators on every host."""
+    lines = [
+        "\t".join(["sql", case["name"], *case["argv"]])
+        for case in cases["sql"]
+    ]
+    lines.extend(
+        "\t".join(["concurrency", case["name"], *case["argv"]])
+        for case in cases["concurrency"]
+    )
+    output = ("\n".join(lines) + "\n").encode("utf-8")
+    stdout_buffer = getattr(sys.stdout, "buffer", None)
+    if stdout_buffer is None:
+        sys.stdout.write(output.decode("utf-8"))
+    else:
+        stdout_buffer.write(output)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
@@ -158,11 +176,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.cases_json:
             print(json.dumps(build_cases(data), sort_keys=True))
         elif args.cases_lines:
-            cases = build_cases(data)
-            for case in cases["sql"]:
-                print("\t".join(["sql", case["name"], *case["argv"]]))
-            for case in cases["concurrency"]:
-                print("\t".join(["concurrency", case["name"], *case["argv"]]))
+            _write_case_lines(build_cases(data))
         else:
             print(f"PASS: {len(data['sql'])} SQL scenarios and {len(data['concurrency'])} concurrency cases validated")
     except (ManifestError, OSError) as error:
