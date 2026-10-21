@@ -1,5 +1,7 @@
 # Ministry corrective release — local acceptance and evidence index
 
+> **Chronological evidence log; initial tables retain historical states.** The opening L0-E snapshot and matrix below predate the later T04-P first-save and T12-006 closing records. T04-P and T12-006 subsequently received scoped **APPROVED_LOCAL** reviews with actual local SQL/rehearsal evidence; their initial `BLOCKED_NOT_RUN` statements are superseded for those reviewed candidates. Later pinned full-suite evidence is **546/548**, while historical **528/529** still needs disposition. Use the [consolidated current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) for the active task/status map and the [branch consolidation result](consolidation/2026-10-21/result.md) for portable artifact locations and subsequent checks. No scoped closing record approves L0, hosted activation or Android delivery.
+
 **Date:** 2026-10-21
 **Disposition:** PARTIAL / BLOCKED — not a local-release, branch, hosted, or delivery approval.
 **Evidence unit:** L0-E; pending independent Sol review.

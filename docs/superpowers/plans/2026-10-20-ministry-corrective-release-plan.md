@@ -1,10 +1,10 @@
 # Ministry Corrective Release Implementation Plan
 
-> **Current execution priority (2026-10-21):** The Web and Android functional-acceptance amendment at the end of this plan governs the next bounded work. It continues this plan on Windows; it neither approves Linux acceptance nor authorizes an APK or hosted operation.
+> **Current execution priority (2026-10-21):** The consolidated current-state section below governs continuation on Windows Web/Android. Linux is deferred. Hosted project reads are authorized; APK builds and hosted mutations retain separate gates.
 
-> **Current review entry:** Read the “2026-10-20 completion map and bounded delivery addendum” and the 2026-10-21 Web/Android amendment before the historical status/protocol. They reconcile completion and replace OpenCode with the user-selected native Luna Medium / Sol 6.1 low method. The user has authorized bounded local Web/Android acceptance execution; APK builds and hosted operations retain their separate gates.
+> **Current review entry:** Read “Consolidated current state and continuation — 2026-10-21” first. It owns current status/evidence/authority; original task IDs, contracts, acceptance and historical checkboxes remain preserved below.
 
-> **Execution method selected by the user:** adapted pipeline. This Codex session is strategist, director, arbiter and whole-product reviewer. OpenCode CLI is the coder worker. A native `gpt-6.1-sol` / low-effort subagent reviews each stage. This supersedes the packaged automatic Script CEO dispatch/model/commit defaults; the engineering acceptance and verification gates remain mandatory.
+> **Execution method:** native Luna Medium implements; native Sol 6.1 low independently reviews; the director coordinates and obtains independent final assembled review.
 
 **Goal:** Correct the identified integrity/compatibility gaps, complete operator-facing attendance/progress, and prepare a proven hosted activation and Android delivery.
 
@@ -16,7 +16,233 @@
 
 **Machine plan:** [Local tasks JSON](2026-10-20-ministry-corrective-release-plan.json). It carries complete task interfaces, exact owned paths, acceptance, dependencies and verification commands; it is not an authorization to mutate the hosted project. Bootstrap and operational stages below are deliberately outside automatic local-task execution.
 
-**Status:** User authorized implementation. B1–B3 and combined bootstrap have Sol/director approval: 459 Flutter tests pass, analyzer has zero diagnostics and the final candidate is stable. Task 1 has scoped approval (461 tests, zero diagnostics); Task 2 is approved (465 tests, zero diagnostics); Task 3 is in progress. See `docs/verification/2026-10-20-corrective-execution.md` for scoped evidence and remaining runtime/activation blockers.
+**Status:** Local corrective source is implemented with scoped approvals. Current assembled acceptance is FAIL/BLOCKED (pinned 546/548, real T11 and Android missing). The consolidated index below replaces former Task 3-in-progress and 459/461/465 checkpoint status; those counts remain historical evidence.
+
+## Consolidated current state and continuation — 2026-10-21
+
+This is the single current execution/status index, mirrored in JSON `consolidated_current_state_2026_10_21`. [Spec S17](../specs/2026-10-20-ministry-corrective-release-design.md#s17-consolidated-authority-and-acceptance-state--2026-10-21) owns current authority; S01–S16/R01–R11/A1–A9/G0–G4 preserve product contracts. Markdown owns current evidence and operational steps; JSON retains Tasks 1–12/dependencies/interfaces and mirrors this index. Reconcile discrepancies before dependent work. Historical checkboxes/assessments below are process history, not a second queue or current approval. Do not reimplement approved slices.
+
+**Workspace/authority.** Use `C:/Users/Carlos_Neto/.codex/worktrees/ministry-supabase-config/App discipulado`, branch `codex/ministry-production-completion`, investigated clean base `0b05473`. Historical merge/documentation refs are ancestors; application `lib/`, Android and migrations are unchanged since `d0d0e0f`. Native Luna Medium implements, native Sol 6.1 low independently reviews, director coordinates and obtains independent assembled review. This consolidation is documents only; review it before continuing implementation. Local commits/merges and hosted project reads are already authorized; push is not. Supabase CLI is authenticated and discovered `Discipulado IEADPE` (`voqmtnqjrbugpazcimvh`, `linked:false`), which proves discovery only. Local project linking/client settings may proceed within existing authorization after investigation; hosted migration/ledger/grant/OAuth/import/test writes are not authorized. No APK until ALL pre-gates and explicit build/signing approvals; G3 and G4 remain separate. Windows Web+Android only; Linux DEFERRED by user. Finalized attendance remains immutable; acknowledge cancellation then create linked replacement, preserving original marks/history and exact replay.
+
+**Requirement inheritance.** Read the [2026-10-18 design](../specs/2026-10-18-ministry-production-completion-design.md) and [parent plan](2026-10-18-ministry-production-completion-plan.md) as provenance. Their two contextual registration entries/shared fields, canonical unique identity, genuine visits, effective enrollment/attendance follow-up, 1/7/30-day reminder boundaries, manual 3-visit deviation / 90-day completion guards, Team/access separation, history, Storage/SAF and accessibility obligations remain covered by R01–R11/S15. Their former model/executor/status and older single-entry wording are superseded, not new work.
+
+### Portable evidence and current limits
+
+Current review inputs: [consolidation README](../../verification/consolidation/2026-10-21/README.md), [result](../../verification/consolidation/2026-10-21/result.md), [independent review](../../verification/consolidation/2026-10-21/independent-review.md), [dated local report](../../verification/ministry-corrective-local-report.md), and [portable handoff guide](../../verification/2026-10-21-portable-branch-handoff.md). These are dated evidence, not present release authority. The handoff's historical push authorization does not authorize a push in this continuation.
+
+`build/verification` is absent in the active worktree. References below use portable archive-member locators, not working local hyperlinks. `tar:X` means member `build/verification/corrective-release/X` in [original evidence tar](../../verification/handoff/2026-10-21-corrective-evidence.tar.gz), SHA256 `a2eca52bab31566dfc2cdaa7aca2ef93e9cc8a78f598473745fd9be58dd2104e` (522 regular relative files; [manifest](../../verification/handoff/evidence-manifest.json)). `zip:X` means the same prefix in [reviewed local evidence ZIP](../../verification/consolidation/2026-10-21/reviewed-local-evidence.zip), SHA256 `034df43a08dd675e7d958a0872785e2d70e066d73c0e9a6312f980a40d6361eb` (28 entries; [hash manifest](../../verification/consolidation/2026-10-21/reviewed-local-evidence-manifest.json)). Historical tools/specs are inactive in [recovered history ZIP](../../verification/consolidation/2026-10-21/recovered-local-history.zip), SHA256 `31bcadd71ec0066088b4008b39a1538d73b21911516e3d1ffbb4dda20ff4f3c0` ([manifest](../../verification/consolidation/2026-10-21/recovered-local-history-manifest.json)). Read regular relative members without execution; verify SHA/size/member hashes before relying on extracted bytes. Do not activate old tooling.
+
+The two L0 approval-index JSONs were deliberately excluded by credential scanning and are absent from the tar. Do not reconstruct/expose them or turn their historical links into available evidence. Missing individual final reviews remain missing. Original `build/...` links in historical sections mean archive locations where a matching member exists; otherwise evidence is unavailable. T04-P and T12-006 durable final reviews ARE in the tar. Recent pinned full-suite/analyzer/web/preflight logs and source manifest are in the ZIP. Some later device/smoke/timeout logs are only described by dated reports or external backup; do not claim portable raw evidence until indexed and sanitized. Archives preserve hashes/candidate context; scope approval never transfers automatically to changed bytes.
+
+### Existing units: implementation versus approval
+
+`IMPLEMENTED` means source exists without a durable complete current scoped approval. `APPROVED_LOCAL` means only the described source-bound slice/checkpoint; it does not imply L0/hosted/device/release approval. `FAIL`, `BLOCKED`, `DEFERRED` retain their ordinary meanings. Task IDs and acceptance criteria are unchanged.
+
+| Existing unit | Current disposition | Evidence and limit | Portable/source locator |
+|---|---|---|---|
+| B0 | BLOCKED | Windows Docker/bootable Android prerequisites missing; pinned SDK available historically, default differs. | `consolidation README; local report dated Windows continuation` |
+| B1 | APPROVED_LOCAL | Importer/replay/race scoped historical approval; no real legacy import. | `tar:B1/review.md; 2026-10-20-corrective-execution.md` |
+| B2 | APPROVED_LOCAL | Historical font/visual portability slice; current golden failures remain under L0. | `tar:B2/review.md; B2/promotion-review.md` |
+| B3 | APPROVED_LOCAL | 459-test bootstrap checkpoint only; not current branch green. | `tar:B3/review.md` |
+| T01 | APPROVED_LOCAL | Canonical projection scoped review; hosted parity unproven. | `tar:T01/review.md` |
+| T02 | APPROVED_LOCAL | Immutable finalization/replacement scoped review; live acceptance missing. | `tar:T02/review.md` |
+| T03 | IMPLEMENTED | Director-attributed scoped verdict; durable individual final review absent. | `tar:T03/coder-report.json; handoff acceptance limitations` |
+| T04 | IMPLEMENTED | Attendance UX source exists; director-attributed verdict; live browser/device missing. | `tar:T04/coder-report.json; integration_test/unified_journey_test.dart` |
+| T04-P | APPROVED_LOCAL | Actual first-save SQL and focused UI proof; original test-first RED not reconstructed. | `tar:T04-first-save/sol-final-review.md` |
+| T05 | IMPLEMENTED | Bounded history source/migration004 exists; director-attributed verdict, missing individual final review. | `tar:T05/coder-report.json` |
+| T06 | IMPLEMENTED | Progress UI exists; director-attributed scoped verdict, live persistence missing. | `tar:T06/coder-report.json` |
+| T07 | IMPLEMENTED | Authority compatibility migration005 exists; director-attributed verdict, hosted authority unknown. | `tar:T07/coder-report.json` |
+| T08 | APPROVED_LOCAL | Later pinned workflow fixture scoped review supersedes earlier pending note; Google/OAuth still open. | `zip:T08/captured-zone-stage-report.json; consolidation independent-review` |
+| T09 | APPROVED_LOCAL | Windows portability scoped partial approval; Linux DEFERRED, ordinary matrix incomplete. | `zip:T09/coder-report.json; consolidation independent-review` |
+| T10 | APPROVED_LOCAL | Literal-LF argv correction scoped review; live stack gates remain missing and Linux DEFERRED. | `zip:T10/final-candidate-report.json; consolidation independent-review` |
+| T11 | BLOCKED | Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified. | `integration_test/unified_journey_test.dart; local report guarded runner exit 2` |
+| T12 | APPROVED_LOCAL | 006 local preparation: 16 forward migrations / 17 real checkpoints; later Windows fixture 30/30 and wrapper 2/2 scoped. Hosted parity/recovery unproven. | `tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md` |
+| L0 | FAIL | Pinned 546/548:two 360px goldens; larger loops unexecuted; historical 528/529 unresolved; consolidation54-test run failed on90s timeout, narrow 1/1 does not waive. | `zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README` |
+| H0/H1 | BLOCKED | Recovery/catalog/ledger equivalence and exact package remain missing; project read access authorized. | `activation package; S12/S15/G1` |
+| H2/O1 | BLOCKED | Hosted mutations/OAuth/grants/test writes not authorized; actual roles/Google/Storage journey unproven. | `S15 A1–A8/G1/G2; existing OAuth runbook` |
+| H3 | BLOCKED | Firebase export or source-inspected verified absence and stable-ID reconciliation missing. | `S13; inherited 2026-10-18 requirements` |
+| D0/D1/D2 | BLOCKED | No accepted runtime device/installed journey; release uses debug signing; G3/build/G4 outstanding; no APK. | `android/app/build.gradle.kts; S15 A9/G3/G4` |
+| Linux T09/T10 matrix | DEFERRED | User directed no further Linux investment; never label old cross-platform acceptance complete. | `2026-10-21 amendment` |
+
+The broad consolidation run is FAIL: 54 tests in 348.596s, one Bash subprocess timeout at90s. Focused repetition1/1 in 27.988s does not identify the timing cause. Pinned 546/548 failures remain360px Team 2.63% and gallery 3.64%; inspected glyph/icon-edge disposition is not a suite waiver and larger loops were not reached. Default 3.47.2 results remain distinct from pinned 3.47.7. Historical 528/529 is neither silently inherited as a current reproduced bug nor waived by isolated PASS.
+
+### Ordered continuation within existing owners
+
+These are refinements of existing B0/B2/T09–T12/L0/H0–H3/O1/D0–D2, not new feature tasks. Commands are future reproducible entry points from the canonical root, using explicitly resolved pinned executables; inspect local parameters and ownership first. Placeholder values must be resolved privately. Environment checks need direct evidence; behavioral changes require cause-based regression tests. None of these commands was executed by this document consolidation.
+
+
+**Command convention (B0 resolves before running checks).** The command lines below are inner argv, not unwrapped execution instructions. The project has no `scripts/cmd`; use the installed global runner `C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/scripts/cmd`. Resolve `$MinistryBash`, `$MinistryPython`, `$MinistryPwsh` and `$MinistryPinnedFlutter` to actual absolute executables, and verify PowerShell supports `-CommandWithArgs`. `$MinistryPinnedFlutter` must report Flutter 3.47.7/Dart 3.13.5; PATH `flutter` is known to resolve 3.47.2 on this host and cannot close final gates. Bind each log to a unique existing-unit/candidate run. Example shape, with variables resolved in B0 (not executed here):
+
+```powershell
+$MinistryCmd = 'C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/scripts/cmd'
+& $MinistryBash $MinistryCmd --full-file $MinistryEvidenceLog -- $MinistryPython -m unittest scripts.test_unified_gate.UnifiedGateContractTests.test_database_child_failure_is_retained_as_its_exact_exit_code
+& $MinistryBash $MinistryCmd --full-file $MinistryFlutterLog -- $MinistryPwsh -NoProfile -CommandWithArgs '& $args[0] @($args | Select-Object -Skip 1); exit $LASTEXITCODE' $MinistryPinnedFlutter --version
+```
+
+**Inherited process PATH is mandatory.** An absolute launcher alone is insufficient: `run_unified_journey.py` resolves `flutter` through `shutil.which`, and both unified shell gates invoke `flutter`/`dart` from PATH. In B0 resolve the SDK root containing the verified 3.47.7 `bin`, Git Bash binary directory, Python directory and any required session-only `python3` launcher directory. Prepend those directories to the PATH of the current execution process and its children only. Do not use `setx`, user/machine environment APIs, shell profile edits or persistent aliases. Restore the parent process PATH after the bounded run. Example setup, using actual paths resolved in B0 rather than guessed SDK locations:
+
+```powershell
+$MinistryPreviousPath = $env:Path
+try {
+    $env:Path = @($MinistryPinnedSdkBin, $MinistryGitBashBin, $MinistryPythonBin, $MinistrySessionLauncherBin, $MinistryPreviousPath) -join [IO.Path]::PathSeparator
+    # All logged probes and subsequent gates run here and inherit this PATH.
+    # Start Git Bash with --noprofile --norc; PowerShell children with -NoProfile.
+    # Assert the recorded paths and version output below before any acceptance gate.
+} finally {
+    $env:Path = $MinistryPreviousPath
+}
+```
+
+Before gates, use the global runner to capture these nonsensitive probes inside the SAME inherited environment: Python `shutil.which('flutter')`, `shutil.which('dart')`, `shutil.which('python')` and `shutil.which('python3')`, plus child `flutter --version` and `dart --version`; Git Bash `--noprofile --norc -c 'hash -r; command -v flutter dart python3; flutter --version; dart --version; python3 --version'`; PowerShell `-NoProfile` with `Get-Command flutter,dart,python` and each version. Verify Python resolves the pinned SDK `.bat` launchers and Bash resolves the equivalent launchers in the SAME SDK bin; both Flutter 3.47.7 and bundled Dart 3.13.5 must be observed in all three processes. Verify Bash `python3` and PowerShell `python` use the intended Python runtime (provide only a session-local launcher outside tracked source if required). Stop for environment diagnosis on any mismatch. Reuse that exact inherited environment for Python browser runner, Bash and PowerShell gates; fresh login shells/default PATH are not acceptable. Retain path/version proof with the candidate/toolchain evidence. These are prerequisite checks, not product tests.
+
+Use the same argument-safe launch shape for each listed check, substituting its resolved executable/arguments; capture the raw child exit, not merely successful wrapper launch. If the installed launcher cannot execute the pinned `.bat` correctly, classify/fix launcher setup before acceptance. Raw Supabase credential status and interactive ADB pairing codes are explicit exceptions: user-private terminal/device flow, no runner or transcript/evidence capture. Log only redacted health and the minimum nonsensitive ADB target/reverse summary. Never put credentials in runner argv or full logs.
+
+#### 1. B0 / L0 toolchain and evidence index
+
+**Dependencies:** consolidated-plan review. **Files:** `docs/verification/ministry-corrective-local-report.md`, `docs/verification/consolidation/2026-10-21/README.md`, `docs/verification/handoff/evidence-manifest.json`, `pubspec.lock`, `test/support/sdk_fonts.dart`.
+
+- Record absolute resolved executable paths and pin Flutter 3.47.7 / Dart 3.13.5 through the inherited process PATH convention and three-process resolution proofs above for all direct and nested final gates; record framework/engine/font provenance, JDK/Gradle/browser/driver versions and lockfile digest. Default 3.47.2 is separate evidence. Do not alter dependencies to erase a renderer mismatch.
+- Validate tracked archive SHA/member path/type/size/hash against existing manifests without running archived tooling; index each task review/log as archive+member+hash and source candidate. Bind new evidence to current HEAD+dirty/new-file hashes. Missing member remains missing; do not invent a final review.
+
+```text
+git status --short
+git rev-parse HEAD
+git branch --show-current
+Get-Command flutter,python,java,adb,supabase -ErrorAction SilentlyContinue
+flutter --version
+python --version
+java -version
+supabase --version
+```
+
+**Review:** Sol checks exact toolchain/source identity and portable evidence coverage; direct inventory, no artificial RED.
+
+**Expected result:** Reproducible candidate/toolchain index with every required evidence locator resolved or explicitly absent; no product acceptance inferred.
+
+#### 2. T09/T10 / L0 Bash timeout diagnosis
+
+**Dependencies:** B0 source/toolchain capture. **Files:** `scripts/test_unified_gate.py`, `scripts/verify_unified.sh`, `scripts/verification_cases.py`, `docs/verification/ministry-corrective-local-report.md`.
+
+- Retain broad 348.596s / 54 tests / one 90s timeout and focused 27.988s / 1 pass as separate runs; reproduce the existing exact target method before grouped discovery.
+- Reproduce boundedly with resolved Python/Bash identity; capture subprocess argv, child lifecycle, elapsed stages and inherited nonsecret environment/runner load. Compare narrow and discovery ordering and the working child-exit tests. Classify fixture/runner/environment/product cause before correction; increasing timeout alone is not a diagnosis.
+- For evidenced behavior defect add a failing regression at the cause, fix within owner files, then narrow and appropriate grouped check. Environment-only remediation uses direct evidence. Stop repeated broad runs once new evidence no longer changes diagnosis.
+
+```text
+python -m unittest scripts.test_unified_gate.UnifiedGateContractTests.test_database_child_failure_is_retained_as_its_exact_exit_code
+python -m unittest scripts.test_verification_cases scripts.test_unified_gate scripts.test_hosted_upgrade
+```
+
+**Review:** Sol verifies exact exit-code assertion is preserved, no skip/relaxation, and reasoned cause or named blocker.
+
+**Expected result:** Root-cause disposition and stable bounded child-exit behavior; until then broad run remains FAIL.
+
+#### 3. B2 / L0 visuals and historical race
+
+**Dependencies:** B0 pinned identity, T09/T10 diagnostic disposition. **Files:** `test/features/ministry/ui/team_lifecycle_test.dart`, `test/widgets/ministry_component_gallery_test.dart`, `test/database/task_3_test.dart`, `scripts/database_access_concurrency.py`, `docs/verification/ministry-corrective-local-report.md`.
+
+- Inspect retained expected/actual/diff images under pinned SDK/fonts. Investigate glyph/icon differences; source-bound 360px disposition does not pass failing tests. Execute 360/768/1440 and 200% text even when first golden assertion stops its loop, using a bounded test-structure correction if needed; preserve all assertions and review each capture. No blind update-goldens/tolerance change.
+- Inspect original 528/529 lock failure and isolated-pass logs; bind a fresh reproduction to an owned disposable PostgreSQL target. Trace lock ordering and compare working race paths before changing code/test; missing owned DB is BLOCKED. Do not reopen approved unrelated features.
+
+```text
+flutter test --no-pub --concurrency=1 test/features/ministry/ui/team_lifecycle_test.dart test/widgets/ministry_component_gallery_test.dart
+flutter test --no-pub --concurrency=1 test/database/task_3_test.dart
+```
+
+**Review:** Sol inspects visual artifacts at all required sizes and semantic race assertions; any baseline promotion needs actual comparison and explicit disposition.
+
+**Expected result:** Failing golden/race causes resolved with evidence; unchanged historical failures retain explicit disposition, no waiver.
+
+#### 4. B0 / T11 local backend and client setup
+
+**Dependencies:** B0 identity, owned local service capacity. **Files:** `supabase/config.toml`, `scripts/run_unified_journey.py`, `scripts/verification_cases.json`, `scripts/verify_unified.ps1`, `scripts/verify_unified.sh`, `integration_test/unified_journey_test.dart`, `lib/configuration.dart`, `docs/verification/ministry-corrective-local-report.md`.
+
+- Diagnose Docker WSL Virtual Machine Platform blocker with bounded probes and logs. Admin Windows-feature/reboot action needs user action; keep dependent T11 blocked while progressing other local units. Provision only identified coordinator-owned disposable loopback Auth/PostgREST/Storage/PostgreSQL and matching Chrome/driver; capture health/ownership and sufficient disk.
+- Do not run raw credential-bearing Supabase status through a command/evidence logger. Let the guarded runner consume status internally; retain only its redacted health/ownership summary. Use guarded runner to create run-owned synthetic identities and matching public client URL/publishable key through private temporary settings; service role/PAT/DB password/Google secret never enter Flutter defines. Read existing actual config file location before any change. A no-config fail-closed page proves bootstrap only.
+- Run existing T11 source, inspect all real assertions: canonical registration/edit/enroll/preview/draft/finalize/read-only/progress/cancel-linked-replacement/fresh session, cross-scope and revocation. Verify FK/lineage cleanup after success and partial failure plus unrelated sentinel survival. No privileged seeded-roster shortcut or hosted fallback.
+
+```text
+docker info
+python scripts/run_unified_journey.py
+bash scripts/verify_unified.sh
+pwsh -NoProfile -File scripts/verify_unified.ps1
+```
+
+**Review:** Sol reads actual run logs, owned setup/cleanup proof and current source hashes; stubs/static build do not close browser acceptance.
+
+**Expected result:** Actual local journey and both local gates exit 0 on same candidate, or exact BLOCKED/FAIL prerequisite without fabricated runtime PASS.
+
+#### 5. D0 Android target and safe loopback connectivity
+
+**Dependencies:** B0 Android toolchain inventory, T11 owned backend for connectivity. **Files:** inspect `android/app/src/main/AndroidManifest.xml`, `android/app/build.gradle.kts`, `docs/operations/unified-release.md`; **create future evidence document** `docs/verification/ministry-corrective-delivery-report.md` (currently absent).
+
+- Prepare bootable authorized Google-capable emulator and physical device; investigate existing API 31/34 ADB offline and package-install stalls. Setup/connectivity only before APK gate: do not build/install/run app. Record actual API/browser/device identity and boot completion.
+- For physical wireless ADB use Android Wireless debugging pairing UI and trusted private same-network transport; user enters short-lived pairing code directly into private local terminal/device flow. Never request/store code in chat, screen capture or logs; do not expose adb tcpip 5555 or public firewall rules. Select explicit authorized serial; disconnect/remove pairing after use.
+- Keep backend host bind loopback. Once connection exists, adb reverse the actual owned local API port (54321 example must match Supabase local status), verify reverse listing/device route before later app execution and remove mapping afterwards. Use 127.0.0.1 on device with matching public client config; do not replace with hosted URL to bypass unavailable local stack. Only public URL/key in private client settings; no client service credentials.
+
+```text
+adb devices -l
+adb -s <authorized-serial> reverse tcp:54321 tcp:54321
+adb -s <authorized-serial> reverse --list
+adb -s <authorized-serial> reverse --remove tcp:54321
+```
+
+**Review:** Sol checks target ownership, private pairing handling and loopback mapping evidence; physical observations identified separately from emulator/fixtures.
+
+**Expected result:** Authorized online target and documented secure backend reachability, still no APK or Android product acceptance until all build gates pass.
+
+#### 6. T12 / H0/H1 read-only package refresh
+
+**Dependencies:** T12-006 local preparation preserved. **Files:** `scripts/inspect_hosted_contracts.py`, `scripts/rehearse_hosted_upgrade.py`, `docs/verification/ministry-corrective-activation-package.md`, `docs/operations/unified-migration.md`, `docs/operations/unified-release.md`.
+
+- CLI authentication/project discovery already done: Discipulado IEADPE/voqmtnqjrbugpazcimvh/linked:false. Reuse authorized reads; no repeated login or migration command. Investigate local linking/settings separately within existing authorization, recording only nonsensitive config identity. Inspector needs explicit project-ref, endpoint, managed libpq service, local semantic contract and output; --help is safe, actual inventory needs authorized managed DB channel and read-only catalog queries. PAT is not a DB password.
+- Refresh exact schema/ledger/function/policy/grant fingerprints without binding scope RPC or personal rows. Retain local 006 chain 16 migrations / 17 checkpoints; prepare exact hashes/order and classify complete/partial/conflicting effects including 180001/002 data guards.
+- H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. Prepare reviewable package before requesting mutations; do not run hosted migrations/ledger repair/grants/import/OAuth/test writes.
+
+```text
+supabase projects list
+python scripts/inspect_hosted_contracts.py --help
+```
+
+**Review:** Sol checks target identity, full semantic comparison, exact006 chain and protected evidence handling; stale healthy/404 observations remain historical.
+
+**Expected result:** Updated read-only compatibility evidence and concrete G1/G2 package, or exact access/source/recovery blockers; no hosted activation claim.
+
+#### 7. L0 final Web assembly
+
+**Dependencies:** T09/T10 timeout disposition, B2 visuals/race, T11 actual journey/gates. **Files:** `docs/verification/ministry-corrective-local-report.md`, `docs/verification/unified-final-report.md`.
+
+- Use pinned explicit SDK paths and same stable source/config/stack. Retain focused and full command exits/raw hashes plus live/fixture distinctions; run required SQL/concurrency/local gates and complete existing accessibility/routing checks.
+- Recover missing individual review records if available; otherwise keep director attribution and request current bounded source/evidence review, never relabel absent historical artifacts. Independent assembled review resolves all Critical/Important findings and records remaining minor/operational blockers.
+
+```text
+flutter test --no-pub --concurrency=1
+flutter analyze --no-pub
+flutter build web --no-pub
+python scripts/web_preflight.py build/web
+```
+
+**Review:** Independent Sol plus director evaluate R01–R11 / A1–A8 and current Web evidence; Linux explicitly DEFERRED, not blanket original-plan completion.
+
+**Expected result:** Current Windows local/Web acceptance approved only if every required current gate passes; Android/hosted/legacy/release categories remain separately open.
+
+#### 8. O1 / H2 / H3 / D1-D2 gated delivery
+
+**Dependencies:** L0, H1 recovery/parity package, H3 source disposition, O1 real OAuth, D0 target and G3 signing, explicit build authorization. **Files:** `docs/operations/google-oauth.md`, `docs/operations/unified-release.md`, `android/app/build.gradle.kts`, `pubspec.yaml`; **create future evidence document** `docs/verification/ministry-corrective-delivery-report.md` (currently absent).
+
+- Prepare exact setting/account/import/signing diffs and recoverability/custody evidence through existing G1/G2/G3; current release debug signing blocks delivery. These tasks remain gated, not instructions to mutate now. No APK build until ALL pre-gates+approvals, including reviewed package/version/certificate continuity and explicit build authorization.
+- Only after approval build exact candidate with public-only configuration; inspect hash/size/package/version/certificate/toolchain, install/update approved bytes and observe A1-A8 on emulator/physical device. Hosted live checks/test writes require their separate authorization. Verify Storage/SAF, callbacks and durable fresh-session journey.
+- Independent final review and G4 exact destination/audience/retention/download-byte policy precede publication. Local commits/merges authorized; push and artifact publication remain unauthorized.
+
+```text
+apksigner verify --verbose --print-certs <approved-apk>
+aapt dump badging <approved-apk>
+```
+
+**Review:** Independent assembled review verifies S15 A9 plus real-role/legacy/device evidence and separate G1-G4 dispositions.
+
+**Expected result:** Eventually exact signed installed/downloaded artifact evidence; currently BLOCKED, no speculative release/build PASS.
+
+**Consolidation review:** outcome is recorded in the [separate consolidation review record](../../verification/2026-10-21-spec-plan-consolidation-review.md). Prior amendment/consolidation approvals apply only to their recorded hashes and scopes. JSON/link/diff validation is documentation evidence only.
 
 ## Global constraints
 
@@ -28,41 +254,22 @@
 - Forward migrations only. Preserve strict public payload/result types, RLS/grants, lock ordering, idempotency, current one-active-enrollment and historical capacity invariants.
 - New test files belong to each JSON task's `verification.new_test_files`; SQL/Python scenario files are explicitly owned in `touches` and executed through contained Dart wrappers/authoritative commands. This keeps the installed Flutter RED adapter meaningful without pretending SQL is a Dart test file.
 - Bootstrap failures are disclosed and repaired; no hidden waiver or red full-suite approval. Local, hosted, legacy and device evidence have separate states.
-- Read-only Sol stage reviewers do not implement. Only director arbitration may change task acceptance; fixes return to the same OpenCode task session. No silent fallback from CLI/provider errors to Codex coding.
-- No commit/push/merge, hosted repair/application/import or Android publication is implied by this planning task or by packaged script defaults. Preserve the user's existing changes and do not expose credentials/private records.
+- Read-only Sol stage reviewers do not implement. Only director arbitration may change task acceptance; fixes return to the same native Luna task implementer; record actual model availability and do not substitute silently.
+- Local commits/merges are authorized by the user; push, hosted mutations and Android publication are not authorized by this consolidation. Preserve the user's existing changes and do not expose credentials/private records.
 
 ## Execution protocol for this environment
 
-Use the actual delegation skill at `/workspace/.agents/skills/opencode-cli-delegation/SKILL.md` (recovered verbatim from the user's `environment-fixes.zip`); source skill bundle is `/workspace/.config/opencode/vendor/superpowers@ace9e92ac19d7cb485e8d946ee7b828177e46d08`. Read only the applicable engineering overlays listed in the spec for each work unit.
+The current method is native Luna Medium implementation and fresh native Sol 6.1 low read-only review, with director coordination and independent final assembled review. Investigate repository, behavior, contracts and failures before design/fixes. Bind each bounded brief to existing task files/interfaces/dependencies and exact candidate hashes; record actual model, commands/exits, findings and re-review. Return findings to the same task implementer. One writer owns shared contracts. Direct evidence suffices for environment/inventory/document checks; no artificial TDD RED. Behavioral corrections require meaningful assertion RED/GREEN and appropriate final gates.
 
-1. Director records `git status`, branch/base SHA, all pre-existing tracked/untracked paths and an evidence digest. Work on an isolated authorized checkout or the established branch with one writer. Do not overwrite these planning/review documents.
-2. Director writes a bounded brief outside product files. It states: pipeline coder role, task ID, spec refs, allowed source/new test files, dependencies, exact contracts, required RED/GREEN/verification, relevant skill file paths, no hosted access/no commit/push, and structured result schema.
-3. Invoke OpenCode from the resolved project root using an argument array, requested model `opencode/deepseek-v4.1-flash-free`, JSON output and a unique task title. Attach only the brief/necessary non-secret files. Keep ordinary proxy/CA/provider configuration; omit privileged Supabase variables from local coder subprocesses. Do not inspect or copy OpenCode credentials.
-4. A fresh work unit gets a fresh CLI session. Capture its real session ID from the event stream. Corrections use that exact `--session` plus the same model; never `--continue` blindly into an unrelated last session. Use `--standalone` only after the documented managed-service/port conflict. Authentication/model/provider errors stop that work unit with BLOCKED, not a replacement model.
-5. Expected coder result is structured JSON: `status` (`completed`, `blocked`, `test_defect`), `task_id`, `changed_files`, `summary`, `tests` (command, exit code, raw evidence path, RED/GREEN role), `session_id`, `issues`, `self_review`. Reconcile it with actual process exit, Git diff/new files, tool output and test results. A self-reported completed status cannot approve the task.
-6. Director runs/inspects authoritative focused and full gates and prepares a review package bound to HEAD plus content hashes, including new files. Send it to a clean-context native reviewer requested as `gpt-6.1-sol`, `reasoning_effort=low`. Reviewer returns APPROVED/SEND_BACK/ESCALATE with severity, file/line, reproducible trigger, acceptance/test gaps and minor disposition.
-7. Director arbitrates contradictory tests/contracts, sends every Critical/Important finding to the same OpenCode coder session, reruns affected checks and obtains a new stage review. A native subagent may transport a coder brief/results, but must not replace CLI product coding. The parent session performs the final combined review and preserves all rulings.
-8. Keep an append-only execution record under the ignored plan workspace, with brief/review paths, hashes, worker identities, exact commands/exits, scope changes and remaining blockers. Do not fabricate the installed Script CEO ledger events. Publish a sanitized tracked execution summary at stage boundaries. No automatic commit or push.
-
-Suggested argument-safe invocation shape (not executed as a product task by this document):
-
-```python
-subprocess.run([
-    opencode_executable, 'run',
-    '--model', 'opencode/deepseek-v4.1-flash-free',
-    '--format', 'json', '--title', task_title,
-    '--file', str(brief_path),
-    'Act as this pipeline task coder. Read the attached bounded brief and return actual changes and evidence.'
-], cwd=project_root, env=coder_environment, check=False)
-```
-
-The brief's directory restrictions are application instructions, not an OS sandbox guarantee. Preserve actual managed tool policies and do not weaken them to make a worker start.
+Local commits and merges have user authorization; push does not. Hosted project reads have authorization, mutations do not. No APK build until every existing pre-gate and separate build/signing approval passes. The original OpenCode invocation/session protocol is historical provenance in `0b05473`, not executable policy. The consolidated current-state section governs stop points, source identity, status and continuation.
 
 ## B0 — Environment and baseline entry
 
+Historical bootstrap checklist: retain old observations/process boxes; use consolidated B0 continuation for current readiness, not the former import/36-diagnostic baseline.
+
 **Owners:** director prepares/validates; any bounded environment repair is explicit. No product change during this document-authoring stage.
 
-- [ ] Verify CLI version/model availability with a no-tool/no-edit readiness request and record its actual exit/session result. Verify reviewer availability through the native subagent tool. Template profile declarations are not live-model proof.
+- [ ] Verify requested native implementer/reviewer availability and record actual identity; template declarations are not runtime proof.
 - [ ] Verify trusted portable hooks. Existing project hooks point to Windows paths; do not execute them as if valid on Linux, silently discard inherited restrictions, or activate packaged Terra/Sol example defaults. Confirm the adapted protocol instead of starting a second automatic executor.
 - [ ] Verify Flutter/Dart, Java/Android, PostgreSQL, PowerShell, Chromium/driver and loopback Supabase prerequisites as needed. Repair local executable modes via the supported installation/workspace process; `bash scripts/cmd` is valid for its currently non-executable copy.
 - [ ] Pin SDK and test font provenance; retain the current lockfile. Capture an exact fresh baseline (commands, tool versions, file hashes, raw failures) before fixing it.
@@ -76,7 +283,7 @@ The brief's directory restrictions are application instructions, not an OS sandb
 **Contract:** existing `ieadpe_import_convert(operation_id uuid,payload jsonb)->jsonb`; no accepted client revision/person field is added. Existing result/replay/duplicate/tombstone contracts stay intact. New legacy rows have revision 1/person_id null; canonical reconciliation remains a separately audited stable-ID operation.
 
 - [x] Add/reproduce a valid accepted import after all migrations with the mandatory revision column; observe SQLSTATE 23502 in the current code. Add duplicate, tombstone, lost-response replay, concurrent same legacy ID and counter/zero-confirmation transaction-order assertions.
-- [x] Have the CLI coder replace the importer in a forward migration, explicitly initializing the inserted composite record's revision, retaining every prior validation/lock/result/receipt rule.
+- [x] Have the native Luna implementer replace the importer in a forward migration, explicitly initializing the inserted composite record's revision, retaining every prior validation/lock/result/receipt rule.
 - [x] Run `python3 scripts/test_database.py import_revision_compatibility_test.sql`, `python3 scripts/test_database.py import_test.sql`, `python3 scripts/test_database.py --import-concurrency`, and the two Task 16/wrapper Flutter files. Expect all to pass with no double count/link/revision reset.
 - [x] Obtain Sol 6.1/low review of actual diff/evidence. Other baseline failures remain explicitly open; this is not ordinary full-green pipeline completion.
 
@@ -101,7 +308,7 @@ The brief's directory restrictions are application instructions, not an OS sandb
 
 ## Local corrective task schedule
 
-Start with one writer at a time. `depends_on` is authoritative; exact `touches` and registered new test paths define scope. Shared model/codec/server contract producers land before consumers. The latest user-selected director/CLI/reviewer protocol owns dispatch; installed deterministic validation/command helpers remain useful without invoking Script CEO.
+Start with one writer at a time. `depends_on` is authoritative; exact `touches` and registered new test paths define scope. Shared model/codec/server contract producers land before consumers. The current native director/implementer/reviewer protocol owns dispatch; installed deterministic validation/command helpers remain useful without invoking Script CEO.
 
 | Task | Outcome | Dependencies |
 |---|---|---|
@@ -158,7 +365,7 @@ Repair referral and candidate lookup after person edits without changing their p
 - [x] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [x] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [x] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [x] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [x] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -222,7 +429,7 @@ Replace finalized-correction behavior with the user-selected immutable policy an
 - [x] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [x] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [x] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [x] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [x] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -274,7 +481,7 @@ Introduce a small composed controller that preserves exact intent across ambiguo
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -325,12 +532,14 @@ Integrate exact retries and immutable presentation into the existing class-bound
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
-**Focused verification** (expected PASS, except the initial meaningful RED):
+**Focused verification** (expected PASS, except the initial meaningful RED). Existing T04-P/S16 commands are included for the already-owned preview regression; retain all original UI targets:
 
 ```text
 flutter test --no-pub --concurrency=1 test/features/ministry/ui/attendance_history_test.dart test/features/ministry/ui/lesson_session_test.dart test/features/ministry/ui/session_navigation_test.dart test/features/ministry/ui/session_visual_test.dart
+python3 scripts/test_database.py attendance_roster_preview_test.sql
+flutter test --no-pub --concurrency=1 test/database/attendance_roster_preview_test.dart
 ```
 
 ### Task 5: Expose bounded enrollment history with strict typed transport
@@ -374,7 +583,7 @@ Add only the missing student-enrollment read, retaining the existing progress RP
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -422,7 +631,7 @@ Use the bounded history and existing progress RPC to finish the normal operator 
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -466,7 +675,7 @@ Resolve the documented archived campaign-scope regression while preserving curre
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -520,7 +729,7 @@ Apply the existing bounded recovery proposal without confusing display metadata 
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -562,7 +771,7 @@ Exercise actual Windows and POSIX resolver branches independently of host OS wit
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -612,7 +821,7 @@ Prevent Bash/PowerShell divergence and require all standalone SQL, seeded upgrad
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -658,7 +867,7 @@ Replace the obsolete unscoped-create/transfer journey and prove persistent ident
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -698,7 +907,7 @@ Produce an auditable activation package while keeping this pipeline local-only a
 - Classify recorded+present, fully-equivalent unrecorded, absent and partial/conflicting states per version; inspect indexes/policies/grants and data transformations, not only one column or ledger row.
 - Rehearsal refuses non-loopback targets and never defaults to hosted; seed a disposable production-shaped baseline through 202610180002 with ledger through 018.
 - Demonstrate that blindly replaying existing Base44 DDL fails; independently prove equivalent objects and guard reconciliation before producing a reviewable ledger-repair proposal.
-- Exact ordered local upgrade includes 202610180003, all nine October 19 migrations and all five corrective October 20 migrations; test partial resume and stop on deliberate catalog drift.
+- Exact ordered local upgrade includes 202610180003, all nine October 19 migrations and all six corrective October 20 migrations through 006; test partial resume and stop on deliberate catalog drift.
 - Upgrade preserves counts, stable IDs, manual states, snapshots, scope/replay rules and current RPC envelopes; expected hashes and roles are recorded without private records.
 - Activation package names target/source/migration digests, backup/restore checks, old-client compatibility/write-pause plan, monitoring and rollback/stop conditions; no hosted writes or ledger repair is executed.
 - Unknown Firebase source and unavailable APK/device evidence remain explicit blockers; do not infer source absence from empty Ministry tables or invent supported import shapes.
@@ -710,7 +919,7 @@ Produce an auditable activation package while keeping this pipeline local-only a
 - [ ] Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.
 - [ ] Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.
 - [ ] Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.
-- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization.
+- [ ] Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges are authorized; push remains unauthorized.
 
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
@@ -735,7 +944,7 @@ flutter test --no-pub --concurrency=1 test/operations/hosted_upgrade_preparation
 - [ ] Refresh project identity, ledger, columns/constraints/indexes/policies/grants/function hashes and aggregate risk counts through the authorized read-only channel. Never call binding `ieadpe_get_scope` as inventory.
 - [ ] Obtain an authorized encrypted database backup and applicable private Storage inventory/backup, outside Git. Restore to an isolated destination and verify counts, constraints, stable links/history and required object access. Record hashes/location authority and recovery procedure, not private contents.
 - [ ] Verify every effect of the unrecorded `202610180001/002` changes. If any effect is partial/conflicting, stop for a dedicated reviewed repair; if equivalent, prepare exact ledger reconciliation through the verified channel. Do not blindly replay existing CREATE/ALTER or mark unknown DDL applied.
-- [ ] Rehearse the ordered pending sequence: `202610180003`, October 19 `001` through `009`, then October 20 `001` through `005`. Preserve old/new client compatibility or define an explicit write pause/update boundary; new nested create/edit envelopes must not break an active old APK silently.
+- [ ] Rehearse the ordered pending sequence: `202610180003`, October 19 `001` through `009`, then October 20 `001` through `006` (T12-006: 16 forward migrations). Preserve old/new client compatibility or define an explicit write pause/update boundary; new nested create/edit envelopes must not break an active old APK silently.
 - [ ] Present the final concrete target/source/migration-hash/backup/rollback package for user authorization **before hosted writes**. This plan and PAT availability do not themselves authorize cutover. If no recovery or exact-state proof is available, record BLOCKED and continue independent artifact work.
 
 ## H2 — Authorized activation and real-role acceptance
@@ -791,9 +1000,9 @@ Planning self-review must validate the JSON with the installed canonical validat
 
 ## 2026-10-20 completion map and bounded delivery addendum
 
-Author: native Sol 6.1 low. Assessment only; no tests/builds/remote writes were performed for this document. Existing plan/spec remain the owners; no new plan is necessary. Read [S15 acceptance and approval boundaries](../specs/2026-10-20-ministry-corrective-release-design.md#s15-completion-assessment-and-bounded-delivery-clarification--2026-10-20). Preserve the dirty branch and no-commit/no-push constraint.
+Author: native Sol 6.1 low. Assessment only; no tests/builds/remote writes were performed for this document. Existing plan/spec remain the owners; no new plan is necessary. Read [S15 acceptance and approval boundaries](../specs/2026-10-20-ministry-corrective-release-design.md#s15-completion-assessment-and-bounded-delivery-clarification--2026-10-20). Historical assessment of the then-dirty candidate; current authorization is recorded in the consolidated section.
 
-### Task-by-task completion assessment
+### Historical task-by-task completion assessment (superseded status index below)
 
 Statuses distinguish scoped approval from branch/release acceptance. Coder `completed` is not approval. The director supplied the recorded native Sol low verdicts for T01–T10 and T12 after correction-6; where the durable report still says pending, the approval is attributed to that director record and must be attached to the final evidence index, not invented inside an older worker report.
 
@@ -813,7 +1022,7 @@ Statuses distinguish scoped approval from branch/release acceptance. Coder `comp
 | T08 greeting/safe Team | Approved scoped, director-recorded Sol verdict | `T08/coder-report.json`; existing `session_display_name.dart`, app/Home/Admin tests. Original APK draft now a reference, not unfinished duplicate work. Real Google session still pending. |
 | T09 portable runner | Approved scoped, director-recorded Sol verdict | `T09/coder-report.json`, Python/Flutter runner tests; no full local browser claim. |
 | T10 complete verification manifest | Approved scoped, director-recorded Sol verdict | `T10/coder-report.json`, `scripts/verification_cases.json`, Python/Dart gates. Stubs prove runner contracts, not actual full stack/CI passage. |
-| T11 coupled Chromium journey | Incomplete / blocked | No T11 executed acceptance report found. `integration_test/unified_journey_test.dart` still needs the exact current journey plus actual local Auth/Storage/Chromium run and cleanup proof. Full stack capacity is a blocker. |
+| T11 coupled Chromium journey | Incomplete / blocked | No T11 executed acceptance report found. `integration_test/unified_journey_test.dart` contains the current journey assertions; actual local Auth/Storage/Chromium execution, cleanup and sentinel-survival proof remain missing. Full stack capacity is a blocker. |
 | T12 hosted preparation | Approved local with 006 + real checkpoints | Durable `build/verification/corrective-release/T12/continuation-006/sol-final-review.md`: exact 16 migrations through 006, 17 actual catalog checkpoints, derived manifest and real loopback rehearsal approved locally. Correction-6 preparation remains historical. Hosted inventory/parity, ledger repair and activation remain unapproved. |
 | T04–T07 assembled checkpoint | FAIL / unresolved branch acceptance | `CHECKPOINT-T04-T07/checkpoint-report.json`: full suite 528 pass/1 failure in `test/database/task_3_test.dart`, analyzer exit 0; isolated race rerun passed. Retain both; do not relabel full run green. |
 | Local closing | Incomplete | No complete current two-platform gate + actual local journey + final source-bound full-green report. Earlier expanded-review SQL/visual/analysis gaps require explicit current dispositions, not automatic inheritance as present defects or implicit closure. |
@@ -852,7 +1061,7 @@ For a new behavioral defect, record named assertion/runtime RED with at least on
 - [ ] Refresh inventory using an authorized read-only managed channel; record target/project, ledger, complete semantic fingerprints and aggregate link/count invariants. Never probe binding scope RPC as inventory. PAT is not SQL credentials.
 - [ ] Obtain encrypted DB/Auth-recovery material and Storage inventory/bytes/policies, record digests/custodian; restore in isolated approved infrastructure and prove counts/constraints/RLS/links/history/object access. Measure restore time and obtain owner-approved recovery point/time objectives.
 - [ ] Inspect original Firebase/source export or independently verifiable absence; reconcile stable IDs, archived/tombstoned/history totals and ambiguous mappings plus Base44/current data. Dry-run repeat import in isolation; unknown source remains BLOCKED. If actual schema requires new importer behavior, author a bounded source-specific spec/task before product code.
-- [ ] Prove every 180001/180002 DDL/data/guard effect, propose exact ledger commands only for fully equivalent versions, pin 15 forward migrations/checksums and resume/drift criteria. Unknown state stops; no blind ledger repair/push.
+- [ ] Prove every 180001/180002 DDL/data/guard effect, propose exact ledger commands only for fully equivalent versions, pin 16 forward migrations/checksums through 006 and resume/drift criteria. Unknown state stops; no blind ledger repair/push.
 - [ ] Present concrete maintenance owner/window, old-writer pause proof, backup/restore/source evidence, SQL order/checksums, monitoring, rollback/reconciliation commands and stop conditions. Ask for target-specific G1 authorization only after this package exists. Permission grants/import require their own G2 package and approval.
 - [ ] After separately authorized execution, perform existing H2 live-role/Storage/persisted journey checks with run-owned records; halt on authority/integrity mismatch and follow reviewed recovery procedure. Record local/hosted/legacy states separately.
 
@@ -890,14 +1099,14 @@ For a new behavioral defect, record named assertion/runtime RED with at least on
 
 S15 A1/A2 -> T08/O1/H2/D2; A3/A4/A5 -> T01/T07/T11/H2/H3; A6/A7 -> T02–T06/T11/H2; A8 -> local closing/H2/D2; A9 -> D0/D2. G0 is review of this assessment/addendum; G1/G2/G3/G4 remain explicit future actions with concrete evidence prerequisites. No additional feature task is justified by this assessment. The APK draft remains a historical Task 8 reference; executing its old queue would duplicate approved work.
 
-Self-review checked all units B0–B3/T01–T12/local closing/H1–H3/D1, source-versus-hosted evidence, stale report wording, no secret values and no duplicate implementation queue. The machine JSON remains historical local-task scope; this reviewed Markdown addendum governs operational refinements and current native dispatch. No existing checkbox was falsely marked complete.
+Self-review checked all units B0–B3/T01–T12/local closing/H1–H3/D1, source-versus-hosted evidence, stale report wording, no secret values and no duplicate implementation queue. The consolidated Markdown and JSON now share current status/continuation; this dated assessment remains historical evidence. No existing checkbox was falsely marked complete.
 
-**Exact review question:** Does this completion map accurately capture the existing plan's approved local work and remaining acceptance gates, and do the bounded delivery clarifications cover the functional downloadable APK you intend, using native Luna Medium implementation and Sol 6.1 low task reviews plus independent final review?
+**Historical review prompt:** This completion-map review preceded the current consolidation; it is not an unanswered execution-method approval checkpoint.
 
 
 ## T04-P: bounded first-save roster preview correction — 2026-10-21
 
-**Owner:** Sol 6.1 low authors brief/spec/plan and independently reviews; native Luna Medium implements. **Spec:** S16 above and existing S06/S07/S11. This is corrective work within T04's promised open draft/finalize/replacement interface; SQL ownership below is the explicit bounded extension to the original T04 file list. It does not reopen completed tasks wholesale or authorize hosted migrations. Do not use OpenCode, commit/push, build APKs or run full suites before L0.
+**Owner:** Sol 6.1 low authors brief/spec/plan and independently reviews; native Luna Medium implements. **Spec:** S16 above and existing S06/S07/S11. This is corrective work within T04's promised open draft/finalize/replacement interface; SQL ownership below is the explicit bounded extension to the original T04 file list. It does not reopen completed tasks wholesale or authorize hosted migrations. Do not use OpenCode or build APKs before all pre-gates/approvals. Local commits/merges are authorized; push is not. This task’s historical focused-gate sequence is preserved below.
 
 **Files authorized for implementation:**
 
@@ -938,7 +1147,7 @@ Run focused session visual test only if affected; format changed Dart and `git d
 
 Self-review: same RPC/envelope/permission boundary; only open-unfrozen read semantics change. New SQL ownership and release dependency are explicit; no hosted execution or automatic closure of T11/T12/L0 is implied.
 
-**Machine-plan reconciliation:** the existing JSON remains unchanged and describes original Tasks 1–12, including original T04 ownership. T04-P is an explicit supplemental Markdown unit with its own files, registered new-test wrapper and brief; it must not be dispatched as unchanged JSON Task 4 or through its historical OpenCode executor. JSON Task 4 alone is insufficient authority for the new SQL files. Native dispatch must attach S16/T04-P/brief together. JSON migration identities through 005 remain historical dependencies, not a complete 006 cutover chain. This documents the deliberate supplement rather than claiming JSON already contains it.
+**Machine-plan reconciliation:** JSON Task 4 now explicitly carries S16/T04-P ownership, approved scoped status and evidence limits; Task 12 includes 006. Original task IDs/interfaces remain stable. No separate executor or replacement task queue is introduced.
 
 ### T04-P local closing record — 2026-10-21
 
@@ -952,7 +1161,7 @@ T12's dependent 006 integration now has separate [APPROVED_LOCAL review](../../.
 
 **Authority and scope:** The user selected functional acceptance on Web and Android and directed that no further work be invested in Linux. Continue the existing T11/L0/O1/D0/D2 requirements on Windows; no replacement implementation plan or duplicate feature queue is created. Linux 23/25 acceptance remains **NOT EXECUTED / DEFERRED BY USER**, so T09/T10 ordinary acceptance and original-plan completion must not be claimed from this platform recut. This amendment does not waive failing checks or confer branch/release approval.
 
-**Director ruling — 2026-10-21:** The user's selection authorizes the bounded local investigation, prerequisite diagnosis, existing tests and necessary scoped corrections in the checklist below, with the native implementation/review pipeline. It supersedes earlier planning-only statements such as “does not authorize execution ... now” and “planning review is the current stop point” only for that local Web/Android work. This is not authorization for APK/build publication, hosted access or mutation, secret/key generation or exposure, staging, commit, push or merge; all existing pre-build, signing and release gates remain binding.
+**Director ruling — 2026-10-21:** The user's selection authorizes the bounded local investigation, prerequisite diagnosis, existing tests and necessary scoped corrections in the checklist below, with the native implementation/review pipeline. It supersedes earlier planning-only statements such as “does not authorize execution ... now” and “planning review is the current stop point” only for that local Web/Android work. The earlier amendment did not authorize APK/build publication, hosted access/mutation, keys or Git integration. Later user authority now permits project reads and local commits/merges; push, APK builds, hosted mutations and secret exposure remain unauthorized; all existing pre-build, signing and release gates remain binding.
 
 **Current evidence:** At `codex/ministry-production-completion@d0d0e0fbedd4a671f2e09180de94dcac0343ef63` plus the reviewed dirty delta, the pinned Flutter 3.47.7/Dart 3.13.5 full suite is 546 passed/2 failed (360px Team/gallery goldens); analyzer, web build and static web preflight pass. The current manifest and dated local report bind the evidence. An independent Sol 6.1 low visual review approves disposition of the inspected 360px diffs as glyph/icon rendering differences with no visible layout defect; it does not waive the two suite failures and calls out that neither responsive golden loop reaches its larger viewports. Additional local Chrome smoke confirms Flutter startup and the fail-closed bootstrap screen at exact 360/768/1440 CSS viewports, but no backend is configured and no login/persistence acceptance is claimed; the Flutter app smoke suite passed 5/5 on the available Windows SDK. Docker's WSL Virtual Machine Platform is unavailable; Android HAXM is usable and the CPU reports VT-x/SLAT support. API 31 and 34 system images are present, but the clean API 31 no-Vulkan retry and the API 34 attempt both remain ADB `offline`; no Android boot or app run completed. The SDK Manager emulator update also stalled with no package progress and was stopped (exit 1). Enabling Windows Hypervisor Platform and Virtual Machine Platform with administrator access and rebooting remains an unperformed next setup option; DISM returned elevation-required error 740. Historical 528/529 requires root-cause disposition; real T11 and Android application acceptance remain blocked. No approval is transferred to changed bytes.
 
@@ -965,6 +1174,6 @@ T12's dependent 006 integration now has separate [APPROVED_LOCAL review](../../.
 - [ ] **D0/D2 Android acceptance, only after predecessor gates and separate build/signing approval:** use the exact candidate and S15 A1–A8/D2 checks: install/update, cold/warm login return, cancellation/denial/back, proper greeting/Team authority, persisted complete academic journey after reopening, revocation/user switch, 200% text/back/resume, Storage/photo and SAF XLSX choose/cancel/write/reopen with accents. Emulator and physical-device observations, certificate/package/version/hash and update continuity remain the existing requirements; widget tests or a launch smoke do not replace them. Do not build an APK until all previously required pre-build gates and approvals have been satisfied. If real provider/backend or target prerequisites are unavailable, record the corresponding acceptance as BLOCKED rather than claim both platforms work.
 - [ ] **Independent assembled review:** preserve Luna Medium implementation and Sol 6.1 low stage review. Director reviews the complete candidate, test meaning, exact Web/Android evidence and remaining categories before any integration/publication. Update the existing local report and eventual delivery report independently; the current work is functional acceptance, not completed production activation/delivery.
 
-**Unchanged boundaries and dependencies:** Finalized attendance is immutable for new commands; correction requires acknowledged cancellation and a linked replacement, preserving history and exact receipt replay. Hosted Supabase access, migrations, ledger repair, grants, OAuth console changes, recovery/activation, legacy import and deployment remain outside this authorization; obtain separate explicit authorization for a concrete hosted operation. H1/H2/H3 and G1/G2/G3/G4 are neither removed nor satisfied by this amendment. In particular, no claim of intended hosted compatibility, real Google login, release signing or production delivery is possible without their evidence. No staging, commit, push, merge, APK or publication is authorized by this planning amendment.
+**Unchanged boundaries and dependencies:** Finalized attendance is immutable for new commands; correction requires acknowledged cancellation and a linked replacement, preserving history and exact receipt replay. Hosted Supabase mutations, migrations, ledger repair, grants, OAuth console changes, recovery/activation, legacy import and deployment remain outside this authorization; obtain separate explicit authorization for a concrete hosted operation. H1/H2/H3 and G1/G2/G3/G4 are neither removed nor satisfied by this amendment. In particular, no claim of intended hosted compatibility, real Google login, release signing or production delivery is possible without their evidence. Later user authority permits local commits/merges and project reads. Push, APK builds, hosted mutations and publication remain gated.
 
-**Machine-plan relationship:** `execution_amendment_2026_10_21` in the JSON mirrors this scope and references existing units; Tasks 1–12 and their historical commands/interfaces remain unchanged. Markdown S15/S16/T04-P and this amendment govern current native dispatch; historical OpenCode metadata is not dispatch authority. The amendment's scope and preserved boundaries were independently **APPROVED — no findings** by Sol 6.1 low against the hashes recorded in the local report. This is plan review only; JSON parse and diff checks are documentary validation, not execution-gate evidence.
+**Machine-plan relationship:** `execution_amendment_2026_10_21` in the JSON mirrors this scope and references existing units; Tasks 1–12 retain IDs/interfaces; consolidated status/continuation and T04-P/006 ownership are now mirrored in JSON. Markdown S15/S16/T04-P and this amendment govern current native dispatch; historical OpenCode metadata is not dispatch authority. The amendment's scope and preserved boundaries were independently **APPROVED — no findings** by Sol 6.1 low against the hashes recorded in the local report. This is plan review only; JSON parse and diff checks are documentary validation, not execution-gate evidence.

@@ -3,16 +3,16 @@
   "title": "Ministry corrective release: local contracts, operator workflow and activation preparation",
   "spec_doc": "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md",
   "global_constraints": [
-    "Planning artifact only until reviewed. No automatic hosted mutation, migration repair, import, deployment, push, merge or Android publication.",
+    "Current scope: Windows Web/Android continuation after consolidated-plan review. Linux deferred by user. Local commits/merges and hosted project reads are authorized; push, hosted mutations and APK builds remain gated.",
     "Bootstrap B0-B3 from the companion Markdown plan must finish with full green verification and an integration review before ordinary corrective tasks are approved; no implicit baseline waiver.",
-    "Use the user-selected adapted pipeline: this Codex session is strategist/director/arbiter/final reviewer, OpenCode CLI opencode/deepseek-v4.1-flash-free is coder, and a native gpt-6.1-sol low-effort subagent reviews each stage. Pin the installed engineering skill source ace9e92ac19d7cb485e8d946ee7b828177e46d08. Do not launch a competing Script CEO controller or silently substitute workers.",
+    "Native Luna Medium implements; native gpt-6.1-sol low independently reviews; director coordinates and obtains independent assembled review. Historical OpenCode/Script CEO metadata is not dispatch authority.",
     "Portuguese product UI; English technical artifacts; existing Base44 theme and locked dependencies. No new package/template/backend or unrelated refactor.",
     "Use forward migrations only. Preserve verified server authorization, existing actor/access/class/receipt lock order, strict envelopes, least privilege and no personal values in logs/receipts.",
     "Finalized attendance is immutable for new commands regardless of finalize flag; exact acknowledged receipt replay remains valid. Corrections cancel then create a linked replacement.",
     "Ambiguous retry retains identical operation ID, payload, revision, marks and action; identity/scope loss clears protected state and rejects late replies.",
     "Canonical operational reads join ministry_people; only unlinked legacy rows use snapshot fallback. Preserve historical snapshots and never merge by name.",
     "Use assertion/runtime RED, focused GREEN, authoritative full suite/analyzer and candidate-bound semantic review. Compile/load errors and blocked tools are not successful RED/PASS.",
-    "Keep all gates local-only, using disposable synthetic databases and local Supabase Auth/Storage. Any real hosted execution is a later concrete reviewed operational action outside this JSON.",
+    "Product gates use owned disposable loopback services. Hosted project reads are authorized; hosted mutations/migrations/ledger repair/grants/import/OAuth changes require separate concrete authorization.",
     "Run serially initially because models/codecs/contracts and verification artifacts are shared. The director owns scheduling; no worker broadens task-owned files without recorded arbitration.",
     "No test baselines refreshed blindly, skipped negative/security assertions, fabricated approval/review/runtime evidence or implicit baseline waivers."
   ],
@@ -66,8 +66,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "Canonical projection scoped review; hosted parity unproven.",
+        "evidence_locator": "tar:T01/review.md",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 2,
@@ -142,8 +149,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "Immutable finalization/replacement scoped review; live acceptance missing.",
+        "evidence_locator": "tar:T02/review.md",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 3,
@@ -190,8 +204,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "IMPLEMENTED",
+        "scope": "Director-attributed scoped verdict; durable individual final review absent.",
+        "evidence_locator": "tar:T03/coder-report.json; handoff acceptance limitations",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 4,
@@ -200,7 +221,8 @@
       "spec_refs": [
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s06-immutable-finalization-and-replacement",
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s07-attendance-operation-ownership",
-        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s11-verification-and-release-gates"
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s11-verification-and-release-gates",
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s16-t04-correction-eligible-roster-preview-before-first-save--2026-10-21"
       ],
       "touches": [
         "lib/features/ministry/ui/attendance_page.dart",
@@ -209,7 +231,12 @@
         "test/features/ministry/ui/lesson_session_test.dart",
         "test/features/ministry/ui/session_navigation_test.dart",
         "test/features/ministry/ui/session_visual_test.dart",
-        "docs/verification/l1/visual-review.md"
+        "docs/verification/l1/visual-review.md",
+        "supabase/migrations/202610200006_attendance_roster_preview.sql",
+        "supabase/tests/database/attendance_roster_preview_test.sql",
+        "test/database/attendance_roster_preview_test.dart",
+        "scripts/verification_cases.json",
+        "docs/integration/ministry-completion-contracts.md"
       ],
       "depends_on": [
         2,
@@ -235,11 +262,14 @@
         ]
       },
       "verification": {
-        "command": "flutter test --no-pub --concurrency=1 test/features/ministry/ui/attendance_history_test.dart test/features/ministry/ui/lesson_session_test.dart test/features/ministry/ui/session_navigation_test.dart test/features/ministry/ui/session_visual_test.dart",
+        "command": "flutter test --no-pub --concurrency=1 test/features/ministry/ui/attendance_history_test.dart test/features/ministry/ui/lesson_session_test.dart test/features/ministry/ui/session_navigation_test.dart test/features/ministry/ui/session_visual_test.dart\npython3 scripts/test_database.py attendance_roster_preview_test.sql\nflutter test --no-pub --concurrency=1 test/database/attendance_roster_preview_test.dart",
         "new_test_files": [
-          "test/features/ministry/ui/attendance_history_test.dart"
+          "test/features/ministry/ui/attendance_history_test.dart",
+          "test/database/attendance_roster_preview_test.dart"
         ],
-        "sql_scenarios": [],
+        "sql_scenarios": [
+          "attendance_roster_preview_test.sql"
+        ],
         "python_test_modules": []
       },
       "steps": [
@@ -248,8 +278,22 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "IMPLEMENTED",
+        "scope": "Attendance UX source exists; director-attributed verdict; live browser/device missing.",
+        "evidence_locator": "tar:T04/coder-report.json; integration_test/unified_journey_test.dart",
+        "branch_release_approval": false
+      },
+      "continuation_owners": [],
+      "supplement": {
+        "id": "T04-P",
+        "status": "APPROVED_LOCAL",
+        "contract": "S16 identical session/roster envelope; open unfrozen preview only; no read DML; writer freezes; cancellation/replacement immutable history.",
+        "evidence_locator": "tar:T04-first-save/sol-final-review.md",
+        "limits": "Original historical test-first RED unavailable; later mutation probe is not original TDD evidence. No duplicate implementation."
+      }
     },
     {
       "id": 5,
@@ -304,8 +348,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "IMPLEMENTED",
+        "scope": "Bounded history source/migration004 exists; director-attributed verdict, missing individual final review.",
+        "evidence_locator": "tar:T05/coder-report.json",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 6,
@@ -357,8 +408,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "IMPLEMENTED",
+        "scope": "Progress UI exists; director-attributed scoped verdict, live persistence missing.",
+        "evidence_locator": "tar:T06/coder-report.json",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 7,
@@ -410,8 +468,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "IMPLEMENTED",
+        "scope": "Authority compatibility migration005 exists; director-attributed verdict, hosted authority unknown.",
+        "evidence_locator": "tar:T07/coder-report.json",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 8,
@@ -436,7 +501,7 @@
         7
       ],
       "acceptance": [
-        "Select trimmed nonblank string full_name then name; null/malformed values show Ol\u00e1!; never use email or metadata as a role.",
+        "Select trimmed nonblank string full_name then name; null/malformed values show Olá!; never use email or metadata as a role.",
         "Actual app wiring passes the active identity display name and clears it on identity change; no prior name survives a new session.",
         "AccessPanel receives canOpenTeam and onScopeRefresh; admin-only inconsistent scope stays in Admin with the exact spec warning and Atualizar acesso.",
         "Valid Ministry scope opens Team; registrars still cannot reach Admin/Team; no scope flags or router grant semantics are broadened.",
@@ -465,8 +530,15 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
-      ]
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "Later pinned workflow fixture scoped review supersedes earlier pending note; Google/OAuth still open.",
+        "evidence_locator": "zip:T08/captured-zone-stage-report.json; consolidation independent-review",
+        "branch_release_approval": false
+      },
+      "continuation_owners": []
     },
     {
       "id": 9,
@@ -513,7 +585,16 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "Windows portability scoped partial approval; Linux DEFERRED, ordinary matrix incomplete.",
+        "evidence_locator": "zip:T09/coder-report.json; consolidation independent-review",
+        "branch_release_approval": false
+      },
+      "continuation_owners": [
+        "T09/T10 / L0 Bash timeout diagnosis"
       ]
     },
     {
@@ -571,7 +652,16 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "Literal-LF argv correction scoped review; live stack gates remain missing and Linux DEFERRED.",
+        "evidence_locator": "zip:T10/final-candidate-report.json; consolidation independent-review",
+        "branch_release_approval": false
+      },
+      "continuation_owners": [
+        "T09/T10 / L0 Bash timeout diagnosis"
       ]
     },
     {
@@ -632,7 +722,16 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "BLOCKED",
+        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified.",
+        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2",
+        "branch_release_approval": false
+      },
+      "continuation_owners": [
+        "B0 / T11 local backend and client setup"
       ]
     },
     {
@@ -663,7 +762,7 @@
         "Classify recorded+present, fully-equivalent unrecorded, absent and partial/conflicting states per version; inspect indexes/policies/grants and data transformations, not only one column or ledger row.",
         "Rehearsal refuses non-loopback targets and never defaults to hosted; seed a disposable production-shaped baseline through 202610180002 with ledger through 018.",
         "Demonstrate that blindly replaying existing Base44 DDL fails; independently prove equivalent objects and guard reconciliation before producing a reviewable ledger-repair proposal.",
-        "Exact ordered local upgrade includes 202610180003, all nine October 19 migrations and all five corrective October 20 migrations; test partial resume and stop on deliberate catalog drift.",
+        "Exact ordered local upgrade includes 202610180003, all nine October 19 migrations and all six corrective October 20 migrations through 006 (16 forward migrations); test partial resume and stop on deliberate catalog drift.",
         "Upgrade preserves counts, stable IDs, manual states, snapshots, scope/replay rules and current RPC envelopes; expected hashes and roles are recorded without private records.",
         "Activation package names target/source/migration digests, backup/restore checks, old-client compatibility/write-pause plan, monitoring and rollback/stop conditions; no hosted writes or ledger repair is executed.",
         "Unknown Firebase source and unavailable APK/device evidence remain explicit blockers; do not infer source absence from empty Ministry tables or invent supported import shapes."
@@ -692,7 +791,16 @@
         "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
         "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
         "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, resumes the same OpenCode coder session for Critical/Important corrections and records the re-review. No commit/push without separate user authorization."
+        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+      ],
+      "current_status": {
+        "status": "APPROVED_LOCAL",
+        "scope": "006 local preparation: 16 forward migrations / 17 real checkpoints; later Windows fixture 30/30 and wrapper 2/2 scoped. Hosted parity/recovery unproven.",
+        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md",
+        "branch_release_approval": false
+      },
+      "continuation_owners": [
+        "T12 / H0/H1 read-only package refresh"
       ]
     }
   ],
@@ -701,8 +809,8 @@
   },
   "execution_amendment_2026_10_21": {
     "goal": "Observed functional acceptance on Web and Android using the existing plan, with Windows as the execution host.",
-    "authority": "User selected functional-acceptance path 2 and directed no further Linux work; this does not authorize hosted operations, an APK or publication.",
-    "director_ruling_2026_10_21": "User selection authorizes bounded local investigation, prerequisite diagnosis, existing tests and necessary scoped corrections through the native pipeline. Earlier planning-only/no-execution stop statements are superseded only for this local Web/Android work. APK/build publication, hosted access/mutation, secret/key generation/exposure and staging/commit/push/merge remain unauthorized; existing pre-build, signing and release gates remain binding.",
+    "authority": "User selected Windows Web/Android acceptance and deferred Linux. Later authority permits hosted project reads and local commits/merges; hosted mutations, APK builds and publication retain separate gates.",
+    "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, APK builds, key/signing changes and publication require separate gates/approval.",
     "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
     "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
     "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 546 passed/2 visual failures, analyzer/web build/static preflight pass. Historical 528/529 disposition, T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
@@ -711,17 +819,17 @@
       "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
       "B0/T11: diagnose Windows Docker engine; prepare owned disposable loopback Supabase Auth/PostgREST/Storage and matching Chromium/ChromeDriver; execute existing SQL/concurrency/unified gates without hosted fallback.",
       "T11/L0: execute exact current browser journey, scope denial, FK-ordered cleanup and unrelated sentinel survival; complete existing visual/accessibility/routing checks and source-bound review. Real Google/OAuth remains O1/G2 and is BLOCKED without its prerequisites/authorization.",
-      "D0/D2: only after existing predecessor gates and separate build/signing approvals, observe emulator/physical install/update and S15 A1-A8/D2 Android journey, callback, durability, revocation, Storage/SAF and exact artifact identity.",
+      "D0/D2: only after ALL predecessor/pre-build gates and separate build/signing approvals, observe emulator/physical install/update and S15 A1-A8/D2 Android journey, callback, durability, revocation, Storage/SAF and exact artifact identity.",
       "Director: obtain independent assembled review and record Web/Android/local/hosted/legacy/device dispositions separately before integration/publication."
     ],
     "invariants": [
       "Finalized attendance is immutable for new commands; corrections require acknowledged cancellation and a linked replacement, preserving history and exact receipt replay.",
-      "No hosted Supabase access/change, migration, ledger repair, grants, OAuth mutation, recovery/activation, import or deployment under this amendment; separate explicit concrete authorization remains required.",
-      "No APK until all existing pre-build requirements and approvals are satisfied; G3 key/signing policy and G4 publication remain separate. No staging, commit, push or merge.",
+      "Hosted project reads authorized; no hosted Supabase mutation, migration, ledger repair, grants, OAuth mutation, recovery/activation, import or deployment under this amendment; separate explicit concrete authorization remains required.",
+      "No APK until all existing pre-build requirements and approvals are satisfied; G3 key/signing policy and G4 publication remain separate. Local commits/merges authorized; push unauthorized.",
       "Missing prerequisites/failing checks remain BLOCKED/FAIL, never fixture PASS. H1/H2/H3 and G1/G2/G3/G4 remain open as applicable.",
       "Native Luna Medium implements; independent Sol 6.1 low reviews; director coordinates. Historical OpenCode executor metadata does not govern current dispatch."
     ],
-    "review_status": "approved_no_findings",
+    "review_status": "historical amendment review applies only to recorded hashes; current outcome in review_record",
     "independent_review": {
       "reviewer": "GPT-6.1 Sol low",
       "verdict": "APPROVED — no findings",
@@ -729,6 +837,390 @@
       "reviewed_json_sha256": "92E0F7D62B5259308BD2FA99BB06405A0F0F42B57701A313811298A9574428EC",
       "scope": "Web/Android local-acceptance amendment, supersession of the planning-only stop for bounded local work, existing gates and authorization boundaries, Linux deferral, and immutable finalized attendance. This is a plan review, not execution-gate approval."
     },
-    "validation_scope": "Documentation only; JSON parse and diff checks do not prove product/platform acceptance."
+    "validation_scope": "Documentation only; JSON parse and diff checks do not prove product/platform acceptance.",
+    "review_record": "docs/verification/2026-10-21-spec-plan-consolidation-review.md"
+  },
+  "consolidated_current_state_2026_10_21": {
+    "spec_owner": "S17 plus preserved R01-R11/S01-S16/A1-A9/G0-G4",
+    "markdown_owner": "consolidated-current-state-and-continuation--2026-10-21",
+    "canonical_worktree": "C:/Users/Carlos_Neto/.codex/worktrees/ministry-supabase-config/App discipulado",
+    "branch": "codex/ministry-production-completion",
+    "investigated_head": "0b05473",
+    "units": [
+      {
+        "unit": "B0",
+        "status": "BLOCKED",
+        "scope": "Windows Docker/bootable Android prerequisites missing; pinned SDK available historically, default differs.",
+        "evidence_locator": "consolidation README; local report dated Windows continuation"
+      },
+      {
+        "unit": "B1",
+        "status": "APPROVED_LOCAL",
+        "scope": "Importer/replay/race scoped historical approval; no real legacy import.",
+        "evidence_locator": "tar:B1/review.md; 2026-10-20-corrective-execution.md"
+      },
+      {
+        "unit": "B2",
+        "status": "APPROVED_LOCAL",
+        "scope": "Historical font/visual portability slice; current golden failures remain under L0.",
+        "evidence_locator": "tar:B2/review.md; B2/promotion-review.md"
+      },
+      {
+        "unit": "B3",
+        "status": "APPROVED_LOCAL",
+        "scope": "459-test bootstrap checkpoint only; not current branch green.",
+        "evidence_locator": "tar:B3/review.md"
+      },
+      {
+        "unit": "T01",
+        "status": "APPROVED_LOCAL",
+        "scope": "Canonical projection scoped review; hosted parity unproven.",
+        "evidence_locator": "tar:T01/review.md"
+      },
+      {
+        "unit": "T02",
+        "status": "APPROVED_LOCAL",
+        "scope": "Immutable finalization/replacement scoped review; live acceptance missing.",
+        "evidence_locator": "tar:T02/review.md"
+      },
+      {
+        "unit": "T03",
+        "status": "IMPLEMENTED",
+        "scope": "Director-attributed scoped verdict; durable individual final review absent.",
+        "evidence_locator": "tar:T03/coder-report.json; handoff acceptance limitations"
+      },
+      {
+        "unit": "T04",
+        "status": "IMPLEMENTED",
+        "scope": "Attendance UX source exists; director-attributed verdict; live browser/device missing.",
+        "evidence_locator": "tar:T04/coder-report.json; integration_test/unified_journey_test.dart"
+      },
+      {
+        "unit": "T04-P",
+        "status": "APPROVED_LOCAL",
+        "scope": "Actual first-save SQL and focused UI proof; original test-first RED not reconstructed.",
+        "evidence_locator": "tar:T04-first-save/sol-final-review.md"
+      },
+      {
+        "unit": "T05",
+        "status": "IMPLEMENTED",
+        "scope": "Bounded history source/migration004 exists; director-attributed verdict, missing individual final review.",
+        "evidence_locator": "tar:T05/coder-report.json"
+      },
+      {
+        "unit": "T06",
+        "status": "IMPLEMENTED",
+        "scope": "Progress UI exists; director-attributed scoped verdict, live persistence missing.",
+        "evidence_locator": "tar:T06/coder-report.json"
+      },
+      {
+        "unit": "T07",
+        "status": "IMPLEMENTED",
+        "scope": "Authority compatibility migration005 exists; director-attributed verdict, hosted authority unknown.",
+        "evidence_locator": "tar:T07/coder-report.json"
+      },
+      {
+        "unit": "T08",
+        "status": "APPROVED_LOCAL",
+        "scope": "Later pinned workflow fixture scoped review supersedes earlier pending note; Google/OAuth still open.",
+        "evidence_locator": "zip:T08/captured-zone-stage-report.json; consolidation independent-review"
+      },
+      {
+        "unit": "T09",
+        "status": "APPROVED_LOCAL",
+        "scope": "Windows portability scoped partial approval; Linux DEFERRED, ordinary matrix incomplete.",
+        "evidence_locator": "zip:T09/coder-report.json; consolidation independent-review"
+      },
+      {
+        "unit": "T10",
+        "status": "APPROVED_LOCAL",
+        "scope": "Literal-LF argv correction scoped review; live stack gates remain missing and Linux DEFERRED.",
+        "evidence_locator": "zip:T10/final-candidate-report.json; consolidation independent-review"
+      },
+      {
+        "unit": "T11",
+        "status": "BLOCKED",
+        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified.",
+        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2"
+      },
+      {
+        "unit": "T12",
+        "status": "APPROVED_LOCAL",
+        "scope": "006 local preparation: 16 forward migrations / 17 real checkpoints; later Windows fixture 30/30 and wrapper 2/2 scoped. Hosted parity/recovery unproven.",
+        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md"
+      },
+      {
+        "unit": "L0",
+        "status": "FAIL",
+        "scope": "Pinned 546/548:two 360px goldens; larger loops unexecuted; historical 528/529 unresolved; consolidation54-test run failed on90s timeout, narrow 1/1 does not waive.",
+        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README"
+      },
+      {
+        "unit": "H0/H1",
+        "status": "BLOCKED",
+        "scope": "Recovery/catalog/ledger equivalence and exact package remain missing; project read access authorized.",
+        "evidence_locator": "activation package; S12/S15/G1"
+      },
+      {
+        "unit": "H2/O1",
+        "status": "BLOCKED",
+        "scope": "Hosted mutations/OAuth/grants/test writes not authorized; actual roles/Google/Storage journey unproven.",
+        "evidence_locator": "S15 A1–A8/G1/G2; existing OAuth runbook"
+      },
+      {
+        "unit": "H3",
+        "status": "BLOCKED",
+        "scope": "Firebase export or source-inspected verified absence and stable-ID reconciliation missing.",
+        "evidence_locator": "S13; inherited 2026-10-18 requirements"
+      },
+      {
+        "unit": "D0/D1/D2",
+        "status": "BLOCKED",
+        "scope": "No accepted runtime device/installed journey; release uses debug signing; G3/build/G4 outstanding; no APK.",
+        "evidence_locator": "android/app/build.gradle.kts; S15 A9/G3/G4"
+      },
+      {
+        "unit": "Linux T09/T10 matrix",
+        "status": "DEFERRED",
+        "scope": "User directed no further Linux investment; never label old cross-platform acceptance complete.",
+        "evidence_locator": "2026-10-21 amendment"
+      }
+    ],
+    "continuation": [
+      {
+        "owner": "B0 / L0 toolchain and evidence index",
+        "depends_on": [
+          "consolidated-plan review"
+        ],
+        "files": [
+          "docs/verification/ministry-corrective-local-report.md",
+          "docs/verification/consolidation/2026-10-21/README.md",
+          "docs/verification/handoff/evidence-manifest.json",
+          "pubspec.lock",
+          "test/support/sdk_fonts.dart"
+        ],
+        "commands": [
+          "git status --short",
+          "git rev-parse HEAD",
+          "git branch --show-current",
+          "Get-Command flutter,python,java,adb,supabase -ErrorAction SilentlyContinue",
+          "flutter --version",
+          "python --version",
+          "java -version",
+          "supabase --version"
+        ],
+        "steps": [
+          "Record absolute resolved executable paths and pin Flutter 3.47.7 / Dart 3.13.5 through inherited process PATH and three-process Python/Bash/PowerShell resolution proof for all direct/nested gates; record framework/engine/font provenance, JDK/Gradle/browser/driver versions and lockfile digest. Default 3.47.2 is separate evidence. Do not alter dependencies to erase a renderer mismatch.",
+          "Validate tracked archive SHA/member path/type/size/hash against existing manifests without running archived tooling; index each task review/log as archive+member+hash and source candidate. Bind new evidence to current HEAD+dirty/new-file hashes. Missing member remains missing; do not invent a final review."
+        ],
+        "review": "Sol checks exact toolchain/source identity and portable evidence coverage; direct inventory, no artificial RED.",
+        "expected": "Reproducible candidate/toolchain index with every required evidence locator resolved or explicitly absent; no product acceptance inferred."
+      },
+      {
+        "owner": "T09/T10 / L0 Bash timeout diagnosis",
+        "depends_on": [
+          "B0 source/toolchain capture"
+        ],
+        "files": [
+          "scripts/test_unified_gate.py",
+          "scripts/verify_unified.sh",
+          "scripts/verification_cases.py",
+          "docs/verification/ministry-corrective-local-report.md"
+        ],
+        "commands": [
+          "python -m unittest scripts.test_unified_gate.UnifiedGateContractTests.test_database_child_failure_is_retained_as_its_exact_exit_code",
+          "python -m unittest scripts.test_verification_cases scripts.test_unified_gate scripts.test_hosted_upgrade"
+        ],
+        "steps": [
+          "Retain broad 348.596s / 54 tests / one 90s timeout and focused 27.988s / 1 pass as separate runs; reproduce the existing exact target method before grouped discovery.",
+          "Reproduce boundedly with resolved Python/Bash identity; capture subprocess argv, child lifecycle, elapsed stages and inherited nonsecret environment/runner load. Compare narrow and discovery ordering and the working child-exit tests. Classify fixture/runner/environment/product cause before correction; increasing timeout alone is not a diagnosis.",
+          "For evidenced behavior defect add a failing regression at the cause, fix within owner files, then narrow and appropriate grouped check. Environment-only remediation uses direct evidence. Stop repeated broad runs once new evidence no longer changes diagnosis."
+        ],
+        "review": "Sol verifies exact exit-code assertion is preserved, no skip/relaxation, and reasoned cause or named blocker.",
+        "expected": "Root-cause disposition and stable bounded child-exit behavior; until then broad run remains FAIL."
+      },
+      {
+        "owner": "B2 / L0 visuals and historical race",
+        "depends_on": [
+          "B0 pinned identity",
+          "T09/T10 diagnostic disposition"
+        ],
+        "files": [
+          "test/features/ministry/ui/team_lifecycle_test.dart",
+          "test/widgets/ministry_component_gallery_test.dart",
+          "test/database/task_3_test.dart",
+          "scripts/database_access_concurrency.py",
+          "docs/verification/ministry-corrective-local-report.md"
+        ],
+        "commands": [
+          "flutter test --no-pub --concurrency=1 test/features/ministry/ui/team_lifecycle_test.dart test/widgets/ministry_component_gallery_test.dart",
+          "flutter test --no-pub --concurrency=1 test/database/task_3_test.dart"
+        ],
+        "steps": [
+          "Inspect retained expected/actual/diff images under pinned SDK/fonts. Investigate glyph/icon differences; source-bound 360px disposition does not pass failing tests. Execute 360/768/1440 and 200% text even when first golden assertion stops its loop, using a bounded test-structure correction if needed; preserve all assertions and review each capture. No blind update-goldens/tolerance change.",
+          "Inspect original 528/529 lock failure and isolated-pass logs; bind a fresh reproduction to an owned disposable PostgreSQL target. Trace lock ordering and compare working race paths before changing code/test; missing owned DB is BLOCKED. Do not reopen approved unrelated features."
+        ],
+        "review": "Sol inspects visual artifacts at all required sizes and semantic race assertions; any baseline promotion needs actual comparison and explicit disposition.",
+        "expected": "Failing golden/race causes resolved with evidence; unchanged historical failures retain explicit disposition, no waiver."
+      },
+      {
+        "owner": "B0 / T11 local backend and client setup",
+        "depends_on": [
+          "B0 identity",
+          "owned local service capacity"
+        ],
+        "files": [
+          "supabase/config.toml",
+          "scripts/run_unified_journey.py",
+          "scripts/verification_cases.json",
+          "scripts/verify_unified.ps1",
+          "scripts/verify_unified.sh",
+          "integration_test/unified_journey_test.dart",
+          "lib/configuration.dart",
+          "docs/verification/ministry-corrective-local-report.md"
+        ],
+        "commands": [
+          "docker info",
+          "python scripts/run_unified_journey.py",
+          "bash scripts/verify_unified.sh",
+          "pwsh -NoProfile -File scripts/verify_unified.ps1"
+        ],
+        "steps": [
+          "Diagnose Docker WSL Virtual Machine Platform blocker with bounded probes and logs. Admin Windows-feature/reboot action needs user action; keep dependent T11 blocked while progressing other local units. Provision only identified coordinator-owned disposable loopback Auth/PostgREST/Storage/PostgreSQL and matching Chrome/driver; capture health/ownership and sufficient disk.",
+          "Do not run raw credential-bearing Supabase status through a command/evidence logger. Let the guarded runner consume status internally; retain only its redacted health/ownership summary. Use guarded runner to create run-owned synthetic identities and matching public client URL/publishable key through private temporary settings; service role/PAT/DB password/Google secret never enter Flutter defines. Read existing actual config file location before any change. A no-config fail-closed page proves bootstrap only.",
+          "Run existing T11 source, inspect all real assertions: canonical registration/edit/enroll/preview/draft/finalize/read-only/progress/cancel-linked-replacement/fresh session, cross-scope and revocation. Verify FK/lineage cleanup after success and partial failure plus unrelated sentinel survival. No privileged seeded-roster shortcut or hosted fallback."
+        ],
+        "review": "Sol reads actual run logs, owned setup/cleanup proof and current source hashes; stubs/static build do not close browser acceptance.",
+        "expected": "Actual local journey and both local gates exit 0 on same candidate, or exact BLOCKED/FAIL prerequisite without fabricated runtime PASS."
+      },
+      {
+        "owner": "D0 Android target and safe loopback connectivity",
+        "depends_on": [
+          "B0 Android toolchain inventory",
+          "T11 owned backend for connectivity"
+        ],
+        "files": [
+          "android/app/src/main/AndroidManifest.xml",
+          "android/app/build.gradle.kts",
+          "docs/operations/unified-release.md",
+          "docs/verification/ministry-corrective-delivery-report.md"
+        ],
+        "commands": [
+          "adb devices -l",
+          "adb -s <authorized-serial> reverse tcp:54321 tcp:54321",
+          "adb -s <authorized-serial> reverse --list",
+          "adb -s <authorized-serial> reverse --remove tcp:54321"
+        ],
+        "steps": [
+          "Prepare bootable authorized Google-capable emulator and physical device; investigate existing API 31/34 ADB offline and package-install stalls. Setup/connectivity only before APK gate: do not build/install/run app. Record actual API/browser/device identity and boot completion.",
+          "For physical wireless ADB use Android Wireless debugging pairing UI and trusted private same-network transport; user enters short-lived pairing code directly into private local terminal/device flow. Never request/store code in chat, screen capture or logs; do not expose adb tcpip 5555 or public firewall rules. Select explicit authorized serial; disconnect/remove pairing after use.",
+          "Keep backend host bind loopback. Once connection exists, adb reverse the actual owned local API port (54321 example must match Supabase local status), verify reverse listing/device route before later app execution and remove mapping afterwards. Use 127.0.0.1 on device with matching public client config; do not replace with hosted URL to bypass unavailable local stack. Only public URL/key in private client settings; no client service credentials."
+        ],
+        "review": "Sol checks target ownership, private pairing handling and loopback mapping evidence; physical observations identified separately from emulator/fixtures.",
+        "expected": "Authorized online target and documented secure backend reachability, still no APK or Android product acceptance until all build gates pass.",
+        "create_future_files": [
+          "docs/verification/ministry-corrective-delivery-report.md"
+        ]
+      },
+      {
+        "owner": "T12 / H0/H1 read-only package refresh",
+        "depends_on": [
+          "T12-006 local preparation preserved"
+        ],
+        "files": [
+          "scripts/inspect_hosted_contracts.py",
+          "scripts/rehearse_hosted_upgrade.py",
+          "docs/verification/ministry-corrective-activation-package.md",
+          "docs/operations/unified-migration.md",
+          "docs/operations/unified-release.md"
+        ],
+        "commands": [
+          "supabase projects list",
+          "python scripts/inspect_hosted_contracts.py --help"
+        ],
+        "steps": [
+          "CLI authentication/project discovery already done: Discipulado IEADPE/voqmtnqjrbugpazcimvh/linked:false. Reuse authorized reads; no repeated login or migration command. Investigate local linking/settings separately within existing authorization, recording only nonsensitive config identity. Inspector needs explicit project-ref, endpoint, managed libpq service, local semantic contract and output; --help is safe, actual inventory needs authorized managed DB channel and read-only catalog queries. PAT is not a DB password.",
+          "Refresh exact schema/ledger/function/policy/grant fingerprints without binding scope RPC or personal rows. Retain local 006 chain 16 migrations / 17 checkpoints; prepare exact hashes/order and classify complete/partial/conflicting effects including 180001/002 data guards.",
+          "H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. Prepare reviewable package before requesting mutations; do not run hosted migrations/ledger repair/grants/import/OAuth/test writes."
+        ],
+        "review": "Sol checks target identity, full semantic comparison, exact006 chain and protected evidence handling; stale healthy/404 observations remain historical.",
+        "expected": "Updated read-only compatibility evidence and concrete G1/G2 package, or exact access/source/recovery blockers; no hosted activation claim."
+      },
+      {
+        "owner": "L0 final Web assembly",
+        "depends_on": [
+          "T09/T10 timeout disposition",
+          "B2 visuals/race",
+          "T11 actual journey/gates"
+        ],
+        "files": [
+          "docs/verification/ministry-corrective-local-report.md",
+          "docs/verification/unified-final-report.md"
+        ],
+        "commands": [
+          "flutter test --no-pub --concurrency=1",
+          "flutter analyze --no-pub",
+          "flutter build web --no-pub",
+          "python scripts/web_preflight.py build/web"
+        ],
+        "steps": [
+          "Use pinned explicit SDK paths and same stable source/config/stack. Retain focused and full command exits/raw hashes plus live/fixture distinctions; run required SQL/concurrency/local gates and complete existing accessibility/routing checks.",
+          "Recover missing individual review records if available; otherwise keep director attribution and request current bounded source/evidence review, never relabel absent historical artifacts. Independent assembled review resolves all Critical/Important findings and records remaining minor/operational blockers."
+        ],
+        "review": "Independent Sol plus director evaluate R01–R11 / A1–A8 and current Web evidence; Linux explicitly DEFERRED, not blanket original-plan completion.",
+        "expected": "Current Windows local/Web acceptance approved only if every required current gate passes; Android/hosted/legacy/release categories remain separately open."
+      },
+      {
+        "owner": "O1 / H2 / H3 / D1-D2 gated delivery",
+        "depends_on": [
+          "L0",
+          "H1 recovery/parity package",
+          "H3 source disposition",
+          "O1 real OAuth",
+          "D0 target and G3 signing",
+          "explicit build authorization"
+        ],
+        "files": [
+          "docs/operations/google-oauth.md",
+          "docs/operations/unified-release.md",
+          "docs/verification/ministry-corrective-delivery-report.md",
+          "android/app/build.gradle.kts",
+          "pubspec.yaml"
+        ],
+        "commands": [
+          "apksigner verify --verbose --print-certs <approved-apk>",
+          "aapt dump badging <approved-apk>"
+        ],
+        "steps": [
+          "Prepare exact setting/account/import/signing diffs and recoverability/custody evidence through existing G1/G2/G3; current release debug signing blocks delivery. These tasks remain gated, not instructions to mutate now. No APK build until ALL pre-gates+approvals, including reviewed package/version/certificate continuity and explicit build authorization.",
+          "Only after approval build exact candidate with public-only configuration; inspect hash/size/package/version/certificate/toolchain, install/update approved bytes and observe A1-A8 on emulator/physical device. Hosted live checks/test writes require their separate authorization. Verify Storage/SAF, callbacks and durable fresh-session journey.",
+          "Independent final review and G4 exact destination/audience/retention/download-byte policy precede publication. Local commits/merges authorized; push and artifact publication remain unauthorized."
+        ],
+        "review": "Independent assembled review verifies S15 A9 plus real-role/legacy/device evidence and separate G1-G4 dispositions.",
+        "expected": "Eventually exact signed installed/downloaded artifact evidence; currently BLOCKED, no speculative release/build PASS.",
+        "create_future_files": [
+          "docs/verification/ministry-corrective-delivery-report.md"
+        ]
+      }
+    ],
+    "portable_locator_roots": {
+      "tar": "docs/verification/handoff/2026-10-21-corrective-evidence.tar.gz::build/verification/corrective-release/",
+      "zip": "docs/verification/consolidation/2026-10-21/reviewed-local-evidence.zip::build/verification/corrective-release/"
+    },
+    "missing_evidence": "build directory is absent in active checkout; absent archive members remain unavailable. L0 approval-index JSON files excluded by credential scan; never reconstruct or expose. Individual T03-T07 final review artifacts not found; director attribution is not equivalent to durable final review.",
+    "command_convention": {
+      "runner": "C:/Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/scripts/cmd",
+      "shape": "B0 resolves absolute Bash/Python/PowerShell/pinned Flutter; bash GLOBAL_CMD --full-file UNIQUE_LOG -- EXECUTABLE ARGV. Windows flutter.bat uses verified pwsh -CommandWithArgs argument-safe launcher documented in Markdown. Inner commands are not permission to bypass runner. Capture actual child exit.",
+      "pinned": "Flutter3.47.7/Dart3.13.5 required final gates; default3.47.2 distinct.",
+      "exceptions": "Interactive ADB pairing and raw Supabase status only user-private terminal/internal guarded runner; never transcript/full logs. No credentials in runner argv/output.",
+      "inherited_process_path": "Before all probes/gates prepend verified Flutter3.47.7 SDK bin, Git Bash bin, intended Python bin and any session-only python3 launcher directory to current-process PATH. All children inherit it; restore original PATH in finally. No persistent user/machine PATH/profile/alias edits. Bash --noprofile --norc; PowerShell -NoProfile. Absolute pinned launcher alone is insufficient for shutil.which or nested gate commands.",
+      "resolution_proof": {
+        "python": "Log shutil.which for flutter/dart/python/python3 and child flutter/dart versions from that same inherited process environment; pinned SDK launchers required.",
+        "bash": "Via global runner run Bash --noprofile --norc with hash -r, command -v flutter dart python3 and their versions; expected pinned SDK and intended Python.",
+        "powershell": "Via global runner run PowerShell -NoProfile Get-Command flutter,dart,python plus versions; expected same SDK/Python.",
+        "required": "Flutter3.47.7/bundled Dart3.13.5 proven in all three processes before browser/unified gates; mismatch BLOCKED. Reuse same environment for direct and nested commands."
+      }
+    },
+    "review_record": "docs/verification/2026-10-21-spec-plan-consolidation-review.md"
   }
 }
