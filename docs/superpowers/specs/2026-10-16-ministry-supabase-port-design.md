@@ -1,5 +1,8 @@
 # IEADPE Ministry Supabase Port — Design Spec
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: implemented locally through migration 018 and commit `0c6b969`; production provisioning and legacy migration remain release work. Sources: completed convert Supabase app at `642047f`; `discipulado-IEADPE` `main` at `4acb563`; its trust-data spec and pending JSON plan. The convert app is the final product base.
 
 ## Product and data contract

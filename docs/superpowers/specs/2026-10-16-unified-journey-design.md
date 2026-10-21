@@ -1,5 +1,8 @@
 # Unified Convert-to-Student Journey — Design Spec
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: app composition and local journey implemented through commit `0c6b969`; integrated-browser and human accessibility/release evidence remain incomplete. Depends on the completed convert app and ministry Supabase port.
 
 ## User journey

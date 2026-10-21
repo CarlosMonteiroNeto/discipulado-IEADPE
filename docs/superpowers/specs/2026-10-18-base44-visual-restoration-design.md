@@ -1,5 +1,8 @@
 # Base44 Visual Restoration Design
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Date: 2026-10-18. Status: execution authorized by the user, with Sol low planning, Luna max implementation, then alternating Sol low reviews and Luna max fixes until zero critical or important findings.
 
 ## Intent and evidence

@@ -1,5 +1,8 @@
 # Unified Discipulado Integration Roadmap
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: implementation integrated; release evidence remains incomplete. The 19-task convert implementation remains the baseline. Work is being executed in the managed worktree `C:/Users/Carlos_Neto/.codex/worktrees/ieadpe-supabase-pipeline/App discipulado` on `implementation/supabase-free`; do not restart the completed convert tasks. Commits through `84ef689` compose the Supabase ministry port, handoff, shared shell, explicitly selected and bounded congregation paging, and verification entry points. No production deployment or private-record migration is claimed.
 
 ## Current execution state (2026-10-17)

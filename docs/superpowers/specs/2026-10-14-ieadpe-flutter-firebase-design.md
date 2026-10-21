@@ -1,5 +1,8 @@
 # IEADPE Converts — Flutter and Firebase Design
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > Historical design requiring paid Firebase services. Superseded by [the Spark-only design](2026-10-14-ieadpe-flutter-spark-design.md). Do not implement Functions/Storage from this document under the current Spark-only constraint.
 
 Status: proposed implementation baseline, prepared for review. Supersedes the earlier Supabase design. Implementation has not started.

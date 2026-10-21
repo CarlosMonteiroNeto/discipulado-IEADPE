@@ -1,5 +1,8 @@
 # IEADPE Convertidos — Flutter Design
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > Superseded by [the Flutter + Firebase design](2026-10-14-ieadpe-flutter-firebase-design.md). Retained as historical planning evidence only.
 
 ## Status

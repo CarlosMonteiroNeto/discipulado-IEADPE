@@ -1,4 +1,5 @@
 {
+  "_documentation_authority": {"role": "historical_plan_or_configuration_example", "spec": "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md", "plan": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md", "machine_plan": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.json", "scope": "Original payload retained as provenance; current execution order, task status, models and gates are owned by the canonical pair."},
   "feature": "Unified app verification, migration rehearsal and release preparation",
   "execution_status": "local implementation complete; release evidence incomplete",
   "evidence": ["docs/verification/unified-matrix.md", "docs/verification/unified-final-report.md", "docs/operations/unified-migration.md", "docs/operations/unified-release.md"],

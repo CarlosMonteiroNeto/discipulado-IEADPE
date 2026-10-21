@@ -1,5 +1,8 @@
 # APK identity and access recovery — design draft
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: bounded correction, pending user design review. Author: Sol 6.1 / low, using `brainstorming`. The user selected Luna/medium in coder role, delegating edits to OpenCode CLI, with this Sol/low reviewer. This draft preserves the current uncommitted L1 work.
 
 ## Intended result and evidence

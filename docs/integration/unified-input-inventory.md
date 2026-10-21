@@ -1,5 +1,8 @@
 # Unified input inventory and proposed ownership
 
+<!-- canonical-document-authority -->
+> **Supporting technical reference.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Reuse procedures/contracts only through the corresponding current task and its reviewed interface, prerequisites and authorization. Counts, completed operations and old environment statements retain their original observation date.
+
 Planning evidence, 2026-10-18. Sources: retained Base44 UserAccessManager.jsx and ConvertForm.jsx; original Flutter Git revision 4acb563 domain/contact.dart, student.dart, class_group.dart, congregation.dart and features/team/contact_form.dart; current ministry UI and contracts. This is a planning comparison, not a completed migration.
 
 | Input | Base44 | Original Flutter/Firebase | Unified proposal |

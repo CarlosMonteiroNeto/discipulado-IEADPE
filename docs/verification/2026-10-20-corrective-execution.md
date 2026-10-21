@@ -1,5 +1,8 @@
 # Corrective release execution
 
+<!-- canonical-document-authority -->
+> **Dated candidate record.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The body preserves original candidate observations and scoped outcomes; retained next-step/model/workspace/push instructions belong to that historical context and do not redirect future execution.
+
 Execution follows the approved adapted pipeline: this session directs and arbitrates; OpenCode CLI `opencode/deepseek-v4.1-flash-free` implements; native `gpt-6.1-sol` / low reviewers inspect stages. No commits, pushes or hosted writes have been performed.
 
 ## B1 — Import compatibility

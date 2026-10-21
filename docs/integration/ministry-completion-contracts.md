@@ -1,5 +1,8 @@
 # Ministry completion contracts
 
+<!-- canonical-document-authority -->
+> **Supporting technical reference.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Reuse procedures/contracts only through the corresponding current task and its reviewed interface, prerequisites and authorization. Counts, completed operations and old environment statements retain their original observation date.
+
 Status: C1 local evidence, policy, exact interfaces, and manifest were reviewed. Final Sol/low follow-up review found zero critical, important, or minor findings; reviewed SHA: `e8d3daa5bc9dab9edc205c94774c217ba782dbd1`. User direction on 2026-10-19 selects the plan recommendations below as implementation defaults; this does not certify source evidence or hosted state. Hosted schema, functions, grants, data, backups, and migration ledger are **unknown**.
 
 ## Evidence labels and gate

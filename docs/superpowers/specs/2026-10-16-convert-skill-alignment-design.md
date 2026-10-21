@@ -1,5 +1,8 @@
 # Convert App Skill Alignment — Design Spec
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: documentary alignment completed and carried into the unified journey and quality gate. Implementation baseline was `implementation/supabase-free` at `642047f`; the completed 19 tasks were not replayed. Source domain skills are `superpowers-two-model-pipeline` `origin/main` at `ace9e92`.
 
 ## Evidence and intended result

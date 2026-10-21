@@ -1,5 +1,8 @@
 # Base44 Record Migration — Implementation Plan
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 1. Validate export shape and relationship counts without exposing PII; add synthetic generator tests for orphan history and outer-whitespace normalization, and confirm the failing behavior before implementation.
 2. Implement the deterministic SQL generator with strict validation, private pending access staging, orphan-event preservation, idempotency digest, and dry-run/commit modes.
 3. Add Supabase migration `202610180001_base44_history.sql` for legacy keys, nullable event links, RLS scope, private pending grants, and import receipts. Add migration `202610180002_base44_archive_weekly_consistency.sql` for a private raw Feedback archive, authoritative weekly reads, and reconciliation of weekly guard counts. Add database tests for scoped linked/orphan events, inaccessible Feedback archive data, and imported converts with no guard row.

@@ -1,5 +1,8 @@
 # Convert UI and ethics audit
 
+<!-- canonical-document-authority -->
+> **Dated candidate record.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The body preserves original candidate observations and scoped outcomes; retained next-step/model/workspace/push instructions belong to that historical context and do not redirect future execution.
+
 Scope: completed convert UI only, using source inspection and existing test artifacts. This is not a manual browser/device or assistive-technology audit. No screenshots or human task observations are recorded; unexecuted checks are marked incomplete. The integration comparison belongs to the unified journey and no theme change is proposed here.
 
 ## Structure and composition sketch

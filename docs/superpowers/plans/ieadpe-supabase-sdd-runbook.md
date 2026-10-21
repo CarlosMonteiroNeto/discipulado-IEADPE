@@ -1,5 +1,8 @@
 # Current execution mode — standard Superpowers
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 2026-10-15: user-directed fallback is active. Use the approved JSON plan with native SDD subagents (gpt-6.1-sol/low), direct checks, task reviews and a final branch review. The older custom pipeline instructions below are historical and must not be executed. Progress is in the plan-specific .superpowers/sdd workspace.
 
 # IEADPE Supabase — Script Pipeline Runbook

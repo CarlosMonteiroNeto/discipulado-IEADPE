@@ -1,5 +1,8 @@
 # Enrollment and attendance transaction sequence
 
+<!-- canonical-document-authority -->
+> **Historical integration baseline.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Retain the original contracts/provenance; use current completion contracts and the task owner to resolve superseded identity, grant and attendance assumptions.
+
 ```mermaid
 sequenceDiagram
     autonumber

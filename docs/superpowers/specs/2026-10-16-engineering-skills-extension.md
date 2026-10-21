@@ -1,5 +1,8 @@
 # Engineering Skill Coverage for IEADPE Integration
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: planning requirements for the IEADPE side of the unified app. Source: `origin/main` of `C:/Users/Carlos_Neto/superpowers-two-model-pipeline` at `ace9e92` (2026-10-16 inspection), specifically `skills/brainstorming/SKILL.md` and the eight new domain skills. The installed cached Superpowers 6.4.2 does not yet expose those domain skills; executors must pin and load the fork version that owns the plan before claiming skill compliance. No external skill installation is implied.
 
 ## Baseline and correction

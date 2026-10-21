@@ -1,5 +1,8 @@
 # Convert requirements and quality trace
 
+<!-- canonical-document-authority -->
+> **Dated candidate record.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The body preserves original candidate observations and scoped outcomes; retained next-step/model/workspace/push instructions belong to that historical context and do not redirect future execution.
+
 Baseline: completed `implementation/supabase-free` at `642047f` (the baseline named by the alignment spec). Evidence sources are `docs/verification/final-report.md`, the accepted spec `docs/superpowers/specs/2026-10-14-ieadpe-flutter-supabase-free-design.md`, ten migrations under `supabase/migrations/`, their SQL scenarios under `supabase/tests/database/`, and the 240-test Flutter suite. This trace is documentary and does not rerun those suites. `PASS` below means the cited execution is recorded in the final report, not newly observed in this task.
 
 ## Requirements trace

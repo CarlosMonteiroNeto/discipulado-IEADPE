@@ -1,5 +1,8 @@
 # Ministry contracts for the Supabase port
 
+<!-- canonical-document-authority -->
+> **Historical integration baseline.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Retain the original contracts/provenance; use current completion contracts and the task owner to resolve superseded identity, grant and attendance assumptions.
+
 > Historical contract baseline. The independent campaign/ministry grant assumptions below were superseded by 202610180003_base44_unified_access.sql and the approved unified-access design. The current local shared-person and Team completion gate is [ministry-completion-contracts.md](ministry-completion-contracts.md); do not implement new completion features from obsolete authority/identity assumptions in this baseline. Existing RPC shapes remain reference evidence until replaced by reviewed forward-compatible contracts.
 
 Status: task 1 contract baseline. Sources: `discipulado-IEADPE` `main@4acb563` (`docs/superpowers/specs/discipulado-ieadpe-spec.md`, `lib/domain/*.dart`, `functions/src/*/service.ts`) and the completed convert app `implementation/supabase-free@642047f` (`supabase/migrations/202610140002_schema.sql`, `202610140003_access.sql`, and `202610140004_convert_commands.sql`). This document resolves the port boundary for plan tasks 2–5. It does not authorize identity cutover or historical import.

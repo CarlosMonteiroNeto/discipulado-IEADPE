@@ -1,0 +1,7 @@
+warning: in the working copy of 'docs/superpowers/plans/ieadpe-sdd-config.toml.example', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'docs/superpowers/plans/ieadpe-sdd-config.toml.example', LF will be replaced by CRLF the next time Git touches it
+PASS 73 original bodies retained; nine historical JSON payloads unchanged
+PASS all documentation JSON parses
+PASS 12 task IDs/dependencies/interfaces/acceptance preserved
+PASS documentation-only diff; git diff --check
+BRANCH codex/ministry-production-completion

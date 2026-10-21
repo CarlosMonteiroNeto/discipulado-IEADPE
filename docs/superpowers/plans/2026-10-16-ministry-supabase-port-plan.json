@@ -1,4 +1,5 @@
 {
+  "_documentation_authority": {"role": "historical_plan_or_configuration_example", "spec": "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md", "plan": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md", "machine_plan": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.json", "scope": "Original payload retained as provenance; current execution order, task status, models and gates are owned by the canonical pair."},
   "feature": "Port IEADPE ministry data and invariants into completed Supabase app",
   "execution_status": "complete_for_local_synthetic_behavior; live provisioning and legacy migration remain release work",
   "evidence": ["supabase/migrations/202610140011_ministry_schema.sql", "supabase/migrations/202610140018_ministry_congregation_directory.sql", "supabase/tests/database/ministry_congregations_test.sql", "docs/verification/unified-matrix.md"],

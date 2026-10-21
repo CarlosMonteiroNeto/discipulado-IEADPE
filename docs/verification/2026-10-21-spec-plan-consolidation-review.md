@@ -65,3 +65,37 @@ Round 2 returned **APPROVED — documentary review**, with no remaining findings
 The [documentary check log](2026-10-21-spec-plan-document-checks.log) records final schema/ID/dependency/reference/hash checks and `git diff --check`. Original task interfaces/dependencies and existing tests remain preserved; T04 now explicitly owns and invokes the already-implemented roster-preview extension. T12's acceptance states the existing migration-006 chain. No new feature task was added.
 
 The next implementation entry is B0/L0 toolchain and evidence identity, followed by the existing timeout/visual/race and local T11 work, with D0 physical-device readiness and separate gated delivery. The 23-unit status map and eight owned continuations are the active queue. Product, L0, hosted, Android and release acceptance remain incomplete; this approval applies to the documentation only.
+
+## Follow-up: parallel documents and engineering assurance
+
+The user approved the consolidated direction and requested a broader reconciliation of handoffs and parallel documents with brainstorming/software-engineering/quality skill guidance. Investigation base for this follow-up is `36c53e9f6f233868abdac44fdf0569c513dc9463`. The earlier closing verdict and hashes above remain the record of the first consolidation candidate, not the hashes of the extended revision.
+
+Read-only Sol low audit `audit_remaining_work` found conflicting entry points in the root README, L1/portable handoffs, task manifest, execution ledger and operational runbooks. Sol low editor `consolidate_spec_plan` incorporated useful remaining obligations into S18 and the existing plan owners; no second backlog or new product implementation was created. The root README now describes implemented authentication/routing and points to the canonical pair instead of resuming L1.
+
+| Annotated document role | Files | Preservation rule |
+| --- | --- | --- |
+| Historical Markdown specs/plans/runbooks | 32 | Add authority pointer; retain original body. |
+| Supporting operations/integration references | 16 | Preserve procedures/typed details, subordinate use to current task/contracts/gates. |
+| Historical integration baselines | 2 | Preserve superseded authority/identity/attendance assumptions as provenance. |
+| Dated report/handoff/ledger/manifest entry points | 13 | Retain candidate-scoped observations; current queue and authorization come from the canonical pair. |
+| Historical JSON plans/configuration examples | 9 | Add `_documentation_authority`; original parsed payload remains unchanged. |
+| Historical TOML example | 1 | Add comments; preserve original body. |
+
+The [preservation manifest](2026-10-21-document-authority-manifest.json) records all 73 paths, original Git blobs, inserted-block offsets and raw/LF-normalized hashes. The [sweep log](2026-10-21-document-authority-sweep.log) records the role counts. Original raw reviews, prior logs, archive manifests, ZIP/TAR archives and images were not rewritten. Recovery copies remain outside the repository. An initial command-transport quoting error occurred before edits; the corrected external helper performed the sweep and verified body preservation.
+
+Engineering sources were actually read at `C:/Users/Carlos_Neto/.config/opencode/vendor/superpowers`, revision `ace9e92ac19d7cb485e8d946ee7b828177e46d08`, with all nine skill files clean against that checkout. The [routing record](../superpowers/skills-routing.md) pins their hashes and the official brainstorming file actually read. S18 states the seven elicitation states, scope/comprehension/volatility risks, quality trade-offs, DoR/DoD, SQA versus SQC and static versus dynamic evidence. The plan maps inherited behavior to case partitions, boundaries, owners and real evidence. Skill reading/planning coverage is not product execution or ISO/CMMI/MPS certification; external skills were not installed or invoked.
+
+Retained coverage includes PKCE/session edge cases, private photos and Storage HTTP/cleanup, DB plus Storage-byte recovery, safe file/SAF lifecycle, deliberate contact/privacy, bounded queries/capacity/date rules, accessibility and exact-artifact delivery. Firefox/WebKit smoke and older dark-mode support require explicit existing-owner disposition where evidence/decisions are absent; they are neither silently discarded nor automatically added as new features/build blockers.
+
+The installed strict plan validator additionally found duplicate Task 4 test ownership: `attendance_roster_preview_test.dart` appeared in both `touches` and `verification.new_test_files`. The failure is retained in the [validator log](2026-10-21-document-authority-plan-validator.log). Correction keeps the wrapper in test ownership and its verification command, removing only the duplicate `touches` entry. This is a plan-schema correction, not an application defect or a reconstructed TDD RED. Final validation and independent review of this follow-up are recorded below.
+
+**Follow-up closing review: APPROVED — documentary consolidation**, independent read-only GPT-6.1 Sol low agent `final_diff_review`, no blocking findings. The reviewer confirmed preservation of all 73 documents and nine historical JSON payloads, unchanged 12 task IDs/dependencies/interfaces/acceptance, corrected T04 ownership/verification, real skill hashes, current relative links and one authority without a second backlog. This does not approve product, L0, hosted, Android or release.
+
+| Approved file | SHA-256 |
+| --- | --- |
+| Spec | `a7d758f300dbf6eff65ec02e9a0dd3f0f1697a1cab3890b3b8a978410c79800c` |
+| Plan Markdown | `888692dc7367e53508ac7e5db7534270f2ddfb72f9c76f6c8b58f5dac6cc2ee9` |
+| Plan JSON | `73b6840ce6b889ba197b23b43e06d08ac57fcf39b5bf847f0a8418c0932de03e` |
+| Skills routing | `945a4490021521ae12ad870678378b69c7f8081276856bcd50cdd8c6b4cb99da` |
+
+Fresh [documentary checks](2026-10-21-document-authority-checks.log) passed exact inserted-block removal/raw body preservation, Git baseline comparison, historical JSON payload equivalence, all documentation JSON parsing, task invariants, documentation-only diff and whitespace checks. The real installed [strict plan validator passed after correction](2026-10-21-document-authority-plan-validator-green.log); the original failure remains preserved separately. No application tests, build, hosted mutation, migration, signing or publication was performed by this documentary audit. The next execution remains the current plan's B0/L0 entry and eight existing owned continuations.

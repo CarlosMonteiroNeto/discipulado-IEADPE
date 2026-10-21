@@ -1,5 +1,8 @@
 # Unified verification matrix
 
+<!-- canonical-document-authority -->
+> **Dated candidate record.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The body preserves original candidate observations and scoped outcomes; retained next-step/model/workspace/push instructions belong to that historical context and do not redirect future execution.
+
 This matrix defines the local gate (`scripts/verify_unified.ps1` on Windows, `scripts/verify_unified.sh` on macOS/Linux) and CI job (`.github/workflows/verify-unified.yml`). Both gates ask `scripts/verification_cases.py` for validated platform-neutral argv rows from `scripts/verification_cases.json`, then invoke the same Flutter, PostgreSQL harness, SQL scenarios, concurrency checks, guarded local HTTP health probes, browser adapter smokes, and `scripts/run_unified_journey.py`. The validator compares manifest coverage against every current standalone `supabase/tests/database/*_test.sql` file and fails closed for missing, duplicate, stale, unsafe, or mis-seeded cases. Each invocation writes `build/verification/unified-report.md` and `build/verification/unified-commands.log`.
 
 ## Result contract

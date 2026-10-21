@@ -1,5 +1,8 @@
 # Base44 Visual Restoration Implementation Plan
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. The user explicitly selected Luna max implementation, Sol low review and Luna max fixes until zero critical or important findings; preserve that workflow. Steps use checkbox syntax for tracking.
 
 **Goal:** Restore Base44 appearance throughout the unified Flutter Android/web app without changing functional contracts.

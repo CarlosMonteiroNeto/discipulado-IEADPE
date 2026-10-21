@@ -74,7 +74,16 @@
         "evidence_locator": "tar:T01/review.md",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "authority_identity",
+        "paging_capacity",
+        "campaign_baseline"
+      ]
     },
     {
       "id": 2,
@@ -157,7 +166,14 @@
         "evidence_locator": "tar:T02/review.md",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "attendance_history"
+      ]
     },
     {
       "id": 3,
@@ -212,7 +228,14 @@
         "evidence_locator": "tar:T03/coder-report.json; handoff acceptance limitations",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "retry_generation"
+      ]
     },
     {
       "id": 4,
@@ -234,7 +257,6 @@
         "docs/verification/l1/visual-review.md",
         "supabase/migrations/202610200006_attendance_roster_preview.sql",
         "supabase/tests/database/attendance_roster_preview_test.sql",
-        "test/database/attendance_roster_preview_test.dart",
         "scripts/verification_cases.json",
         "docs/integration/ministry-completion-contracts.md"
       ],
@@ -293,7 +315,16 @@
         "contract": "S16 identical session/roster envelope; open unfrozen preview only; no read DML; writer freezes; cancellation/replacement immutable history.",
         "evidence_locator": "tar:T04-first-save/sol-final-review.md",
         "limits": "Original historical test-first RED unavailable; later mutation probe is not original TDD evidence. No duplicate implementation."
-      }
+      },
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "attendance_history",
+        "retry_generation",
+        "ui_accessibility"
+      ]
     },
     {
       "id": 5,
@@ -356,7 +387,15 @@
         "evidence_locator": "tar:T05/coder-report.json",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "paging_capacity",
+        "attendance_history"
+      ]
     },
     {
       "id": 6,
@@ -416,7 +455,15 @@
         "evidence_locator": "tar:T06/coder-report.json",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "attendance_history",
+        "ui_accessibility"
+      ]
     },
     {
       "id": 7,
@@ -476,7 +523,16 @@
         "evidence_locator": "tar:T07/coder-report.json",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "authority_identity",
+        "paging_capacity",
+        "campaign_baseline"
+      ]
     },
     {
       "id": 8,
@@ -538,7 +594,16 @@
         "evidence_locator": "zip:T08/captured-zone-stage-report.json; consolidation independent-review",
         "branch_release_approval": false
       },
-      "continuation_owners": []
+      "continuation_owners": [],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "authority_identity",
+        "oauth_session",
+        "ui_accessibility"
+      ]
     },
     {
       "id": 9,
@@ -595,6 +660,14 @@
       },
       "continuation_owners": [
         "T09/T10 / L0 Bash timeout diagnosis"
+      ],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "browser_host",
+        "environment_evidence"
       ]
     },
     {
@@ -662,6 +735,15 @@
       },
       "continuation_owners": [
         "T09/T10 / L0 Bash timeout diagnosis"
+      ],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "paging_capacity",
+        "browser_host",
+        "environment_evidence"
       ]
     },
     {
@@ -732,6 +814,23 @@
       },
       "continuation_owners": [
         "B0 / T11 local backend and client setup"
+      ],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "authority_identity",
+        "paging_capacity",
+        "attendance_history",
+        "retry_generation",
+        "campaign_baseline",
+        "oauth_session",
+        "photo_file_privacy",
+        "xlsx_feedback",
+        "ui_accessibility",
+        "browser_host",
+        "environment_evidence"
       ]
     },
     {
@@ -801,6 +900,13 @@
       },
       "continuation_owners": [
         "T12 / H0/H1 read-only package refresh"
+      ],
+      "quality_refs": [
+        "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
+        "docs/superpowers/skills-routing.md#stage-and-evidence-routing"
+      ],
+      "quality_coverage_keys": [
+        "recovery_operations"
       ]
     }
   ],
@@ -1222,5 +1328,312 @@
       }
     },
     "review_record": "docs/verification/2026-10-21-spec-plan-consolidation-review.md"
+  },
+  "engineering_assurance": {
+    "spec_owner": "S18",
+    "routing_doc": "docs/superpowers/skills-routing.md",
+    "audited_head": "36c53e9f6f233868abdac44fdf0569c513dc9463",
+    "vendor_root": "C:/Users/Carlos_Neto/.config/opencode/vendor/superpowers",
+    "vendor_revision": "ace9e92ac19d7cb485e8d946ee7b828177e46d08",
+    "read_skill_sha256": {
+      "requirements": "d11d588ca7f857396cb2b366509ecc99421aec1f8a8ad544f376af4c864be3f9",
+      "design-oo-ux": "d53febd5032568448f36644873fd49b28e8bd82aeb6bb222b9d16839c9cc438a",
+      "coding-standards": "d657ed261bc2a4e840b9be78ff75dd8e2c72d24778a449b32b10027539f92da2",
+      "verification-test": "bb8ea7c0df70d00e5df807b56789c5fa0d862a73a145462d0380550ecd44c6cc",
+      "quality-gate": "155f65c57df09a6697d5098bf9c44fad1ad3843b26c17553fd26b65dbfc6e8b1",
+      "cloud-deploy": "82e7fd59a88adac79643a3baa852afa55566b79e1cc083d4a067d7fb8b61cfd7",
+      "agile-loop": "e0eca0b8beee47f34cd12362bee179b8f78eb20fcda8f6a249af2f548ba57186",
+      "apple-design": "a9d80f680316110c1278af19b55ba3e0a3bf04ab74c66764c4db829ff9c2dadb",
+      "a11y-ethics": "f69a22dd2bd163a40523a921a8a6f203e49413303c0fe5b40435a0aa17eb2dfe"
+    },
+    "brainstorming": {
+      "path": "C:/Users/Carlos_Neto/.codex/plugins/cache/openai-curated-remote/superpowers/6.4.2/skills/brainstorming/SKILL.md",
+      "sha256": "a32d2255354775aa124855aa7100cf276bea096fff4ebb3a0edf57be216e6c72",
+      "scope": "approved-intent bounded documentary refinement; no product implementation"
+    },
+    "claim_limit": "Skills actually read/applied to this planning audit; no executed product acceptance, retrospective skill-loading certification, ISO/CMMI/MPS compliance or new runtime authorization.",
+    "quality_case_matrix": [
+      {
+        "id": "authority_identity",
+        "requirements": "R02/R06/R07; S05/S09/S15A2-A5",
+        "owners": [
+          "T01",
+          "T07",
+          "T08",
+          "T11",
+          "H2",
+          "O1"
+        ],
+        "partitions": "Registrar create-without-read; own active/foreign/archived scope; global selection; revoked existing token; organizational job title versus verified login grant; same-scope explicit identity versus nonexistent/foreign/already-linked/ambiguous ID.",
+        "boundaries": "Empty/one/multiple direction grants; exact 12 organizational role codes remain directory data; no name-only merge.",
+        "evidence_review": "Current SQL/RPC/HTTP allow+deny and no-partial-state assertions; typed codec/permission review. Old independent ministry-grants contract is historical, not new runtime authority.",
+        "existing_evidence_references": [
+          "supabase/tests/database/unified_scope_test.sql",
+          "test/features/admin/admin_page_test.dart",
+          "test/features/ministry/ui/ministry_handoff_repository_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "paging_capacity",
+        "requirements": "R02/R05/R06/R08",
+        "owners": [
+          "T01",
+          "T05",
+          "T07",
+          "T10",
+          "T11",
+          "L0"
+        ],
+        "partitions": "Valid scoped prefix/page versus tampered/foreign/filter-changed cursor and unsupported filter; complete result versus genuine empty/search-empty/error.",
+        "boundaries": "Page0/1/100/101; signed cursor tail ordering/no duplicates; enrollment99/100/101 historical total and duplicate active enrollment, both race orders.",
+        "evidence_review": "Bounded query/page traversal and invariants with actual argv/scenarios; retain measured page/payload/read cost if captured, never invent latency/budget numbers or use Firestore read assumptions.",
+        "existing_evidence_references": [
+          "supabase/tests/database/ministry_academic_test.sql",
+          "test/features/ministry/data/ministry_repository_test.dart",
+          "scripts/verification_cases.json"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "attendance_history",
+        "requirements": "R03/R05; S06/S08/S16",
+        "owners": [
+          "T02",
+          "T04",
+          "T04-P",
+          "T05",
+          "T06",
+          "T11",
+          "L0"
+        ],
+        "partitions": "Open-unfrozen read-only preview; frozen stored roster including empty; finalized/canceled; legacy/canonical names; canceled predecessor versus mismatch/duplicate replacement; active versus completed/archived class.",
+        "boundaries": "Enrollment start/end date−1/on/+1; zero/one/many eligible, closed-but-date-eligible; rename before/after freeze; future finalization; save/cancel and duplicate replacement both commit orders.",
+        "evidence_review": "No-DML preview, first-save exact roster, persisted reopen, rollback on mismatch, new-operation immutable denial and exact authorized replay; progress present/(present+absent), null denominator 0, exclude excused/unmarked/canceled. No copied marks/history rewrite.",
+        "existing_evidence_references": [
+          "supabase/tests/database/attendance_roster_preview_test.sql",
+          "supabase/tests/database/attendance_integrity_test.sql",
+          "test/features/ministry/ui/attendance_history_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "retry_generation",
+        "requirements": "R04/R06/R08; S07",
+        "owners": [
+          "T03",
+          "T04",
+          "T11",
+          "L0"
+        ],
+        "partitions": "Acknowledged/ambiguous/definite rejection; same versus changed ID/payload/action/revision; late response after logout/scope/user/session/route change; success on old target must not refresh/save new target.",
+        "boundaries": "No retry/one/repeated exact retry; overlapping save/open/refresh and both relevant completion orders.",
+        "evidence_review": "Controller/production-boundary regression proving immutable pending command and rejected late generations; actual T11 where available. Revert/mutation probe labelled by actual timing, never reconstructed historical RED.",
+        "existing_evidence_references": [
+          "test/features/ministry/ui/attendance_save_controller_test.dart",
+          "test/features/ministry/ui/session_navigation_test.dart",
+          "test/workflows_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "campaign_baseline",
+        "requirements": "R01/R02/R05/R08/R10; inherited campaign contracts",
+        "owners": [
+          "B1",
+          "T01",
+          "T07",
+          "T11",
+          "L0",
+          "H3"
+        ],
+        "partitions": "Register new convert versus non-convert student; real visit versus qualifying finalized presence; manual historical state versus active/closed enrollment; exact import/reimport/tombstone/ambiguous source.",
+        "boundaries": "1/7/30-day follow-up; deviation 2/3 actual visits; completion 89/90 days with known start+active state; Sunday 19:59/20:00 America/Sao_Paulo weekly boundary versus academic America/Recife date policy.",
+        "evidence_review": "Existing lifecycle/weekly/import/report/feedback/registration suites are preserved, not reimplemented. Check affected coupled projections/counts and history/source parity; native SQL fixtures do not prove real source completeness.",
+        "existing_evidence_references": [
+          "docs/verification/convert-requirements-trace.md",
+          "test/features/converts/list_test.dart",
+          "test/features/backup/import_test.dart",
+          "scripts/verification_cases.json"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "oauth_session",
+        "requirements": "R06/R07/R11; S15A1/A2/A8",
+        "owners": [
+          "T08",
+          "T11",
+          "O1",
+          "H2",
+          "D2"
+        ],
+        "partitions": "First/existing Google login; denial/cancel/back; cold/warm Android return; expired/replayed/missing verifier; duplicate/unknown query or unsafe destination; offline/online logout/user switch/revocation.",
+        "boundaries": "Exact trusted origin/path/query and local/hosted/client identity, no wildcard/fragment bypass; no email fallback/metadata authority.",
+        "evidence_review": "Authorized actual PKCE/provider/session evidence separately from synthetic SDK/loopback tests; current exact callback/config setting diff for any G2 mutation.",
+        "existing_evidence_references": [
+          "docs/operations/google-oauth.md",
+          "test/features/auth/auth_flow_test.dart",
+          "test/workflows_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "photo_file_privacy",
+        "requirements": "R06/R08/R11; inherited private photo/export contracts",
+        "owners": [
+          "T11",
+          "L0",
+          "H1",
+          "H2",
+          "O1",
+          "D2"
+        ],
+        "partitions": "Own pending/attached versus foreign/expired/revoked; picker cancellation/corrupt/oversize/EXIF/transparency; upload/attach/remove failure retains prior image; user/scope loss while choosing/uploading/downloading/writing.",
+        "boundaries": "Existing 192×192JPEG processing,1 MiB object and1 hour pending expiry contracts; actual capability limitations and supported file-provider errors.",
+        "evidence_review": "Real Storage allow/deny + picker/resume + protected-cache evidence; cleanup uses Storage HTTP then restricted metadata RPC, no direct storage.objects deletion. Only authorized operator cleanup. No religious prefill/PII routes/logs/persistent private-image URLs.",
+        "existing_evidence_references": [
+          "docs/operations/convert-forms.md",
+          "docs/operations/supabase-free.md",
+          "test/features/photos/photo_test.dart",
+          "test/features/converts/photo_save_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "xlsx_feedback",
+        "requirements": "R01/R08/R11; inherited backup/report/feedback",
+        "owners": [
+          "B1",
+          "T11",
+          "L0",
+          "H3",
+          "D2"
+        ],
+        "partitions": "Supported XLSX roundtrip/accents/age0/null versus .xls/formula/malformed ZIP/oversize; chooser unsupported/cancel/error/saved; feedback submitter versus manager; scope loss during chooser/write.",
+        "boundaries": "Existing 10 MiB compressed / 50 MiB expanded / 10,000 rows and 10,001 rejection; feedback 5000/5001 chars; report inclusive endpoints/filter/sort/export exact displayed rows and >1000 rows.",
+        "evidence_review": "Reuse valid baseline codec/writer evidence if hashes match; affected regressions and real secure-context browser chooser/Android SAF flush-close-reopen/persistence proof remain separate. No new exporter feature inferred for unsupported browsers.",
+        "existing_evidence_references": [
+          "docs/operations/data-gateway.md",
+          "test/features/backup/backup_codec_test.dart",
+          "test/features/feedback/feedback_test.dart",
+          "test/platform/file_exporter_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "ui_accessibility",
+        "requirements": "R07/R08/R11; S03/S15A8",
+        "owners": [
+          "B2",
+          "T04",
+          "T06",
+          "T08",
+          "T11",
+          "L0",
+          "D2"
+        ],
+        "partitions": "Loading/empty/search-empty/error/retry/forbidden/not-found/stale-revision/success; keyboard/dialog cancel and restored focus; labeled attendance and screen-reader outcome; reduced motion versus normal.",
+        "boundaries": "360/768/1440 and 200% text; 48 logical px targets;4.5:1 ordinary text/3:1 meaningful boundaries; long accented text; all viewport cases execute despite earlier golden fail.",
+        "evidence_review": "Source-bound visual comparisons + measured contrast and actual keyboard/assistive-tech/human observations with unexecuted markers. Dark-mode obligation/support disposition unresolved from old source; no automatic palette/theme change.",
+        "existing_evidence_references": [
+          "docs/integration/unified-design-system.md",
+          "test/widgets/unified_navigation_test.dart",
+          "test/widgets/ministry_component_gallery_test.dart",
+          "test/features/ministry/ui/team_lifecycle_test.dart"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "browser_host",
+        "requirements": "R08/R11; inherited unified-quality/release",
+        "owners": [
+          "T09",
+          "T10",
+          "T11",
+          "L0",
+          "D2"
+        ],
+        "partitions": "Configured real local journey versus no-config bootstrap; route cold/reload/back/forward/callback; real asset bytes versus HTML wildcard replacement; Chromium versus Firefox/WebKit smoke capability.",
+        "boundaries": "Exact route fallback/MIME/HTTPS/public configuration; current host file-size/count limits revalidated from actual artifacts before destination approval.",
+        "evidence_review": "Chromium Auth/PostgREST/Storage/cleanup/sentinel proof; Firefox/WebKit executed or explicitly incomplete plus support disposition, no silent waiver/new automatic blocker from this audit. Hosted QA requires separate authorized destination/action.",
+        "existing_evidence_references": [
+          "integration_test/unified_journey_test.dart",
+          "scripts/run_unified_journey.py",
+          "scripts/web_preflight.py",
+          "docs/operations/release.md"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "recovery_operations",
+        "requirements": "R09/R10/R11; S12/S13/S15G1-G4",
+        "owners": [
+          "T12",
+          "H0",
+          "H1",
+          "H2",
+          "H3",
+          "O1",
+          "D0",
+          "D2"
+        ],
+        "partitions": "Recorded+present/equivalent-unrecorded/absent/partial-conflicting catalog; exact recognized prefix versus drift; stable source IDs versus ambiguous/unavailable source; full versus partial DB+Storage recovery.",
+        "boundaries": "16 forward migrations / 17 real checkpoints through 006; restore metadata+bytes/count/hash/RLS/Auth/photo; old/new writers and approved write-pause; same-certificate update/version continuity; exact downloaded artifact bytes.",
+        "evidence_review": "Fresh authorized catalog fingerprints; protected encrypted independent backup copies and isolated measured restore; quotas/MAU/database/storage/egress and outage/incident owner; concrete G1-G4 package. No paid availability/geo/LB promise or XLSX-as-backup.",
+        "existing_evidence_references": [
+          "docs/verification/ministry-corrective-activation-package.md",
+          "scripts/inspect_hosted_contracts.py",
+          "scripts/rehearse_hosted_upgrade.py",
+          "docs/operations/unified-responsibility.md"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      },
+      {
+        "id": "environment_evidence",
+        "requirements": "R08; S17/S18",
+        "owners": [
+          "B0",
+          "T09",
+          "T10",
+          "T11",
+          "L0",
+          "D0"
+        ],
+        "partitions": "Pinned versus default SDK; narrow versus grouped Bash timeout; real owned loopback target versus unknown/hosted; valid member versus absent/excluded historical evidence.",
+        "boundaries": "Flutter 3.47.7 / Dart 3.13.5 inherited Python/Bash/PowerShell PATH; 90s timeout 54-test failure versus 27.988s narrow PASS; device online versus offline; interactive ADB secret never logged.",
+        "evidence_review": "Direct path/version/ownership/child-exit/hash/portable-index checks, no artificial TDD. Diagnose cause before timeout change; no broad PASS from isolated PASS, no fixture PASS for actual stack/device.",
+        "existing_evidence_references": [
+          "scripts/test_unified_gate.py",
+          "scripts/test_verification_cases.py",
+          "docs/verification/consolidation/2026-10-21/README.md"
+        ],
+        "execution_rule": "Use existing owner continuation files/dependencies/commands/review/expected result; these references do not authorize editing unrelated baseline files. Reuse valid source-matching evidence, add cause-specific regression only for observed defect."
+      }
+    ],
+    "document_roles": {
+      "canonical_triplet": "sole requirements/interfaces, current status/continuation, mirrored task authority",
+      "other_specs_plans_templates": "historical provenance, no autonomous queue",
+      "integration": "technical reference under canonical decisions; runtime handoff contract is not session handoff",
+      "operations": "technical procedures under H/O/D+G1-G4, not independent authorization",
+      "entry_readmes_routing": "entry/applicability only",
+      "handoffs_ledgers_manifests_reports": "dated source-bound snapshots, not current next-task authority",
+      "raw_evidence": "immutable logs/reviews/archive manifests/ZIP/TAR/screenshots; preserve exclusions/hashes/history",
+      "research": "docs/research package/source/quality research artifacts are dated provenance, no independent executor/queue/runtime approval"
+    },
+    "definition_of_ready": "S18: actor/value+investigation+owned files+known dependency/contracts/errors/locks/replay+source/toolchain/environment+case/review/evidence outputs; block only affected unresolved capability.",
+    "definition_of_done": "S18: observed expected and safe-denial/rollback evidence; focused+applicable assembled gates on same candidate; actual exits/hash/portable locators with static/dynamic/fixture/live distinctions; independent Critical/Important closure+minor disposition; no secrets, category-specific acceptance.",
+    "open_documentary_dispositions": [
+      {
+        "owner": "L0",
+        "topic": "Inherited Firefox/WebKit smoke",
+        "state": "explicit execution/capability/support disposition required; incomplete if absent; no silent waiver or automatic new build blocker from documentary audit"
+      },
+      {
+        "owner": "L0",
+        "topic": "Inherited dark-mode obligation",
+        "state": "approved disposition not located; record source/current support decision unresolved; no assumed rejection or new theme implementation"
+      }
+    ]
   }
 }

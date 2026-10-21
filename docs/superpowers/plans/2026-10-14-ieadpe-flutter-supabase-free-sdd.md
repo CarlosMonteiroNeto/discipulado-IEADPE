@@ -1,5 +1,8 @@
 # IEADPE Flutter + Supabase Free Implementation Plan
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use standard superpowers:subagent-driven-development task-by-task. The user switched away from the custom pipeline on 2026-10-15. The user fixes every model and effort; no escalation. Steps use checkbox syntax.
 
 **Goal:** Recreate the captured IEADPE app in Flutter for web and Android using Supabase Free and Google OAuth.

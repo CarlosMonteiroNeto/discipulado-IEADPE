@@ -1,5 +1,8 @@
 # L1 Ministry Delivery: Cross-Device Handoff
 
+<!-- canonical-document-authority -->
+> **Dated candidate record.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The body preserves original candidate observations and scoped outcomes; retained next-step/model/workspace/push instructions belong to that historical context and do not redirect future execution.
+
 **Status:** In progress; not release-ready. Pushed to `origin/codex/ministry-production-completion`; resume from the current remote HEAD.
 
 ## Resume this branch

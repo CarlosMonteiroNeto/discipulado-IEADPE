@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+  File "C:\Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/scripts\plan_validation.py", line 119, in validate_plan
+    _fail("task {} new test files belong in verification.new_test_files, not touches".format(tid))
+  File "C:\Users/Carlos_Neto/.codex/skills/two-model-sdd-pipeline/scripts\plan_validation.py", line 17, in _fail
+    raise ValueError("invalid plan: " + message)
+ValueError: invalid plan: task 4 new test files belong in verification.new_test_files, not touches

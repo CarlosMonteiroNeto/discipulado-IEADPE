@@ -1,5 +1,8 @@
 # Base44 visual restoration verification
 
+<!-- canonical-document-authority -->
+> **Supporting technical reference.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Reuse procedures/contracts only through the corresponding current task and its reviewed interface, prerequisites and authorization. Counts, completed operations and old environment statements retain their original observation date.
+
 Date: 2026-10-18. This change restores the Base44 presentation across the unified Flutter campaign and ministry surfaces while retaining existing routes, repositories, authorization and operation owners.
 
 ## Checks completed

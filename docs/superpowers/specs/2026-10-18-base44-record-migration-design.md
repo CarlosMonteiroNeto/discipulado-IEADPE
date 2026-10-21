@@ -1,5 +1,8 @@
 # Base44 Record Migration — Design Spec
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: approved for execution by the user's request to export the Base44 records and migrate them into the Supabase-backed IEADPE app. The Base44 app remains the read-only source until reconciliation is complete.
 
 ## Goal and source

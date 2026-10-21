@@ -1,5 +1,8 @@
 # Google authentication integration
 
+<!-- canonical-document-authority -->
+> **Supporting technical reference.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Reuse procedures/contracts only through the corresponding current task and its reviewed interface, prerequisites and authorization. Counts, completed operations and old environment statements retain their original observation date.
+
 This is the authoritative setup and wiring document; `google-auth.md` is a compatibility link. Official guidance checked **2026-10-16**: [Supabase Google provider](https://supabase.com/docs/guides/auth/social-login/auth-google), [PKCE flow](https://supabase.com/docs/guides/auth/sessions/pkce-flow), [Google audience restrictions](https://support.google.com/cloud/answer/15549945?hl=en).
 
 ## Operator console preparation

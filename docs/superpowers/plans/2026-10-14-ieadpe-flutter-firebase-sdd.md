@@ -1,5 +1,8 @@
 # IEADPE Flutter + Firebase Implementation Plan
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](../specs/2026-10-20-ministry-corrective-release-design.md), [current plan](2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > Historical plan requiring paid Firebase services. Superseded by [the 18-task Spark-only SDD plan](2026-10-14-ieadpe-flutter-spark-sdd.md). The current release excludes Functions and Storage.
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. The user's explicit model policy overrides skill recommendations to escalate models or effort.

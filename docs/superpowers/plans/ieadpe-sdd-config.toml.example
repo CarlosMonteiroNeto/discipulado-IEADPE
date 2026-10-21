@@ -1,3 +1,5 @@
+# Historical configuration example; use current spec/plan/JSON for execution authority.
+# Canonical plan: docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md
 # Project-scoped Codex execution settings. Example only; merge deliberately.
 # Preserve unrelated settings and inspect custom role files for overrides.
 model = "gpt-6.1-sol"

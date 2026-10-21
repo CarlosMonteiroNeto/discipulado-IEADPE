@@ -1,5 +1,8 @@
 # L1 Class Session Management — Design Amendment
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 Status: the three conversational design sections are user-approved; this written spec awaits user review. Author: Sol 6.1 / low. This additive amendment implements L1 of `2026-10-18-ministry-production-completion-plan.md` and its design, read with `docs/verification/ministry-task-manifest.md` and `docs/integration/ministry-completion-contracts.md`. It preserves reviewed A1/A2/V1/F1 work. Investigation baseline: `acf1ae9` in the ministry-production-completion worktree.
 
 ## Outcome and scope

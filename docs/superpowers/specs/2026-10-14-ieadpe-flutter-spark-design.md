@@ -1,5 +1,8 @@
 # IEADPE Flutter — Firebase Spark Design
 
+<!-- canonical-document-authority -->
+> **Historical planning reference.** The [current spec](2026-10-20-ministry-corrective-release-design.md), [current plan](../plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. The original body preserves its dated design, checklists and execution provenance; reconcile useful obligations through the current task owners before future work.
+
 > Historical: superseded by the accepted [Supabase Free design](../specs/2026-10-14-ieadpe-flutter-supabase-free-design.md) and [implementation plan](../plans/2026-10-14-ieadpe-flutter-supabase-free-sdd.md). Do not execute this baseline.
 
 Status: historical, superseded baseline. This supersedes the Functions/Storage Firebase design and the earlier Supabase design. The user requested Firebase Spark only; free alternatives are being compared, not selected automatically. Implementation has not started.
