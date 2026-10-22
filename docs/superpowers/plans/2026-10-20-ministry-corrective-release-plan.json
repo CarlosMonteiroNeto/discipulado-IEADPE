@@ -894,8 +894,8 @@
       ],
       "current_status": {
         "status": "APPROVED_LOCAL",
-        "scope": "006 local preparation: 16 forward migrations / 17 real checkpoints; later Windows fixture 30/30 and wrapper 2/2 scoped. Hosted parity/recovery unproven.",
-        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md",
+        "scope": "006 local preparation preserved. Current-source refresh at 4957140: 16 forward migrations / 17 real checkpoints PASS, package rebuilt. Hosted read-only inventory BLOCKED (no managed libpq service/PGSERVICE; project linked:false); hosted parity/recovery unproven.",
+        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md; build/verification/corrective-release/T12/read-only-refresh/",
         "branch_release_approval": false
       },
       "continuation_owners": [
@@ -919,7 +919,7 @@
     "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, APK builds, key/signing changes and publication require separate gates/approval.",
     "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
     "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
-    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (12:33 after the access-lock harness correction), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. The historical 528/529 timeout is root-caused as a test-harness cross-lock wake race, not a product lock bypass; the deterministic two-phase harness passes 32/32 direct and 6/6 focused runs. T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
+    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (12:33 after the access-lock harness correction; 12:41 after the T12 package refresh), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. The historical 528/529 timeout is root-caused as a test-harness cross-lock wake race, not a product lock bypass; the deterministic two-phase harness passes 32/32 direct and 6/6 focused runs. T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
     "ordered_existing_units": [
       "L0: review 360px Team/gallery differences and retained 528/529 root-cause disposition; fix evidenced defects or obtain reviewed visual disposition; rerun affected and required assembled pinned gates on one candidate.",
       "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
@@ -1052,8 +1052,8 @@
       {
         "unit": "T12",
         "status": "APPROVED_LOCAL",
-        "scope": "006 local preparation: 16 forward migrations / 17 real checkpoints; later Windows fixture 30/30 and wrapper 2/2 scoped. Hosted parity/recovery unproven.",
-        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md"
+        "scope": "006 local preparation preserved. Current-source refresh at 4957140: 16 forward migrations / 17 real checkpoints PASS, package rebuilt. Hosted read-only inventory BLOCKED (no managed libpq service/PGSERVICE; project linked:false); hosted parity/recovery unproven.",
+        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md; build/verification/corrective-release/T12/read-only-refresh/"
       },
       {
         "unit": "L0",
@@ -1245,9 +1245,9 @@
           "python scripts/inspect_hosted_contracts.py --help"
         ],
         "steps": [
-          "CLI authentication/project discovery already done: Discipulado IEADPE/voqmtnqjrbugpazcimvh/linked:false. Reuse authorized reads; no repeated login or migration command. Investigate local linking/settings separately within existing authorization, recording only nonsensitive config identity. Inspector needs explicit project-ref, endpoint, managed libpq service, local semantic contract and output; --help is safe, actual inventory needs authorized managed DB channel and read-only catalog queries. PAT is not a DB password.",
-          "Refresh exact schema/ledger/function/policy/grant fingerprints without binding scope RPC or personal rows. Retain local 006 chain 16 migrations / 17 checkpoints; prepare exact hashes/order and classify complete/partial/conflicting effects including 180001/002 data guards.",
-          "H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. Prepare reviewable package before requesting mutations; do not run hosted migrations/ledger repair/grants/import/OAuth/test writes."
+          "Completed 2026-10-21: authorized project discovery returned Discipulado IEADPE/voqmtnqjrbugpazcimvh/ACTIVE_HEALTHY/PostgreSQL 17.11.0.003/linked:false. No .supabase link, PGSERVICE/PGSERVICEFILE or pg_service.conf exists; the catalog inspector was not invoked. PAT is not a DB password and was not used as one.",
+          "Completed locally: the current 16-migration / 17-checkpoint chain passed on the owned disposable loopback PostgreSQL and the package was rebuilt with fresh snapshots/manifest. Hosted schema/ledger/function/policy/grant fingerprints remain BLOCKED because no managed libpq channel is configured; no scope RPC or personal rows were queried.",
+          "Prepared the reviewable current-source package; H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. No hosted migration, ledger repair, grant, import, OAuth test write or other mutation was run."
         ],
         "review": "Sol checks target identity, full semantic comparison, exact006 chain and protected evidence handling; stale healthy/404 observations remain historical.",
         "expected": "Updated read-only compatibility evidence and concrete G1/G2 package, or exact access/source/recovery blockers; no hosted activation claim."
