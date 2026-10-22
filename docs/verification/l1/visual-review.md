@@ -65,3 +65,11 @@ This section covers the corrective-release Task 4 surfaces. It does not rewrite 
 ## Remaining human/device checks
 
 Automation proves deterministic pixels, current assertions and the reviewed candidate files. It does not replace a screen-reader pass, physical-device rendering, or independent reviewer/director sign-off of the golden promotion. The Sol visual/code review for B2 is still required.
+
+## Windows baseline correction for the B2 promotion (2026-10-21)
+
+The B2 candidate run that produced the 20 gallery and 4 Team promotions ran on Linux (`/workspace/discipulado-IEADPE`, per `B2/generate-candidates.log` and `B2/promotion-review.md`). The authoritative final gate runs on Windows with pinned Flutter 3.47.7. Those are different rasterization environments: the promoted Linux PNGs differ from the Windows output by 0.662%–4.972% of pixels, with text/icon contours only and identical geometry, wrapping, control bounds and state selection.
+
+A fresh pinned-Windows capture with `MINISTRY_GOLDEN_CAPTURE_ROOT` executed all 24 cases (4 Team and 20 gallery at 360/768/1440 plus 200% text) before any comparison stopped the loop. Every one of the 24 Windows captures is **byte-identical** to the corresponding pre-B2 baseline at `d0d0e0f^`; none matches the Linux-promoted `HEAD` baseline. The pre-B2 Windows baselines were therefore restored rather than re-promoting new unknown pixels or raising a tolerance.
+
+Evidence (local, git-ignored): `build/verification/corrective-release/L0-visual-2026-10-21/` — `captures/`, `capture-vs-tracked-metrics.json`, `compare_captures.py`, `compare_old_new.py`, `inspect-team360.png`, `inspect-gallery360top.png`, focused and full-suite logs. The focused suites pass 23/23 against the restored baselines; the pinned full suite passes 548/548. This correction is Windows-host-specific; a Linux golden job would need its own reviewed baseline or a deterministic cross-platform font renderer. It does not waive any assertion or change product UI.

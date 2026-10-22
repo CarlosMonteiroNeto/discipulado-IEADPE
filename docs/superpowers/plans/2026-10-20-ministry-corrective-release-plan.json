@@ -919,7 +919,7 @@
     "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, APK builds, key/signing changes and publication require separate gates/approval.",
     "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
     "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
-    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 546 passed/2 visual failures, analyzer/web build/static preflight pass. Historical 528/529 disposition, T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
+    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (14:34), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. Historical 528/529 disposition, T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
     "ordered_existing_units": [
       "L0: review 360px Team/gallery differences and retained 528/529 root-cause disposition; fix evidenced defects or obtain reviewed visual disposition; rerun affected and required assembled pinned gates on one candidate.",
       "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
@@ -968,7 +968,7 @@
       {
         "unit": "B2",
         "status": "APPROVED_LOCAL",
-        "scope": "Historical font/visual portability slice; current golden failures remain under L0.",
+        "scope": "Font/SDK portability code retained; Linux-generated golden promotions reverted to Windows baselines under L0.",
         "evidence_locator": "tar:B2/review.md; B2/promotion-review.md"
       },
       {
@@ -1058,8 +1058,8 @@
       {
         "unit": "L0",
         "status": "FAIL",
-        "scope": "Pinned 546/548:two 360px goldens; larger loops unexecuted; historical 528/529 unresolved; consolidation54-test run failed on90s timeout, narrow 1/1 does not waive.",
-        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README"
+        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines. Historical 528/529 unresolved; T11 live stack/browser and Android app acceptance open.",
+        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; local report 2026-10-21 L0 golden correction"
       },
       {
         "unit": "H0/H1",
