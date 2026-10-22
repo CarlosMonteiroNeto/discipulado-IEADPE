@@ -27,7 +27,7 @@ The user authorized production database changes with the constraint that existin
 - All pre-existing row counts were preserved; `public.ministry_people` was backfilled to 51 rows and all 51 converts have `person_id`. Final columns/constraints/indexes/policies/RLS are **244/187/78/18/27 exact**; zero tables lack RLS; `anon` remains denied.
 - Auth health is HTTP 200; PostgREST reloaded; anonymous REST probes to `converts`, `ministry_people`, and `ministry_sessions` are HTTP 401.
 - Ten function fingerprints differ from the synthetic final contract but were already present before activation and were unchanged by the migrations. All table/function grant differences are extra `service_role` privileges; no expected grant is missing.
-- T11 live loopback journey, full Android authenticated acceptance, release signing/publication, H3, independent review, and rotation of the earlier exposed service-role credential remain open. This activation does not approve the assembled release.
+- T11 live loopback journey, full Android authenticated acceptance, release signing/publication, independent review, and rotation of the earlier exposed service-role credential remain open. Firebase legacy import is out of scope by the owner's 2026-10-22 attestation that no other data exists; no independent export inspection or import was performed. This activation does not approve the assembled release.
 
 ## Consolidated current state and continuation — 2026-10-21
 
@@ -71,7 +71,7 @@ The two L0 approval-index JSONs were deliberately excluded by credential scannin
 | L0 | FAIL | Pinned 548/548 green; analyzer/web build/preflight pass; 24 goldens restored to Windows baselines; 528/529 root-caused as a test-harness race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and full Android authenticated acceptance remain open; debug build/install/login smoke passed on 2026-10-21. | `zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README; local report T11 host blocker and Android debug smoke` |
 | H0/H1 | PASS_WITH_RESIDUAL | Production backup/restore, hosted inventory, ledger repair and 16-migration activation applied and structurally verified on 2026-10-22; 10 pre-existing function fingerprints remain recorded. | `docs/verification/2026-10-22-production-database-activation.md; activation package; tracked activation evidence` |
 | H2/O1 | PARTIAL | The authorized production database migrations are applied; OAuth/grants/test writes and the actual real-role/Google/Storage journey remain open. | `S15 A1–A8/G1/G2; activation report residual gates` |
-| H3 | BLOCKED | Firebase export or source-inspected verified absence and stable-ID reconciliation missing. | `S13; inherited 2026-10-18 requirements` |
+| H3 | OUT_OF_SCOPE | Owner attested on 2026-10-22 that no Firebase legacy import is required and no other data exists beyond the enumerated Base44/current Supabase data. This is owner attestation, not independent export verification; no import was performed. | `owner instruction 2026-10-22; activation report` |
 | D0/D1/D2 | BLOCKED | Debug APK installed and login UI smoke passed (1.0/2.0 text, no backend); no authenticated journey, OAuth, persistence, Storage/SAF or full device acceptance; release still uses debug signing; G3/build/G4 outstanding; no release APK. | `android/app/build.gradle.kts; S15 A9/G3/G4; local report T11 host blocker and Android debug smoke` |
 | Linux T09/T10 matrix | DEFERRED | User directed no further Linux investment; never label old cross-platform acceptance complete. | `2026-10-21 amendment` |
 
@@ -207,7 +207,7 @@ adb -s <authorized-serial> reverse --remove tcp:54321
 
 - CLI authentication/project discovery already done: Discipulado IEADPE/voqmtnqjrbugpazcimvh/linked:false. Reuse authorized reads; no repeated login or migration command. Investigate local linking/settings separately within existing authorization, recording only nonsensitive config identity. Inspector needs explicit project-ref, endpoint, managed libpq service, local semantic contract and output; --help is safe, actual inventory needs authorized managed DB channel and read-only catalog queries. PAT is not a DB password.
 - Refresh exact schema/ledger/function/policy/grant fingerprints without binding scope RPC or personal rows. Retain local 006 chain 16 migrations / 17 checkpoints; prepare exact hashes/order and classify complete/partial/conflicting effects including 180001/002 data guards.
-- H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. Prepare reviewable package before requesting mutations; do not run hosted migrations/ledger repair/grants/import/OAuth/test writes.
+- H1 backup/Auth/Storage recovery proof and isolated restore remain separate prerequisites. H3 is out of scope by the owner's 2026-10-22 attestation that no Firebase legacy data exists beyond the enumerated data; no independent export inspection or import is performed. Prepare a reviewable package before requesting further mutations; do not run unapproved hosted migrations/ledger repair/grants/import/OAuth/test writes.
 
 ```text
 supabase projects list
@@ -238,7 +238,7 @@ python scripts/web_preflight.py build/web
 
 #### 8. O1 / H2 / H3 / D1-D2 gated delivery
 
-**Dependencies:** L0, H1 recovery/parity package, H3 source disposition, O1 real OAuth, D0 target and G3 signing, explicit build authorization. **Files:** `docs/operations/google-oauth.md`, `docs/operations/unified-release.md`, `android/app/build.gradle.kts`, `pubspec.yaml`; **create future evidence document** `docs/verification/ministry-corrective-delivery-report.md` (currently absent).
+**Dependencies:** L0, H1 recovery/parity package, H3 owner-attested out-of-scope disposition, O1 real OAuth, D0 target and G3 signing, explicit build authorization. **Files:** `docs/operations/google-oauth.md`, `docs/operations/unified-release.md`, `android/app/build.gradle.kts`, `pubspec.yaml`; **create future evidence document** `docs/verification/ministry-corrective-delivery-report.md` (currently absent).
 
 - Prepare exact setting/account/import/signing diffs and recoverability/custody evidence through existing G1/G2/G3; current release debug signing blocks delivery. These tasks remain gated, not instructions to mutate now. No **release** APK build or publication until ALL pre-gates+approvals, including reviewed package/version/certificate continuity and explicit build authorization; the 2026-10-21 debug login smoke is not release acceptance.
 - Only after approval build exact candidate with public-only configuration; inspect hash/size/package/version/certificate/toolchain, install/update approved bytes and observe A1-A8 on emulator/physical device. Hosted live checks/test writes require their separate authorization. Verify Storage/SAF, callbacks and durable fresh-session journey.
@@ -1019,6 +1019,8 @@ flutter test --no-pub --concurrency=1 test/operations/hosted_upgrade_preparation
 
 ## H3 — Legacy reconciliation
 
+> **2026-10-22 scope decision:** the owner confirmed that no Firebase legacy import is required and that no other data exists beyond the enumerated Base44/current Supabase data. H3 is recorded as `OUT_OF_SCOPE_OWNER_ATTESTED_ABSENCE` for this release. This is an owner attestation, not an independent Firebase export inspection; no import is performed. The historical mapping requirements remain recorded below for provenance only.
+
 **Predecessor:** compatible hosted model plus an authorized source export or verifiable source-absence record. **Files:** operations migration runbook and supported-source mapping/rehearsal evidence; implementation of a new importer requires a bounded brief for the actual exported schema.
 
 - [ ] Determine original Firebase/source availability separately from current empty Ministry tables. Preserve stable source IDs and source/export retention.
@@ -1087,7 +1089,7 @@ Statuses distinguish scoped approval from branch/release acceptance. Coder `comp
 | Local closing | Incomplete | No complete current two-platform gate + actual local journey + final source-bound full-green report. Earlier expanded-review SQL/visual/analysis gaps require explicit current dispositions, not automatic inheritance as present defects or implicit closure. |
 | H1 recovery/exact package | Blocked | No encrypted-backup/isolated-restore evidence; ledger/schema mismatch; fresh complete hosted fingerprints and Base44 data/guard equivalence pending. T12 preparation is a dependency, not H1 completion. |
 | H2 activation/real roles | Blocked, unapproved mutation | Target healthy but required identity/RPC/authority absent; current converts HTTP 404. Health endpoints do not prove allowed roles, OAuth or Storage policies. |
-| H3 legacy reconciliation | Blocked | Firebase export or verified source absence unproven; current zero academic totals cannot waive it. Supported-source mapping/repeat import/reconciliation required. |
+| H3 legacy reconciliation | Out of scope — owner attested | On 2026-10-22 the owner confirmed no Firebase legacy import is required and no other data exists beyond the enumerated Base44/current Supabase data. No independent export inspection or import was performed; historical mapping requirements are not executed. |
 | D1 installed/downloadable APK | Blocked | Debug signing configured, no release certificate decision, physical Android 14 target connected. A debug APK was built/installed/cold-launched on that target on 2026-10-21 for a login-screen smoke only; no release APK exists. Aborted debug run exit 143 is not test/build failure. Authenticated journey, release signing/update and download evidence absent. |
 
 ### Does the existing scope cover functional delivery?

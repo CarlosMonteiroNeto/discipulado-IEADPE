@@ -1075,9 +1075,9 @@
       },
       {
         "unit": "H3",
-        "status": "BLOCKED",
-        "scope": "Firebase export or source-inspected verified absence and stable-ID reconciliation missing.",
-        "evidence_locator": "S13; inherited 2026-10-18 requirements"
+        "status": "OUT_OF_SCOPE",
+        "scope": "Owner attested on 2026-10-22 that no Firebase legacy import is required and no other data exists beyond the enumerated Base44/current Supabase data; no independent export inspection or import was performed.",
+        "evidence_locator": "owner instruction 2026-10-22; docs/verification/2026-10-22-production-database-activation.md"
       },
       {
         "unit": "D0/D1/D2",
@@ -1247,7 +1247,7 @@
         "steps": [
           "Completed 2026-10-21: authorized project discovery returned Discipulado IEADPE/voqmtnqjrbugpazcimvh/ACTIVE_HEALTHY/PostgreSQL 17.11.0.003/linked:false. No .supabase link, PGSERVICE/PGSERVICEFILE or pg_service.conf exists; the catalog inspector was not invoked. PAT is not a DB password and was not used as one.",
           "Completed locally: the current 16-migration / 17-checkpoint chain passed on the owned disposable loopback PostgreSQL and the package was rebuilt with fresh snapshots/manifest. Hosted schema/ledger/function/policy/grant fingerprints remain BLOCKED because no managed libpq channel is configured; no scope RPC or personal rows were queried.",
-          "Prepared the reviewable current-source package; H1 backup/Auth/Storage recovery proof and isolated restore, H3 authorized source export/absence and stable-ID reconciliation remain separate prerequisites. No hosted migration, ledger repair, grant, import, OAuth test write or other mutation was run."
+          "Prepared the reviewable current-source package. H1 backup/Auth/Storage recovery proof and isolated restore were completed on 2026-10-22. H3 is out of scope by the owner's 2026-10-22 attestation that no Firebase legacy data exists beyond the enumerated data; no independent export inspection or import was performed. No unapproved hosted mutation, grant, import, OAuth test write or other operation was run."
         ],
         "review": "Sol checks target identity, full semantic comparison, exact006 chain and protected evidence handling; stale healthy/404 observations remain historical.",
         "expected": "Updated read-only compatibility evidence and concrete G1/G2 package, or exact access/source/recovery blockers; no hosted activation claim."
@@ -1281,7 +1281,7 @@
         "depends_on": [
           "L0",
           "H1 recovery/parity package",
-          "H3 source disposition",
+          "H3 owner-attested out-of-scope disposition",
           "O1 real OAuth",
           "D0 target and G3 signing",
           "explicit build authorization"
@@ -1356,15 +1356,24 @@
       "residual_function_fingerprints": 10,
       "grant_differences_only_extra_service_role": true,
       "evidence": "docs/verification/2026-10-22-production-database-activation.md",
-      "evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31",
+      "evidence_sha256": "0007381B997222FE36070541A841180255DBEFC2BE69DD375E13BA65FD1F3E58",
       "open_gates": [
         "T11 live loopback journey",
         "full Android authenticated acceptance",
         "release signing/publication and production device acceptance",
-        "H3 legacy Firebase disposition",
         "independent review",
         "rotation of earlier exposed service-role credential"
-      ]
+      ],
+      "legacy_data_attestation": {
+        "attested_by": "owner",
+        "attested_at": "2026-10-22",
+        "statement": "No Firebase legacy import is required; no other data exists beyond the enumerated Base44/current Supabase data."
+      }
+    },
+    "legacy_data_attestation_2026_10_22": {
+      "attested_by": "owner",
+      "attested_at": "2026-10-22",
+      "statement": "No Firebase legacy import is required; no other data exists beyond the enumerated Base44/current Supabase data."
     }
   },
   "engineering_assurance": {

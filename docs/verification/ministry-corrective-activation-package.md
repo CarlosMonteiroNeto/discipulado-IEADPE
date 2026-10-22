@@ -12,11 +12,11 @@
     "working_tree_files": "activation evidence and documentation updates only; application and migration bytes are unchanged from the recorded source candidate",
     "files": {
       "docs/verification/2026-10-22-production-database-activation.md": "tracked",
-      "docs/verification/evidence/2026-10-22-production-activation-evidence.json": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
+      "docs/verification/evidence/2026-10-22-production-activation-evidence.json": "0007381B997222FE36070541A841180255DBEFC2BE69DD375E13BA65FD1F3E58"
     },
     "application_and_migration_bytes_unchanged_from": "4957140e13538d10d32a34773eb4867a552de8e0",
     "application_migration_diff_check": "git diff 4957140..a2bf2c2 -- lib android supabase is empty",
-    "activation_evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
+    "activation_evidence_sha256": "0007381B997222FE36070541A841180255DBEFC2BE69DD375E13BA65FD1F3E58"
   },
   "migration_sequence": [
     {
@@ -312,8 +312,15 @@
     "rollback_procedure": "stop target writes, retain sources, restore only to an isolated destination, reconcile counts/constraints/links/object access, and retry only after the cause is understood"
   },
   "legacy_firebase": {
-    "status": "BLOCKED",
-    "reason": "source export or verified absence unavailable"
+    "status": "OUT_OF_SCOPE_OWNER_ATTESTED_ABSENCE",
+    "reason": "Owner confirmed on 2026-10-22 that no Firebase legacy import is required and no other data exists beyond the enumerated Base44/current Supabase data. No independent export inspection or import was performed.",
+    "owner_attestation": {
+      "attested_by": "owner",
+      "attested_at": "2026-10-22",
+      "statement": "No Firebase legacy import is required; no other data exists beyond the enumerated Base44/current Supabase data."
+    },
+    "independent_export_inspection": "not performed",
+    "import_performed": false
   },
   "android_artifact": {
     "status": "BLOCKED",
@@ -334,7 +341,6 @@
   "next_gates": [
     "independent review of this current-source package, migration bytes and production activation evidence",
     "T11 live loopback Auth/PostgREST/Storage/Chromium journey; hosted API smoke does not replace it",
-    "H3 legacy Firebase source export or verified absence plus stable-ID reconciliation",
     "full Android authenticated acceptance on a real backend; debug login smoke is not sufficient",
     "release signing/custody, release APK publication and production device acceptance",
     "rotate previously exposed service-role/database credentials and record the result"
@@ -390,6 +396,12 @@
       "missing_expected_grants": 0
     },
     "evidence_path": "docs/verification/evidence/2026-10-22-production-activation-evidence.json",
-    "evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
+    "evidence_sha256": "0007381B997222FE36070541A841180255DBEFC2BE69DD375E13BA65FD1F3E58"
+  },
+  "legacy_data": {
+    "firebase_import": "OUT_OF_SCOPE",
+    "basis": "owner_attestation_2026_10_22",
+    "independent_export_inspection": "not performed",
+    "import_performed": false
   }
 }

@@ -3,7 +3,7 @@
 <!-- canonical-document-authority -->
 > **Supporting technical reference.** The [current spec](../superpowers/specs/2026-10-20-ministry-corrective-release-design.md), [current plan](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.md) and [JSON mirror](../superpowers/plans/2026-10-20-ministry-corrective-release-plan.json) govern current requirements, status, task order and authorization. Reuse procedures/contracts only through the corresponding current task and its reviewed interface, prerequisites and authorization. Counts, completed operations and old environment statements retain their original observation date.
 
-Status: Base44 records and 30 authorized access grants are active in hosted Supabase. Migration `202610180002_base44_archive_weekly_consistency.sql` is applied. It reconciled 39 weekly guard rows for 50 active converts; verification now reports zero missing and zero stale counters. Firebase ministry records, production cutover, and deleting either source remain separate operations.
+Status: Base44 records and 30 authorized access grants are active in hosted Supabase. Migration `202610180002_base44_archive_weekly_consistency.sql` is applied. It reconciled 39 weekly guard rows for 50 active converts; verification now reports zero missing and zero stale counters. The authorized production database activation was applied on 2026-10-22; see the [production activation report](../verification/2026-10-22-production-database-activation.md). Firebase legacy import is out of scope by the owner's 2026-10-22 attestation that no other data exists; production cutover and deleting either source remain separate operations.
 
 ## Base44 export contract
 

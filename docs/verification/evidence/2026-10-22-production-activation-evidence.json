@@ -61,7 +61,10 @@
   "baseline": {
     "hosted_ledger_before": 18,
     "hosted_ledger_through_before": "202610140018",
-    "baseline_versions_repaired": ["202610180001", "202610180002"],
+    "baseline_versions_repaired": [
+      "202610180001",
+      "202610180002"
+    ],
     "baseline_schema_exact": {
       "columns": true,
       "constraints": true,
@@ -139,11 +142,21 @@
     "t11_live_local_stack": "BLOCKED",
     "android_authenticated_acceptance": "BLOCKED",
     "release_signing_and_publication": "BLOCKED",
-    "legacy_firebase_disposition": "BLOCKED",
+    "legacy_firebase_disposition": "OUT_OF_SCOPE_OWNER_ATTESTED_ABSENCE",
     "independent_current_package_review": "PENDING"
   },
   "rollback": {
     "method": "restore the verified encrypted backup to an isolated destination; do not overwrite production until cause and authorization are established",
     "production_restore_performed": false
+  },
+  "legacy_data": {
+    "firebase_import": "OUT_OF_SCOPE",
+    "owner_attestation": {
+      "attested_by": "owner",
+      "attested_at": "2026-10-22",
+      "statement": "No Firebase legacy import is required; no other data exists beyond the enumerated Base44/current Supabase data."
+    },
+    "independent_export_inspection": "not performed",
+    "import_performed": false
   }
 }

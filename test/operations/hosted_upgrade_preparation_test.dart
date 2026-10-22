@@ -25,7 +25,14 @@ void main() {
     expect(package['production_activation']['ledger_last'], '202610200006');
     expect(package['production_activation']['forward_migrations_applied'], 16);
     expect(package['production_activation']['errors'], 0);
-    expect(package['legacy_firebase']['status'], 'BLOCKED');
+    expect(
+      package['legacy_firebase']['status'],
+      'OUT_OF_SCOPE_OWNER_ATTESTED_ABSENCE',
+    );
+    expect(
+      package['legacy_firebase']['owner_attestation']['attested_at'],
+      '2026-10-22',
+    );
     expect(package['android_artifact']['status'], 'BLOCKED');
   });
 

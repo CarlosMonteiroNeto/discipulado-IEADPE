@@ -54,6 +54,10 @@ All **10** function-definition fingerprint differences from the synthetic final 
 
 The **18 table-grant** and **55 function-grant** differences are only extra `service_role` privileges, which are normal Supabase defaults. There are no missing expected grants and no unexpected `anon` grants. The applied migration therefore did not weaken the expected grant model.
 
+## Legacy data scope decision
+
+On 2026-10-22 the owner confirmed that no Firebase legacy import is required and that no other data exists beyond the enumerated Base44/current Supabase data. H3 is therefore recorded as `OUT_OF_SCOPE_OWNER_ATTESTED_ABSENCE`. This is an owner attestation, not an independent Firebase export inspection; no import was performed.
+
 ## Open gates and risks
 
 The following are still open and are not implied by this database activation:
@@ -61,7 +65,6 @@ The following are still open and are not implied by this database activation:
 - T11 live loopback Auth/PostgREST/Storage/Chromium journey is still blocked by the unavailable Windows Docker engine. The hosted API smoke is useful but does not replace that journey.
 - Full Android authenticated acceptance, OAuth, persistence, and Storage/SAF checks are not complete. The 2026-10-21 debug APK login smoke used synthetic configuration and is not production acceptance.
 - Release signing/custody, release APK publication, and production device acceptance remain gated; no release artifact exists.
-- H3 legacy Firebase export/verified absence and stable-ID reconciliation remain open.
 - Independent review of the current package, migration bytes, and this production activation remains pending.
 - Earlier tooling displayed a legacy service-role credential and a temporary database password. Values are not repeated here. The temporary application/backup roles are gone and no `ministry_*` role remains; rotation of the exposed service-role credential is still pending and should be completed before release.
 
@@ -71,7 +74,7 @@ The verified encrypted backup and plaintext copies are retained. Rollback or rec
 
 ## Evidence index
 
-- Tracked activation evidence: `docs/verification/evidence/2026-10-22-production-activation-evidence.json`, SHA-256 `864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31`, 5,866 bytes.
+- Tracked activation evidence: `docs/verification/evidence/2026-10-22-production-activation-evidence.json`, SHA-256 `0007381B997222FE36070541A841180255DBEFC2BE69DD375E13BA65FD1F3E58`, 6,453 bytes.
 - Machine activation package: `docs/verification/ministry-corrective-activation-package.md`.
 - Local-only apply logs: `build/verification/corrective-release/hosted-db-2026-10-21/production-apply-logs/` (16 files); progress ledger: `production-apply-progress.txt` (16 lines).
 - Local-only comparisons: `production-final-catalog-raw.txt`, `production-final-equivalence.json`, `production-final-contract.json`, `baseline-equivalence.json`, `clone-final-equivalence.json`, `summary.json`, `parity-key-objects.json`.
