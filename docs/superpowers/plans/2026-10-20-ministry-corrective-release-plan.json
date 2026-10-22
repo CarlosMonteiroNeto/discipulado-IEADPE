@@ -3,7 +3,7 @@
   "title": "Ministry corrective release: local contracts, operator workflow and activation preparation",
   "spec_doc": "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md",
   "global_constraints": [
-    "Current scope: Windows Web/Android continuation after consolidated-plan review. Linux deferred by user. Local commits/merges and hosted project reads are authorized; push, hosted mutations and APK builds remain gated.",
+    "Current scope: Windows Web/Android continuation after consolidated-plan review. Linux deferred by user. Local commits/merges and hosted project reads are authorized; push, hosted mutations and release APK builds/publication remain gated. The 2026-10-21 debug-only APK build/install/login smoke was explicitly authorized by the user and is not release or full Android acceptance.",
     "Bootstrap B0-B3 from the companion Markdown plan must finish with full green verification and an integration review before ordinary corrective tasks are approved; no implicit baseline waiver.",
     "Native Luna Medium implements; native gpt-6.1-sol low independently reviews; director coordinates and obtains independent assembled review. Historical OpenCode/Script CEO metadata is not dispatch authority.",
     "Portuguese product UI; English technical artifacts; existing Base44 theme and locked dependencies. No new package/template/backend or unrelated refactor.",
@@ -915,14 +915,14 @@
   },
   "execution_amendment_2026_10_21": {
     "goal": "Observed functional acceptance on Web and Android using the existing plan, with Windows as the execution host.",
-    "authority": "User selected Windows Web/Android acceptance and deferred Linux. Later authority permits hosted project reads and local commits/merges; hosted mutations, APK builds and publication retain separate gates.",
-    "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, APK builds, key/signing changes and publication require separate gates/approval.",
+    "authority": "User selected Windows Web/Android acceptance and deferred Linux. Later authority permits hosted project reads and local commits/merges; hosted mutations, release APK builds and publication retain separate gates. A debug-only APK build/install/login device smoke was explicitly authorized on 2026-10-21 and passed; it does not satisfy release, production or full Android acceptance.",
+    "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, release APK builds, key/signing changes and publication require separate gates/approval. The user separately authorized the 2026-10-21 debug APK build/install/login device smoke and directed that the prior no-build rule be ignored for that test only; release signing, release APK publication and production device acceptance remain gated.",
     "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
     "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
-    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (12:33 after the access-lock harness correction; 12:41 after the T12 package refresh), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. The historical 528/529 timeout is root-caused as a test-harness cross-lock wake race, not a product lock bypass; the deterministic two-phase harness passes 32/32 direct and 6/6 focused runs. T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
+    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (12:33 after the access-lock harness correction; 12:41 after the T12 package refresh), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. The historical 528/529 timeout is root-caused as a test-harness cross-lock wake race, not a product lock bypass; the deterministic two-phase harness passes 32/32 direct and 6/6 focused runs. T11 actual journey and Android acceptance remain open. On 2026-10-21 a physical Xiaomi 2109119DG (lisa_eea, Android 14/API 34, arm64-v8a, 1080x2400 at 440 dpi) received an explicitly authorized debug APK (build/app/outputs/flutter-apk/app-debug.apk, 97,463,903 bytes, SHA-256 027D4E34DED09CC6C5AD15C27F281894C518C559309DEDF32A6068A570517A77, Android Debug signer) built with synthetic public configuration (SUPABASE_URL=https://example.invalid, synthetic publishable key); it installed at 2026-10-21 23:09:29 after the prior differently-signed debug install and its local data were removed with user approval, cold-launched in 4,299 ms, completed Supabase init with no fatal exception or ANR, rendered the real login page at 1.0 and 2.0 system text scale, and made no hosted contact when the Google button was tapped accidentally. This is login-screen smoke only: authenticated journey, OAuth, persistence, protected routes, Storage/photo, SAF/XLSX, release signing and delivery were not verified, so T11, D2 and L0 remain BLOCKED/FAIL. See current local report section '2026-10-21 T11 host blocker and Android debug device smoke' and the git-ignored evidence summary build/verification/corrective-release/android-debug-smoke-2026-10-21/summary.json (SHA-256 0673A89C8415B6E375F966019F256C09323C326A2B321437925513122B8906C4); no runtime claim follows from static Web gates.",
     "ordered_existing_units": [
       "L0: review 360px Team/gallery differences and retained 528/529 root-cause disposition; fix evidenced defects or obtain reviewed visual disposition; rerun affected and required assembled pinned gates on one candidate.",
-      "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
+      "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness and record the separately authorized 2026-10-21 debug APK build/install/login-smoke result as login evidence only, not release or full Android acceptance; prepare G3 signing/custody/update-policy diff for separate approval.",
       "B0/T11: diagnose Windows Docker engine; prepare owned disposable loopback Supabase Auth/PostgREST/Storage and matching Chromium/ChromeDriver; execute existing SQL/concurrency/unified gates without hosted fallback.",
       "T11/L0: execute exact current browser journey, scope denial, FK-ordered cleanup and unrelated sentinel survival; complete existing visual/accessibility/routing checks and source-bound review. Real Google/OAuth remains O1/G2 and is BLOCKED without its prerequisites/authorization.",
       "D0/D2: only after ALL predecessor/pre-build gates and separate build/signing approvals, observe emulator/physical install/update and S15 A1-A8/D2 Android journey, callback, durability, revocation, Storage/SAF and exact artifact identity.",
@@ -931,7 +931,7 @@
     "invariants": [
       "Finalized attendance is immutable for new commands; corrections require acknowledged cancellation and a linked replacement, preserving history and exact receipt replay.",
       "Hosted project reads authorized; no hosted Supabase mutation, migration, ledger repair, grants, OAuth mutation, recovery/activation, import or deployment under this amendment; separate explicit concrete authorization remains required.",
-      "No APK until all existing pre-build requirements and approvals are satisfied; G3 key/signing policy and G4 publication remain separate. Local commits/merges authorized; push unauthorized.",
+      "No release APK build or publication until all existing pre-build requirements and approvals are satisfied; G3 key/signing policy and G4 publication remain separate. The 2026-10-21 debug APK build/install/login smoke is authorized evidence only and does not satisfy these gates. Local commits/merges authorized; push unauthorized.",
       "Missing prerequisites/failing checks remain BLOCKED/FAIL, never fixture PASS. H1/H2/H3 and G1/G2/G3/G4 remain open as applicable.",
       "Native Luna Medium implements; independent Sol 6.1 low reviews; director coordinates. Historical OpenCode executor metadata does not govern current dispatch."
     ],
@@ -956,8 +956,8 @@
       {
         "unit": "B0",
         "status": "BLOCKED",
-        "scope": "Windows Docker/bootable Android prerequisites missing; pinned SDK available historically, default differs.",
-        "evidence_locator": "consolidation README; local report dated Windows continuation"
+        "scope": "Windows Docker remains unavailable (2026-10-21 recheck: com.docker.service stopped, WSL install-only stub; admin/reboot not performed); pinned SDK verified. Physical Android 14 target paired/connected; debug APK built/installed and login smoke run; full authenticated journey not run.",
+        "evidence_locator": "consolidation README; local report dated Windows continuation; local report T11 host blocker and Android debug smoke"
       },
       {
         "unit": "B1",
@@ -1046,8 +1046,8 @@
       {
         "unit": "T11",
         "status": "BLOCKED",
-        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified.",
-        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2"
+        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified. 2026-10-21 host recheck: Docker daemon absent and WSL feature unavailable; no stack or browser journey was started. An Android debug login-screen smoke passed separately but does not exercise the journey.",
+        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2; local report T11 host blocker and Android debug smoke"
       },
       {
         "unit": "T12",
@@ -1058,8 +1058,8 @@
       {
         "unit": "L0",
         "status": "FAIL",
-        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines; 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and Android app acceptance open.",
-        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; local report 2026-10-21 L0 golden correction"
+        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines; 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and full Android authenticated acceptance remain open; a debug build/install/login smoke passed on 2026-10-21.",
+        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; local report 2026-10-21 L0 golden correction; local report T11 host blocker and Android debug smoke"
       },
       {
         "unit": "H0/H1",
@@ -1082,8 +1082,8 @@
       {
         "unit": "D0/D1/D2",
         "status": "BLOCKED",
-        "scope": "No accepted runtime device/installed journey; release uses debug signing; G3/build/G4 outstanding; no APK.",
-        "evidence_locator": "android/app/build.gradle.kts; S15 A9/G3/G4"
+        "scope": "Debug APK installed and login UI smoke passed (1.0/2.0 text, no backend); no authenticated journey, OAuth, persistence, Storage/SAF or full device acceptance; release still uses debug signing; G3/build/G4 outstanding; no release APK.",
+        "evidence_locator": "android/app/build.gradle.kts; S15 A9/G3/G4; local report T11 host blocker and Android debug smoke"
       },
       {
         "unit": "Linux T09/T10 matrix",
@@ -1218,12 +1218,12 @@
           "adb -s <authorized-serial> reverse --remove tcp:54321"
         ],
         "steps": [
-          "Prepare bootable authorized Google-capable emulator and physical device; investigate existing API 31/34 ADB offline and package-install stalls. Setup/connectivity only before APK gate: do not build/install/run app. Record actual API/browser/device identity and boot completion.",
+          "Prepare bootable authorized Google-capable emulator and physical device; investigate existing API 31/34 ADB offline and package-install stalls. Setup/connectivity only before the release APK gate; the separately authorized 2026-10-21 debug login smoke is recorded evidence and does not satisfy this step. Record actual API/browser/device identity and boot completion.",
           "For physical wireless ADB use Android Wireless debugging pairing UI and trusted private same-network transport; user enters short-lived pairing code directly into private local terminal/device flow. Never request/store code in chat, screen capture or logs; do not expose adb tcpip 5555 or public firewall rules. Select explicit authorized serial; disconnect/remove pairing after use.",
           "Keep backend host bind loopback. Once connection exists, adb reverse the actual owned local API port (54321 example must match Supabase local status), verify reverse listing/device route before later app execution and remove mapping afterwards. Use 127.0.0.1 on device with matching public client config; do not replace with hosted URL to bypass unavailable local stack. Only public URL/key in private client settings; no client service credentials."
         ],
         "review": "Sol checks target ownership, private pairing handling and loopback mapping evidence; physical observations identified separately from emulator/fixtures.",
-        "expected": "Authorized online target and documented secure backend reachability, still no APK or Android product acceptance until all build gates pass.",
+        "expected": "Authorized online target and documented secure backend reachability, still no release APK or Android product acceptance until all build gates pass; the 2026-10-21 debug-only login smoke does not satisfy this gate.",
         "create_future_files": [
           "docs/verification/ministry-corrective-delivery-report.md"
         ]
@@ -1298,7 +1298,7 @@
           "aapt dump badging <approved-apk>"
         ],
         "steps": [
-          "Prepare exact setting/account/import/signing diffs and recoverability/custody evidence through existing G1/G2/G3; current release debug signing blocks delivery. These tasks remain gated, not instructions to mutate now. No APK build until ALL pre-gates+approvals, including reviewed package/version/certificate continuity and explicit build authorization.",
+          "Prepare exact setting/account/import/signing diffs and recoverability/custody evidence through existing G1/G2/G3; current release debug signing blocks delivery. These tasks remain gated, not instructions to mutate now. No release APK build or publication until ALL pre-gates+approvals, including reviewed package/version/certificate continuity and explicit build authorization; the 2026-10-21 debug login smoke is not release acceptance.",
           "Only after approval build exact candidate with public-only configuration; inspect hash/size/package/version/certificate/toolchain, install/update approved bytes and observe A1-A8 on emulator/physical device. Hosted live checks/test writes require their separate authorization. Verify Storage/SAF, callbacks and durable fresh-session journey.",
           "Independent final review and G4 exact destination/audience/retention/download-byte policy precede publication. Local commits/merges authorized; push and artifact publication remain unauthorized."
         ],
