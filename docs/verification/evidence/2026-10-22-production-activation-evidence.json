@@ -1,0 +1,149 @@
+{
+  "schema": "production-activation-evidence/v1",
+  "activated_at": "2026-10-22",
+  "project_ref": "voqmtnqjrbugpazcimvh",
+  "project_name": "Discipulado IEADPE",
+  "candidate": {
+    "head": "a2bf2c234c51d8e6893de92f51e92a3b8f76f88b",
+    "application_and_migration_bytes_unchanged_from": "4957140e13538d10d32a34773eb4867a552de8e0",
+    "forward_migrations": 16,
+    "final_migration": "202610200006_attendance_roster_preview.sql"
+  },
+  "backup": {
+    "directory": "C:/Users/Carlos_Neto/.codex/backups/ministry-prod-20261021",
+    "plain_archive": "ministry-prod-20261021.tar.gz",
+    "plain_archive_sha256": "BED4AD3F3216F197D5B6B8BE3D57F39BA7DE8310BFDBA542BAE9F65AE991D29A",
+    "encrypted_archive": "ministry-prod-20261021.tar.gz.enc",
+    "encrypted_archive_sha256": "D5CDA777E44A13D109052FFE846A2D50B36E08521C46FD33BE6AA0A3110513F8",
+    "encrypted_archive_bytes": 223056,
+    "encryption": "AES-256-CBC with PBKDF2, 200000 iterations",
+    "decrypt_verified_sha256_match": true,
+    "dumps": {
+      "app.dump": "6A5916F26AD6DDAAB83FE3611F19BFEA8983EF45B9C4E8CD50611FB0720629E3",
+      "auth-storage-meta-data.dump": "1D4BADCD2531D10019564F7921CEB6233FF403926E7E15F1D517763FCA36233A",
+      "full.dump": "B917B12810244ECA3C19ACA26A89BFBCBE8DCB1F4BCE42010F31DD5370870489"
+    },
+    "passphrase": "retained separately under owner-only ACL; value not recorded"
+  },
+  "isolated_restore": {
+    "database": "ministry_prodclone_20261021",
+    "server": "owned disposable loopback PostgreSQL 127.0.0.1:54329",
+    "restore_exit": 0,
+    "tables": 26,
+    "constraints": 171,
+    "counts": {
+      "public.converts": 51,
+      "public.congregations": 24,
+      "public.user_access": 30,
+      "private.congregation_week_guards": 40,
+      "public.weekly_reports": 10,
+      "public.convert_events": 15,
+      "private.base44_source_metadata": 127,
+      "private.base44_user_access_pending": 30,
+      "private.mutation_receipts": 6,
+      "public.profiles": 1
+    },
+    "utc_hashes_match": {
+      "public.converts": "a206c44c8ddabdf492c86c95f0a7803e",
+      "public.congregations": "94b482ecc3c761238b96cb6958bf6529",
+      "public.user_access": "10866d49020ba9b0b15e938b6b484c80"
+    },
+    "auth_users": 1,
+    "storage_objects": 0,
+    "storage_buckets": 1,
+    "clone_rehearsal": {
+      "forward_migrations_applied": 16,
+      "exit_codes": "all zero",
+      "clone_only_fix": "minimal local auth.users stub lacked email_confirmed_at; added only to the clone, not production",
+      "final_structural_contract_exact": true
+    }
+  },
+  "baseline": {
+    "hosted_ledger_before": 18,
+    "hosted_ledger_through_before": "202610140018",
+    "baseline_versions_repaired": ["202610180001", "202610180002"],
+    "baseline_schema_exact": {
+      "columns": true,
+      "constraints": true,
+      "indexes": true,
+      "policies": true,
+      "rls": true
+    },
+    "baseline_function_fingerprints_changed_before_activation": 21,
+    "baseline_function_fingerprints_changed_after_forward_chain": 10,
+    "ledger_repair_performed": true,
+    "blind_db_push_used": false
+  },
+  "production_apply": {
+    "ledger_after": 36,
+    "ledger_last": "202610200006",
+    "forward_migrations_applied": 16,
+    "errors": 0,
+    "active_writes_observed_before": false,
+    "postgrest_schema_reload": "NOTIFY pgrst, 'reload schema' succeeded",
+    "migration_transport": "Supabase Management API as postgres, one explicit migration transaction at a time",
+    "no_temporary_superuser_created": true
+  },
+  "post_verification": {
+    "tables_without_rls": 0,
+    "anon_select_public_converts": false,
+    "key_objects": {
+      "public.ministry_people": true,
+      "public.converts.revision": true,
+      "public.converts.person_id": true,
+      "public.ministry_students.person_id": true,
+      "public.ministry_sessions.replaces_session_id": true,
+      "public.ministry_contacts.email": true,
+      "public.ministry_contacts.user_access_id": true
+    },
+    "ministry_people": 51,
+    "converts_with_person": 51,
+    "preserved_counts": {
+      "public.converts": 51,
+      "public.congregations": 24,
+      "public.user_access": 30,
+      "private.congregation_week_guards": 40,
+      "public.weekly_reports": 10,
+      "public.convert_events": 15,
+      "private.base44_source_metadata": 127,
+      "private.base44_user_access_pending": 30,
+      "private.mutation_receipts": 6,
+      "public.profiles": 1,
+      "public.ministry_contacts": 0,
+      "public.ministry_students": 0,
+      "public.ministry_sessions": 0,
+      "public.ministry_attendance": 0
+    },
+    "final_contract": {
+      "columns": "244 exact",
+      "constraints": "187 exact",
+      "indexes": "78 exact",
+      "policies": "18 exact",
+      "rls": "27 exact",
+      "functions": "93 present; 10 pre-existing fingerprints unchanged by migrations",
+      "table_grants": "27 present; 18 extras are service_role only",
+      "function_grants": "93 present; 55 extras are service_role only"
+    },
+    "hosted_api_smoke": {
+      "auth_health": "HTTP 200",
+      "rest_converts_anon": "HTTP 401",
+      "rest_ministry_people_anon": "HTTP 401",
+      "rest_ministry_sessions_anon": "HTTP 401"
+    }
+  },
+  "residual_risks": {
+    "functions_not_changed_by_migrations": 10,
+    "grant_differences_only_extra_service_role": true,
+    "missing_expected_grants": 0,
+    "exposed_service_role_or_database_credential_rotation_pending": true,
+    "t11_live_local_stack": "BLOCKED",
+    "android_authenticated_acceptance": "BLOCKED",
+    "release_signing_and_publication": "BLOCKED",
+    "legacy_firebase_disposition": "BLOCKED",
+    "independent_current_package_review": "PENDING"
+  },
+  "rollback": {
+    "method": "restore the verified encrypted backup to an isolated destination; do not overwrite production until cause and authorization are established",
+    "production_restore_performed": false
+  }
+}

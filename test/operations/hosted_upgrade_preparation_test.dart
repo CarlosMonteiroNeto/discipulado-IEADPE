@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('activation package records the exact forward sequence and no hosted effects', () {
+  test('activation package records the exact forward sequence and verified production activation', () {
     final package = jsonDecode(
       File('docs/verification/ministry-corrective-activation-package.md')
           .readAsStringSync(),
@@ -16,10 +16,15 @@ void main() {
       '202610200006_attendance_roster_preview.sql',
     );
     expect(package['hosted_effects'], {
-      'inventory_performed': false,
-      'migration_applied': false,
-      'ledger_repaired': false,
+      'inventory_performed': true,
+      'migration_applied': true,
+      'ledger_repaired': true,
     });
+    expect(package['hosted_activation'], 'APPLIED_AND_VERIFIED');
+    expect(package['backup_restore']['status'], 'PASS');
+    expect(package['production_activation']['ledger_last'], '202610200006');
+    expect(package['production_activation']['forward_migrations_applied'], 16);
+    expect(package['production_activation']['errors'], 0);
     expect(package['legacy_firebase']['status'], 'BLOCKED');
     expect(package['android_artifact']['status'], 'BLOCKED');
   });

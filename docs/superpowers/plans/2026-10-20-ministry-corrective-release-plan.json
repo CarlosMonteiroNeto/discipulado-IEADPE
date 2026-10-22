@@ -1052,8 +1052,8 @@
       {
         "unit": "T12",
         "status": "APPROVED_LOCAL",
-        "scope": "006 local preparation preserved. Current-source refresh at 4957140: 16 forward migrations / 17 real checkpoints PASS, package rebuilt. Hosted read-only inventory BLOCKED (no managed libpq service/PGSERVICE; project linked:false); hosted parity/recovery unproven.",
-        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md; build/verification/corrective-release/T12/read-only-refresh/"
+        "scope": "006 local preparation preserved. Current-source refresh at 4957140: 16 forward migrations / 17 real checkpoints PASS, package rebuilt. Hosted read-only inventory BLOCKED (no managed libpq service/PGSERVICE; project linked:false); hosted parity/recovery unproven. Production activation applied 2026-10-22: backup/isolated restore, baseline inventory, ledger repair, all 16 forward migrations and post-checks passed; 10 pre-existing function fingerprints remain.",
+        "evidence_locator": "tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md; build/verification/corrective-release/T12/read-only-refresh/; docs/verification/2026-10-22-production-database-activation.md"
       },
       {
         "unit": "L0",
@@ -1063,15 +1063,15 @@
       },
       {
         "unit": "H0/H1",
-        "status": "BLOCKED",
-        "scope": "Recovery/catalog/ledger equivalence and exact package remain missing; project read access authorized.",
-        "evidence_locator": "activation package; S12/S15/G1"
+        "status": "PASS_WITH_RESIDUAL",
+        "scope": "Production backup/restore, hosted inventory, ledger repair and 16-migration activation applied and structurally verified on 2026-10-22; 10 pre-existing function fingerprints remain recorded.",
+        "evidence_locator": "docs/verification/2026-10-22-production-database-activation.md; activation package; tracked activation evidence"
       },
       {
         "unit": "H2/O1",
-        "status": "BLOCKED",
-        "scope": "Hosted mutations/OAuth/grants/test writes not authorized; actual roles/Google/Storage journey unproven.",
-        "evidence_locator": "S15 A1–A8/G1/G2; existing OAuth runbook"
+        "status": "PARTIAL",
+        "scope": "Authorized production database migrations are applied; OAuth/grants/test writes and the actual real-role/Google/Storage journey remain open.",
+        "evidence_locator": "S15 A1-A8/G1/G2; activation report residual gates"
       },
       {
         "unit": "H3",
@@ -1327,7 +1327,45 @@
         "required": "Flutter3.47.7/bundled Dart3.13.5 proven in all three processes before browser/unified gates; mismatch BLOCKED. Reuse same environment for direct and nested commands."
       }
     },
-    "review_record": "docs/verification/2026-10-21-spec-plan-consolidation-review.md"
+    "review_record": "docs/verification/2026-10-21-spec-plan-consolidation-review.md",
+    "current_head": "a2bf2c234c51d8e6893de92f51e92a3b8f76f88b",
+    "production_activation_2026_10_22": {
+      "status": "APPLIED_AND_VERIFIED",
+      "project_ref": "voqmtnqjrbugpazcimvh",
+      "ledger_rows": 36,
+      "ledger_last": "202610200006",
+      "baseline_ledger_rows_repaired": [
+        "202610180001",
+        "202610180002"
+      ],
+      "forward_migrations_applied": 16,
+      "errors": 0,
+      "preserved_counts": true,
+      "new_ministry_people": 51,
+      "converts_with_person_id": 51,
+      "final_contract_structural_exact": true,
+      "tables_without_rls": 0,
+      "anon_select_public_converts": false,
+      "backup_restore": "PASS",
+      "hosted_api_smoke": {
+        "auth_health": 200,
+        "rest_converts_anon": 401,
+        "rest_ministry_people_anon": 401,
+        "rest_ministry_sessions_anon": 401
+      },
+      "residual_function_fingerprints": 10,
+      "grant_differences_only_extra_service_role": true,
+      "evidence": "docs/verification/2026-10-22-production-database-activation.md",
+      "evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31",
+      "open_gates": [
+        "T11 live loopback journey",
+        "full Android authenticated acceptance",
+        "release signing/publication and production device acceptance",
+        "H3 legacy Firebase disposition",
+        "independent review",
+        "rotation of earlier exposed service-role credential"
+      ]
+    }
   },
   "engineering_assurance": {
     "spec_owner": "S18",

@@ -1,16 +1,22 @@
 {
   "task_id": 12,
   "target_project_ref": "voqmtnqjrbugpazcimvh",
-  "source_sha": "4957140e13538d10d32a34773eb4867a552de8e0",
+  "source_sha": "a2bf2c234c51d8e6893de92f51e92a3b8f76f88b",
   "source_tree_sha256": "b4c5f7a75311056742a077bd853ff7e6b78b3c30",
-  "refreshed_at": "2026-10-21",
-  "status": "LOCAL_REHEARSAL_PASS / REVIEW_PENDING / HOSTED_INVENTORY_BLOCKED",
-  "refresh_scope": "Current-source read-only package refresh. The local 16-migration chain was rehearsed against the current bytes on an owned disposable loopback PostgreSQL; hosted catalog inventory was not performed.",
+  "refreshed_at": "2026-10-22",
+  "status": "PRODUCTION_ACTIVATION_APPLIED / STRUCTURAL_VERIFICATION_PASS / RELEASE_GATES_OPEN",
+  "refresh_scope": "Hosted production activation record. The verified production backup was isolated-restored and rehearsed with the real data; the two missing baseline ledger rows were repaired; all 16 forward migrations were applied on the hosted project; post-activation catalog, data, RLS and API checks passed. Release gates remain open.",
   "candidate_provenance": {
-    "head": "4957140e13538d10d32a34773eb4867a552de8e0",
+    "head": "a2bf2c234c51d8e6893de92f51e92a3b8f76f88b",
     "candidate_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    "working_tree_files": "none; clean checkout. source_sha and source_tree_sha256 bind the candidate.",
-    "files": {}
+    "working_tree_files": "activation evidence and documentation updates only; application and migration bytes are unchanged from the recorded source candidate",
+    "files": {
+      "docs/verification/2026-10-22-production-database-activation.md": "tracked",
+      "docs/verification/evidence/2026-10-22-production-activation-evidence.json": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
+    },
+    "application_and_migration_bytes_unchanged_from": "4957140e13538d10d32a34773eb4867a552de8e0",
+    "application_migration_diff_check": "git diff 4957140..a2bf2c2 -- lib android supabase is empty",
+    "activation_evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
   },
   "migration_sequence": [
     {
@@ -121,30 +127,43 @@
   "baseline": {
     "last_schema_migration": "202610180002",
     "ledger_through": "202610140018",
-    "synthetic_only": true
+    "synthetic_only": true,
+    "hosted_baseline_verified": true,
+    "hosted_baseline_schema_exact": {
+      "columns": true,
+      "constraints": true,
+      "indexes": true,
+      "policies": true,
+      "rls": true
+    }
   },
   "ledger_repair_proposal": {
-    "review_required": true,
+    "review_required": false,
     "versions": [
       "202610180001",
       "202610180002"
     ],
     "requires_full_equivalence": true,
-    "guard_reconciliation": "independent proof required before any future repair",
-    "proposal_only": true,
+    "guard_reconciliation": "applied after baseline structural equivalence and isolated restore; the two missing baseline rows were inserted with exact versions",
+    "proposal_only": false,
     "synthetic_equivalence_proven": true,
     "synthetic_guard_reconciliation_proven": true,
-    "hosted_equivalence_proven": false,
-    "proposal_ready_for_hosted_repair": false
+    "hosted_equivalence_proven": true,
+    "proposal_ready_for_hosted_repair": true,
+    "applied": true,
+    "applied_versions": [
+      "202610180001",
+      "202610180002"
+    ]
   },
   "hosted_effects": {
-    "inventory_performed": false,
-    "migration_applied": false,
-    "ledger_repaired": false
+    "inventory_performed": true,
+    "migration_applied": true,
+    "ledger_repaired": true
   },
   "hosted_read_only_inventory": {
-    "status": "BLOCKED",
-    "performed": false,
+    "status": "PASS",
+    "performed": true,
     "project_metadata": {
       "ref": "voqmtnqjrbugpazcimvh",
       "name": "Discipulado IEADPE",
@@ -160,17 +179,26 @@
     },
     "safe_surfaces_observed": [
       "supabase projects list: project identity, region, status, database host and PostgreSQL version",
-      "The command warned that the checkout is not linked; this is local configuration only."
+      "The command warned that the checkout is not linked; this is local configuration only.",
+      "Read-only hosted catalog and migration-ledger inventory completed through the Management API.",
+      "Production data counts, Auth presence and Storage inventory recorded before activation."
     ],
-    "blockers": [
-      "No managed libpq PGSERVICE or libpq service file is configured.",
-      "The project is linked:false and the checkout has no .supabase directory.",
-      "The authenticated CLI/PAT session is not a database password and was not used as one.",
-      "No schema, migration-ledger, function, policy or grant fingerprint was refreshed."
-    ],
+    "blockers": [],
     "evidence": {
-      "path": "build/verification/corrective-release/T12/read-only-refresh/hosted-project-read.json",
-      "sha256": "6d0191eb4d9431f341e812a30493cacfcaa17c058692948656fc4bf2115a3b5b"
+      "path": "build/verification/corrective-release/hosted-db-2026-10-21/summary.json",
+      "sha256": "85DB19C7A3F621E3551DFFEEFB135C99CCB96E25C0778A04F4E823FBDFC6412D"
+    },
+    "inventory_summary": {
+      "ledger_before": 18,
+      "ledger_through_before": "202610140018",
+      "tables": 26,
+      "rls_enabled_tables": 26,
+      "policies": 17,
+      "routines": 63,
+      "auth_users": 1,
+      "storage_buckets": 1,
+      "storage_objects": 0,
+      "hosted_baseline_schema_exact": true
     }
   },
   "local_rehearsal": {
@@ -200,7 +228,12 @@
     "path": "build/verification/corrective-release/T12/semantic-manifest.json",
     "sha256": "d8845392ab3c719c418448846ad2129a1e66298876200a8cef627b034055635a",
     "snapshots_path": "build/verification/corrective-release/T12/semantic-snapshots.json",
-    "snapshots_sha256": "a068e8e2607926ba426e8280d7bf60cbe177ff6ee518690a967fdde2beddb933"
+    "snapshots_sha256": "a068e8e2607926ba426e8280d7bf60cbe177ff6ee518690a967fdde2beddb933",
+    "real_data_clone_final_equivalence": {
+      "path": "build/verification/corrective-release/hosted-db-2026-10-21/clone-final-equivalence.json",
+      "sha256": "9E351A099F18037A81660E8D8D69C98AD92D6438607BD317B168A8DF08DBADEF",
+      "structural_exact": true
+    }
   },
   "checkpoint_count": {
     "total": 17,
@@ -214,10 +247,13 @@
     "prefix classification and partial resume from the 202610190001 prefix",
     "deliberate catalog-drift stop before 202610190002 and rollback of synthetic drift",
     "Base44 equivalence and weekly-guard reconciliation proposal only; no ledger repair",
-    "corrected attendance-preview no-DML and first-save assertions"
+    "corrected attendance-preview no-DML and first-save assertions",
+    "real-data clone of app.dump through all 16 forward migrations",
+    "hosted baseline inventory and exact structural comparison",
+    "production ledger repair, 16-migration apply, post-data/RLS/API verification"
   ],
   "backup_restore": {
-    "status": "BLOCKED",
+    "status": "PASS",
     "required": true,
     "checks": [
       "encrypted database backup",
@@ -225,7 +261,23 @@
       "isolated restore",
       "counts/constraints/links/object access",
       "retained digest and recovery procedure"
-    ]
+    ],
+    "plain_archive_sha256": "BED4AD3F3216F197D5B6B8BE3D57F39BA7DE8310BFDBA542BAE9F65AE991D29A",
+    "encrypted_archive_sha256": "D5CDA777E44A13D109052FFE846A2D50B36E08521C46FD33BE6AA0A3110513F8",
+    "encrypted_archive_bytes": 223056,
+    "decrypt_verified_sha256_match": true,
+    "isolated_restore": {
+      "database": "ministry_prodclone_20261021",
+      "restore_exit": 0,
+      "tables": 26,
+      "constraints": 171,
+      "counts_match": true,
+      "content_hashes_match_after_utc": true
+    },
+    "auth_users": 1,
+    "storage_buckets": 1,
+    "storage_objects": 0,
+    "passphrase_location": "separate owner-only directory; value not recorded"
   },
   "historical_snapshot_to_recheck": {
     "converts": 51,
@@ -234,12 +286,14 @@
     "admin_users": 1,
     "active_ministry_grants": 0,
     "current_academic_records": 0,
-    "authoritative_for_cutover": false
+    "authoritative_for_cutover": true,
+    "rechecked_at": "2026-10-22",
+    "post_migration_counts_equal": true
   },
   "compatibility": {
     "old_client_write_pause_required": true,
-    "status": "INCOMPLETE",
-    "write_pause_plan": "pause incompatible old-client writes before envelope changes; confirm by real operator sessions",
+    "status": "APPLIED_WITH_NO_ACTIVE_WRITES_OBSERVED",
+    "write_pause_plan": "no active writes were observed immediately before activation; old-client writes were effectively paused. An explicit real-operator session confirmation was not recorded.",
     "monitoring": [
       "authorization denials",
       "RPC/schema errors",
@@ -263,11 +317,11 @@
   },
   "android_artifact": {
     "status": "BLOCKED",
-    "reason": "Physical Android 14 target is connected over ADB, but no authorized APK, install or app-acceptance evidence exists."
+    "reason": "Debug APK built/installed/login-smoke passed on 2026-10-21; release signing, publication and full authenticated device acceptance remain blocked."
   },
   "effects": {
-    "migrations_applied": false,
-    "ledger_repaired": false
+    "migrations_applied": true,
+    "ledger_repaired": true
   },
   "historical_evidence": {
     "superseded_source_sha": "f2fffca489fd36f55957bba49736cb35dd31d5a6",
@@ -278,12 +332,64 @@
     "approval_transfer": "none; all 16 current migration hashes differ from the prior package. The f2fffca package and continuation-006 rehearsal remain historical evidence only."
   },
   "next_gates": [
-    "H1 encrypted database/Storage backup and isolated measured restore",
+    "independent review of this current-source package, migration bytes and production activation evidence",
+    "T11 live loopback Auth/PostgREST/Storage/Chromium journey; hosted API smoke does not replace it",
     "H3 legacy Firebase source export or verified absence plus stable-ID reconciliation",
-    "managed libpq service and authorized read-only catalog/ledger/function/policy/grant inventory",
-    "independent review of this current-source package and migration bytes",
-    "approved write-pause/compatibility plan before any hosted mutation",
-    "separate signed Android artifact and device acceptance gates"
+    "full Android authenticated acceptance on a real backend; debug login smoke is not sufficient",
+    "release signing/custody, release APK publication and production device acceptance",
+    "rotate previously exposed service-role/database credentials and record the result"
   ],
-  "hosted_activation": "UNAPPROVED"
+  "hosted_activation": "APPLIED_AND_VERIFIED",
+  "production_activation": {
+    "status": "APPLIED_AND_VERIFIED",
+    "performed_at": "2026-10-22",
+    "project_ref": "voqmtnqjrbugpazcimvh",
+    "ledger_rows_before": 18,
+    "ledger_rows_after": 36,
+    "ledger_last": "202610200006",
+    "baseline_ledger_rows_repaired": [
+      "202610180001",
+      "202610180002"
+    ],
+    "forward_migrations_applied": 16,
+    "errors": 0,
+    "preserved_counts": {
+      "public.converts": 51,
+      "public.congregations": 24,
+      "public.user_access": 30,
+      "private.congregation_week_guards": 40,
+      "public.weekly_reports": 10,
+      "public.convert_events": 15,
+      "private.base44_source_metadata": 127,
+      "private.base44_user_access_pending": 30,
+      "private.mutation_receipts": 6,
+      "public.profiles": 1
+    },
+    "new_ministry_people": 51,
+    "converts_with_person_id": 51,
+    "final_contract": {
+      "columns": 244,
+      "constraints": 187,
+      "indexes": 78,
+      "policies": 18,
+      "rls_tables": 27,
+      "structural_exact": true
+    },
+    "tables_without_rls": 0,
+    "anon_select_public_converts": false,
+    "postgrest_schema_reload": "NOTIFY pgrst, 'reload schema' succeeded",
+    "api_smoke": {
+      "auth_health": 200,
+      "rest_converts_anon": 401,
+      "rest_ministry_people_anon": 401,
+      "rest_ministry_sessions_anon": 401
+    },
+    "residual_drift": {
+      "functions_unchanged_by_migrations_but_different_from_synthetic_final": 10,
+      "grant_differences_only_extra_service_role": true,
+      "missing_expected_grants": 0
+    },
+    "evidence_path": "docs/verification/evidence/2026-10-22-production-activation-evidence.json",
+    "evidence_sha256": "864FA13C88A8E0870253FF5717376088AB0DA5DB1F080272779DF03A80996A31"
+  }
 }
