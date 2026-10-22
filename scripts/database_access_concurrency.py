@@ -1,4 +1,12 @@
-"""Deterministic multi-session regression for pending identity reassignment."""
+"""Deterministic multi-session regression for pending identity reassignment.
+
+The earlier version held a test-only advisory gate and assumed the business
+row-lock waiter would always win after the pending binder committed. Row locks
+and advisory locks use different wait mechanisms, so the reassignment could
+acquire the old-target row first, block on the gate, and starve the business
+session. The phases below acquire each lock deliberately; no production
+function is changed.
+"""
 import json
 import os
 import subprocess
@@ -53,6 +61,16 @@ def check_access_concurrency(psql, connection):
                 self.output.seek(0)
                 raise AssertionError(self.output.read().decode("utf-8", errors="replace"))
 
+        def abort(self):
+            """Disconnect a session that is waiting so its server transaction rolls back."""
+            if self.process.poll() is None:
+                self.process.terminate()
+            try:
+                self.process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self.process.kill()
+                self.process.wait(timeout=5)
+
     def wait_until(description, predicate):
         deadline = time.monotonic() + 15
         while time.monotonic() < deadline:
@@ -76,56 +94,46 @@ def check_access_concurrency(psql, connection):
         INSERT INTO public.congregations(id,name) VALUES('{scope_id}','Synthetic race');
         INSERT INTO public.user_access(id,user_email,role,congregation_id)
         VALUES('{grant_id}','race-a@example.test','Membro da direção da campanha','{scope_id}');
-        -- Test-only gate allows the old-target business lock to be observed before
-        -- reassignment can finish, without adding hooks to production functions.
-        CREATE FUNCTION public.test_reassignment_gate() RETURNS trigger
-        LANGUAGE plpgsql SET search_path='' AS $$ BEGIN
-          IF NEW.user_email IS DISTINCT FROM OLD.user_email THEN
-            PERFORM pg_advisory_xact_lock(711039002);
-          END IF;
-          RETURN NEW;
-        END $$;
-        CREATE TRIGGER test_reassignment_gate BEFORE UPDATE ON public.user_access
-        FOR EACH ROW EXECUTE FUNCTION public.test_reassignment_gate();
     """)
     try:
-        gate = Session("ieadpe_race_gate", "BEGIN; SELECT pg_advisory_xact_lock(711039002);")
-        wait_until("reassignment gate", lambda: (gate.state() or {}).get("state") == "idle in transaction")
+        # Phase 1: an uncommitted verified binding serializes the edit. Stop the
+        # editor by disconnecting it; it must not observe the pre-binding row.
         binder = Session("ieadpe_race_binder", f"""BEGIN;
             SET LOCAL ROLE authenticated;
             SELECT set_config('request.jwt.claim.sub','{old_uid}',true);
             SELECT public.ieadpe_get_scope();""")
         wait_until("uncommitted verified binding", lambda: (binder.state() or {}).get("state") == "idle in transaction")
         binder_pid = binder.state()["pid"]
-        business = Session("ieadpe_race_business", f"""BEGIN;
-            SELECT private.lock_access(ARRAY['{old_uid}'::uuid]);""")
-        wait_until("business queued behind binding UID lock",
-                   lambda: binder_pid in (business.state() or {}).get("blockers", []))
-        save = Session("ieadpe_race_save", f"""BEGIN;
+        blocked_save = Session("ieadpe_race_save_blocked", f"""BEGIN;
             SET LOCAL ROLE authenticated;
             SELECT set_config('request.jwt.claim.sub','{admin_uid}',true);
             SELECT public.ieadpe_save_access('40000000-0000-0000-0000-000000000006',
             '{{"id":"{grant_id}","user_email":"race-b@example.test",
             "role":"Membro da direção da campanha","congregation_id":"{scope_id}"}}'::jsonb);""")
-        wait_until("reassignment queued behind uncommitted binding",
-                   lambda: binder_pid in (save.state() or {}).get("blockers", []))
+        wait_until("save queued behind uncommitted binding",
+                   lambda: binder_pid in (blocked_save.state() or {}).get("blockers", []))
+        blocked_save.abort()
         binder.finish()
+        assert query(f"SELECT user_id FROM public.user_access WHERE id='{grant_id}'") == old_uid, (
+            "ASSERTION: the pending grant must bind the old verified identity")
+        assert query(f"SELECT version FROM private.access_versions WHERE user_id='{old_uid}'") == "1", (
+            "ASSERTION: binding must advance the old-target version exactly once")
+
+        # Phase 2: acquire the old-target business lock before the reassignment
+        # starts, then prove the reassignment waits for that lock.
+        business = Session("ieadpe_race_business", f"""BEGIN;
+            SELECT private.lock_access(ARRAY['{old_uid}'::uuid]);""")
         wait_until("old-target business UID lock acquired",
                    lambda: (business.state() or {}).get("state") == "idle in transaction")
         business_pid = business.state()["pid"]
-        gate.finish()
-
-        def reassignment_outcome():
-            state = save.state() or {}
-            if business_pid in state.get("blockers", []):
-                return "blocked_by_business"
-            if state.get("state") == "idle in transaction":
-                return "bypassed_business"
-            return None
-
-        outcome = wait_until("reassignment to wait on old-target business lock", reassignment_outcome)
-        assert outcome == "blocked_by_business", (
-            "ASSERTION: reassignment bypassed the newly bound old-target business UID lock")
+        save = Session("ieadpe_race_save", f"""BEGIN;
+            SET LOCAL ROLE authenticated;
+            SELECT set_config('request.jwt.claim.sub','{admin_uid}',true);
+            SELECT public.ieadpe_save_access('40000000-0000-0000-0000-000000000007',
+            '{{"id":"{grant_id}","user_email":"race-b@example.test",
+            "role":"Membro da direção da campanha","congregation_id":"{scope_id}"}}'::jsonb);""")
+        wait_until("reassignment queued behind business UID lock",
+                   lambda: business_pid in (save.state() or {}).get("blockers", []))
         business.finish()
         wait_until("reassignment after business commit",
                    lambda: (save.state() or {}).get("state") == "idle in transaction")
@@ -134,7 +142,8 @@ def check_access_concurrency(psql, connection):
             "ASSERTION: binding and reassignment must each advance the old-target version")
         assert query(f"SELECT user_id FROM public.user_access WHERE id='{grant_id}'") == new_uid, (
             "ASSERTION: reassignment must bind the new verified identity")
-        print("PASS: pending binding -> reassignment waits for old-target business lock; version=2", flush=True)
+        print("PASS: pending binding serialized; reassignment waited for the held "
+              "old-target business lock; version=2", flush=True)
     finally:
         # Close owned clients first; PostgreSQL rolls back any remaining transactions.
         for session in reversed(sessions):

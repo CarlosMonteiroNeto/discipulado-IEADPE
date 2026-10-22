@@ -919,7 +919,7 @@
     "director_ruling_2026_10_21": "Consolidated current authority supersedes older planning-only/Git/read prohibitions: native bounded local Web/Android work; hosted project reads and local commits/merges authorized. Push, hosted mutations/migrations, APK builds, key/signing changes and publication require separate gates/approval.",
     "markdown_owner": "2026-10-20-ministry-corrective-release-plan.md#2026-10-21-web-and-android-functional-acceptance-amendment",
     "linux_acceptance": "NOT EXECUTED / DEFERRED BY USER; do not claim T09/T10 ordinary acceptance or original-plan completion.",
-    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (14:34), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. Historical 528/529 disposition, T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
+    "current_evidence": "Pinned Flutter 3.47.7/Dart 3.13.5: full suite 548/548 passed (12:33 after the access-lock harness correction), analyzer/web build/static preflight pass. The 24 Linux-generated B2 golden promotions were reverted to pre-B2 Windows baselines, each byte-identical to a fresh pinned-Windows capture at 360/768/1440 and 200% text. The historical 528/529 timeout is root-caused as a test-harness cross-lock wake race, not a product lock bypass; the deterministic two-phase harness passes 32/32 direct and 6/6 focused runs. T11 actual journey and Android acceptance remain open. See current local report and final-local-candidate-manifest.json; no runtime claim follows from static Web gates.",
     "ordered_existing_units": [
       "L0: review 360px Team/gallery differences and retained 528/529 root-cause disposition; fix evidenced defects or obtain reviewed visual disposition; rerun affected and required assembled pinned gates on one candidate.",
       "B0/D0: audit current SDK/JDK/Gradle/licenses/ADB/targets/browser/callback/package/version/certificate readiness without building an APK; prepare G3 signing/custody/update-policy diff for separate approval.",
@@ -1058,7 +1058,7 @@
       {
         "unit": "L0",
         "status": "FAIL",
-        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines. Historical 528/529 unresolved; T11 live stack/browser and Android app acceptance open.",
+        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines; 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and Android app acceptance open.",
         "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; local report 2026-10-21 L0 golden correction"
       },
       {
@@ -1164,7 +1164,7 @@
         ],
         "steps": [
           "Inspect retained expected/actual/diff images under pinned SDK/fonts. Investigate glyph/icon differences; source-bound 360px disposition does not pass failing tests. Execute 360/768/1440 and 200% text even when first golden assertion stops its loop, using a bounded test-structure correction if needed; preserve all assertions and review each capture. No blind update-goldens/tolerance change.",
-          "Inspect original 528/529 lock failure and isolated-pass logs; bind a fresh reproduction to an owned disposable PostgreSQL target. Trace lock ordering and compare working race paths before changing code/test; missing owned DB is BLOCKED. Do not reopen approved unrelated features."
+          "Completed 2026-10-21: inspected the original 528/529 failure against the owned disposable loopback PostgreSQL. The timeout is a test-harness cross-lock wake race, not a product lock bypass: the old test-only gate could let the reassignment acquire the old-target row first and starve the business session. The harness now sequences pending-binding serialization and the held old-target business lock in two deterministic phases. Evidence: 32/32 direct runs, 6/6 focused and 548/548 full suite; no product SQL, skip, or assertion relaxation."
         ],
         "review": "Sol inspects visual artifacts at all required sizes and semantic race assertions; any baseline promotion needs actual comparison and explicit disposition.",
         "expected": "Failing golden/race causes resolved with evidence; unchanged historical failures retain explicit disposition, no waiver."
