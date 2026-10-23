@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../ui/br_input.dart';
+import '../../ui/form_fields.dart';
+
 /// Shared input controls for the canonical person identity.
 ///
 /// The owner supplies controllers so the same fields can be embedded in convert
@@ -41,19 +44,14 @@ class PersonFields extends StatelessWidget {
     int? maxLength,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: TextFormField(
-      key: ValueKey(key),
+    child: AppTextFormField(
+      fieldKey: ValueKey(key),
       controller: controller,
+      label: label,
       enabled: enabled,
       keyboardType: keyboard,
       validator: validator,
       maxLength: maxLength,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: const OutlineInputBorder(),
-      ),
     ),
   );
 
@@ -63,18 +61,25 @@ class PersonFields extends StatelessWidget {
     mainAxisSize: MainAxisSize.min,
     children: [
       _field('person-name', 'Nome *', name, validator: nameValidator),
-      _field(
-        'person-phone',
-        'Telefone (opcional)',
-        phone,
-        keyboard: TextInputType.phone,
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: BrPhoneField(
+          fieldKey: const ValueKey('person-phone'),
+          controller: phone,
+          enabled: enabled,
+        ),
       ),
-      _field(
-        'person-birth-date',
-        'Data de nascimento (aaaa-mm-dd)',
-        birthDate,
-        keyboard: TextInputType.datetime,
-        validator: birthDateValidator,
+      Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: BrDateField(
+          fieldKey: const ValueKey('person-birth-date'),
+          controller: birthDate,
+          label: 'Data de nascimento',
+          enabled: enabled,
+          allowClear: true,
+          validator:
+              birthDateValidator ?? (value) => brDateValidationError(value),
+        ),
       ),
       _field('person-address-street', 'Logradouro', street),
       _field('person-address-district', 'Bairro', district),

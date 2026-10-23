@@ -491,8 +491,8 @@ class _ConvertHandoffPageState extends State<ConvertHandoffPage> {
         Padding(
           padding: const EdgeInsets.only(bottom: 4),
           child: Base44PageHeading(
-            title: 'Novos convertidos',
-            icon: Icons.people_outline,
+            title: 'Encaminhamentos',
+            icon: Icons.move_to_inbox_outlined,
           ),
         ),
         for (final item in _referrals)

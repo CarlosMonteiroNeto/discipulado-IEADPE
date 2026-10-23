@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
 import '../../../ui/base44_widgets.dart';
+import '../../../ui/br_input.dart';
+import '../../../ui/form_fields.dart';
 import '../../people/person_fields.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
@@ -121,9 +123,10 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
 
   void _hydrate(MinistryStudentDetail student, MinistryPerson? person) {
     _name.text = person?.name ?? student.name;
-    _phone.text = person?.phone ?? student.phoneE164 ?? '';
-    _birthDate.text =
-        person?.birthDate?.toString() ?? student.birthDate?.toString() ?? '';
+    _phone.text = brPhoneDisplay(person?.phone ?? student.phoneE164);
+    _birthDate.text = brDateDisplay(
+      person?.birthDate?.toString() ?? student.birthDate?.toString(),
+    );
     final address = person?.address ?? student.address;
     _street.text = address?.street ?? '';
     _district.text = address?.district ?? '';
@@ -190,13 +193,8 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
       controller.text.trim().isEmpty ? null : controller.text.trim();
 
   CalendarDate? _date() {
-    final text = _birthDate.text.trim();
-    if (text.isEmpty) return null;
-    try {
-      return CalendarDate.parse(text);
-    } on MinistryDataException {
-      return null;
-    }
+    final date = parseDateInput(_birthDate.text);
+    return date == null ? null : CalendarDate(date.year, date.month, date.day);
   }
 
   Address? _address() {
@@ -228,7 +226,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     if (!_personForm.currentState!.validate()) return;
     final draft = MinistryPersonDraft(
       name: _name.text.trim(),
-      phone: _optional(_phone),
+      phone: resolveBrPhone(_phone.text, person.phone ?? student.phoneE164),
       birthDate: _date(),
       address: _address(),
     );
@@ -435,10 +433,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
                 }
                 return null;
               },
-              birthDateValidator: (value) =>
-                  value == null || value.trim().isEmpty || _date() != null
-                  ? null
-                  : 'Informe uma data válida (aaaa-mm-dd)',
+              birthDateValidator: brDateValidationError,
             ),
             if (_person != null)
               Align(
@@ -470,18 +465,18 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 12),
-          TextFormField(
-            key: const ValueKey('student-detail-education'),
+          AppTextFormField(
+            fieldKey: const ValueKey('student-detail-education'),
             controller: _education,
             enabled: _canEdit && !_busy,
-            decoration: const InputDecoration(labelText: 'Escolaridade'),
+            label: 'Escolaridade',
           ),
           const SizedBox(height: 16),
-          TextFormField(
-            key: const ValueKey('student-detail-marital-status'),
+          AppTextFormField(
+            fieldKey: const ValueKey('student-detail-marital-status'),
             controller: _maritalStatus,
             enabled: _canEdit && !_busy,
-            decoration: const InputDecoration(labelText: 'Estado civil'),
+            label: 'Estado civil',
           ),
           const SizedBox(height: 16),
           _answerField(

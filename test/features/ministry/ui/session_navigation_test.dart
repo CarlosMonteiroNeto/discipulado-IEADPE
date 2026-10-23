@@ -20,6 +20,8 @@ import 'package:ieadpe_converts/features/ministry/ui/session_form.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_list.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
 
+import '../../../support/date_picker.dart';
+
 const congregationId = '33333333-3333-4333-8333-333333333333';
 const classAId = '22222222-2222-4222-8222-222222222222';
 const classBId = '99999999-9999-4999-8999-999999999997';
@@ -452,7 +454,7 @@ void main() {
     await _drain(tester);
     await tester.pump(const Duration(milliseconds: 500));
     expect(find.byType(SessionForm), findsOneWidget);
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.enterText(
       find.byKey(const Key('session-topic')),
       'Lição futura',
@@ -623,7 +625,7 @@ void main() {
     await tester.tap(find.text('Nova aula'));
     await _drain(tester);
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await _drain(tester);
     expect(fixture.commandCalls, hasLength(1));

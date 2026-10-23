@@ -1091,7 +1091,10 @@ void main() {
         findsOneWidget,
       );
       final dateField = tester.widget<TextField>(
-        find.byKey(const Key('session-date')),
+        find.descendant(
+          of: find.byKey(const Key('session-date')),
+          matching: find.byType(TextField),
+        ),
       );
       expect(dateField.controller!.text, '20/12/2026');
       expect(dateField.readOnly, isTrue);

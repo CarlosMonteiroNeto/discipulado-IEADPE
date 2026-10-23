@@ -9,6 +9,8 @@ import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart'
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/features/ministry/ui/session_list.dart';
 
+import '../../../support/date_picker.dart';
+
 const congregationId = '33333333-3333-4333-8333-333333333333';
 const classAId = '22222222-2222-4222-8222-222222222222';
 const classBId = '99999999-9999-4999-8999-999999999997';
@@ -254,7 +256,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls.single.payload['class_id'], classAId);
@@ -272,7 +274,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls.single.payload['class_id'], classBId);
@@ -284,7 +286,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.pumpWidget(const SizedBox());
@@ -310,7 +312,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, isEmpty);
@@ -359,7 +361,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('retry-pending-session-create')));
@@ -660,12 +662,12 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '21/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 21));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, hasLength(1));
@@ -686,10 +688,10 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Nova aula'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '20/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 20));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('session-date')), '21/12/2026');
+    await pickDate(tester, const Key('session-date'), DateTime(2026, 12, 21));
     await tester.tap(find.text('Salvar'));
     await tester.pumpAndSettle();
     expect(gateway.createCalls, hasLength(2));

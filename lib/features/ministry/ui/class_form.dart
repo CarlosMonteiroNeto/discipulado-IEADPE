@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
 import '../../../ui/base44_widgets.dart';
+import '../../../ui/br_input.dart';
+import '../../../ui/form_fields.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 import '../data/ministry_codec.dart';
@@ -63,8 +65,8 @@ class _ClassFormState extends State<ClassForm> {
     final initial = widget.initialClass;
     _classId = initial?.id ?? _uuid.v4();
     _name.text = initial?.name ?? '';
-    _startDate.text = initial?.startDate ?? '';
-    _endDate.text = initial?.endDate ?? '';
+    _startDate.text = brDateDisplay(initial?.startDate);
+    _endDate.text = brDateDisplay(initial?.endDate);
     _teacherChoice = initial?.teacherContactId ?? _noTeacher;
     _loadTeachers();
   }
@@ -141,48 +143,33 @@ class _ClassFormState extends State<ClassForm> {
   }
 
   CalendarDate? _parseDate(TextEditingController controller) {
-    final value = controller.text.trim();
-    if (value.isEmpty) return null;
-    try {
-      return CalendarDate.parse(value);
-    } on MinistryDataException {
-      return null;
-    }
+    final value = parseDateInput(controller.text);
+    return value == null
+        ? null
+        : CalendarDate(value.year, value.month, value.day);
   }
 
   String? _requiredDate(String? value) {
     if (value == null || value.trim().isEmpty) {
       return 'Informe a data de início.';
     }
-    try {
-      CalendarDate.parse(value.trim());
-      return null;
-    } on MinistryDataException {
-      return 'Use o formato AAAA-MM-DD.';
-    }
+    return brDateValidationError(value);
   }
 
-  String? _optionalDate(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    try {
-      CalendarDate.parse(value.trim());
-      return null;
-    } on MinistryDataException {
-      return 'Use o formato AAAA-MM-DD.';
-    }
+  String? _optionalEndDate(String? value) {
+    final invalid = brDateValidationError(value);
+    if (invalid != null) return invalid;
+    final end = _parseDate(_endDate);
+    final start = _parseDate(_startDate);
+    return end != null && start != null && end.compareTo(start) < 0
+        ? 'A data de término deve ser igual ou posterior à data de início.'
+        : null;
   }
 
   Future<void> _save() async {
     if (_busy || !_editable || !_form.currentState!.validate()) return;
     final start = _parseDate(_startDate)!;
     final end = _parseDate(_endDate);
-    if (end != null && end.compareTo(start) < 0) {
-      setState(
-        () => _error =
-            'A data de término deve ser igual ou posterior à data de início.',
-      );
-      return;
-    }
     final teacherId = _teacherChoice == _noTeacher ? null : _teacherChoice;
     final name = _name.text.trim();
     final signature = jsonEncode({
@@ -411,40 +398,23 @@ class _ClassFormState extends State<ClassForm> {
                           ),
                         ],
                         const SizedBox(height: UnifiedSpace.fieldGap),
-                        TextFormField(
-                          key: const Key('class-start-date'),
+                        BrDateField(
+                          fieldKey: const Key('class-start-date'),
                           controller: _startDate,
+                          label: 'Data de início',
+                          helperText: 'Selecione no calendário',
                           enabled: _fieldsEnabled,
-                          keyboardType: TextInputType.datetime,
-                          decoration: const InputDecoration(
-                            labelText: 'Data de início',
-                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                            hintText: 'AAAA-MM-DD',
-                            prefixIcon: Icon(Icons.calendar_today_outlined),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: UnifiedSpace.x4,
-                              vertical: UnifiedSpace.x4,
-                            ),
-                          ),
                           validator: _requiredDate,
                         ),
                         const SizedBox(height: UnifiedSpace.fieldGap),
-                        TextFormField(
-                          key: const Key('class-end-date'),
+                        BrDateField(
+                          fieldKey: const Key('class-end-date'),
                           controller: _endDate,
+                          label: 'Data de término',
+                          helperText: 'Opcional · selecione no calendário',
                           enabled: _fieldsEnabled,
-                          keyboardType: TextInputType.datetime,
-                          decoration: const InputDecoration(
-                            labelText: 'Data de término',
-                            floatingLabelBehavior: FloatingLabelBehavior.always,
-                            hintText: 'AAAA-MM-DD',
-                            prefixIcon: Icon(Icons.event_available_outlined),
-                            contentPadding: EdgeInsets.symmetric(
-                              horizontal: UnifiedSpace.x4,
-                              vertical: UnifiedSpace.x4,
-                            ),
-                          ),
-                          validator: _optionalDate,
+                          allowClear: true,
+                          validator: _optionalEndDate,
                         ),
                         if (_error != null) ...[
                           const SizedBox(height: UnifiedSpace.x2),

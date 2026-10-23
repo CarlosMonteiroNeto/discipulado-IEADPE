@@ -8,6 +8,8 @@ import '../data/ministry_codec.dart';
 import 'package:flutter/material.dart';
 
 import '../../../ui/base44_widgets.dart';
+import '../../../ui/br_input.dart';
+import '../../../ui/form_fields.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_browser_repository.dart';
 import '../domain/ministry_models.dart';
@@ -119,7 +121,11 @@ class _StudentsPageState extends State<StudentsPage> {
                     FilledButton.icon(
                       onPressed: widget.onOpenHandoff,
                       icon: const Icon(Icons.move_to_inbox_outlined),
-                      label: const Text('Revisar novos convertidos'),
+                      label: const Text('Encaminhamentos'),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Convertidos que ainda não têm aluno vinculado.',
                     ),
                     if (widget.onRegister != null) ...[
                       const SizedBox(height: 8),
@@ -388,12 +394,8 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
       controller.text.trim().isEmpty ? null : controller.text.trim();
 
   DateOnly? _date() {
-    if (_birthDate.text.trim().isEmpty) return null;
-    try {
-      return DateOnly.parse(_birthDate.text.trim());
-    } catch (_) {
-      return null;
-    }
+    final date = parseDateInput(_birthDate.text);
+    return date == null ? null : DateOnly(date.year, date.month, date.day);
   }
 
   Future<void> _submit() async {
@@ -424,7 +426,7 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
           );
     final person = MinistryPersonDraft(
       name: _name.text.trim(),
-      phone: _optional(_phone),
+      phone: resolveBrPhone(_phone.text, null),
       birthDate: date == null
           ? null
           : CalendarDate(date.year, date.month, date.day),
@@ -485,16 +487,11 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
     TextEditingController controller,
   ) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: TextFormField(
-      key: ValueKey(key),
+    child: AppTextFormField(
+      fieldKey: ValueKey(key),
       controller: controller,
       enabled: !_busy,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: const OutlineInputBorder(),
-      ),
+      label: label,
     ),
   );
 
@@ -559,12 +556,7 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
                           }
                           return null;
                         },
-                        birthDateValidator: (value) =>
-                            value == null ||
-                                value.trim().isEmpty ||
-                                _date() != null
-                            ? null
-                            : 'Informe uma data válida (aaaa-mm-dd)',
+                        birthDateValidator: brDateValidationError,
                       ),
                       _academicTextField(
                         'student-education',

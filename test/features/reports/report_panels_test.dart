@@ -8,6 +8,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/platform/file_exporter.dart';
 import 'package:ieadpe_converts/features/reports/events_panel.dart';
+
+import '../../support/date_picker.dart';
+
 import 'package:ieadpe_converts/features/reports/conversion_panel.dart';
 import 'package:ieadpe_converts/features/reports/reports_repository.dart';
 
@@ -211,8 +214,16 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, '2026-10-01');
-      await tester.enterText(find.byType(TextField).last, '2026-10-31');
+      await pickDate(
+        tester,
+        const Key('report-start-date'),
+        DateTime(2026, 10, 1),
+      );
+      await pickDate(
+        tester,
+        const Key('report-end-date'),
+        DateTime(2026, 10, 31),
+      );
       await tester.tap(find.text('Aplicar'));
       await tester.pumpAndSettle();
       expect(find.text('2 evento(s) encontrado(s)'), findsOneWidget);
@@ -238,7 +249,11 @@ void main() {
         'ação@example.test',
       ]);
       expect(find.text('Salvamento cancelado.'), findsOneWidget);
-      await tester.enterText(find.byType(TextField).first, '2026-10-31');
+      await pickDate(
+        tester,
+        const Key('report-start-date'),
+        DateTime(2026, 10, 31),
+      );
       await tester.pump();
       expect(find.text('Exportar XLSX'), findsNothing);
       expect(saver.bytes!.every((b) => b == 0), isTrue);
@@ -396,32 +411,30 @@ void main() {
       expect(find.text('Arquivo salvo no local escolhido.'), findsOneWidget);
     },
   );
-  testWidgets(
-    'invalid or reversed dates require correction and cannot export',
-    (tester) async {
-      await tester.pumpWidget(
-        host(
-          EventsPanel(
-            repository: ReportsRepository(PanelGateway()),
-            exporter: Saver(),
-            onScopeRefresh: () async {},
-          ),
+  testWidgets('reversed dates require correction and cannot export', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      host(
+        EventsPanel(
+          repository: ReportsRepository(PanelGateway()),
+          exporter: Saver(),
+          onScopeRefresh: () async {},
         ),
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).first, '2026-02-30');
-      await tester.tap(find.text('Aplicar'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Confira as datas'), findsOneWidget);
-      expect(find.text('Exportar XLSX'), findsNothing);
-      await tester.enterText(find.byType(TextField).first, '2026-11-01');
-      await tester.enterText(find.byType(TextField).last, '2026-10-01');
-      await tester.tap(find.text('Aplicar'));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('Confira as datas'), findsOneWidget);
-      expect(find.text('Exportar XLSX'), findsNothing);
-    },
-  );
+      ),
+    );
+    await tester.pumpAndSettle();
+    await pickDate(
+      tester,
+      const Key('report-start-date'),
+      DateTime(2026, 11, 1),
+    );
+    await pickDate(tester, const Key('report-end-date'), DateTime(2026, 10, 1));
+    await tester.tap(find.text('Aplicar'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('Confira as datas'), findsOneWidget);
+    expect(find.text('Exportar XLSX'), findsNothing);
+  });
   testWidgets(
     'all 1205 traversed events remain displayed and exported without a cap',
     (tester) async {

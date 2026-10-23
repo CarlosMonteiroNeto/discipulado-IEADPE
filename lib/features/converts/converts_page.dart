@@ -255,7 +255,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Base44PageHeading(
-          title: 'Novos Convertidos',
+          title: 'Convertidos',
           icon: Icons.people_outline,
           subtitle: _loading
               ? 'Carregando convertidos…'

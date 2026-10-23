@@ -7,6 +7,8 @@ import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
 import '../../domain/worship_types.dart';
 import '../../data/supabase_gateway.dart';
+import '../../ui/br_input.dart';
+import '../../ui/form_fields.dart';
 import '../../ui/unified_theme.dart';
 import '../people/person_fields.dart';
 
@@ -141,11 +143,17 @@ class _ConvertFormState extends State<ConvertForm> {
     );
     _landmark = TextEditingController(text: i?.landmark);
     _phone = TextEditingController(
-      text: identity?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
+      text: brPhoneDisplay(
+        identity?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
+      ),
     );
-    _birthDate = TextEditingController(text: identity?.birthDate?.toString());
+    _birthDate = TextEditingController(
+      text: brDateDisplay(identity?.birthDate?.toString()),
+    );
     _age = TextEditingController(text: i?.age?.toString());
-    _date = TextEditingController(text: i?.conversionDate.toString());
+    _date = TextEditingController(
+      text: brDateDisplay(i?.conversionDate.toString()),
+    );
     _congregation = i?.congregationId;
     _worship = i?.worshipType;
     _gender = i?.gender;
@@ -214,20 +222,13 @@ class _ConvertFormState extends State<ConvertForm> {
   }
 
   DateOnly? _parsedDate() {
-    try {
-      return DateOnly.parse(_date.text);
-    } catch (_) {
-      return null;
-    }
+    final date = parseDateInput(_date.text);
+    return date == null ? null : DateOnly(date.year, date.month, date.day);
   }
 
   DateOnly? _parsedBirthDate() {
-    if (_birthDate.text.trim().isEmpty) return null;
-    try {
-      return DateOnly.parse(_birthDate.text.trim());
-    } catch (_) {
-      return null;
-    }
+    final date = parseDateInput(_birthDate.text);
+    return date == null ? null : DateOnly(date.year, date.month, date.day);
   }
 
   Future<void> _submit() async {
@@ -241,6 +242,7 @@ class _ConvertFormState extends State<ConvertForm> {
     final oldPerson = i?.personIdentity;
     final oldAddress = oldPerson?.address;
     final oldName = oldPerson?.name ?? i?.name;
+    final oldPhone = oldPerson?.phone ?? i?.legacyIdentity?.phone ?? i?.phone;
     final oldAddressStreet = oldPerson == null
         ? i?.legacyIdentity?.address ?? i?.address
         : oldAddress?['street'] as String?;
@@ -262,11 +264,8 @@ class _ConvertFormState extends State<ConvertForm> {
       conversionDate: _parsedDate()!,
       worshipType: _worship!,
       address: optional(_address, oldAddressStreet),
-      phone: optional(
-        _phone,
-        oldPerson?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
-      ),
-      birthDate: _birthDate.text.trim().isEmpty ? null : _parsedBirthDate(),
+      phone: resolveBrPhone(_phone.text, oldPhone),
+      birthDate: _parsedBirthDate(),
       personAddress: {
         'street': optional(_address, oldAddressStreet),
         'district': optional(_district, oldAddress?['district'] as String?),
@@ -313,19 +312,14 @@ class _ConvertFormState extends State<ConvertForm> {
     TextInputType? keyboard,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
-    child: TextFormField(
-      key: ValueKey(key),
+    child: AppTextFormField(
+      fieldKey: ValueKey(key),
       controller: c,
       readOnly: _busy,
       keyboardType: keyboard,
       validator: validator,
-      decoration: InputDecoration(
-        labelText: label,
-        filled: true,
-        fillColor: Colors.white,
-        border: const OutlineInputBorder(),
-      ),
       onChanged: (_) => setState(() {}),
+      label: label,
     ),
   );
   @override
@@ -467,12 +461,7 @@ class _ConvertFormState extends State<ConvertForm> {
                     }
                     return null;
                   },
-                  birthDateValidator: (value) {
-                    if (value == null || value.trim().isEmpty) return null;
-                    return _parsedBirthDate() == null
-                        ? 'Informe uma data válida (aaaa-mm-dd)'
-                        : null;
-                  },
+                  birthDateValidator: brDateValidationError,
                 ),
                 _field(
                   'landmark',
@@ -513,17 +502,22 @@ class _ConvertFormState extends State<ConvertForm> {
                   validator: (v) => v == null ? 'Gênero é obrigatório' : null,
                 ),
                 const SizedBox(height: 16),
-                _field(
-                  'conversion_date',
-                  'Data de conversão * (aaaa-mm-dd)',
-                  _date,
-                  keyboard: TextInputType.datetime,
-                  validator: (v) {
-                    final d = _parsedDate();
-                    if (d == null) {
-                      return 'Informe uma data válida (aaaa-mm-dd)';
-                    }
-                    return d.compareTo(BusinessCalendar().today(widget.now())) >
+                BrDateField(
+                  fieldKey: const ValueKey('conversion_date'),
+                  controller: _date,
+                  label: 'Data de conversão *',
+                  enabled: !_busy,
+                  validator: (value) {
+                    final invalid = brDateValidationError(
+                      value,
+                      required: true,
+                    );
+                    if (invalid != null) return invalid;
+                    final date = _parsedDate();
+                    if (date == null) return 'Informe uma data válida.';
+                    return date.compareTo(
+                              BusinessCalendar().today(widget.now()),
+                            ) >
                             0
                         ? 'A data não pode ser futura'
                         : null;

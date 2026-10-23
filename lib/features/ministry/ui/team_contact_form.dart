@@ -6,6 +6,8 @@ import '../../../data/access_repository.dart';
 import '../../../data/supabase_gateway.dart';
 import '../../../domain/models.dart' show AccessRole;
 import '../../../ui/base44_widgets.dart';
+import '../../../ui/br_input.dart';
+import '../../../ui/form_fields.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
@@ -94,9 +96,9 @@ class _TeamContactFormState extends State<TeamContactForm> {
     super.initState();
     _contactId = _contact?.id ?? widget.createId();
     _name = TextEditingController(text: _contact?.name ?? '');
-    _phone = TextEditingController(text: _contact?.phoneE164 ?? '');
+    _phone = TextEditingController(text: brPhoneDisplay(_contact?.phoneE164));
     _birthDate = TextEditingController(
-      text: _contact?.birthDate?.toString() ?? '',
+      text: brDateDisplay(_contact?.birthDate?.toString()),
     );
     _email = TextEditingController(text: _contact?.email ?? '');
     _roleCode = _contact?.roleCode;
@@ -115,13 +117,10 @@ class _TeamContactFormState extends State<TeamContactForm> {
   }
 
   CalendarDate? _parsedBirthDate() {
-    final value = _birthDate.text.trim();
-    if (value.isEmpty) return null;
-    try {
-      return CalendarDate.parse(value);
-    } on MinistryDataException {
-      return null;
-    }
+    final value = parseDateInput(_birthDate.text);
+    return value == null
+        ? null
+        : CalendarDate(value.year, value.month, value.day);
   }
 
   List<MinistryDirectoryEntry> get _replacementCandidates => _roleCode == null
@@ -242,7 +241,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
     }
 
     final name = _name.text.trim();
-    final phone = _phone.text.trim().isEmpty ? null : _phone.text.trim();
+    final phone = resolveBrPhone(_phone.text, _contact?.phoneE164);
     final birthDate = _parsedBirthDate();
     final emailText = _email.text.trim();
     final email = emailText.isEmpty ? null : emailText.toLowerCase();
@@ -633,40 +632,22 @@ class _TeamContactFormState extends State<TeamContactForm> {
                     ),
                 ],
                 const SizedBox(height: UnifiedSpace.x2),
-                TextFormField(
-                  key: const ValueKey('team-contact-phone'),
+                BrPhoneField(
+                  fieldKey: const ValueKey('team-contact-phone'),
                   controller: _phone,
+                  label: 'Telefone',
+                  helperText: 'Opcional · 11 dígitos com DDD',
                   enabled: _canEditFields,
-                  keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(
-                    labelText: 'Telefone',
-                    helperText: 'Opcional',
-                  ),
-                  validator: (value) {
-                    final phone = value?.trim() ?? '';
-                    if (phone.isNotEmpty &&
-                        !RegExp(r'^\+[1-9][0-9]{1,14}$').hasMatch(phone)) {
-                      return 'Use o formato internacional, por exemplo +5511999990000.';
-                    }
-                    return null;
-                  },
                 ),
                 const SizedBox(height: UnifiedSpace.x2),
-                TextFormField(
-                  key: const ValueKey('team-contact-birth-date'),
+                BrDateField(
+                  fieldKey: const ValueKey('team-contact-birth-date'),
                   controller: _birthDate,
+                  label: 'Nascimento',
+                  helperText: 'Opcional · selecione no calendário',
                   enabled: _canEditFields,
-                  keyboardType: TextInputType.datetime,
-                  decoration: const InputDecoration(
-                    labelText: 'Nascimento',
-                    helperText: 'aaaa-mm-dd',
-                  ),
-                  validator: (value) =>
-                      value == null ||
-                          value.trim().isEmpty ||
-                          _parsedBirthDate() != null
-                      ? null
-                      : 'Informe uma data válida (aaaa-mm-dd).',
+                  allowClear: true,
+                  validator: brDateValidationError,
                 ),
                 if (widget.canManageAccess) ...[
                   const SizedBox(height: UnifiedSpace.sectionGap),

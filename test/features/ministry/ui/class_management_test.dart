@@ -11,6 +11,9 @@ import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart'
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/features/ministry/ui/class_detail_page.dart';
 import 'package:ieadpe_converts/features/ministry/ui/class_form.dart';
+
+import '../../../support/date_picker.dart';
+
 import 'package:ieadpe_converts/features/ministry/ui/classes_page.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
 
@@ -405,13 +408,15 @@ void main() {
         find.byKey(const Key('class-name')),
         'Fundamentos',
       );
-      await tester.enterText(
-        find.byKey(const Key('class-start-date')),
-        '2026-10-01',
+      await pickDate(
+        tester,
+        const Key('class-start-date'),
+        DateTime(2026, 10, 1),
       );
-      await tester.enterText(
-        find.byKey(const Key('class-end-date')),
-        '2026-09-30',
+      await pickDate(
+        tester,
+        const Key('class-end-date'),
+        DateTime(2026, 9, 30),
       );
       await tester.tap(find.text('Salvar turma'));
       await tester.pumpAndSettle();
@@ -423,9 +428,10 @@ void main() {
         findsOneWidget,
       );
 
-      await tester.enterText(
-        find.byKey(const Key('class-end-date')),
-        '2026-12-31',
+      await pickDate(
+        tester,
+        const Key('class-end-date'),
+        DateTime(2026, 12, 31),
       );
       await tester.tap(find.text('Salvar turma'));
       await tester.pumpAndSettle();
@@ -476,9 +482,10 @@ void main() {
       await tester.tap(find.byKey(const Key('open-class-form')));
       await tester.pumpAndSettle();
       await tester.enterText(find.byKey(const Key('class-name')), 'Original');
-      await tester.enterText(
-        find.byKey(const Key('class-start-date')),
-        '2026-10-01',
+      await pickDate(
+        tester,
+        const Key('class-start-date'),
+        DateTime(2026, 10, 1),
       );
       await tester.tap(find.text('Salvar turma'));
       await tester.pumpAndSettle();

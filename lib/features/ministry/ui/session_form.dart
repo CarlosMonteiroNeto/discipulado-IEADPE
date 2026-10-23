@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
+import '../../../ui/br_input.dart';
+import '../../../ui/form_fields.dart';
 import '../data/ministry_browser_repository.dart';
 import '../data/ministry_codec.dart';
 import '../data/ministry_repository.dart';
@@ -41,6 +43,7 @@ class SessionForm extends StatefulWidget {
 
 class _SessionFormState extends State<SessionForm> {
   final _uuid = const Uuid();
+  final _form = GlobalKey<FormState>();
   late final TextEditingController _date;
   final _topic = TextEditingController();
   _PendingCreate? _pending;
@@ -51,7 +54,7 @@ class _SessionFormState extends State<SessionForm> {
   void initState() {
     super.initState();
     _date = TextEditingController(
-      text: widget.initialDate == null ? '' : _displayDate(widget.initialDate!),
+      text: brDateDisplay(widget.initialDate?.toString()),
     );
   }
 
@@ -63,22 +66,12 @@ class _SessionFormState extends State<SessionForm> {
   }
 
   CalendarDate? _parseDate(String value) {
-    final text = value.trim();
-    try {
-      return CalendarDate.parse(
-        text.contains('/') ? text.split('/').reversed.join('-') : text,
-      );
-    } catch (_) {
-      return null;
-    }
+    final date = parseDateInput(value);
+    return date == null ? null : CalendarDate(date.year, date.month, date.day);
   }
 
-  String _displayDate(CalendarDate date) =>
-      '${date.day.toString().padLeft(2, '0')}/'
-      '${date.month.toString().padLeft(2, '0')}/${date.year}';
-
   Future<void> _save() async {
-    if (_busy) return;
+    if (_busy || !(_form.currentState?.validate() ?? false)) return;
     final date = _parseDate(_date.text);
     if (date == null) {
       setState(() => _error = 'Informe uma data válida.');
@@ -203,58 +196,62 @@ class _SessionFormState extends State<SessionForm> {
       ),
     ),
     body: SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(24),
-        children: [
-          Text('Turma: ${widget.classSummary.name}'),
-          if (widget.isReplacement) ...[
-            const SizedBox(height: 8),
-            const Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: EdgeInsets.all(12),
-                child: Text(
-                  'A substituta mantém a turma e a data da aula cancelada. '
-                  'A lista de alunos será congelada no primeiro salvamento e '
-                  'pode refletir matrículas atuais.',
+      child: Form(
+        key: _form,
+        child: ListView(
+          padding: const EdgeInsets.all(24),
+          children: [
+            Text('Turma: ${widget.classSummary.name}'),
+            if (widget.isReplacement) ...[
+              const SizedBox(height: 8),
+              const Card(
+                margin: EdgeInsets.zero,
+                child: Padding(
+                  padding: EdgeInsets.all(12),
+                  child: Text(
+                    'A substituta mantém a turma e a data da aula cancelada. '
+                    'A lista de alunos será congelada no primeiro salvamento e '
+                    'pode refletir matrículas atuais.',
+                  ),
                 ),
               ),
+            ],
+            BrDateField(
+              fieldKey: const Key('session-date'),
+              controller: _date,
+              label: 'Data',
+              helperText: widget.isReplacement
+                  ? 'Data fixa da aula cancelada'
+                  : 'Selecione no calendário',
+              readOnly: widget.isReplacement,
+              validator: (value) =>
+                  brDateValidationError(value, required: true),
             ),
+            const SizedBox(height: 12),
+            AppTextFormField(
+              fieldKey: const Key('session-topic'),
+              controller: _topic,
+              label: 'Tema (opcional)',
+              maxLength: 200,
+            ),
+            if (_error != null)
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            FilledButton(
+              onPressed: _busy ? null : _save,
+              child: const Text('Salvar'),
+            ),
+            if (_pending != null)
+              TextButton(
+                key: const Key('retry-pending-session-create'),
+                onPressed: _busy ? null : () => _submit(_pending!),
+                child: const Text('Repetir criação pendente'),
+              ),
+            if (_busy) const LinearProgressIndicator(),
           ],
-          TextField(
-            key: const Key('session-date'),
-            controller: _date,
-            readOnly: widget.isReplacement,
-            decoration: const InputDecoration(
-              labelText: 'Data',
-              helperText: 'Formato: DD/MM/AAAA',
-              helperMaxLines: 2,
-            ),
-            keyboardType: TextInputType.datetime,
-          ),
-          TextField(
-            key: const Key('session-topic'),
-            controller: _topic,
-            maxLength: 200,
-            decoration: const InputDecoration(labelText: 'Tema (opcional)'),
-          ),
-          if (_error != null)
-            Text(
-              _error!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          FilledButton(
-            onPressed: _busy ? null : _save,
-            child: const Text('Salvar'),
-          ),
-          if (_pending != null)
-            TextButton(
-              key: const Key('retry-pending-session-create'),
-              onPressed: _busy ? null : () => _submit(_pending!),
-              child: const Text('Repetir criação pendente'),
-            ),
-          if (_busy) const LinearProgressIndicator(),
-        ],
+        ),
       ),
     ),
   );

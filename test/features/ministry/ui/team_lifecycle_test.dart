@@ -431,7 +431,7 @@ void main() {
     expect(find.byType(TeamContactForm), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('team-contact-phone')),
-      '+5511999990001',
+      '(11) 9 9999-0001',
     );
     await _tapAndSettle(tester, find.text('Salvar contato'));
 
@@ -672,7 +672,7 @@ void main() {
       await _tapAndSettle(tester, find.text('Ana Silva').last);
       await tester.enterText(
         find.byKey(const ValueKey('team-contact-phone')),
-        '+5511999990002',
+        '(11) 9 9999-0002',
       );
 
       await _tapAndSettle(tester, find.text('Salvar contato'));
@@ -709,7 +709,7 @@ void main() {
 
     await _tapAndSettle(tester, find.byTooltip('Editar contato'));
     final phoneField = find.byKey(const ValueKey('team-contact-phone'));
-    await tester.enterText(phoneField, '+5511999990002');
+    await tester.enterText(phoneField, '(11) 9 9999-0002');
     await _tapAndSettle(
       tester,
       find.byKey(const ValueKey('team-contact-save')),
@@ -720,7 +720,17 @@ void main() {
       find.textContaining('Os dados permanecem no formulário'),
       findsOneWidget,
     );
-    expect(tester.widget<TextFormField>(phoneField).enabled, isFalse);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.descendant(
+              of: phoneField,
+              matching: find.byType(TextFormField),
+            ),
+          )
+          .enabled,
+      isFalse,
+    );
 
     await _tapAndSettle(tester, find.text('Tentar novamente'));
 
@@ -751,7 +761,7 @@ void main() {
       await _tapAndSettle(tester, find.text('Ana Silva').last);
       await tester.enterText(
         find.byKey(const ValueKey('team-contact-phone')),
-        '+5511999990002',
+        '(11) 9 9999-0002',
       );
       await _tapAndSettle(
         tester,
@@ -761,7 +771,17 @@ void main() {
       expect(gateway.contact(_otherContactId)['revision'], 4);
       expect(gateway.contact(_contactId)['revision'], 5);
       final phoneField = find.byKey(const ValueKey('team-contact-phone'));
-      expect(tester.widget<TextFormField>(phoneField).enabled, isFalse);
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.descendant(
+                of: phoneField,
+                matching: find.byType(TextFormField),
+              ),
+            )
+            .enabled,
+        isFalse,
+      );
 
       await _tapAndSettle(tester, find.text('Tentar novamente'));
 

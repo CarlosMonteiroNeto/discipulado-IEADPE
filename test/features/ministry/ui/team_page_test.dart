@@ -137,12 +137,12 @@ void main() {
         gateway.reads.map((read) => read.$1),
         contains('ministry_get_contact'),
       );
-      expect(find.text('1982-02-03'), findsOneWidget);
+      expect(find.text('03/02/1982'), findsOneWidget);
       expect(find.text('Professor(a) do discipulado'), findsNWidgets(2));
 
       await tester.enterText(
         find.byKey(const ValueKey('team-contact-phone')),
-        '+5511999990001',
+        '(11) 9 9999-0001',
       );
       await tester.tap(find.text('Salvar contato'));
       await tester.pumpAndSettle();

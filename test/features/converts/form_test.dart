@@ -7,6 +7,8 @@ import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
 import 'package:ieadpe_converts/features/converts/convert_form.dart';
 
+import '../../support/date_picker.dart';
+
 const _congregationId = 'b0000000-0000-4000-8000-000000000001';
 
 ConvertRecord record({
@@ -188,16 +190,18 @@ void main() {
           ),
         ),
       );
-      await t.enterText(
-        find.byKey(const ValueKey('conversion_date')),
-        '2026-01-02',
+      await pickDate(
+        t,
+        const ValueKey('conversion_date'),
+        DateTime(2026, 1, 2),
       );
       await tapSave(t, 'Atualizar');
       expect(calls, 0);
       expect(find.text('A data não pode ser futura'), findsOneWidget);
-      await t.enterText(
-        find.byKey(const ValueKey('conversion_date')),
-        '2026-01-01',
+      await pickDate(
+        t,
+        const ValueKey('conversion_date'),
+        DateTime(2026, 1, 1),
       );
       await tapSave(t, 'Atualizar');
       await t.pumpAndSettle();

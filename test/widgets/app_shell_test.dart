@@ -56,12 +56,22 @@ void main() {
       for (final label in [
         'Equipe',
         'Alunos',
+        'Cadastrar aluno',
         'Turmas',
         'Frequência',
-        'Novos convertidos',
       ]) {
         expect(find.text(label).hitTestable(), findsOneWidget);
       }
+      expect(find.text('Novos convertidos').hitTestable(), findsNothing);
+      expect(
+        find.descendant(
+          of: find.byKey(
+            const ValueKey('app-shell-drawer-/ministry/students/register'),
+          ),
+          matching: find.byIcon(Icons.person_add_alt_1_outlined),
+        ),
+        findsOneWidget,
+      );
       await t.tap(find.text('Alunos').last);
       await t.pumpAndSettle();
       expect(opened, ['/ministry/students']);

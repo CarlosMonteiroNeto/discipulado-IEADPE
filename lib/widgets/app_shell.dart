@@ -38,7 +38,7 @@ class AppShell extends StatelessWidget {
     '/ministry/students/register': 'Cadastrar aluno',
     '/ministry/classes': 'Turmas',
     '/ministry/attendance': 'Frequência',
-    '/ministry/handoff': 'Novos convertidos',
+    '/ministry/handoff': 'Encaminhamentos',
   };
 
   static const icons = {
@@ -49,10 +49,14 @@ class AppShell extends StatelessWidget {
     '/ministry': Icons.menu_book_outlined,
     '/ministry/team': Icons.groups_outlined,
     '/ministry/students': Icons.school_outlined,
+    '/ministry/students/register': Icons.person_add_alt_1_outlined,
     '/ministry/classes': Icons.class_outlined,
     '/ministry/attendance': Icons.fact_check_outlined,
     '/ministry/handoff': Icons.move_to_inbox_outlined,
   };
+
+  /// Routes remain authorized for deep links but are reached through Alunos.
+  static const hiddenFromMenu = {'/ministry/handoff'};
 
   static const _feedbackAction = '__base44_feedback__';
   static const _signOutAction = '__base44_sign_out__';
@@ -86,7 +90,9 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final routes = routesFor(scope);
+    final routes = routesFor(scope)
+        .where((route) => !hiddenFromMenu.contains(route))
+        .toList(growable: false);
     final mobile = MediaQuery.sizeOf(context).width < 768;
     final hasOverflow = routes.length > 5;
     final primaryRoutes = mobile

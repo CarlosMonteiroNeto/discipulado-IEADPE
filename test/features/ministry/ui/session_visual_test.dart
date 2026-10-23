@@ -314,9 +314,9 @@ void main() {
         'session-form',
       );
       final save = find.widgetWithText(FilledButton, 'Salvar');
-      expect(find.text('Formato: DD/MM/AAAA'), findsOneWidget);
+      expect(find.text('Selecione no calendário'), findsOneWidget);
       expect(
-        tester.getRect(find.text('Formato: DD/MM/AAAA')).right,
+        tester.getRect(find.text('Selecione no calendário')).right,
         lessThanOrEqualTo(spec.size.width),
       );
       await tester.ensureVisible(save);
@@ -343,7 +343,10 @@ void main() {
         findsOneWidget,
       );
       final replacementDate = tester.widget<TextField>(
-        find.byKey(const Key('session-date')),
+        find.descendant(
+          of: find.byKey(const Key('session-date')),
+          matching: find.byType(TextField),
+        ),
       );
       expect(replacementDate.controller!.text, '20/12/2026');
       expect(replacementDate.readOnly, isTrue);

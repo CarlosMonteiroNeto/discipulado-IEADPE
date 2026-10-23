@@ -27,6 +27,7 @@ import 'package:ieadpe_converts/features/home/home_page.dart';
 import 'package:ieadpe_converts/ui/unified_theme.dart';
 
 import '../integration_test/unified_journey_test.dart' as journey;
+import 'support/date_picker.dart';
 
 class LoopbackHttp extends HttpOverrides {}
 
@@ -380,7 +381,9 @@ class RootFixture {
       if (requestHandlerErrors.isNotEmpty) {
         final failure = requestHandlerErrors.first;
         Error.throwWithStackTrace(
-          StateError('RootFixture HTTP request handler failed: ${failure.error}'),
+          StateError(
+            'RootFixture HTTP request handler failed: ${failure.error}',
+          ),
           failure.stackTrace,
         );
       }
@@ -664,9 +667,10 @@ void main() {
         find.byKey(const ValueKey('landmark')),
         'Perto da praça',
       );
-      await tester.enterText(
-        find.byKey(const ValueKey('conversion_date')),
-        '2026-10-15',
+      await pickDate(
+        tester,
+        const ValueKey('conversion_date'),
+        DateTime(2026, 10, 15),
       );
       final congregationField = find
           .descendant(

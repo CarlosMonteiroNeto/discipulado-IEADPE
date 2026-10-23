@@ -10,6 +10,8 @@ import '../../platform/file_exporter.dart';
 import '../../platform/portuguese_sort.dart';
 import '../../platform/table_workbook.dart';
 import '../../ui/base44_widgets.dart';
+import '../../ui/br_input.dart';
+import '../../ui/form_fields.dart';
 import '../../ui/unified_theme.dart';
 import '../admin/congregation_repository.dart';
 import 'reports_repository.dart';
@@ -32,6 +34,7 @@ class ReportView extends StatefulWidget {
 }
 
 class _ReportViewState extends State<ReportView> {
+  final _filterForm = GlobalKey<FormState>();
   final _start = TextEditingController(), _end = TextEditingController();
   late String _token;
   int _request = 0, _catalogRequest = 0, _sortColumn = 3;
@@ -174,17 +177,26 @@ class _ReportViewState extends State<ReportView> {
 
   Future<void> _apply() async {
     if (!_current || _saving) return;
+    if (!(_filterForm.currentState?.validate() ?? true)) return;
     DateRange range;
     try {
+      final start = parseDateInput(_start.text);
+      final end = parseDateInput(_end.text);
+      if ((_start.text.trim().isNotEmpty && start == null) ||
+          (_end.text.trim().isNotEmpty && end == null)) {
+        throw const FormatException();
+      }
       range = DateRange(
-        start: _start.text.isEmpty ? null : DateOnly.parse(_start.text),
-        end: _end.text.isEmpty ? null : DateOnly.parse(_end.text),
+        start: start == null
+            ? null
+            : DateOnly(start.year, start.month, start.day),
+        end: end == null ? null : DateOnly(end.year, end.month, end.day),
       );
       if (!range.valid) throw const FormatException();
     } catch (_) {
       setState(
         () => _message =
-            'Confira as datas no formato AAAA-MM-DD e a ordem do período.',
+            'Confira as datas no formato DD/MM/AAAA e a ordem do período.',
       );
       return;
     }
@@ -383,67 +395,75 @@ class _ReportViewState extends State<ReportView> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: [
-                  SizedBox(
-                    width: 210,
-                    child: TextField(
-                      controller: _start,
-                      enabled: !_saving,
-                      decoration: const InputDecoration(
-                        labelText: 'Data inicial',
-                        hintText: 'AAAA-MM-DD',
-                      ),
-                      onChanged: (_) => _edited(),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 210,
-                    child: TextField(
-                      controller: _end,
-                      enabled: !_saving,
-                      decoration: const InputDecoration(
-                        labelText: 'Data final',
-                        hintText: 'AAAA-MM-DD',
-                      ),
-                      onChanged: (_) => _edited(),
-                    ),
-                  ),
-                  if (widget.events)
+              Form(
+                key: _filterForm,
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
                     SizedBox(
-                      width: 250,
-                      child: DropdownButtonFormField<String>(
-                        key: ValueKey(
-                          '$_token-$_congregation-${_catalog.length}',
-                        ),
-                        initialValue: _congregation,
-                        decoration: const InputDecoration(
-                          labelText: 'Congregação',
-                        ),
-                        isExpanded: true,
-                        items: [
-                          const DropdownMenuItem<String>(
-                            value: null,
-                            child: Text('Todas'),
-                          ),
-                          for (final c in _catalog)
-                            DropdownMenuItem(value: c.id, child: Text(c.name)),
-                        ],
-                        onChanged: _saving
-                            ? null
-                            : (v) {
-                                _congregation = v;
-                                _edited();
-                              },
+                      width: 210,
+                      child: BrDateField(
+                        fieldKey: const Key('report-start-date'),
+                        controller: _start,
+                        label: 'Data inicial',
+                        helperText: 'Opcional',
+                        enabled: !_saving,
+                        allowClear: true,
+                        onChanged: (_) => _edited(),
+                        validator: brDateValidationError,
                       ),
                     ),
-                  FilledButton(
-                    onPressed: _busy || _saving ? null : _apply,
-                    child: const Text('Aplicar'),
-                  ),
-                ],
+                    SizedBox(
+                      width: 210,
+                      child: BrDateField(
+                        fieldKey: const Key('report-end-date'),
+                        controller: _end,
+                        label: 'Data final',
+                        helperText: 'Opcional',
+                        enabled: !_saving,
+                        allowClear: true,
+                        onChanged: (_) => _edited(),
+                        validator: brDateValidationError,
+                      ),
+                    ),
+                    if (widget.events)
+                      SizedBox(
+                        width: 250,
+                        child: DropdownButtonFormField<String>(
+                          key: ValueKey(
+                            '$_token-$_congregation-${_catalog.length}',
+                          ),
+                          initialValue: _congregation,
+                          decoration: const InputDecoration(
+                            labelText: 'Congregação',
+                          ),
+                          isExpanded: true,
+                          items: [
+                            const DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('Todas'),
+                            ),
+                            for (final c in _catalog)
+                              DropdownMenuItem(
+                                value: c.id,
+                                child: Text(c.name),
+                              ),
+                          ],
+                          onChanged: _saving
+                              ? null
+                              : (v) {
+                                  _congregation = v;
+                                  _edited();
+                                },
+                        ),
+                      ),
+                    FilledButton(
+                      onPressed: _busy || _saving ? null : _apply,
+                      child: const Text('Aplicar'),
+                    ),
+                  ],
+                ),
               ),
               if (_busy)
                 Semantics(
