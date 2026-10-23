@@ -34,10 +34,45 @@ Linux release work and the Phase 2 `new_convert` student filter remain deferred.
 - Path: `build/app/outputs/flutter-apk/app-debug.apk`
 - Target: `android-arm64`
 - Bytes: `136,304,948`
-- SHA-256: `941070376770C5DF238AF406BA20F5A4274DD0BE7631865963AA4EB6068943EA`
+- SHA-256: `D07AB76CB83EDE4BD6185C6AC37147719872B2AD59F70E73D2505FCFC1FC0735`
+- Built: `2026-10-22T23:53:30-03:00`
+- Configuration: `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` supplied at build
+  time through `--dart-define-from-file`, from a defines file kept outside the
+  repository and deleted after the build.
 
 The APK is a debug build. Release signing, publication, and production-device
 acceptance remain gated.
+
+### Android device pass
+
+- Device: `2109119DG`, Android 14 (`API 34`), `arm64-v8a`. The adb serial is
+  recorded in `evidence.json` rather than repeated here.
+- Install: `adb install -r build\app\outputs\flutter-apk\app-debug.apk` printed
+  `Performing Streamed Install` / `Success` and exited `0`; app data was
+  preserved.
+- Launch: launcher `br.org.ieadpe.ieadpe_converts/.MainActivity` started `COLD`
+  with status `ok` in `2,590 ms`, and the focused window was that activity.
+- Init log: `supabase.supabase_flutter: INFO: ***** Supabase init completed *****`.
+  No fatal exception and no ANR in the 141 captured logcat lines.
+- Visible shell labels: `IEADPE`, `Novos Convertidos`, `Abrir menu`,
+  `Seção do Discipulado`, `Discipulado`, `Cadastrar Novo Convertido`,
+  `Sem foto do convertido`, `Escolher foto`, `Congregação *`,
+  `11 dígitos com DDD`, `Abrir calendário`, `Selecione no calendário`,
+  `Enviar sugestão`, and the `Início`, `Cadastrar`, `Convertidos`,
+  `Discipulado`, and `Menu` tab labels.
+- Configuration error screen absent: `Serviço indisponível`,
+  `Preparando acesso`, `Tentar novamente`, and
+  `Não foi possível disponibilizar o acesso` were each searched for and not
+  found.
+- Persisted session present: the device already held a Supabase session, so the
+  router published an access scope and the authenticated ministry shell rendered
+  on the `Cadastrar` tab. **The login screen was therefore not rendered and login
+  was not exercised.** Clearing app data or signing out was out of scope and was
+  not performed.
+
+Evidence: `build/verification/phase1-config-apk-2026-10-22/evidence.json` and
+`ui-text.txt`. This pass installed, cold-started, and read the screen only: no
+write or mutation, no Storage access, and no screenshot.
 
 ## Skill changes
 
@@ -58,9 +93,6 @@ existing fork branch was used instead of creating a new public repository.
 
 ## Blockers and approval gates
 
-- **Device pass blocked:** `adb devices -l` reported no attached device. The APK
-  could not be installed and the read-only Android navigation pass could not be
-  repeated.
 - **Discipulado scope defect remains open:** the app previously showed
   `Não foi possível carregar as congregações autorizadas.` and
   `Nenhuma congregação autorizada está disponível para esta sessão.` while a
