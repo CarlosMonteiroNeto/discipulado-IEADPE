@@ -71,15 +71,18 @@ acceptance remain gated.
   not performed.
 
 Evidence: `build/verification/phase1-config-apk-2026-10-22/evidence.json` and
-`ui-text.txt`. This pass installed, cold-started, and read the screen only: no
-write or mutation, no Storage access, and no screenshot.
+`ui-text.txt`. Those two artifacts and the APK itself were **not** transferred to the
+continuation host, so the values above are the record made on the previous host and
+could not be re-read here. This pass installed, cold-started, and read the screen
+only: no write or mutation, no Storage access, and no screenshot.
 
 ### Read-only ministry navigation audit (2026-10-23)
 
 Provenance: performed on the previous host during the 2026-10-23 session. The
 git-ignored artifacts (`build/verification/phase1-device-2026-10-23/navigation.json`
-and `ui/*.xml`) were **not** transferred to the continuation host, so this table
-reproduces the captured verdicts and is not an independent re-run. The review of
+and `ui/*.xml`) were **not** transferred to the continuation host, so **no row below
+has a retrievable artifact on this host**. Every verdict is second-hand from the
+previous session's capture; the table is not an independent re-run, and the review of
 Task 2's artifact is still open. The pass was navigation only: no submit, login,
 logout, data clearing, screenshot, or write.
 
@@ -100,9 +103,11 @@ repeatedly landed on `Cadastrar`.
 
 ### Discipulado authorized-congregation diagnosis (2026-10-23)
 
-Classification: `client_filter`, meaning client-side identifier validation, not a
-session-scope or server-contract failure. Local evidence:
-`build/verification/phase1-device-2026-10-23/discipulado.json` (git-ignored).
+Classification: `client_filter` is the best-supported hypothesis, meaning client-side
+identifier validation rather than a session-scope or server-contract failure. Local
+evidence: `build/verification/phase1-device-2026-10-23/discipulado.json` (git-ignored).
+Because no fresh device log or server response could be captured here, a mapped
+backend error is **not** positively excluded; the ranking is given under limits below.
 
 - The 24 hosted congregations were imported through
   `private.base44_stable_uuid` (`supabase/migrations/202610180001_base44_history.sql`),
@@ -128,10 +133,17 @@ session-scope or server-contract failure. Local evidence:
   a version nibble of `0` or a variant nibble of `0` are rejected as
   `invalid_response`; the scope loader's lax regex accepts the same values.
 - This host has no `adb`, Android SDK, or attached device, so the diagnosis is not
-  confirmed by a fresh device log and the excluded classifications
-  (`session_scope_empty`, `rpc_error`, `stale_cache`) rest on code paths and the
-  earlier tracked record of a direct scoped RPC returning HTTP 200 with non-empty
-  results.
+  confirmed by a fresh device log. The ranking among causes is therefore:
+  `client_filter` best supported (reproducible parser rejection plus the import
+  provenance of the ids); `rpc_error` not excluded; `session_scope_empty` and
+  `stale_cache` unsupported by the code paths. The only record of a direct scoped
+  RPC returning HTTP 200 with non-empty results is the 2026-10-22 report itself —
+  no captured status/body artifact exists in this repository, so that record cannot
+  carry independent evidential weight.
+- The simultaneous `Nenhuma congregação autorizada está disponível para esta sessão.`
+  panel is an empty state rendered while `_ministryCatalogError` is set. Spec A3
+  forbids presenting a failure as a genuine empty state, so the double panel is a
+  disclosed follow-up defect, not intended behaviour.
 
 `follow-up required` (not implemented here, because this plan forbids product edits
 inside a verification task): replace the strict RFC 4122 pattern with one shared
@@ -165,7 +177,7 @@ pinned 3.47.7 / 3.13.5, so this run is a deviation and not a re-certification of
 
 | Check | Result |
 |---|---|
-| `git rev-parse HEAD` | `77e108d7a2405b954da30efda4c6f1f8378086a5` |
+| `git rev-parse HEAD` | `77e108d7a2405b954da30efda4c6f1f8378086a5`, the base of this run (the commit carrying this section is its child) |
 | `pubspec.lock` SHA-256 | `40C22CD01D6E91716F61E090181D610C9BED66769DA107E368BA5A991E53DCE5` (matches the pinned bytes) |
 | `flutter pub get` | `Got dependencies!`, lockfile unchanged |
 | `flutter test` | 537 passed / 23 failed |
@@ -210,8 +222,18 @@ existing fork branch was used instead of creating a new public repository.
 - **Write journey not exercised:** create, edit, finalize, cancellation, and
   Storage writes still require explicit approval.
 - **Legacy phone data not backfilled:** 23 of 51 production convert phones are
-  not in the 11-digit national shape (21 other formats, 2 empty); 28 have 11
-  digits and none are E.164. New input does not silently rewrite them.
+  reported as not in the 11-digit national shape (21 other formats, 2 empty), with
+  28 in 11 digits and none in E.164. The query behind these counts was not recorded
+  in this repository, so treat the numbers as a previous-session report rather than
+  a reproducible measurement.
+- **Legacy phone preservation is broken for unedited values (Critical):** a stored
+  phone that is not 11 digits is displayed verbatim by `brPhoneDisplay`, then fails
+  `brPhoneValidationError` in `BrPhoneField`, so a convert carrying a legacy phone
+  cannot be saved after an unrelated edit until the phone is cleared or rewritten.
+  The `resolveBrPhone` preservation path is therefore unreachable for exactly the
+  records it was written for. The claim "legacy preservation when the value was not
+  edited" holds only for values that already have 11 digits. Fix and form-level
+  regression test are follow-ups, not part of this verification pass.
 - **Phase 2 deferred:** `ieadpe_ministry_list_students` still has no
   `new_convert` filter, and handoff promotion still does not set it.
 - **Legacy credential rotation:** the previously exposed service-role/database
