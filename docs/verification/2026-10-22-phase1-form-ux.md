@@ -74,6 +74,110 @@ Evidence: `build/verification/phase1-config-apk-2026-10-22/evidence.json` and
 `ui-text.txt`. This pass installed, cold-started, and read the screen only: no
 write or mutation, no Storage access, and no screenshot.
 
+### Read-only ministry navigation audit (2026-10-23)
+
+Provenance: performed on the previous host during the 2026-10-23 session. The
+git-ignored artifacts (`build/verification/phase1-device-2026-10-23/navigation.json`
+and `ui/*.xml`) were **not** transferred to the continuation host, so this table
+reproduces the captured verdicts and is not an independent re-run. The review of
+Task 2's artifact is still open. The pass was navigation only: no submit, login,
+logout, data clearing, screenshot, or write.
+
+| Check | Verdict | Observed |
+|---|---|---|
+| Cold start on the authenticated shell | PASS | opened on `Cadastrar`, not `Início` |
+| `Início` | PASS | dashboard rendered with live readings |
+| `Convertidos` | PASS | list rendered 51 records |
+| `Discipulado` | FAIL | `Falha ao carregar congregações` plus `Nenhuma congregação autorizada está disponível para esta sessão.` |
+| `Alunos` | FAIL | `Selecione uma congregação autorizada antes de continuar.` |
+| `Cadastrar aluno` entry on `Alunos` | BLOCKED | the congregation gate prevented the screen from rendering; the drawer route exists and was not tapped |
+| Redundant handoff entry in the drawer | PASS | drawer dump without the handoff entry; the deep link was not opened |
+
+Two observations remain unclassified rather than accepted as product defects:
+`adb shell input keyevent 4` ended the Activity instead of returning to the
+previous tab, so the audit navigated by tabs and the drawer; and cold start
+repeatedly landed on `Cadastrar`.
+
+### Discipulado authorized-congregation diagnosis (2026-10-23)
+
+Classification: `client_filter`, meaning client-side identifier validation, not a
+session-scope or server-contract failure. Local evidence:
+`build/verification/phase1-device-2026-10-23/discipulado.json` (git-ignored).
+
+- The 24 hosted congregations were imported through
+  `private.base44_stable_uuid` (`supabase/migrations/202610180001_base44_history.sql`),
+  which assembles a UUID from raw md5 hex and never normalizes the RFC 4122
+  version and variant nibbles. The import record is
+  `docs/operations/unified-migration.md`.
+- `MinistryBrowserRepository._isUuid`
+  (`lib/features/ministry/data/ministry_browser_repository.dart`) requires version
+  `1`-`8` and variant `89ab`. An md5-shaped id satisfies that pattern with
+  probability `(8/16)*(4/16) = 1/8`; all 24 satisfying it has probability `2^-72`.
+- The scope loader (`lib/features/auth/auth_repository.dart`) accepts the same ids
+  with a lax `8-4-4-4-12` shape, so the app reports ministry access, requests the
+  catalog, and then the parser throws on the first imported id. `lib/app.dart`
+  converts that throw into `Não foi possível carregar as congregações autorizadas.`;
+  the empty catalog also renders `Nenhuma congregação autorizada está disponível
+  para esta sessão.`; and `Alunos` then falls into the congregation gate.
+- `Convertidos` passes because `Congregation.fromJson` performs no UUID validation
+  and `SupabaseGateway.validateUuid` uses the same lax shape. The split between a
+  working `Convertidos` and a failing `Discipulado` is therefore explained by the
+  validation difference, not by the session.
+- Reproduced on the continuation host with a git-ignored probe,
+  `build/diag/ministry_uuid_probe_test.dart`: 4/4 passed. A v4 id parses; ids with
+  a version nibble of `0` or a variant nibble of `0` are rejected as
+  `invalid_response`; the scope loader's lax regex accepts the same values.
+- This host has no `adb`, Android SDK, or attached device, so the diagnosis is not
+  confirmed by a fresh device log and the excluded classifications
+  (`session_scope_empty`, `rpc_error`, `stale_cache`) rest on code paths and the
+  earlier tracked record of a direct scoped RPC returning HTTP 200 with non-empty
+  results.
+
+`follow-up required` (not implemented here, because this plan forbids product edits
+inside a verification task): replace the strict RFC 4122 pattern with one shared
+shape validator that mirrors PostgreSQL's textual `uuid` form, use it in every
+ministry id check — `ministry_browser_repository.dart`, `ministry_codec.dart`,
+`ministry_repository.dart`, `ministry_handoff_repository.dart`,
+`ministry_models.dart`, `session_navigation_context.dart`, and
+`MinistryRouteContext` in `lib/domain/models.dart` — and add a regression test that
+feeds an md5-shaped congregation id through the repository and the ministry route
+guard.
+
+### What this pass does and does not establish
+
+Established: the configured debug APK installs, cold-starts, initializes Supabase,
+and renders the authenticated shell; `Início` and `Convertidos` render real scoped
+readings on the device; the redundant sidebar handoff entry is hidden; and the
+`Discipulado`/`Alunos` failure is a client-side identifier-validation defect with a
+reproducible local probe.
+
+Not established: login, OAuth, session persistence under a fresh install, create,
+edit, finalize, cancel, promotion, enrollment, Storage reads or writes, release
+signing, publication, download, restore of real photo bytes, or production
+acceptance. The persisted session means the login screen was never exercised, and a
+read-only navigation pass never becomes Android or production acceptance.
+
+### Continuation-host re-run (2026-10-23)
+
+The continuation host is Windows 11 25H2 with Flutter 3.47.2 / Dart 3.13.2, not the
+pinned 3.47.7 / 3.13.5, so this run is a deviation and not a re-certification of the
+`757d0c9` record.
+
+| Check | Result |
+|---|---|
+| `git rev-parse HEAD` | `77e108d7a2405b954da30efda4c6f1f8378086a5` |
+| `pubspec.lock` SHA-256 | `40C22CD01D6E91716F61E090181D610C9BED66769DA107E368BA5A991E53DCE5` (matches the pinned bytes) |
+| `flutter pub get` | `Got dependencies!`, lockfile unchanged |
+| `flutter test` | 537 passed / 23 failed |
+| `flutter analyze` | `No issues found!` (27.9s) |
+
+None of the 23 failures is a product behaviour failure: 21 are `test/database/*`
+scenarios that stop because `psql` is absent (no local PostgreSQL on this host), and
+2 are `test/operations/configuration_test.dart` scenarios that the Windows
+PowerShell execution policy blocks from running `scripts/maintenance_photos.ps1`.
+The 3.47.7 record remains `560/560` for the code under test; it is neither replaced
+nor confirmed by this run.
+
 ## Skill changes
 
 The four form-relevant skills were edited after baseline pressure scenarios and
@@ -93,10 +197,16 @@ existing fork branch was used instead of creating a new public repository.
 
 ## Blockers and approval gates
 
-- **Discipulado scope defect remains open:** the app previously showed
+- **Discipulado scope defect diagnosed, fix pending:** the app shows
   `Não foi possível carregar as congregações autorizadas.` and
   `Nenhuma congregação autorizada está disponível para esta sessão.` while a
-  direct scoped RPC returned HTTP 200 with non-empty results.
+  direct scoped RPC returns HTTP 200 with non-empty results. The cause is the
+  client-side RFC 4122 validation described above, which rejects the Base44-derived
+  congregation ids; the shared-validator fix and its regression test remain a
+  follow-up task and are not implemented in this pass.
+- **Device audit artifact review open:** the 2026-10-23 `navigation.json` and UI
+  dumps were not transferred to the continuation host, so the read-only audit is
+  recorded as second-hand provenance and not as a reviewed artifact.
 - **Write journey not exercised:** create, edit, finalize, cancellation, and
   Storage writes still require explicit approval.
 - **Legacy phone data not backfilled:** 23 of 51 production convert phones are
