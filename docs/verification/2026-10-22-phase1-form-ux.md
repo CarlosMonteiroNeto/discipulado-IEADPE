@@ -387,3 +387,24 @@ This final run does not close the untested OAuth or authenticated Web journey,
 the legacy-phone save blocker, the Convertidos heading/list and Alunos
 registration-entry device checks, or Docker-dependent T11/D2. No production
 write, release signing, publication, or Docker action was performed.
+
+### Interactive Web callback diagnosis — 2026-10-24
+
+The user started Google sign-in in the local Web app and selected a Google
+profile. The browser returned to `/auth/callback` and displayed an HTTP 404.
+The callback allowlist and Flutter redirect policy accepted this return URL;
+the failure was in the local static server: the page had been served with
+`python -m http.server`, which does not apply the exact SPA route rewrites in
+`web/_redirects`. The built artifact contains `/auth/callback /index.html 200`.
+
+Restarted the local-only server with the project's exact `_redirects` rules,
+bound to `127.0.0.1:8767`; it suppresses request logs so callback query strings
+are not retained. `/auth/callback` with a synthetic query now returns the
+Flutter `index.html` with HTTP 200. `python -m unittest discover -s scripts -p
+test_release_operations.py -v` passed 5/5, and
+`python scripts/web_preflight.py build/web` passed. The first test invocation
+used the wrong unittest import mode and failed to find `web_preflight`; the
+discovery-mode rerun passed. No application code, OAuth provider settings,
+Supabase data, or user data was changed/read in this diagnosis. The app is back
+at the local login screen; authenticated Web validation is pending a fresh
+user-initiated Google sign-in through the corrected local server.
