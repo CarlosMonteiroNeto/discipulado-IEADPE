@@ -408,3 +408,18 @@ discovery-mode rerun passed. No application code, OAuth provider settings,
 Supabase data, or user data was changed/read in this diagnosis. The app is back
 at the local login screen; authenticated Web validation is pending a fresh
 user-initiated Google sign-in through the corrected local server.
+
+### Authenticated local Web smoke — 2026-10-24
+
+After the user completed Google sign-in through the corrected local server,
+the Flutter app loaded at `/register`, then the Home and Admin routes loaded
+with no browser console warnings/errors. Admin displayed congregation
+records. The Ministry congregation picker opened and offered authorized
+choices; selecting one kept the Alunos and Turmas routes usable. For that
+selection, Alunos displayed its explicit empty state (`Nenhum aluno cadastrado
+nesta congregação.`) and Turmas displayed `Nenhuma turma encontrada.`; both
+were empty results, not load-error states. No personal student rows were
+opened, no forms were submitted, and no application records were written.
+This confirms the authenticated local Web navigation and congregation
+selection path, but does not prove records exist for the selected congregation
+or close the Docker-dependent T11 integrated persistence journey.
