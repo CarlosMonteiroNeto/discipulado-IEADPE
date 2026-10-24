@@ -49,12 +49,76 @@ class MinistryHomePage extends StatefulWidget {
 
 class _MinistryHomePageState extends State<MinistryHomePage> {
   late Future<Map<String, Object?>> _overview;
+
   @override
   void initState() {
     super.initState();
     _overview = widget.scopeRequired
         ? Future<Map<String, Object?>>.value(const {})
         : widget.loadOverview();
+  }
+
+  Future<void> _openCongregationSelector() async {
+    final selectedId = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (context) => ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.8,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 12),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Selecione uma congregação',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                ),
+              ),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  itemCount: widget.availableCongregationIds.length,
+                  separatorBuilder: (context, index) =>
+                      const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final id = widget.availableCongregationIds[index];
+                    final name = widget.congregationNames[id] ?? id;
+                    final isSelected = id == widget.selectedCongregationId;
+                    return ListTile(
+                      key: ValueKey('ministry-congregation-option:$id'),
+                      title: Text(
+                        name,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      selected: isSelected,
+                      trailing: isSelected
+                          ? const Icon(
+                              Icons.check,
+                              semanticLabel: 'Selecionada',
+                            )
+                          : null,
+                      onTap: () => Navigator.of(context).pop(id),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (selectedId != null) widget.onSelectCongregation?.call(selectedId);
   }
 
   void _refresh() {
@@ -147,33 +211,39 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Text(
-                        'Congregação',
+                        'Congregação autorizada',
                         style: Theme.of(context).textTheme.titleMedium
                             ?.copyWith(color: UnifiedColors.brandNavy),
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        key: ValueKey(
-                          'ministry-congregation-scope:${widget.congregationPageNumber}:${widget.selectedCongregationId}',
+                      OutlinedButton(
+                        key: const ValueKey('ministry-congregation-selector'),
+                        onPressed: widget.onSelectCongregation == null
+                            ? null
+                            : _openCongregationSelector,
+                        style: OutlinedButton.styleFrom(
+                          alignment: Alignment.centerLeft,
+                          minimumSize: const Size.fromHeight(56),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
                         ),
-                        initialValue: widget.selectedCongregationId,
-                        isExpanded: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Congregação autorizada',
-                          prefixIcon: Icon(Icons.church_outlined),
-                        ),
-                        hint: const Text('Selecione uma congregação'),
-                        items: [
-                          for (final id in widget.availableCongregationIds)
-                            DropdownMenuItem(
-                              value: id,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.church_outlined),
+                            const SizedBox(width: 12),
+                            Expanded(
                               child: Text(
-                                widget.congregationNames[id] ?? id,
-                                softWrap: true,
+                                widget.selectedCongregationId == null
+                                    ? 'Selecione uma congregação'
+                                    : widget.congregationNames[widget
+                                              .selectedCongregationId] ??
+                                          'Selecione uma congregação',
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                        ],
-                        onChanged: widget.onSelectCongregation,
+                            const Icon(Icons.arrow_drop_down),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 8),
                       Wrap(

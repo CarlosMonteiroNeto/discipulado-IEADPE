@@ -1044,12 +1044,11 @@ void main() {
       );
       expect(find.text('Página 1'), findsOneWidget);
 
-      final congregationPicker = find.byType(DropdownButtonFormField<String>);
-      await tester.scrollUntilVisible(
-        congregationPicker,
-        300,
-        scrollable: find.byType(Scrollable).first,
+      final congregationPicker = find.byKey(
+        const ValueKey('ministry-congregation-selector'),
       );
+      await tester.ensureVisible(congregationPicker);
+      await tester.pumpAndSettle();
       await tester.tap(congregationPicker);
       await tester.pumpAndSettle();
       await tester.tap(find.text(centralName).last);
@@ -1068,19 +1067,18 @@ void main() {
 
       expect(find.text('Página 2'), findsOneWidget);
       expect(find.text(centralName), findsAtLeastNWidgets(1));
-      await tester.scrollUntilVisible(
-        congregationPicker,
-        300,
-        scrollable: find.byType(Scrollable).first,
+      await tester.ensureVisible(congregationPicker);
+      await tester.pumpAndSettle();
+      await tester.tap(congregationPicker);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(ValueKey('ministry-congregation-option:$centralId')),
+        findsOneWidget,
       );
-      final picker = tester.widget<DropdownButton<String>>(
-        find.descendant(
-          of: find.byType(DropdownButtonFormField<String>),
-          matching: find.byType(DropdownButton<String>),
-        ),
+      expect(
+        find.byKey(ValueKey('ministry-congregation-option:$northId')),
+        findsOneWidget,
       );
-      expect(picker.value, centralId);
-      expect(picker.items!.map((item) => item.value), [centralId, northId]);
       expect(tester.takeException(), isNull);
     },
   );

@@ -111,36 +111,44 @@ void main() {
     tester,
   ) async {
     var selected = '';
+    String? selectedId;
     var openedStudents = false;
     var requestedNextPage = false;
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: MinistryHomePage(
-            loadOverview: () async => const {
-              'students': 0,
-              'classes': 0,
-              'open_sessions': 0,
-              'through_date': '2026-10-17',
-            },
-            scopeName: 'Escolha uma congregação',
-            availableCongregationIds: const [
-              'b2700000-0000-0000-0000-000000000001',
-              'b2700000-0000-0000-0000-000000000002',
-            ],
-            congregationNames: const {
-              'b2700000-0000-0000-0000-000000000001': 'Congregação Central',
-              'b2700000-0000-0000-0000-000000000002': 'Congregação Norte',
-            },
-            selectedCongregationId: null,
-            hasNextCongregationPage: true,
-            congregationPageNumber: 1,
-            onNextCongregationPage: () => requestedNextPage = true,
-            onSelectCongregation: (value) => selected = value!,
-            scopedActionsEnabled: false,
-            onOpenStudents: () => openedStudents = true,
-            onOpenClasses: () {},
-            onOpenAttendance: () {},
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: MinistryHomePage(
+              loadOverview: () async => const {
+                'students': 0,
+                'classes': 0,
+                'open_sessions': 0,
+                'through_date': '2026-10-17',
+              },
+              scopeName: selectedId == null
+                  ? 'Escolha uma congregação'
+                  : 'Congregação Central',
+              availableCongregationIds: const [
+                'b2700000-0000-0000-0000-000000000001',
+                'b2700000-0000-0000-0000-000000000002',
+              ],
+              congregationNames: const {
+                'b2700000-0000-0000-0000-000000000001': 'Congregação Central',
+                'b2700000-0000-0000-0000-000000000002': 'Congregação Norte',
+              },
+              selectedCongregationId: selectedId,
+              hasNextCongregationPage: true,
+              congregationPageNumber: 1,
+              onNextCongregationPage: () => requestedNextPage = true,
+              onSelectCongregation: (value) => setState(() {
+                selected = value!;
+                selectedId = value;
+              }),
+              scopedActionsEnabled: false,
+              onOpenStudents: () => openedStudents = true,
+              onOpenClasses: () {},
+              onOpenAttendance: () {},
+            ),
           ),
         ),
       ),
@@ -152,7 +160,9 @@ void main() {
           .onPressed,
       isNull,
     );
-    await tester.tap(find.byType(DropdownButtonFormField<String>));
+    await tester.tap(
+      find.byKey(const ValueKey('ministry-congregation-selector')),
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Congregação Central').last);
     await tester.pumpAndSettle();
@@ -166,6 +176,98 @@ void main() {
     await tester.tap(nextButton);
     expect(requestedNextPage, isTrue);
   });
+
+  testWidgets(
+    'ministry congregation selector opens choices and enables both scoped lists',
+    (tester) async {
+      const centralId = 'b2700000-0000-0000-0000-000000000001';
+      const northId = 'b2700000-0000-0000-0000-000000000002';
+      String? selectedId;
+      var openedStudents = false;
+      var openedClasses = false;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StatefulBuilder(
+            builder: (context, setState) => Scaffold(
+              body: MinistryHomePage(
+                loadOverview: () async => const {},
+                scopeName: selectedId == null
+                    ? 'Selecione uma congregação'
+                    : 'Congregação Central',
+                availableCongregationIds: const [centralId, northId],
+                congregationNames: const {
+                  centralId: 'Congregação Central',
+                  northId: 'Congregação Norte',
+                },
+                selectedCongregationId: selectedId,
+                onSelectCongregation: (value) =>
+                    setState(() => selectedId = value),
+                scopedActionsEnabled: selectedId != null,
+                onOpenStudents: () => openedStudents = true,
+                onOpenClasses: () => openedClasses = true,
+                onOpenAttendance: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+            .onPressed,
+        isNull,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Turmas'),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.tap(
+        find.byKey(const ValueKey('ministry-congregation-selector')),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Congregação Norte'), findsOneWidget);
+
+      await tester.tap(find.text('Congregação Central').last);
+      await tester.pumpAndSettle();
+      expect(selectedId, centralId);
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, 'Alunos'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.scrollUntilVisible(
+        find.widgetWithText(OutlinedButton, 'Turmas'),
+        160,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(
+        tester
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+            .onPressed,
+        isNotNull,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Turmas'),
+            )
+            .onPressed,
+        isNotNull,
+      );
+
+      await tester.tap(find.widgetWithText(FilledButton, 'Alunos'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Turmas'));
+      expect(openedStudents, isTrue);
+      expect(openedClasses, isTrue);
+    },
+  );
 
   testWidgets('directory failures expose a retry action', (tester) async {
     var retried = false;
@@ -243,6 +345,7 @@ void main() {
             congregationPageNumber: 2,
             hasPreviousCongregationPage: true,
             scopedActionsEnabled: true,
+            onSelectCongregation: (_) {},
             onOpenStudents: () {},
             onOpenClasses: () {},
             onOpenAttendance: () {},
@@ -253,11 +356,20 @@ void main() {
 
     expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
     expect(find.text('Página 2'), findsOneWidget);
-    final picker = tester.widget<DropdownButton<String>>(
-      find.byType(DropdownButton<String>),
+    final selector = find.byKey(
+      const ValueKey('ministry-congregation-selector'),
     );
-    expect(picker.value, selectedId);
-    expect(picker.items!.map((item) => item.value), [selectedId, pageTwoId]);
+    expect(selector, findsOneWidget);
+    await tester.tap(selector);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('ministry-congregation-option:$selectedId')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(ValueKey('ministry-congregation-option:$pageTwoId')),
+      findsOneWidget,
+    );
     expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
   });
 }
