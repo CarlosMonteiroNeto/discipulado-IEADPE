@@ -2,6 +2,7 @@
 library;
 
 import '../../../domain/models.dart' show AccessRole;
+import '../../../domain/uuid_shape.dart';
 
 typedef MinistryJson = Map<String, Object?>;
 
@@ -904,9 +905,6 @@ T _enumByWire<T extends Enum>(List<T> values, String wire) {
   throw MinistryDataException('Unknown enum value: $wire');
 }
 
-const _uuidPattern =
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$';
-
 const _metadataKeys = <String>{
   'id',
   'congregation_id',
@@ -933,7 +931,7 @@ void _checkExactKeys(MinistryJson json, Set<String> expected) {
 
 String _uuid(MinistryJson json, String key) {
   final value = _requiredText(json, key);
-  if (!RegExp(_uuidPattern).hasMatch(value)) {
+  if (!isUuidShape(value)) {
     throw MinistryDataException('Invalid UUID field: $key.');
   }
   return value;
@@ -941,7 +939,7 @@ String _uuid(MinistryJson json, String key) {
 
 String? _optionalUuid(MinistryJson json, String key) {
   final value = _optionalText(json, key);
-  if (value != null && !RegExp(_uuidPattern).hasMatch(value)) {
+  if (value != null && !isUuidShape(value)) {
     throw MinistryDataException('Invalid UUID field: $key.');
   }
   return value;

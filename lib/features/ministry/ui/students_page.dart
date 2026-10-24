@@ -426,7 +426,7 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
           );
     final person = MinistryPersonDraft(
       name: _name.text.trim(),
-      phone: resolveBrPhone(_phone.text, null),
+      phone: resolveBrPhone(_phone.text),
       birthDate: date == null
           ? null
           : CalendarDate(date.year, date.month, date.day),

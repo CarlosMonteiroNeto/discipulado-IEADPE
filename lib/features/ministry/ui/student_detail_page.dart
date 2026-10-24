@@ -226,7 +226,7 @@ class _StudentDetailPageState extends State<StudentDetailPage> {
     if (!_personForm.currentState!.validate()) return;
     final draft = MinistryPersonDraft(
       name: _name.text.trim(),
-      phone: resolveBrPhone(_phone.text, person.phone ?? student.phoneE164),
+      phone: resolveBrPhone(_phone.text),
       birthDate: _date(),
       address: _address(),
     );

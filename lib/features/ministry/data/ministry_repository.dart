@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import '../../../data/supabase_gateway.dart';
 import '../../../domain/models.dart';
+import '../../../domain/uuid_shape.dart';
 import '../domain/ministry_models.dart';
 import 'ministry_codec.dart';
 
@@ -1135,9 +1136,7 @@ class MinistryRepository {
   }
 
   static void _uuid(String value) {
-    if (!RegExp(
-      r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-    ).hasMatch(value)) {
+    if (!isUuidShape(value)) {
       throw const DataFailure('invalid');
     }
   }

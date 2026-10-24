@@ -62,21 +62,17 @@ String? brPhoneValidationError(String? value, {bool required = false}) {
 }
 
 String? brPhoneE164(String? value) {
-  if (brPhoneValidationError(value) != null) return null;
-  return '+55${brPhoneNationalDigits(value!)}';
+  final text = value?.trim() ?? '';
+  if (text.isEmpty || brPhoneValidationError(text) != null) return null;
+  return '+55${brPhoneNationalDigits(text)}';
 }
 
-/// Normalizes a new value but preserves the previous representation when the
-/// digits did not change. This avoids silently rewriting legacy records.
-String? resolveBrPhone(String? value, String? previous) {
+/// Normalizes every valid Brazilian phone to E.164 for storage, including an
+/// unchanged national-format value loaded from a legacy record.
+String? resolveBrPhone(String? value) {
   final text = value?.trim() ?? '';
   if (text.isEmpty) return null;
-  final old = previous?.trim() ?? '';
-  if (old.isNotEmpty &&
-      brPhoneNationalDigits(old) == brPhoneNationalDigits(text)) {
-    return old;
-  }
-  return brPhoneE164(text) ?? text;
+  return brPhoneE164(text);
 }
 
 String formatBrDate(DateTime value) =>

@@ -243,3 +243,11 @@ existing fork branch was used instead of creating a new public repository.
 
 No production data was created, edited, canceled, finalized, or written during
 this verification pass.
+
+### Continuation evidence — 2026-10-24
+
+The earlier phone and UUID follow-up findings in this chronological log are superseded by the current source changes: the UI accepts 11 Brazilian national digits and normalizes to `+55` when persisting/launching WhatsApp; imported Base44 UUID-shaped identifiers are validated by structural shape rather than RFC version/variant bits. Focused and full tests cover these changes. No production data was backfilled or edited.
+
+A read-only device audit was repeated using UI hierarchy dumps and filtered app logs (no screenshots or writes). The installed APK hash is `d07ab76cb83ede4bd6185c6ac37147719872b2ad59f70e73d2505fcfc1fc0735`; it predates current source edits. In that APK, `Início` and `Convertidos` loaded; `Discipulado` showed both `Falha ao carregar congregações` and `Nenhuma congregação autorizada está disponível para esta sessão.`; `Alunos` remained gated by the missing congregation. The log excerpt did not expose HTTP/RPC status or exception, so runtime cause remains unconfirmed. See ignored raw evidence in `build/verification/phase1-device-2026-10-24/`.
+
+Installed EDB PostgreSQL 17.11 user-local binaries and initialized a disposable cluster restricted to `127.0.0.1:54329`. With pinned Flutter 3.47.7, `flutter test --no-pub --concurrency=1` passed **565/565**, including all 21 database tests; `flutter analyze --no-pub` passed. This closes local PostgreSQL availability for SQL tests only. Docker/WSL and the full Supabase Auth/PostgREST/Storage stack remain unavailable, so T11, complete browser integration, hosted acceptance, release signing and production acceptance remain open. No hosted change, release action, or production mutation occurred.

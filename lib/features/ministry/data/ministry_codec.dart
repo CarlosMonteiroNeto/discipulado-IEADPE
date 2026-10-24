@@ -1,5 +1,6 @@
 import '../domain/ministry_models.dart';
 import '../../../domain/models.dart' show AccessRole;
+import '../../../domain/uuid_shape.dart';
 
 /// Safe, transport-independent values returned by ministry read RPCs.
 class MinistryDirectoryEntry {
@@ -959,9 +960,7 @@ DateTime _requiredTimestamp(Object? value) {
 
 String _uuid(Object? value) {
   final text = _text(value);
-  if (!RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  ).hasMatch(text)) {
+  if (!isUuidShape(text)) {
     _invalid();
   }
   return text;

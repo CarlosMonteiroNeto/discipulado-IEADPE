@@ -241,7 +241,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
     }
 
     final name = _name.text.trim();
-    final phone = resolveBrPhone(_phone.text, _contact?.phoneE164);
+    final phone = resolveBrPhone(_phone.text);
     final birthDate = _parsedBirthDate();
     final emailText = _email.text.trim();
     final email = emailText.isEmpty ? null : emailText.toLowerCase();

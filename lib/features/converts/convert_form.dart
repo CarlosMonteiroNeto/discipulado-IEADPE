@@ -242,7 +242,6 @@ class _ConvertFormState extends State<ConvertForm> {
     final oldPerson = i?.personIdentity;
     final oldAddress = oldPerson?.address;
     final oldName = oldPerson?.name ?? i?.name;
-    final oldPhone = oldPerson?.phone ?? i?.legacyIdentity?.phone ?? i?.phone;
     final oldAddressStreet = oldPerson == null
         ? i?.legacyIdentity?.address ?? i?.address
         : oldAddress?['street'] as String?;
@@ -264,7 +263,7 @@ class _ConvertFormState extends State<ConvertForm> {
       conversionDate: _parsedDate()!,
       worshipType: _worship!,
       address: optional(_address, oldAddressStreet),
-      phone: resolveBrPhone(_phone.text, oldPhone),
+      phone: resolveBrPhone(_phone.text),
       birthDate: _parsedBirthDate(),
       personAddress: {
         'street': optional(_address, oldAddressStreet),

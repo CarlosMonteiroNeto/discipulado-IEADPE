@@ -1,4 +1,5 @@
 import '../../../data/supabase_gateway.dart';
+import '../../../domain/uuid_shape.dart';
 import '../domain/ministry_models.dart';
 import 'ministry_codec.dart';
 
@@ -406,9 +407,7 @@ String _uuidValue(Object? value) {
 
 String? _optionalUuidValue(Object? value) =>
     value == null ? null : _uuidValue(value);
-bool _isUuid(String value) => RegExp(
-  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-).hasMatch(value);
+bool _isUuid(String value) => isUuidShape(value);
 String _date(Object? value) {
   final text = _text(value);
   final parsed = DateTime.tryParse(text);

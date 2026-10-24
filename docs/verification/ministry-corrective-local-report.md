@@ -233,3 +233,9 @@ The previously installed `br.org.ieadpe.ieadpe_converts` 1.0.0 app was signed wi
 
 Evidence: `build/verification/corrective-release/android-debug-smoke-2026-10-21/summary.json` (SHA-256 `0673A89C8415B6E375F966019F256C09323C326A2B321437925513122B8906C4`), its `README.md`, build/install/launch logs, APK signature/badging, app-process logcat and screenshots (`login-screen.png` SHA-256 `5962BD12CE1A4A8DBE79E654EAD9936494D4610DF8FB820F594D1B1AD7F36CD6`; 2× `651B22EAADE24D970BDC560A4059426DE108FA86CC7FFD11AD07B01211C9D76A`). The updated host/device probe is `build/verification/corrective-release/T11-host-blocker-2026-10-21.json` (SHA-256 `64E2116C624A3462D00A45F79E6EB7CD20CE1B64EEC898D97744C9E031B8246B`). This smoke does **not** verify authenticated journey, OAuth provider, persistence, protected routes, Storage/photo, SAF/XLSX, release signing or production delivery. T11, the unified journey, D2 and full Android acceptance remain **BLOCKED**; L0 remains **FAIL**.
 
+
+### Continuation update — 2026-10-24
+
+The local PostgreSQL prerequisite is now available: official EDB PostgreSQL 17.11 binaries are installed per-user, and the disposable test cluster binds only to loopback on the port expected by `scripts/test_database.py`. The full pinned Flutter 3.47.7 suite passes **565/565** (exit 0, 13m45s), including database tests; analyzer passes. See `.superpowers/sdd/2026-10-22-phase1-closure-plan/progress.md` for scope and evidence location.
+
+A current-source phone/UUID regression pass does not make the read-only device observation disappear: the installed APK predates these edits. It still shows the paired Discipulado error/empty UI, with no HTTP/RPC diagnostics in captured app logcat, and Alunos remains blocked on congregation scope. Docker/WSL and full local Supabase Auth/PostgREST/Storage remain unavailable, so the complete T11/local browser/hosted/release gates stay open.

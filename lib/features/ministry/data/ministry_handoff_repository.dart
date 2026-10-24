@@ -1,4 +1,5 @@
 import '../../../data/supabase_gateway.dart';
+import '../../../domain/uuid_shape.dart';
 import '../domain/ministry_models.dart';
 
 class ConvertReferral {
@@ -256,9 +257,7 @@ String? _optionalText(Object? value) {
 
 String _parseUuid(Object? value) {
   final text = _text(value);
-  if (!RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  ).hasMatch(text)) {
+  if (!isUuidShape(text)) {
     _invalid();
   }
   return text;
@@ -271,9 +270,7 @@ String? _cursor(Object? value) {
 }
 
 void _checkUuid(String value) {
-  if (!RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  ).hasMatch(value)) {
+  if (!isUuidShape(value)) {
     throw const DataFailure('invalid');
   }
 }

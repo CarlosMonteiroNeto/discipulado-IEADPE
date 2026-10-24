@@ -205,7 +205,9 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                     ],
                   ),
                 ),
-              ] else if (!widget.scopedActionsEnabled)
+              ] else if (!widget.scopedActionsEnabled &&
+                  widget.scopeError == null &&
+                  !widget.scopeLoading)
                 const Base44Panel(
                   child: Text(
                     'Nenhuma congregação autorizada está disponível para esta sessão.',

@@ -189,8 +189,40 @@ void main() {
       find.text('Falha ao carregar o diretório autorizado.'),
       findsOneWidget,
     );
+    expect(
+      find.text(
+        'Nenhuma congregação autorizada está disponível para esta sessão.',
+      ),
+      findsNothing,
+    );
     await tester.tap(find.text('Tentar carregar novamente'));
     expect(retried, isTrue);
+  });
+
+  testWidgets('an empty authorized directory explains the empty state', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MinistryHomePage(
+            loadOverview: () async => const {},
+            scopeName: 'Selecione uma congregação',
+            scopedActionsEnabled: false,
+            onOpenStudents: null,
+            onOpenClasses: null,
+            onOpenAttendance: null,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Nenhuma congregação autorizada está disponível para esta sessão.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('paging keeps the selected congregation visible', (tester) async {

@@ -1,4 +1,5 @@
 import 'business_calendar.dart';
+import 'uuid_shape.dart';
 
 enum Gender {
   male('male'),
@@ -338,9 +339,7 @@ final class MinistryRouteContext {
       (classId == null || _isUuid(classId!)) &&
       (personId == null || _isUuid(personId!));
 
-  static bool _isUuid(String value) => RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  ).hasMatch(value);
+  static bool _isUuid(String value) => isUuidShape(value);
 }
 
 final class Congregation {

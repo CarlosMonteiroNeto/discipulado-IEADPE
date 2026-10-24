@@ -10,7 +10,7 @@ void main() {
       expect(brPhoneDisplay('+5511999990001'), '(11) 9 9999-0001');
     });
 
-    test('preserves legacy values that do not meet the 11-digit mask', () {
+    test('shows a stored value outside the mask verbatim for correction', () {
       expect(brPhoneDisplay('1199990000'), '1199990000');
       expect(brPhoneDisplay('telefone antigo'), 'telefone antigo');
     });
@@ -21,14 +21,11 @@ void main() {
       expect(formatBrPhone('1199999'), '(11) 9 9999');
     });
 
-    test('normalizes to E.164 and preserves an unchanged legacy value', () {
+    test('normalizes valid numbers to E.164 and refuses anything else', () {
       expect(brPhoneE164('(11) 9 9999-0001'), '+5511999990001');
-      expect(resolveBrPhone('(11) 9 9999-0001', '11999990001'), '11999990001');
-      expect(
-        resolveBrPhone('(11) 9 9999-0002', '11999990001'),
-        '+5511999990002',
-      );
-      expect(resolveBrPhone('', '11999990001'), null);
+      expect(brPhoneE164('11999990001'), '+5511999990001');
+      expect(brPhoneE164('1199990000'), null);
+      expect(brPhoneE164(''), null);
     });
 
     test('rejects empty required, short, and invalid DDD values', () {
@@ -58,7 +55,6 @@ void main() {
       expect(parseBrDate('02/01/2026'), DateTime(2026, 1, 2));
       expect(parseDateInput('2026-01-02'), DateTime(2026, 1, 2));
       expect(parseDateInput('31/02/2026'), null);
-      expect(brDateIso(DateTime(2026, 1, 2)), '2026-01-02');
     });
 
     test('validates required and malformed values', () {

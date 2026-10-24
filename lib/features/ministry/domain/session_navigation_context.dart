@@ -1,3 +1,5 @@
+import '../../../domain/uuid_shape.dart';
+
 /// Immutable identity of a session opened from a class's own session list.
 class SessionNavigationContext {
   SessionNavigationContext({
@@ -16,9 +18,7 @@ class SessionNavigationContext {
     }
   }
 
-  static final RegExp _uuid = RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89aAbB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
-  );
+  static final RegExp _uuid = uuidShapePattern;
 
   final String congregationId;
   final String classId;
