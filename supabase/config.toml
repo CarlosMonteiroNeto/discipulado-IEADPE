@@ -43,3 +43,6 @@ enable_signup = false
 [storage]
 enabled = true
 file_size_limit = "10MiB"
+
+[functions.public-intake]
+verify_jwt = false
