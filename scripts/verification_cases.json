@@ -78,6 +78,9 @@
       "scenario": "photos_test.sql"
     },
     {
+      "scenario": "public_intake_test.sql"
+    },
+    {
       "scenario": "public_registration_authority_test.sql"
     },
     {
@@ -126,6 +129,9 @@
     },
     {
       "flag": "--ministry-follow-up-concurrency"
+    },
+    {
+      "flag": "--public-intake-concurrency"
     }
   ]
 }

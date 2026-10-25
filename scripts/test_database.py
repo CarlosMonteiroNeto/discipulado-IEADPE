@@ -17,6 +17,7 @@ from database_ministry_registry_concurrency import check_ministry_registry_concu
 from database_ministry_academic_concurrency import check_ministry_academic_concurrency
 from database_convert_student_concurrency import check_convert_student_concurrency
 from database_ministry_follow_up_concurrency import check_ministry_follow_up_concurrency
+from database_public_intake_concurrency import check_public_intake_concurrency
 
 ROOT = Path(__file__).resolve().parents[1]
 T12_BACKFILL_INVARIANTS_SQL = r"""
@@ -32,7 +33,7 @@ SELECT jsonb_build_object(
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("scenario", nargs="?", default="access_test.sql")
+    parser.add_argument("scenario", nargs="?")
     parser.add_argument("--seed-before-migration")
     parser.add_argument("--seed-scenario")
     parser.add_argument("--verify-after-migration")
@@ -48,7 +49,9 @@ def main():
     parser.add_argument("--ministry-academic-concurrency", action="store_true")
     parser.add_argument("--convert-student-concurrency", action="store_true")
     parser.add_argument("--ministry-follow-up-concurrency", action="store_true")
+    parser.add_argument("--public-intake-concurrency", action="store_true")
     args = parser.parse_args()
+    scenario_name = args.scenario or "access_test.sql"
     snapshot_path = None
     if args.t12_semantic_snapshots:
         snapshot_path = Path(args.t12_semantic_snapshots).resolve()
@@ -59,7 +62,7 @@ def main():
             parser.error("semantic snapshots require the T12 disposable rehearsal")
     database_tests = (ROOT / "supabase/tests/database").resolve()
     migrations_dir = (ROOT / "supabase/migrations").resolve()
-    scenario = (database_tests / args.scenario).resolve()
+    scenario = (database_tests / scenario_name).resolve()
     if scenario.parent != database_tests or not scenario.is_file():
         raise ValueError("Scenario must belong to database tests")
     if (args.seed_before_migration is None) != (args.seed_scenario is None):
@@ -67,7 +70,7 @@ def main():
     if (args.verify_after_migration is None) != (args.verification_scenario is None):
         parser.error("--verify-after-migration and --verification-scenario must be used together")
     if args.t12_resume_and_drift and (args.verify_after_migration !=
-            "202610180002_base44_archive_weekly_consistency.sql" or args.scenario != "t12_post_forward_rehearsal.sql"):
+            "202610180002_base44_archive_weekly_consistency.sql" or scenario_name != "t12_post_forward_rehearsal.sql"):
         parser.error("T12 resume/drift rehearsal requires its 180002 baseline and final scenario")
     seed_migration = None
     seed_scenario = None
@@ -249,9 +252,14 @@ def main():
             check_convert_student_concurrency(psql, target)
         elif args.ministry_follow_up_concurrency:
             check_ministry_follow_up_concurrency(psql, target)
+        elif args.public_intake_concurrency:
+            if args.scenario is not None:
+                run(target, "-f", str(scenario))
+                print("PASS: " + scenario_name, flush=True)
+            check_public_intake_concurrency(psql, target)
         else:
             run(target, "-f", str(scenario))
-            print("PASS: " + args.scenario, flush=True)
+            print("PASS: " + scenario_name, flush=True)
     finally:
         run(admin, "-c", f'DROP DATABASE "{database}" WITH (FORCE)')
 

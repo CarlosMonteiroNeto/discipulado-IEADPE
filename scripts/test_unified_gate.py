@@ -245,6 +245,7 @@ class UnifiedGateContractTests(unittest.TestCase):
                         "--import-concurrency", "--lifecycle-concurrency",
                         "--ministry-registry-concurrency", "--ministry-academic-concurrency",
                         "--convert-student-concurrency", "--ministry-follow-up-concurrency",
+                        "--public-intake-concurrency",
                     }, "verification gate omitted or added a concurrency suite")
                     canonical = next(argv for argv in database_calls
                                      if argv and argv[0] == "canonical_person_link_test.sql")
