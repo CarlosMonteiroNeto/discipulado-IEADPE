@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -11,6 +12,7 @@ import 'package:ieadpe_converts/features/intake/intake_models.dart';
 import 'package:ieadpe_converts/features/intake/public_intake_page.dart';
 import 'package:ieadpe_converts/features/intake/public_intake_repository.dart';
 import 'package:ieadpe_converts/features/intake/turnstile_challenge.dart';
+import 'package:ieadpe_converts/routing/browser_route_history.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -27,6 +29,9 @@ class _FakePublicIntakeRepository extends PublicIntakeRepository {
       );
 
   int catalogReads = 0;
+  List<PublicCongregation> catalog = const [
+    PublicCongregation(id: _congregationId, name: 'Congregação Central'),
+  ];
   final submissions = <({String id, String token, PublicIntakeDraft draft})>[];
   Future<void> Function(String id, PublicIntakeDraft draft, String token)?
   submitHandler;
@@ -34,9 +39,7 @@ class _FakePublicIntakeRepository extends PublicIntakeRepository {
   @override
   Future<List<PublicCongregation>> listAllCongregations() async {
     catalogReads++;
-    return const [
-      PublicCongregation(id: _congregationId, name: 'Congregação Central'),
-    ];
+    return catalog;
   }
 
   @override
@@ -48,6 +51,39 @@ class _FakePublicIntakeRepository extends PublicIntakeRepository {
     submissions.add((id: submissionId, token: turnstileToken, draft: draft));
     await submitHandler?.call(submissionId, draft, turnstileToken);
   }
+}
+
+class _FakeBootstrapHistory implements BrowserRouteHistory {
+  _FakeBootstrapHistory(String initialPath) : _paths = [initialPath];
+
+  final List<String> _paths;
+  int _index = 0;
+  void Function(String path)? _onPop;
+
+  @override
+  String? get currentPath => _paths[_index];
+
+  @override
+  void listen(void Function(String path) onPop) => _onPop = onPop;
+
+  @override
+  void push(String path) {
+    _paths.removeRange(_index + 1, _paths.length);
+    _paths.add(path);
+    _index = _paths.length - 1;
+  }
+
+  @override
+  void replace(String path) => _paths[_index] = path;
+
+  void back() {
+    if (_index == 0) return;
+    _index--;
+    _onPop?.call(_paths[_index]);
+  }
+
+  @override
+  void dispose() => _onPop = null;
 }
 
 class _FakeTurnstileChallenge implements TurnstileChallenge {
@@ -430,6 +466,66 @@ void main() {
     },
   );
 
+  testWidgets('browser Back from login restores public registration', (
+    tester,
+  ) async {
+    final protectedRequests = <http.Request>[];
+    final auth = _AuthProbe(protectedRequests);
+    final repository = _FakePublicIntakeRepository();
+    final history = _FakeBootstrapHistory('/');
+    final challenges = <_FakeTurnstileChallenge>[];
+    _FakeTurnstileChallenge newChallenge() {
+      final challenge = _FakeTurnstileChallenge();
+      challenges.add(challenge);
+      return challenge;
+    }
+
+    addTearDown(() async {
+      await auth.events.close();
+      var disposed = false;
+      final disposal = auth.client.dispose().then((_) => disposed = true);
+      for (var attempt = 0; attempt < 30 && !disposed; attempt++) {
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(
+        disposed,
+        isTrue,
+        reason: 'fake AuthRepository client should dispose',
+      );
+      await disposal;
+    });
+
+    await tester.pumpWidget(
+      App(
+        initialPath: '/',
+        auth: auth,
+        publicIntakeRepository: repository,
+        turnstileChallengeFactory: newChallenge,
+        browserRouteHistoryFactory: () => history,
+      ),
+    );
+    await _pumpAppFrames(tester);
+    expect(find.text('Cadastro público'), findsOneWidget);
+
+    await tester.tap(find.byKey(const ValueKey('app-shell-nav-/home')));
+    await _pumpAppFrames(tester);
+    expect(find.text('Entrar com Google'), findsOneWidget);
+    expect(history.currentPath, '/home');
+
+    history.back();
+    await _pumpAppFrames(tester);
+    expect(history.currentPath, '/');
+    expect(find.text('Cadastro público'), findsOneWidget);
+    expect(find.text('Entrar com Google'), findsNothing);
+    expect(protectedRequests, isEmpty);
+
+    await tester.pumpWidget(const SizedBox());
+    expect(challenges.every((challenge) => challenge.disposals == 1), isTrue);
+  });
+
   testWidgets(
     'authenticated no-grant register uses public names and pending submission',
     (tester) async {
@@ -447,6 +543,27 @@ void main() {
           ),
         );
       final repository = _FakePublicIntakeRepository();
+      repository.catalog = const [
+        PublicCongregation(
+          id: '33333333-3333-4333-8333-333333333333',
+          name: 'Zeta',
+        ),
+        PublicCongregation(id: _congregationId, name: 'Congregação Central'),
+        PublicCongregation(
+          id: '44444444-4444-4444-8444-444444444444',
+          name: 'Sede Alfa',
+        ),
+      ];
+      const localeChannel = MethodChannel('br.org.ieadpe/locale');
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(localeChannel, (call) async {
+        final names = List<String>.from(call.arguments as List)..sort();
+        return names;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(localeChannel, null),
+      );
       final challenges = <_FakeTurnstileChallenge>[];
       _FakeTurnstileChallenge newChallenge() {
         final challenge = _FakeTurnstileChallenge();
@@ -471,6 +588,19 @@ void main() {
       expect(protectedRequests, isEmpty);
       expect(find.text('Escolher foto'), findsNothing);
       expect(find.text('Verificação de segurança'), findsOneWidget);
+      final congregationField = tester.widget<DropdownButton<String>>(
+        find.descendant(
+          of: find.byKey(const ValueKey('convert-congregation')),
+          matching: find.byType(DropdownButton<String>),
+        ),
+      );
+      expect(
+        congregationField.items!
+            .map((item) => (item.child as Text).data)
+            .toList(),
+        ['Sede Alfa', 'Congregação Central', 'Zeta'],
+        reason: 'public catalog rows use existing locale and Sede ordering',
+      );
 
       await _fillPublicForm(tester);
       final submit = find.widgetWithText(FilledButton, 'Cadastrar');

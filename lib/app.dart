@@ -16,6 +16,7 @@ import 'features/admin/congregation_repository.dart';
 import 'features/backup/backup_panel.dart';
 import 'features/backup/backup_repository.dart';
 import 'features/converts/convert_form.dart';
+import 'features/converts/congregation_order.dart';
 import 'features/converts/converts_page.dart';
 import 'features/converts/register_page.dart';
 import 'features/intake/public_intake_page.dart';
@@ -57,6 +58,7 @@ class App extends StatelessWidget {
     this.publicIntakeRepository,
     this.turnstileChallengeFactory,
     this.initialPath,
+    this.browserRouteHistoryFactory,
   });
 
   final Configuration? configuration;
@@ -64,6 +66,7 @@ class App extends StatelessWidget {
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;
   final String? initialPath;
+  final BrowserRouteHistory Function()? browserRouteHistoryFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -79,6 +82,7 @@ class App extends StatelessWidget {
         publicIntakeRepository: publicIntakeRepository,
         turnstileChallengeFactory: turnstileChallengeFactory,
         initialPath: initialPath,
+        browserRouteHistoryFactory: browserRouteHistoryFactory,
       ),
     );
   }
@@ -91,6 +95,7 @@ class _BootstrapScreen extends StatefulWidget {
     this.publicIntakeRepository,
     this.turnstileChallengeFactory,
     this.initialPath,
+    this.browserRouteHistoryFactory,
   });
 
   final Configuration? configuration;
@@ -98,6 +103,7 @@ class _BootstrapScreen extends StatefulWidget {
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;
   final String? initialPath;
+  final BrowserRouteHistory Function()? browserRouteHistoryFactory;
 
   @override
   State<_BootstrapScreen> createState() => _BootstrapScreenState();
@@ -125,7 +131,9 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
     final path = widget.initialPath ?? Uri.base.path;
     _publicMode = isPublicRegistrationPath(path);
     _intendedRoute = widget.initialPath == null ? null : safeRoute(path);
-    _browserHistory = createBrowserRouteHistory();
+    _browserHistory =
+        (widget.browserRouteHistoryFactory ?? createBrowserRouteHistory)();
+    _browserHistory!.listen(_browserPathChanged);
     _publicIntakeRepository = widget.publicIntakeRepository;
     if (_publicIntakeRepository == null && _configuration.isValid) {
       _publicIntakeRepository = PublicIntakeRepository(
@@ -173,17 +181,41 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
     }
   }
 
-  void _openProtectedRoute(String route) {
-    final destination = safeRoute(route);
-    if (isPublicRegistrationPath(destination)) return;
-    _browserHistory?.push(destination);
+  void _showProtectedRoute(String destination, {required bool pushHistory}) {
+    if (pushHistory) _browserHistory?.push(destination);
     setState(() {
       _publicMode = false;
       _publicChallenge = null;
       _intendedRoute = destination;
-      _auth = widget.auth;
+      if (widget.auth != null) _auth = widget.auth;
     });
     if (_auth == null) unawaited(_initialize(intendedRoute: destination));
+  }
+
+  void _openProtectedRoute(String route) {
+    final destination = safeRoute(route);
+    if (isPublicRegistrationPath(destination)) return;
+    _showProtectedRoute(destination, pushHistory: true);
+  }
+
+  void _browserPathChanged(String path) {
+    if (!mounted) return;
+    final destination = safeRoute(path);
+    if (destination != path) _browserHistory?.replace(destination);
+    if (isPublicRegistrationPath(destination)) {
+      if (_publicMode) {
+        _intendedRoute = destination;
+        return;
+      }
+      setState(() {
+        _publicMode = true;
+        _publicChallenge = _newChallenge();
+        _intendedRoute = destination;
+        _loading = false;
+      });
+      return;
+    }
+    if (_publicMode) _showProtectedRoute(destination, pushHistory: false);
   }
 
   Future<void> _returnToPublicRegistration() async {
@@ -636,10 +668,10 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         if (publicRepository == null) {
           throw StateError('Public registration catalog unavailable');
         }
-        rows = [
+        rows = await orderCongregations([
           for (final item in await publicRepository.listAllCongregations())
             Congregation(id: item.id, name: item.name),
-        ];
+        ]);
       } else {
         rows = await CongregationRepository(widget.gateway).list();
       }

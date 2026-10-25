@@ -194,6 +194,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
 
   void _browserPathChanged(String path) {
     final candidate = safeRoute(path);
+    if (_scope == null && isPublicRegistrationPath(candidate)) return;
     if (_scope != null && allowedRoutes.contains(candidate)) {
       _route = candidate;
       _lastAuthorized = candidate;

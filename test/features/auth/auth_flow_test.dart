@@ -253,6 +253,32 @@ void main() {
       await auth.events.close();
     },
   );
+  test(
+    'unauthenticated router leaves public pop paths for bootstrap',
+    () async {
+      final auth = FakeAuth()..currentSession = null;
+      final history = _FakeBrowserHistory()..initialPath = '/home';
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        browserHistory: history,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      history.onPop?.call('/');
+      expect(
+        history.entries,
+        isEmpty,
+        reason:
+            'bootstrap owns the public root path during unauthenticated login',
+      );
+      history.onPop?.call('/register');
+      expect(history.entries, isEmpty);
+
+      router.dispose();
+      await auth.events.close();
+    },
+  );
   test('browser refresh restores only a server authorized path', () async {
     final auth = FakeAuth()
       ..access = AccessScope(ministryCongregationIds: ['ministry-id']);
