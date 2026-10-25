@@ -91,6 +91,8 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   bool _signingOut = false;
   String _route = '/login';
   String get route => _route;
+  final Set<Object> _navigationLocks = <Object>{};
+  bool get navigationLocked => _navigationLocks.isNotEmpty;
   AccessScope? get scope => _scope;
   bool get isChecking => _checking;
   bool _checking = false;
@@ -101,6 +103,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
 
   void _invalidate() {
     _generation++;
+    _navigationLocks.clear();
     _scope = null;
     _route = '/login';
     _checking = false;
@@ -185,6 +188,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   }
 
   void go(String route) {
+    if (navigationLocked && route != _route) return;
     final next = allowedRoutes.contains(route)
         ? route
         : (_scope == null ? '/login' : '/register');
@@ -197,6 +201,10 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   void _browserPathChanged(String path) {
     final candidate = safeRoute(path);
     if (_scope == null && isPublicRegistrationPath(candidate)) return;
+    if (navigationLocked) {
+      if (candidate != _route) _browserHistory.push(_route);
+      return;
+    }
     if (_scope != null && allowedRoutes.contains(candidate)) {
       _route = candidate;
       _lastAuthorized = candidate;
@@ -204,6 +212,20 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
       return;
     }
     _browserHistory.replace(_scope == null ? '/login' : '/register');
+  }
+
+  /// Prevents shell and browser route changes while a protected operation
+  /// needs its page-local retry state. Security invalidation clears the lock.
+  Object acquireNavigationLock() {
+    final token = Object();
+    _navigationLocks.add(token);
+    notifyListeners();
+    return token;
+  }
+
+  void releaseNavigationLock(Object token) {
+    if (!_navigationLocks.remove(token)) return;
+    if (!_disposed) notifyListeners();
   }
 
   Future<void> signOut() async {
@@ -224,6 +246,7 @@ class SessionRouter extends ChangeNotifier with WidgetsBindingObserver {
   @override
   void dispose() {
     _disposed = true;
+    _navigationLocks.clear();
     _generation++;
     _browserHistory.dispose();
     WidgetsBinding.instance.removeObserver(this);

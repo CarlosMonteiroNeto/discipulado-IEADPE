@@ -335,6 +335,56 @@ void main() {
     },
   );
   test(
+    'navigation lock blocks routes but clears on scope revocation and sign-out',
+    () async {
+      final auth = FakeAuth()
+        ..access = AccessScope(congregationIds: ['campaign']);
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        intendedRoute: '/pending',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(router.route, '/pending');
+
+      final revokedLock = router.acquireNavigationLock();
+      router.go('/home');
+      expect(router.route, '/pending');
+      expect(router.navigationLocked, isTrue);
+
+      auth.access = AccessScope();
+      await router.revalidate();
+      expect(router.navigationLocked, isFalse);
+      expect(router.route, '/register');
+
+      auth.access = AccessScope(isAdmin: true);
+      await router.revalidate();
+      router.go('/pending');
+      final currentLock = router.acquireNavigationLock();
+      router.releaseNavigationLock(revokedLock);
+      expect(
+        router.navigationLocked,
+        isTrue,
+        reason: 'a stale page cannot release a newer navigation lock',
+      );
+      router.releaseNavigationLock(currentLock);
+      expect(router.navigationLocked, isFalse);
+
+      auth.signingOut = Completer<void>();
+      router.acquireNavigationLock();
+      final logout = router.signOut();
+      expect(router.navigationLocked, isFalse);
+      await router.refresh();
+      expect(router.route, '/login');
+      expect(router.navigationLocked, isFalse);
+      auth.signingOut!.complete();
+      await logout;
+
+      router.dispose();
+      await auth.events.close();
+    },
+  );
+  test(
     'resume cannot reopen protected pages while signout is pending',
     () async {
       final auth = FakeAuth()..signingOut = Completer<void>();

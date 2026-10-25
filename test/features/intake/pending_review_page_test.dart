@@ -6,6 +6,7 @@ import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/features/intake/pending_review_page.dart';
 import 'package:ieadpe_converts/features/intake/pending_submission_repository.dart';
+import 'package:ieadpe_converts/routing/browser_route_history.dart';
 import 'package:ieadpe_converts/routing/router.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
 
@@ -132,6 +133,107 @@ class _Gateway implements PendingReviewGateway {
   ) async => throw UnimplementedError();
 }
 
+class _ReviewHistory implements BrowserRouteHistory {
+  final entries = <String>['/home', '/pending'];
+  int index = 1;
+  void Function(String path)? onPop;
+
+  @override
+  String? get currentPath => entries[index];
+
+  @override
+  void listen(void Function(String path) callback) => onPop = callback;
+
+  @override
+  void push(String path) {
+    entries.removeRange(index + 1, entries.length);
+    entries.add(path);
+    index = entries.length - 1;
+  }
+
+  @override
+  void replace(String path) => entries[index] = path;
+
+  void back() {
+    if (index > 0) onPop?.call(entries[--index]);
+  }
+
+  @override
+  void dispose() => onPop = null;
+}
+
+class _PendingNavigationHarness extends StatefulWidget {
+  const _PendingNavigationHarness({
+    required this.router,
+    required this.gateway,
+  });
+
+  final SessionRouter router;
+  final _Gateway gateway;
+
+  @override
+  State<_PendingNavigationHarness> createState() =>
+      _PendingNavigationHarnessState();
+}
+
+class _PendingNavigationHarnessState extends State<_PendingNavigationHarness> {
+  @override
+  void initState() {
+    super.initState();
+    widget.router.addListener(_rebuild);
+  }
+
+  @override
+  void didUpdateWidget(covariant _PendingNavigationHarness oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.router != widget.router) {
+      oldWidget.router.removeListener(_rebuild);
+      widget.router.addListener(_rebuild);
+    }
+  }
+
+  void _rebuild() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    widget.router.removeListener(_rebuild);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = widget.router.scope;
+    if (scope == null) {
+      return const MaterialApp(home: Scaffold(body: Text('Validando sessão')));
+    }
+    return MaterialApp(
+      home: AppShell(
+        scope: scope,
+        currentRoute: widget.router.route,
+        navigationLocked: widget.router.navigationLocked,
+        onNavigate: widget.router.go,
+        onSignOut: () => unawaited(widget.router.signOut()),
+        onFeedback: () {},
+        child: widget.router.route == '/pending'
+            ? PendingReviewPage(
+                repository: PendingSubmissionRepository(widget.gateway),
+                scope: scope,
+                congregations: const [
+                  Congregation(id: _congregation, name: 'Central'),
+                ],
+                now: () => DateTime.utc(2026, 10, 25, 10),
+                onScopeRefresh: widget.router.refresh,
+                acquireNavigationLock: widget.router.acquireNavigationLock,
+                releaseNavigationLock: widget.router.releaseNavigationLock,
+              )
+            : Center(child: Text('Rota: ${widget.router.route}')),
+      ),
+    );
+  }
+}
+
 Future<void> _showPage(
   WidgetTester tester, {
   required _Gateway gateway,
@@ -151,11 +253,21 @@ Future<void> _showPage(
               Congregation(id: _otherCongregation, name: 'Norte'),
             ],
         now: () => DateTime.utc(2026, 10, 25, 10),
+        acquireNavigationLock: Object.new,
+        releaseNavigationLock: (_) {},
       ),
     ),
   );
   await tester.pumpAndSettle();
 }
+
+TextFormField _personNameField(WidgetTester tester) =>
+    tester.widget<TextFormField>(
+      find.descendant(
+        of: find.byKey(const ValueKey('person-name')),
+        matching: find.byType(TextFormField),
+      ),
+    );
 
 void main() {
   testWidgets('only review-authorized scope receives Pendentes navigation', (
@@ -314,6 +426,162 @@ void main() {
     expect(gateway.reviews, isEmpty);
     expect(gateway.listItems, hasLength(1));
     expect(find.text('Maria de Exemplo'), findsOneWidget);
+  });
+
+  testWidgets('shell navigation cannot discard an in-flight review operation', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(1280, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    final gateway = _Gateway()
+      ..pendingReview = Completer<Map<String, dynamic>>();
+    final auth = FakeAuth()
+      ..access = AccessScope(congregationIds: [_congregation]);
+    final history = _ReviewHistory();
+    final router = SessionRouter(
+      auth,
+      clearProtectedCaches: () {},
+      intendedRoute: '/pending',
+      browserHistory: history,
+    );
+    addTearDown(router.dispose);
+    addTearDown(auth.events.close);
+    await t.pumpWidget(
+      _PendingNavigationHarness(router: router, gateway: gateway),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('Maria de Exemplo'));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.byKey(const ValueKey('person-name')));
+    await t.enterText(
+      find.byKey(const ValueKey('person-name')),
+      'Maria Corrigida',
+    );
+    await t.ensureVisible(find.text('Aprovar cadastro'));
+    await t.tap(find.text('Aprovar cadastro'));
+    await t.pump();
+    expect(gateway.reviews, hasLength(1));
+    expect(router.navigationLocked, isTrue);
+    expect(
+      t
+          .widget<TextButton>(find.byKey(const ValueKey('app-shell-nav-/home')))
+          .onPressed,
+      isNull,
+    );
+    expect(
+      t
+          .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+          .onPressed,
+      isNull,
+      reason: 'feedback overlay must not replace a frozen review page',
+    );
+    expect(
+      t
+          .widgetList<IconButton>(find.byType(IconButton))
+          .singleWhere((button) => button.tooltip == 'Sair')
+          .onPressed,
+      isNotNull,
+      reason: 'sign-out remains available to invalidate protected state',
+    );
+    await t.tap(
+      find.byKey(const ValueKey('app-shell-nav-/home')),
+      warnIfMissed: false,
+    );
+    await t.pumpAndSettle();
+    expect(router.route, '/pending');
+
+    router.go('/home');
+    expect(
+      router.route,
+      '/pending',
+      reason: 'an in-flight review must keep its exact page state mounted',
+    );
+
+    gateway.pendingReview!.completeError(const DataFailure('unavailable'));
+    gateway.pendingReview = null;
+    await t.pumpAndSettle();
+    expect(
+      find.textContaining('resultado ainda é desconhecido'),
+      findsOneWidget,
+    );
+    expect(router.navigationLocked, isTrue);
+    final first = gateway.reviews.single;
+    expect(
+      (first.payload['draft'] as Map)['person']['name'],
+      'Maria Corrigida',
+    );
+    expect(_personNameField(t).controller?.text, 'Maria Corrigida');
+    history.back();
+    expect(router.route, '/pending');
+    expect(history.currentPath, '/pending');
+    expect(_personNameField(t).controller?.text, 'Maria Corrigida');
+
+    await t.tap(find.text('Tentar novamente'));
+    await t.pumpAndSettle();
+    expect(gateway.reviews, hasLength(2));
+    expect(gateway.reviews.last.operationId, first.operationId);
+    expect(gateway.reviews.last.payload, first.payload);
+    expect(router.navigationLocked, isFalse);
+    expect(
+      t
+          .widget<TextButton>(find.byKey(const ValueKey('app-shell-nav-/home')))
+          .onPressed,
+      isNotNull,
+    );
+    await t.tap(find.byKey(const ValueKey('app-shell-nav-/home')));
+    await t.pumpAndSettle();
+    expect(router.route, '/home');
+  });
+
+  testWidgets('browser Back cannot discard an unknown review operation', (
+    t,
+  ) async {
+    t.view.physicalSize = const Size(1280, 900);
+    t.view.devicePixelRatio = 1;
+    addTearDown(t.view.resetPhysicalSize);
+    addTearDown(t.view.resetDevicePixelRatio);
+    final gateway = _Gateway()
+      ..reviewFailure = 'unavailable'
+      ..failReviewCount = 1;
+    final auth = FakeAuth()
+      ..access = AccessScope(congregationIds: [_congregation]);
+    final history = _ReviewHistory();
+    final router = SessionRouter(
+      auth,
+      clearProtectedCaches: () {},
+      intendedRoute: '/pending',
+      browserHistory: history,
+    );
+    addTearDown(router.dispose);
+    addTearDown(auth.events.close);
+    await t.pumpWidget(
+      _PendingNavigationHarness(router: router, gateway: gateway),
+    );
+    await t.pumpAndSettle();
+    await t.tap(find.text('Maria de Exemplo'));
+    await t.pumpAndSettle();
+    await t.ensureVisible(find.text('Aprovar cadastro'));
+    await t.tap(find.text('Aprovar cadastro'));
+    await t.pumpAndSettle();
+    expect(
+      find.textContaining('resultado ainda é desconhecido'),
+      findsOneWidget,
+    );
+    expect(router.navigationLocked, isTrue);
+
+    history.back();
+    expect(
+      router.route,
+      '/pending',
+      reason: 'browser popstate must not unmount an unresolved review',
+    );
+    expect(history.currentPath, '/pending');
+    expect(find.byKey(const ValueKey('person-name')), findsOneWidget);
+    expect(_personNameField(t).controller?.text, 'Maria de Exemplo');
+    expect(gateway.reviews.single.operationId, isNotEmpty);
+    expect(router.navigationLocked, isTrue);
   });
 
   testWidgets(
@@ -507,6 +775,8 @@ void main() {
               Congregation(id: _congregation, name: 'Central'),
             ],
             now: () => DateTime.utc(2026, 10, 25, 10),
+            acquireNavigationLock: Object.new,
+            releaseNavigationLock: (_) {},
           ),
         ),
       );

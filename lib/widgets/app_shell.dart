@@ -19,6 +19,7 @@ class AppShell extends StatelessWidget {
     this.currentRoute = '/home',
     this.onFeedback,
     this.publicMode = false,
+    this.navigationLocked = false,
   });
 
   final Widget child;
@@ -28,6 +29,7 @@ class AppShell extends StatelessWidget {
   final VoidCallback onSignOut;
   final VoidCallback? onFeedback;
   final bool publicMode;
+  final bool navigationLocked;
 
   static const labels = {
     '/home': 'Início',
@@ -85,6 +87,7 @@ class AppShell extends StatelessWidget {
   ];
 
   void _feedback(BuildContext context) {
+    if (navigationLocked) return;
     if (onFeedback != null) {
       onFeedback!.call();
     } else {
@@ -158,10 +161,12 @@ class AppShell extends StatelessWidget {
                       selected: _active(route),
                       selectedColor: UnifiedColors.brandNavy,
                       selectedTileColor: UnifiedColors.selected,
-                      onTap: () {
-                        Navigator.of(drawerContext).pop();
-                        onNavigate(route);
-                      },
+                      onTap: navigationLocked
+                          ? null
+                          : () {
+                              Navigator.of(drawerContext).pop();
+                              onNavigate(route);
+                            },
                     ),
                   if (!publicMode) ...[
                     const Divider(),
@@ -169,10 +174,12 @@ class AppShell extends StatelessWidget {
                       key: const ValueKey('app-shell-drawer-feedback'),
                       leading: const Icon(Icons.feedback_outlined),
                       title: const Text('Enviar sugestão'),
-                      onTap: () {
-                        Navigator.of(drawerContext).pop();
-                        _feedback(drawerContext);
-                      },
+                      onTap: navigationLocked
+                          ? null
+                          : () {
+                              Navigator.of(drawerContext).pop();
+                              _feedback(drawerContext);
+                            },
                     ),
                     ListTile(
                       key: const ValueKey('app-shell-drawer-sign-out'),
@@ -203,7 +210,7 @@ class AppShell extends StatelessWidget {
           backgroundColor: selected ? Colors.white : Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: () => onNavigate(route),
+        onPressed: navigationLocked ? null : () => onNavigate(route),
         icon: Icon(icons[route], size: 18),
         label: Text(
           labels[route]!,
@@ -228,6 +235,7 @@ class AppShell extends StatelessWidget {
         for (final route in routes)
           PopupMenuItem<String>(
             value: route,
+            enabled: !navigationLocked,
             child: Row(
               children: [
                 Icon(icons[route], size: 20),
@@ -237,8 +245,9 @@ class AppShell extends StatelessWidget {
             ),
           ),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: _feedbackAction,
+          enabled: !navigationLocked,
           child: Row(
             children: [
               Icon(Icons.feedback_outlined, size: 20),
@@ -295,9 +304,11 @@ class AppShell extends StatelessWidget {
                       child: Text(labels[route]!, maxLines: 2),
                     ),
                 ],
-                onChanged: (route) {
-                  if (route != null) onNavigate(route);
-                },
+                onChanged: navigationLocked
+                    ? null
+                    : (route) {
+                        if (route != null) onNavigate(route);
+                      },
               ),
             ),
           ),
@@ -418,10 +429,12 @@ class AppShell extends StatelessWidget {
                           child: Semantics(
                             key: ValueKey('app-shell-nav-$route'),
                             selected: _active(route),
-                            button: true,
+                            button: !navigationLocked,
                             label: labels[route],
                             child: InkWell(
-                              onTap: () => onNavigate(route),
+                              onTap: navigationLocked
+                                  ? null
+                                  : () => onNavigate(route),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -523,7 +536,7 @@ class AppShell extends StatelessWidget {
           ? null
           : FloatingActionButton(
               tooltip: 'Enviar sugestão',
-              onPressed: () => _feedback(context),
+              onPressed: navigationLocked ? null : () => _feedback(context),
               child: const Icon(Icons.feedback_outlined),
             ),
     );

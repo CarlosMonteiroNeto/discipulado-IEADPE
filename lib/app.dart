@@ -796,6 +796,8 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
               )
               .toList(growable: false),
           onScopeRefresh: widget.router.refresh,
+          acquireNavigationLock: widget.router.acquireNavigationLock,
+          releaseNavigationLock: widget.router.releaseNavigationLock,
         ),
         _ => RegisterPage(
           converts: widget.converts,
@@ -822,7 +824,9 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     return AppShell(
       scope: widget.scope,
       currentRoute: widget.router.route,
+      navigationLocked: widget.router.navigationLocked,
       onNavigate: (route) {
+        if (widget.router.navigationLocked) return;
         setState(() => _overlay = null);
         if (!route.startsWith('/ministry') && _catalog == null) _load();
         widget.router.go(route);

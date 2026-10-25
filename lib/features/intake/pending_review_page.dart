@@ -19,6 +19,8 @@ class PendingReviewPage extends StatefulWidget {
     required this.repository,
     required this.scope,
     required this.congregations,
+    required this.acquireNavigationLock,
+    required this.releaseNavigationLock,
     this.onScopeRefresh,
     this.now = DateTime.now,
   });
@@ -26,6 +28,8 @@ class PendingReviewPage extends StatefulWidget {
   final PendingSubmissionRepository repository;
   final AccessScope scope;
   final List<Congregation> congregations;
+  final Object Function() acquireNavigationLock;
+  final void Function(Object token) releaseNavigationLock;
   final Future<void> Function()? onScopeRefresh;
   final DateTime Function() now;
 
@@ -47,6 +51,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
   String? _operationId;
   PendingReviewDecision? _frozenDecision;
   Map<String, Object?>? _frozenDraft;
+  Object? _navigationLockToken;
   int _requestSequence = 0;
 
   bool get _authorized =>
@@ -188,6 +193,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
   }
 
   void _backToQueue() {
+    if (_busy || _unknownOutcome) return;
     setState(() {
       _detail = null;
       _decisionError = null;
@@ -217,6 +223,17 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
     _frozenDecision = null;
     _frozenDraft = null;
     _busy = false;
+    _releaseNavigationLock();
+  }
+
+  void _acquireNavigationLock() {
+    _navigationLockToken ??= widget.acquireNavigationLock();
+  }
+
+  void _releaseNavigationLock() {
+    final token = _navigationLockToken;
+    _navigationLockToken = null;
+    if (token != null) widget.releaseNavigationLock(token);
   }
 
   void _clearPageData() {
@@ -252,6 +269,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
     }
     final publicDraft = PublicIntakeDraft.fromConvertDraft(draft).toJson();
     final operationId = _operationId ?? const Uuid().v4();
+    _acquireNavigationLock();
     setState(() {
       _busy = true;
       _operationId = operationId;
@@ -270,6 +288,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
     final detail = _detail;
     if (detail == null || _busy || _unknownOutcome) return;
     final operationId = const Uuid().v4();
+    _acquireNavigationLock();
     setState(() {
       _busy = true;
       _operationId = operationId;
@@ -332,6 +351,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
           _operationId = null;
           _frozenDecision = null;
           _frozenDraft = null;
+          _releaseNavigationLock();
         }
         _decisionError = error.outcomeUnknown
             ? 'O resultado ainda é desconhecido. Tente novamente para confirmar a mesma decisão.'
@@ -349,6 +369,7 @@ class _PendingReviewPageState extends State<PendingReviewPage> {
           _operationId = null;
           _frozenDecision = null;
           _frozenDraft = null;
+          _releaseNavigationLock();
           _decisionError = 'Revise os dados e tente novamente.';
         });
       }
