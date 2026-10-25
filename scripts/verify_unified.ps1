@@ -125,6 +125,15 @@ try {
         $results.Add([pscustomobject]@{ Name='Browser adapter smoke'; State='BLOCKED'; Exit='n/a'; Command='Chrome/Chromium smoke scripts'; Detail='Chrome/Chromium executable unavailable' })
     }
     Invoke-Gate 'Local routes and asset rewrite fixture' 'python' @('-m','unittest','discover','-s','scripts','-p','test_release_operations.py')
+    Invoke-Gate 'Unified journey runner guards' 'python' @('-m','unittest','discover','-s','scripts','-p','test_unified_journey_runner.py')
+
+    $denoTool = 'deno'
+    if (-not (Get-Command $denoTool -ErrorAction SilentlyContinue)) {
+        $fallbackDeno = Join-Path ([Environment]::GetFolderPath('UserProfile')) '.codex/tools/deno-local/bin/deno.exe'
+        if (Test-Path $fallbackDeno) { $denoTool = $fallbackDeno }
+    }
+    Invoke-Gate 'Public intake test handler check' $denoTool @('check','scripts/public_intake_test_server.ts') $false
+    Invoke-Gate 'Public intake Edge handler tests' $denoTool @('test','supabase/functions/public-intake') $false
 
     Invoke-Gate 'Integrated registrar-to-attendance browser journey' 'python' @('scripts/run_unified_journey.py') $true $true
     $failed = @($results | Where-Object State -eq 'FAIL').Count

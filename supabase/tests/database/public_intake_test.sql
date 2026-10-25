@@ -559,14 +559,18 @@ END $$;
 
 INSERT INTO auth.users(id,email,email_confirmed_at)
  VALUES('cf000000-0000-4000-8000-000000000001','intake-reviewer@example.test',now());
-INSERT INTO private.public_intake_decisions(submission_id,outcome,reviewer_uid,decided_at,retained_until)
+INSERT INTO private.public_intake_decisions(submission_id,outcome,reviewer_uid,decided_at,retained_until,
+ corrected_draft_digest)
  SELECT 'c2000000-0000-4000-8000-000000000001'::uuid,'rejected',
   'cf000000-0000-4000-8000-000000000001'::uuid,timestamptz '2026-07-26 12:00:00+00',
-  timestamptz '2026-10-25 11:59:59+00';
-INSERT INTO private.public_intake_decisions(submission_id,outcome,reviewer_uid,decided_at,retained_until)
+  timestamptz '2026-10-25 11:59:59+00',
+  encode(sha256(convert_to('null','UTF8')),'hex');
+INSERT INTO private.public_intake_decisions(submission_id,outcome,reviewer_uid,decided_at,retained_until,
+ corrected_draft_digest)
  SELECT 'c2000000-0000-4000-8000-000000000002'::uuid,'rejected',
   'cf000000-0000-4000-8000-000000000001'::uuid,timestamptz '2026-10-25 12:00:00+00',
-  timestamptz '2026-10-26 12:00:00+00';
+  timestamptz '2026-10-26 12:00:00+00',
+  encode(sha256(convert_to('null','UTF8')),'hex');
 SELECT private.public_intake_cleanup();
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM private.public_intake_decisions WHERE
  submission_id='c2000000-0000-4000-8000-000000000002'::uuid) AND

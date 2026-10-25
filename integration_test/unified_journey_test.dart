@@ -15,6 +15,8 @@ import 'package:ieadpe_converts/features/ministry/data/ministry_repository.dart'
 import 'package:ieadpe_converts/features/ministry/domain/ministry_models.dart';
 import 'package:ieadpe_converts/widgets/app_shell.dart';
 
+import 'public_intake_journey_test.dart' as public_intake;
+
 const _apiUrl = String.fromEnvironment('SUPABASE_URL');
 const _anonKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
 const _runId = String.fromEnvironment('JOURNEY_RUN_ID');
@@ -1399,6 +1401,7 @@ void main() {
     observedHttp.close();
     await independentProgressClient.dispose();
   }, timeout: const Timeout(Duration(minutes: 15)));
+  public_intake.registerPublicIntakeJourneyTests();
 }
 
 /// Captures only the generated student/person UUID pair from the production

@@ -28,6 +28,19 @@ void main() {
       expect(decoded.exif.imageIfd.hasOrientation, isFalse);
     },
   );
+  test('selected crop coordinates apply after EXIF orientation 6', () async {
+    final output = await processPhoto(
+      await File('test/features/photos/fixtures/orientation6.jpg')
+          .readAsBytes(),
+      crop: NormalizedPhotoCrop(left: 0, top: 0, size: .5),
+    );
+    final decoded = image.decodeJpg(output)!;
+    expect([decoded.width, decoded.height], [512, 512]);
+    final selectedCenter = decoded.getPixel(256, 256);
+    expect(selectedCenter.b, greaterThan(220));
+    expect(selectedCenter.r, lessThan(40));
+    expect(decoded.exif.imageIfd.hasOrientation, isFalse);
+  });
   test('independent PNG transparency composites onto white', () async {
     final output = await processPhoto(
       await File('test/features/photos/fixtures/transparent.png').readAsBytes(),

@@ -104,7 +104,7 @@ raise SystemExit(0)
     def _write_stubs(self) -> None:
         python = self._bash_path(sys.executable)
         dispatcher = self._bash_path(self.dispatcher)
-        names = ("python", "python3", "flutter", "dart", "psql", "supabase", "git")
+        names = ("python", "python3", "flutter", "dart", "psql", "supabase", "git", "deno")
         for name in names:
             posix = self.bin / name
             posix.write_text(

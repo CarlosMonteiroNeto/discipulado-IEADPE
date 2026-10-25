@@ -361,6 +361,7 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
           final viewport = math.min(available, constraints.maxWidth);
           _configureViewport(viewport);
           final textScale = MediaQuery.textScalerOf(context).scale(1);
+          final highContrast = MediaQuery.highContrastOf(context);
           return SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Center(
@@ -406,8 +407,14 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
                                     ),
                                     IgnorePointer(
                                       child: CustomPaint(
+                                        key: ValueKey(
+                                          highContrast
+                                              ? 'photo-crop-guide-high-contrast'
+                                              : 'photo-crop-guide-standard',
+                                        ),
                                         painter: _CropGuidePainter(
                                           active: _interacting,
+                                          highContrast: highContrast,
                                         ),
                                       ),
                                     ),
@@ -506,8 +513,9 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
 }
 
 class _CropGuidePainter extends CustomPainter {
-  const _CropGuidePainter({required this.active});
+  const _CropGuidePainter({required this.active, required this.highContrast});
   final bool active;
+  final bool highContrast;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -518,20 +526,35 @@ class _CropGuidePainter extends CustomPainter {
       ..fillType = PathFillType.evenOdd
       ..addRect(bounds)
       ..addOval(Rect.fromCircle(center: center, radius: radius));
-    canvas.drawPath(shade, Paint()..color = const Color(0x55000000));
+    canvas.drawPath(
+      shade,
+      Paint()..color = highContrast ? Colors.black : const Color(0x55000000),
+    );
+    if (highContrast) {
+      canvas.drawCircle(
+        center,
+        radius,
+        Paint()
+          ..color = Colors.black
+          ..strokeWidth = 6
+          ..style = PaintingStyle.stroke,
+      );
+    }
     canvas.drawCircle(
       center,
       radius,
       Paint()
-        ..color = active ? Colors.lightBlueAccent : Colors.white
-        ..strokeWidth = active ? 3 : 2
+        ..color = highContrast
+            ? (active ? Colors.yellow : Colors.white)
+            : (active ? Colors.lightBlueAccent : Colors.white)
+        ..strokeWidth = highContrast ? (active ? 4 : 3) : (active ? 3 : 2)
         ..style = PaintingStyle.stroke,
     );
   }
 
   @override
   bool shouldRepaint(covariant _CropGuidePainter oldDelegate) =>
-      active != oldDelegate.active;
+      active != oldDelegate.active || highContrast != oldDelegate.highContrast;
 }
 
 Future<NormalizedPhotoCrop?> showPhotoCrop(

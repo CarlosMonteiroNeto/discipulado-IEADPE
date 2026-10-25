@@ -26,7 +26,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Callable
 from urllib.error import HTTPError
-from urllib.parse import urlsplit
+from urllib.parse import quote, urlsplit
 
 from local_supabase_guard import (
     DatabaseTarget,
@@ -88,6 +88,8 @@ class JourneyFixture:
     direction_assignment_id: str
     out_of_scope_assignment_id: str
     convert_name: str
+    public_convert_name: str
+    public_submission_id: str | None = None
 
     @property
     def run_slug(self) -> str:
@@ -107,6 +109,7 @@ class JourneyFixture:
         return {
             "JOURNEY_RUN_ID": self.run_id,
             "JOURNEY_CONGREGATION_A_ID": self.congregation_a_id,
+            "JOURNEY_CONGREGATION_A_NAME": self.congregation_a_name,
             "JOURNEY_CONGREGATION_B_ID": self.congregation_b_id,
             "JOURNEY_CLASS_ID": self.class_id,
             "JOURNEY_SESSION_ID": self.session_id,
@@ -123,6 +126,7 @@ class JourneyFixture:
             "JOURNEY_OUT_OF_SCOPE_EMAIL": self.out_of_scope_email,
             "JOURNEY_OUT_OF_SCOPE_PASSWORD": self.out_of_scope_password,
             "JOURNEY_CONVERT_NAME": self.convert_name,
+            "JOURNEY_PUBLIC_CONVERT_NAME": self.public_convert_name,
             "JOURNEY_DIRECTION_ASSIGNMENT_ID": self.direction_assignment_id,
             "JOURNEY_ALLOWED_ORIGIN": "http://127.0.0.1:7357",
         }
@@ -187,6 +191,7 @@ def make_fixture(
         direction_assignment_id=id_for("direction-assignment-a"),
         out_of_scope_assignment_id=id_for("direction-assignment-b"),
         convert_name=f"Journey Convert {prefix}",
+        public_convert_name=f"Journey Pending Convert {prefix}",
     )
 
 
@@ -227,13 +232,22 @@ def cleanup_sql(fixture: JourneyFixture) -> str:
     f = fixture
     convert_ids = (
         "SELECT c.id FROM public.converts c "
-        f"WHERE c.created_by={_sql_uuid(f.registrar_id)} "
-        f"AND c.name={_sql_text(f.convert_name)} AND c.internal_id=c.id::text"
+        f"WHERE c.internal_id=c.id::text AND ((c.created_by={_sql_uuid(f.registrar_id)} "
+        f"AND c.name={_sql_text(f.convert_name)} AND c.congregation_id={_sql_uuid(f.congregation_a_id)}) "
+        f"OR (c.created_by={_sql_uuid(f.supervisor_id)} "
+        f"AND c.name={_sql_text(f.public_convert_name)} AND c.congregation_id={_sql_uuid(f.congregation_a_id)}))"
     )
     return f"""-- run_id: {f.run_id}
 BEGIN;
 CREATE TEMP TABLE journey_owned_converts ON COMMIT DROP AS
  {convert_ids};
+CREATE TEMP TABLE journey_owned_public_submissions ON COMMIT DROP AS
+ SELECT DISTINCT s.id FROM private.public_intake_submissions s
+ LEFT JOIN private.public_intake_decisions d ON d.submission_id=s.id
+  WHERE s.id={_sql_uuid(f.public_submission_id) if f.public_submission_id else 'NULL::uuid'}
+     OR (s.congregation_id={_sql_uuid(f.congregation_a_id)}
+         AND s.draft->'person'->>'name'={_sql_text(f.public_convert_name)})
+    OR d.official_convert_id IN (SELECT id FROM journey_owned_converts);
 CREATE TEMP TABLE journey_owned_students ON COMMIT DROP AS
  SELECT s.id FROM public.ministry_students s
  WHERE s.congregation_id={_sql_uuid(f.congregation_a_id)}
@@ -288,6 +302,14 @@ END
 $journey_cleanup$;
 DELETE FROM public.ministry_students
  WHERE id IN (SELECT id FROM journey_owned_students);
+DELETE FROM private.public_intake_decisions
+ WHERE submission_id IN (SELECT id FROM journey_owned_public_submissions);
+DELETE FROM private.public_intake_receipts
+ WHERE submission_id IN (SELECT id FROM journey_owned_public_submissions);
+DELETE FROM private.public_intake_accepted_events
+ WHERE submission_id IN (SELECT id FROM journey_owned_public_submissions);
+DELETE FROM private.public_intake_submissions
+ WHERE id IN (SELECT id FROM journey_owned_public_submissions);
 DELETE FROM public.convert_events
  WHERE convert_id IN (SELECT id FROM journey_owned_converts);
 DELETE FROM public.converts
@@ -318,6 +340,41 @@ DELETE FROM public.congregations WHERE
   (id={_sql_uuid(f.congregation_a_id)} AND name={_sql_text(f.congregation_a_name)}) OR
   (id={_sql_uuid(f.congregation_b_id)} AND name={_sql_text(f.congregation_b_name)});
 COMMIT;"""
+
+
+def public_intake_acceptance_sql(fixture: JourneyFixture) -> str:
+    """Check the one run-owned submission, erased payload, and canonical row."""
+
+    if fixture.public_submission_id is None:
+        raise ValueError("The browser did not report an intake submission ID.")
+    f = fixture
+    return f"""WITH target AS (
+ SELECT s.id,s.status,s.draft,s.payload_erased_at
+ FROM private.public_intake_submissions s
+ WHERE s.id={_sql_uuid(f.public_submission_id)}
+   AND s.congregation_id={_sql_uuid(f.congregation_a_id)}
+), decided AS (
+ SELECT d.submission_id,d.outcome,d.reviewer_uid,d.official_convert_id
+ FROM private.public_intake_decisions d
+ JOIN target t ON t.id=d.submission_id
+)
+SELECT CASE WHEN
+ (SELECT count(*) FROM target)=1
+ AND (SELECT count(*) FROM target
+      WHERE status='approved' AND draft IS NULL AND payload_erased_at IS NOT NULL)=1
+ AND (SELECT count(*) FROM decided
+      WHERE outcome='approved' AND reviewer_uid={_sql_uuid(f.supervisor_id)})=1
+ AND (SELECT count(*) FROM public.converts c
+      JOIN decided d ON d.official_convert_id=c.id
+      WHERE c.internal_id=c.id::text
+        AND c.created_by={_sql_uuid(f.supervisor_id)}
+        AND c.name={_sql_text(f.public_convert_name)}
+        AND c.congregation_id={_sql_uuid(f.congregation_a_id)})=1
+ AND (SELECT count(*) FROM private.public_intake_receipts r
+      JOIN target t ON t.id=r.submission_id)=1
+ AND (SELECT count(*) FROM private.public_intake_accepted_events e
+      JOIN target t ON t.id=e.submission_id)=1
+ THEN 'PASS' ELSE 'FAIL' END;"""
 
 
 def revocation_sql(fixture: JourneyFixture, assignment_id: str) -> str:
@@ -370,6 +427,9 @@ def flutter_settings(
         "JOURNEY_OUT_OF_SCOPE_EMAIL",
         "JOURNEY_OUT_OF_SCOPE_PASSWORD",
         "JOURNEY_CONVERT_NAME",
+        "JOURNEY_PUBLIC_CONVERT_NAME",
+        "JOURNEY_CONGREGATION_A_NAME",
+        "JOURNEY_INTAKE_TEST_ENDPOINT",
         "JOURNEY_DIRECTION_ASSIGNMENT_ID",
         "JOURNEY_ALLOWED_ORIGIN",
         "JOURNEY_CONTROL_URL",
@@ -377,6 +437,17 @@ def flutter_settings(
     }
     if any(key not in allowed for key in fixture):
         raise ValueError("Unexpected value requested for the Flutter test bundle.")
+    intake_endpoint = fixture.get("JOURNEY_INTAKE_TEST_ENDPOINT")
+    if intake_endpoint is not None:
+        endpoint = urlsplit(intake_endpoint)
+        if (
+            require_loopback_url(intake_endpoint, label="intake test endpoint")
+            != intake_endpoint
+            or endpoint.path != "/functions/v1/public-intake"
+            or endpoint.query
+            or endpoint.fragment
+        ):
+            raise UnsafeSupabaseTarget("Unsafe local intake test endpoint.")
     return {
         "SUPABASE_URL": api_url,
         "SUPABASE_PUBLISHABLE_KEY": anon_key,
@@ -490,6 +561,116 @@ class RevocationControl:
         self._server.shutdown()
         self._server.server_close()
         self._thread.join(timeout=3)
+
+
+class LocalPublicIntakeTestFunction:
+    """Serve the production intake handler with local-only deterministic dependencies."""
+
+    def __init__(
+        self,
+        config: LocalSupabase,
+        fixture: JourneyFixture,
+        *,
+        allowed_origin: str,
+    ) -> None:
+        origin = urlsplit(allowed_origin)
+        if (
+            require_loopback_url(allowed_origin, label="intake test Origin")
+            != allowed_origin
+            or origin.path
+            or origin.query
+            or origin.fragment
+        ):
+            raise UnsafeSupabaseTarget("Unsafe local intake test Origin.")
+        self.config = config
+        self.fixture = fixture
+        self.allowed_origin = allowed_origin
+        self.port = _free_loopback_port()
+        self.endpoint = (
+            f"http://127.0.0.1:{self.port}/functions/v1/public-intake"
+        )
+        self.health_url = f"http://127.0.0.1:{self.port}/__journey_health"
+        self.process: subprocess.Popen[bytes] | None = None
+
+    def start(self) -> None:
+        deno = _deno_executable()
+        if deno is None:
+            raise PrerequisiteBlocked("Deno is unavailable for the local intake test.")
+        api = urlsplit(self.config.api_url)
+        if api.scheme != "http" or api.hostname not in {
+            "localhost",
+            "127.0.0.1",
+            "::1",
+        }:
+            raise UnsafeSupabaseTarget("Unsafe local intake test API URL.")
+        api_host = f"[{api.hostname}]" if ":" in api.hostname else api.hostname
+        api_authority = f"{api_host}:{api.port or 80}"
+        script = ROOT / "scripts" / "public_intake_test_server.ts"
+        if not script.is_file():
+            raise PrerequisiteBlocked("Local intake test handler is missing.")
+        env = _safe_environment()
+        for key in (
+            "JOURNEY_LOCAL_API_URL",
+            "JOURNEY_LOCAL_SERVICE_ROLE_KEY",
+            "JOURNEY_RUN_ID",
+            "JOURNEY_ALLOWED_ORIGIN",
+            "JOURNEY_TEST_PORT",
+        ):
+            env.pop(key, None)
+        env.update(
+            {
+                "JOURNEY_LOCAL_API_URL": self.config.api_url,
+                "JOURNEY_LOCAL_SERVICE_ROLE_KEY": self.config.service_role_key,
+                "JOURNEY_RUN_ID": self.fixture.run_id,
+                "JOURNEY_ALLOWED_ORIGIN": self.allowed_origin,
+                "JOURNEY_TEST_PORT": str(self.port),
+            }
+        )
+        command = [
+            deno,
+            "run",
+            f"--allow-net=127.0.0.1:{self.port},{api_authority}",
+            "--allow-env=JOURNEY_LOCAL_API_URL,JOURNEY_LOCAL_SERVICE_ROLE_KEY,JOURNEY_RUN_ID,JOURNEY_ALLOWED_ORIGIN,JOURNEY_TEST_PORT",
+            str(script),
+        ]
+        try:
+            self.process = subprocess.Popen(
+                command,
+                cwd=ROOT,
+                env=env,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except OSError as error:
+            raise PrerequisiteBlocked("Local intake test handler could not start.") from error
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            process = self.process
+            if process is None or process.poll() is not None:
+                self.close()
+                raise PrerequisiteBlocked("Local intake test handler stopped during startup.")
+            try:
+                health = request_json(self.health_url, timeout=1)
+                if health == {"ready": True}:
+                    return
+            except Exception:
+                pass
+            time.sleep(0.1)
+        self.close()
+        raise PrerequisiteBlocked("Local intake test handler did not become ready.")
+
+    def close(self) -> None:
+        process = self.process
+        self.process = None
+        if process is None or process.poll() is not None:
+            return
+        process.terminate()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=3)
 
 
 def _safe_environment() -> dict[str, str]:
@@ -621,6 +802,34 @@ def run_sql(sql: str, database_url: str) -> str:
     return result.stdout.strip()
 
 
+def cleanup_public_intake_photo(config: LocalSupabase, fixture: JourneyFixture) -> None:
+    """Remove only the exact anonymous-upload probe object from this local run."""
+
+    api_url = require_loopback_url(config.api_url, label="API URL")
+    api_parts = urlsplit(api_url)
+    if api_parts.path not in {"", "/"}:
+        raise UnsafeSupabaseTarget("Unsafe local storage cleanup API URL.")
+    object_path = f"journey-test/{fixture.run_id}/unsigned.jpg"
+    endpoint = (
+        api_url.rstrip("/")
+        + "/storage/v1/object/convert-photos/"
+        + quote(object_path, safe="/")
+    )
+    try:
+        request_json(
+            endpoint,
+            method="DELETE",
+            headers={
+                "apikey": config.service_role_key,
+                "Authorization": f"Bearer {config.service_role_key}",
+            },
+            timeout=10,
+        )
+    except HTTPError as error:
+        if error.code != 404:
+            raise
+
+
 def _admin_create_user(config: LocalSupabase, user: JourneyUser) -> None:
     body = json.dumps(
         {
@@ -675,6 +884,21 @@ def _fixture_users(fixture: JourneyFixture) -> tuple[JourneyUser, ...]:
 
 def _command_exists(name: str) -> str | None:
     return shutil.which(name)
+
+
+def _deno_executable() -> str | None:
+    """Resolve installed Deno without requiring a persistent PATH change."""
+
+    names = ("deno.exe", "deno") if os.name == "nt" else ("deno",)
+    for name in names:
+        executable = _command_exists(name)
+        if executable is not None:
+            return executable
+    if os.name == "nt":
+        candidate = Path.home() / ".codex" / "tools" / "deno-local" / "bin" / "deno.exe"
+        if candidate.is_file():
+            return str(candidate)
+    return None
 
 
 def _chromedriver_executable() -> str | None:
@@ -898,9 +1122,11 @@ def _run_browser_journey(
     chrome: str,
     *,
     on_owned_identity: Callable[[str, str], None] | None = None,
+    on_public_submission: Callable[[str], None] | None = None,
 ) -> None:
     driver_port = _free_loopback_port()
     control: RevocationControl | None = None
+    intake_test_server: LocalPublicIntakeTestFunction | None = None
     process: subprocess.Popen[bytes] | None = None
     try:
         control = RevocationControl(
@@ -913,12 +1139,19 @@ def _run_browser_journey(
                 revocation_sql(fixture, assignment), config.database_url
             ),
         )
+        intake_test_server = LocalPublicIntakeTestFunction(
+            config,
+            fixture,
+            allowed_origin="http://127.0.0.1:7357",
+        )
+        intake_test_server.start()
         settings = flutter_settings(
             api_url=config.api_url,
             anon_key=config.anon_key,
             service_role_key=config.service_role_key,
             fixture={
                 **fixture.browser_values(),
+                "JOURNEY_INTAKE_TEST_ENDPOINT": intake_test_server.endpoint,
                 "JOURNEY_CONTROL_URL": f"http://{control.address[0]}:{control.address[1]}",
                 "JOURNEY_CONTROL_CAPABILITY": control.capability,
             },
@@ -944,8 +1177,13 @@ def _run_browser_journey(
         owned_identity = _owned_identity_from_output(
             (result.stdout or "") + "\n" + (result.stderr or "")
         )
+        public_submission_id = _public_submission_id_from_output(
+            (result.stdout or "") + "\n" + (result.stderr or "")
+        )
         if owned_identity is not None and on_owned_identity is not None:
             on_owned_identity(*owned_identity)
+        if public_submission_id is not None and on_public_submission is not None:
+            on_public_submission(public_submission_id)
         if result.returncode != 0:
             if any(
                 marker in (result.stdout + result.stderr).lower()
@@ -961,6 +1199,8 @@ def _run_browser_journey(
             raise JourneyFailure("The local Chromium journey failed.")
         if owned_identity is None:
             raise JourneyFailure("The browser journey did not report its owned student identity.")
+        if "PUBLIC_INTAKE_JOURNEY=PASS" not in (result.stdout or ""):
+            raise JourneyFailure("The public intake browser journey did not report completion.")
     except subprocess.TimeoutExpired as error:
         output = error.stdout or ""
         stderr = error.stderr or ""
@@ -969,8 +1209,13 @@ def _run_browser_journey(
         if isinstance(stderr, bytes):
             stderr = stderr.decode("utf-8", errors="replace")
         owned_identity = _owned_identity_from_output(str(output) + "\n" + str(stderr))
+        public_submission_id = _public_submission_id_from_output(
+            str(output) + "\n" + str(stderr)
+        )
         if owned_identity is not None and on_owned_identity is not None:
             on_owned_identity(*owned_identity)
+        if public_submission_id is not None and on_public_submission is not None:
+            on_public_submission(public_submission_id)
         raise JourneyFailure("The local Chromium journey timed out after launch.") from error
     finally:
         if process is not None and process.poll() is None:
@@ -982,6 +1227,8 @@ def _run_browser_journey(
                 process.wait(timeout=3)
         if control is not None:
             control.close()
+        if intake_test_server is not None:
+            intake_test_server.close()
 
 
 def _owned_identity_from_output(output: str) -> tuple[str, str] | None:
@@ -999,6 +1246,25 @@ def _owned_identity_from_output(output: str) -> tuple[str, str] | None:
         raise JourneyFailure("The browser journey reported conflicting cleanup identities.")
     student_id, person_id = next(iter(matches))
     return str(_uuid(student_id)), str(_uuid(person_id))
+
+
+def _public_submission_id_from_output(output: str) -> str | None:
+    """Read only the one UI-generated submission UUID used for exact cleanup."""
+
+    matches = set(
+        re.findall(r"PUBLIC_INTAKE_CLEANUP_ID=([0-9a-fA-F-]{36})", output)
+    )
+    if not matches:
+        return None
+    if len(matches) != 1:
+        raise JourneyFailure("The browser journey reported conflicting intake cleanup IDs.")
+    submission_id = next(iter(matches))
+    if not re.fullmatch(
+        r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}",
+        submission_id,
+    ):
+        raise JourneyFailure("The browser journey reported an invalid intake cleanup ID.")
+    return str(_uuid(submission_id))
 
 
 def _preflight_local_services(config: LocalSupabase) -> None:
@@ -1051,6 +1317,13 @@ def run_journey() -> int:
             person_id=str(_uuid(person_id)),
         )
 
+    def record_public_submission(submission_id: str) -> None:
+        nonlocal cleanup_fixture
+        cleanup_fixture = replace(
+            cleanup_fixture,
+            public_submission_id=str(_uuid(submission_id)),
+        )
+
     setup_attempted = False
     primary_error: int | None = None
     attempted_users: list[JourneyUser] = []
@@ -1066,7 +1339,13 @@ def run_journey() -> int:
             driver,
             chrome,
             on_owned_identity=record_owned_identity,
+            on_public_submission=record_public_submission,
         )
+        if run_sql(
+            public_intake_acceptance_sql(cleanup_fixture),
+            config.database_url,
+        ) != "PASS":
+            raise JourneyFailure("Public intake local SQL acceptance assertions failed.")
     except PrerequisiteBlocked as error:
         primary_error = BLOCKED
         failures.append(("primary", _safe_failure_reason(error)))
@@ -1075,6 +1354,11 @@ def run_journey() -> int:
         failures.append(("primary", type(error).__name__))
     finally:
         if setup_attempted:
+            try:
+                cleanup_public_intake_photo(config, cleanup_fixture)
+            except Exception as error:
+                primary_error = FAIL
+                failures.append(("photo_cleanup", type(error).__name__))
             try:
                 run_sql(cleanup_sql(cleanup_fixture), config.database_url)
             except Exception as error:

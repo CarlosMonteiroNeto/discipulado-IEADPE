@@ -49,8 +49,14 @@ Future<(_HarnessState, GlobalKey<_HarnessState>)> _open(
   Uint8List? source,
   double textScale = 1,
   bool disableAnimations = true,
+  bool highContrast = false,
   NavigatorObserver? observer,
 }) async {
+  if (highContrast) {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(highContrast: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+  }
   final key = GlobalKey<_HarnessState>();
   await tester.pumpWidget(
     MaterialApp(
@@ -226,16 +232,39 @@ void main() {
     expect(route.transitionDuration, isNot(Duration.zero));
   });
 
-  testWidgets('360px viewport, 200% text and reduced motion stay usable', (
+  testWidgets('360, 768 and 1440px crop viewports stay usable at 200% text', (
     tester,
   ) async {
-    tester.view.physicalSize = const Size(360, 800);
-    tester.view.devicePixelRatio = 1;
+    for (final viewportCase in [
+      (width: 360.0, highContrast: false),
+      (width: 768.0, highContrast: true),
+      (width: 1440.0, highContrast: true),
+    ]) {
+      tester.view.physicalSize = Size(viewportCase.width, 900);
+      tester.view.devicePixelRatio = 1;
+      await _open(
+        tester,
+        textScale: 2,
+        highContrast: viewportCase.highContrast,
+      );
+      final viewport = find.byKey(const ValueKey('photo-crop-viewport'));
+      expect(tester.getSize(viewport).width, lessThanOrEqualTo(480));
+      expect(
+        find.byKey(
+          ValueKey(
+            viewportCase.highContrast
+                ? 'photo-crop-guide-high-contrast'
+                : 'photo-crop-guide-standard',
+          ),
+        ),
+        findsOneWidget,
+      );
+      await tester.ensureVisible(find.text('Confirmar foto'));
+      expect(tester.takeException(), isNull);
+      expect(find.textContaining('Ampliação'), findsOneWidget);
+      await _confirm(tester);
+    }
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await _open(tester, textScale: 2);
-    await tester.ensureVisible(find.text('Confirmar foto'));
-    expect(tester.takeException(), isNull);
-    expect(find.textContaining('Ampliação'), findsOneWidget);
   });
 }
