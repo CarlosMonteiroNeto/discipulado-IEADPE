@@ -4,6 +4,8 @@
 
 > **Current review entry:** Read “Consolidated current state and continuation — 2026-10-21” first. It owns current status/evidence/authority; original task IDs, contracts, acceptance and historical checkboxes remain preserved below.
 
+> **2026-10-25 T11 amendment:** The user replaced the Docker/local-Supabase prerequisite for Web acceptance with the authenticated hosted-Supabase Chromium journey. Read [Hosted-Web T11 acceptance amendment](#2026-10-25-hosted-web-t11-acceptance-amendment) and the current T11 row; they supersede older local-stack instructions. T11 is PARTIAL pending hosted cross-congregation and token-revocation evidence. Docker is not to be installed or used.
+
 > **Execution method:** native Luna Medium implements; native Sol 6.1 low independently reviews; the director coordinates and obtains independent final assembled review.
 
 **Goal:** Correct the identified integrity/compatibility gaps, complete operator-facing attendance/progress, and prepare a proven hosted activation and Android delivery.
@@ -16,7 +18,7 @@
 
 **Machine plan:** [Local tasks JSON](2026-10-20-ministry-corrective-release-plan.json). It carries complete task interfaces, exact owned paths, acceptance, dependencies and verification commands; it is not an authorization to mutate the hosted project. Bootstrap and operational stages below are deliberately outside automatic local-task execution.
 
-**Status:** Local corrective source is implemented with scoped approvals. The authorized production database activation is applied and structurally verified; assembled release acceptance remains FAIL/BLOCKED (pinned 548/548; real T11 and full Android authenticated acceptance missing; a debug APK build/install/login smoke passed on 2026-10-21; release signing/publication absent). The consolidated index below replaces former Task 3-in-progress and 459/461/465 checkpoint status; those counts remain historical evidence.
+**Status:** Local corrective source is implemented with scoped approvals. The authorized production database activation is applied and structurally verified. The user-directed hosted-Web T11 lifecycle leg now has browser evidence and exact cleanup; T11 remains PARTIAL for hosted authorization-boundary cases. Full Android authenticated acceptance and release signing/publication remain open, so assembled release acceptance remains FAIL/BLOCKED. The consolidated index below replaces former Task 3-in-progress and 459/461/465 checkpoint status; those counts remain historical evidence.
 
 ## Production database activation — 2026-10-22
 
@@ -51,7 +53,7 @@ The two L0 approval-index JSONs were deliberately excluded by credential scannin
 
 | Existing unit | Current disposition | Evidence and limit | Portable/source locator |
 |---|---|---|---|
-| B0 | BLOCKED | Windows Docker remains unavailable (2026-10-21 recheck: `com.docker.service` stopped, WSL install-only stub; admin/reboot not performed); physical Android 14 target paired/connected, debug APK built/installed and login smoke run; full authenticated journey not run; pinned SDK verified. | `consolidation README; local report dated Windows continuation; local report T11 host blocker and Android debug smoke` |
+| B0 | PARTIAL | The user explicitly deferred Docker/local Supabase; this is no longer a T11/Web prerequisite. The authorized Web build/tests ran with the available SDK. Android readiness and authenticated device acceptance remain separate D0/D2 work. | `2026-10-25 hosted Web report; consolidation README; local report dated Windows continuation` |
 | B1 | APPROVED_LOCAL | Importer/replay/race scoped historical approval; no real legacy import. | `tar:B1/review.md; 2026-10-20-corrective-execution.md` |
 | B2 | APPROVED_LOCAL | Font/SDK portability code remains; Linux-generated promotions were reverted to Windows baselines under L0 (24/24 byte-identical). | `tar:B2/review.md; B2/promotion-review.md` |
 | B3 | APPROVED_LOCAL | 459-test bootstrap checkpoint only; not current branch green. | `tar:B3/review.md` |
@@ -66,9 +68,9 @@ The two L0 approval-index JSONs were deliberately excluded by credential scannin
 | T08 | APPROVED_LOCAL | Later pinned workflow fixture scoped review supersedes earlier pending note; Google/OAuth still open. | `zip:T08/captured-zone-stage-report.json; consolidation independent-review` |
 | T09 | APPROVED_LOCAL | Windows portability scoped partial approval; Linux DEFERRED, ordinary matrix incomplete. | `zip:T09/coder-report.json; consolidation independent-review` |
 | T10 | APPROVED_LOCAL | Literal-LF argv correction scoped review; live stack gates remain missing and Linux DEFERRED. | `zip:T10/final-candidate-report.json; consolidation independent-review` |
-| T11 | BLOCKED | Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified. 2026-10-21 host recheck: Docker daemon absent and WSL feature unavailable; no stack or browser journey was started. An Android debug login-screen smoke passed separately, but it does not exercise the journey. | `integration_test/unified_journey_test.dart; local report guarded runner exit 2; local report T11 host blocker and Android debug smoke` |
+| T11 | PARTIAL | Hosted authenticated Web lifecycle, reload persistence, cancel/replacement/progress, exact synthetic cleanup, 13 direct routes and 4 asset MIME checks passed. Docker/local Supabase is explicitly deferred and not required. Cross-congregation denial and token-revocation behavior were not exercised; fresh OAuth/provider and Storage/photo remain separately tracked under O1/G2 and D2. | `docs/verification/2026-10-24-hosted-web-write-smoke.md; integration_test/unified_journey_test.dart; web preflight and release-operation tests` |
 | T12 | APPROVED_LOCAL | 006 local preparation preserved. Current-source refresh at `4957140`: 16 forward migrations / 17 real checkpoints PASS, package rebuilt. Production activation applied 2026-10-22: backup/isolated restore, baseline inventory, ledger repair, all 16 forward migrations, and post-checks passed; 10 pre-existing function fingerprints remain. | `tar:T12/continuation-006/sol-final-review.md; zip:T12/windows-fixture-followup/sol-final-review.md; docs/verification/2026-10-22-production-database-activation.md` |
-| L0 | FAIL | Pinned 548/548 green; analyzer/web build/preflight pass; 24 goldens restored to Windows baselines; 528/529 root-caused as a test-harness race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and full Android authenticated acceptance remain open; debug build/install/login smoke passed on 2026-10-21. | `zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README; local report T11 host blocker and Android debug smoke` |
+| L0 | FAIL | Pinned 548/548 and 24 golden baselines remain historical evidence; current branch full suite 566/566, analyzer, Web build and preflight pass on the available SDK. Hosted T11 lifecycle passes, but hosted cross-congregation/revocation and full Android authenticated acceptance remain open; debug build/install/login smoke passed on 2026-10-21. | `2026-10-25 hosted Web report and branch candidate; zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; consolidation README; local report Android debug smoke` |
 | H0/H1 | PASS_WITH_RESIDUAL | Production backup/restore, hosted inventory, ledger repair and 16-migration activation applied and structurally verified on 2026-10-22; 10 pre-existing function fingerprints remain recorded. | `docs/verification/2026-10-22-production-database-activation.md; activation package; tracked activation evidence` |
 | H2/O1 | PARTIAL | The authorized production database migrations are applied; OAuth/grants/test writes and the actual real-role/Google/Storage journey remain open. | `S15 A1–A8/G1/G2; activation report residual gates` |
 | H3 | OUT_OF_SCOPE | Owner attested on 2026-10-22 that no Firebase legacy import is required and no other data exists beyond the enumerated Base44/current Supabase data. This is owner attestation, not independent export verification; no import was performed. | `owner instruction 2026-10-22; activation report` |
@@ -163,24 +165,25 @@ flutter test --no-pub --concurrency=1 test/database/task_3_test.dart
 
 **Expected result:** Failing golden/race causes resolved with evidence; unchanged historical failures retain explicit disposition, no waiver.
 
-#### 4. B0 / T11 local backend and client setup
+#### 4. B0 / T11 hosted Web acceptance setup
 
-**Dependencies:** B0 identity, owned local service capacity. **Files:** `supabase/config.toml`, `scripts/run_unified_journey.py`, `scripts/verification_cases.json`, `scripts/verify_unified.ps1`, `scripts/verify_unified.sh`, `integration_test/unified_journey_test.dart`, `lib/configuration.dart`, `docs/verification/ministry-corrective-local-report.md`.
+**Dependencies:** authorized hosted Web session and the backed-up synthetic-data workflow. **Files:** `integration_test/unified_journey_test.dart`, `scripts/web_preflight.py`, `scripts/test_release_operations.py`, `web/_redirects`, `docs/verification/2026-10-24-hosted-web-write-smoke.md`.
 
-- Diagnose Docker WSL Virtual Machine Platform blocker with bounded probes and logs. Admin Windows-feature/reboot action needs user action; keep dependent T11 blocked while progressing other local units. Provision only identified coordinator-owned disposable loopback Auth/PostgREST/Storage/PostgreSQL and matching Chrome/driver; capture health/ownership and sufficient disk.
-- Do not run raw credential-bearing Supabase status through a command/evidence logger. Let the guarded runner consume status internally; retain only its redacted health/ownership summary. Use guarded runner to create run-owned synthetic identities and matching public client URL/publishable key through private temporary settings; service role/PAT/DB password/Google secret never enter Flutter defines. Read existing actual config file location before any change. A no-config fail-closed page proves bootstrap only.
-- Run existing T11 source, inspect all real assertions: canonical registration/edit/enroll/preview/draft/finalize/read-only/progress/cancel-linked-replacement/fresh session, cross-scope and revocation. Verify FK/lineage cleanup after success and partial failure plus unrelated sentinel survival. No privileged seeded-roster shortcut or hosted fallback.
+- Use the real hosted Supabase project from the authenticated Web app in Chromium. Docker and a local Auth/PostgREST/Storage stack are not prerequisites for this acceptance. Never put service-role credentials, PATs, database passwords or OAuth secrets in Flutter defines or evidence.
+- Create only clearly identified synthetic records after confirming a recoverable backup and baseline. Exercise canonical student identity and edit, class creation, enrollment, lesson/session draft, persisted attendance after reload, finalization/read-only history, cancellation with linked replacement, and progress that excludes canceled sessions.
+- Delete only exact run-owned synthetic rows in FK-safe order. Verify related mutation receipts and pre/post invariants; do not restore a production-wide dump over the live database.
+- Verify direct navigation/refresh for every exact app route and confirm JS/WASM/assets retain their own MIME. Keep hosted callback/OAuth-provider acceptance under O1/G2 and Android Storage/photo acceptance under D2.
+- Exercise hosted cross-congregation denial and existing-token revocation using an already authorized least-privilege test identity when available. Do not change live user grants to manufacture a test. Until those cases have auditable evidence, T11 remains PARTIAL even though its lifecycle leg passes.
 
 ```text
-docker info
-python scripts/run_unified_journey.py
-bash scripts/verify_unified.sh
-pwsh -NoProfile -File scripts/verify_unified.ps1
+flutter test --no-pub --concurrency=1 test/widgets/app_shell_test.dart test/workflows_test.dart
+python -m unittest discover -s scripts -p test_release_operations.py
+python scripts/web_preflight.py build/web
 ```
 
 **Review:** Sol reads actual run logs, owned setup/cleanup proof and current source hashes; stubs/static build do not close browser acceptance.
 
-**Expected result:** Actual local journey and both local gates exit 0 on same candidate, or exact BLOCKED/FAIL prerequisite without fabricated runtime PASS.
+**Expected result:** The documented hosted-Web lifecycle leg and exact cleanup pass on the same candidate. Record authorization-boundary cases separately; Docker/local-stack availability never changes the hosted-Web verdict. T11 overall stays PARTIAL until its remaining cross-congregation and revocation cases are proven.
 
 #### 5. D0 Android target and safe loopback connectivity
 
@@ -890,34 +893,38 @@ python3 -m unittest discover -s scripts -p 'test_unified_gate.py'
 flutter test --no-pub --concurrency=1 test/operations/corrective_gate_test.dart
 ```
 
-### Task 11: Verify the current coupled journey in local Chromium with bounded cleanup
+### Task 11: Verify the authenticated ministry journey in Chromium against hosted Supabase
 
-Replace the obsolete unscoped-create/transfer journey and prove persistent identity, immutable attendance, replacement and automatic follow-up through production UI.
+Replace the obsolete unscoped-create/transfer journey and prove persistent identity, immutable attendance, replacement and automatic follow-up through the real hosted backend. Docker and a local Supabase stack are not prerequisites for Web acceptance.
+
+**Current disposition — 2026-10-25:** The hosted lifecycle and cleanup leg passed; T11 overall is **PARTIAL** pending cross-congregation denial and existing-token revocation tests with a preauthorized least-privilege identity. See the dated hosted Web report and current amendment below.
 
 **Spec:** `docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s05-canonical-handoff-reads`, `docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s06-immutable-finalization-and-replacement`, `docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s08-enrollment-history-and-progress`, `docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s11-verification-and-release-gates`
 
 **Files owned:**
 
-- `integration_test/unified_journey_test.dart`
-- `scripts/run_unified_journey.py`
-- `scripts/test_unified_journey_runner.py`
+- `lib/widgets/app_shell.dart`
+- `test/widgets/app_shell_test.dart`
+- `scripts/web_preflight.py`
+- `scripts/test_release_operations.py`
+- `web/_redirects`
 - `test/workflows_test.dart`
-- `docs/verification/unified-final-report.md`
+- `docs/verification/2026-10-24-hosted-web-write-smoke.md`
 
-**Interfaces consumed:** Completed production contracts/UI and loopback-only fixture runner; existing real local Auth Admin API for synthetic identities.
+**Interfaces consumed:** Completed production contracts/UI, the authenticated hosted Supabase project, a user authorized for the selected congregation, and the verified backup/synthetic-cleanup procedure.
 
-**Interfaces produced:** Updated integration test and bounded lineage/canonical cleanup; new dated executed result in unified-final-report.
+**Interfaces produced:** Automated Web menu/routing regressions and a dated hosted Chromium report with candidate identity, performed actions, cleanup evidence, screenshots and explicit limits.
 
 **Acceptance:**
 
-- Registrar selects an allowed active congregation at create and cannot inspect protected lists; student registration without conversion fields creates no conversion/visit obligation.
-- Production UI creates/selects a canonical person, edits identity, enrolls once, creates lesson, drafts/finalizes, reopens read-only persisted marks/progress and shows effective discipleship/follow-up.
-- Explicit convert handoff still works with canonical lookup; no congregation transfer is attempted in the typed edit form.
-- A new finalize=true AND finalize=false write to finalized attendance is denied with unchanged storage; exact receipt replay succeeds.
-- Cancel original then create linked same-date replacement; retained original roster/marks remain unchanged; only finalized non-canceled replacement contributes to progress/follow-up.
-- Cross-congregation reads/writes, existing-token revocation, identity/scope changes and obsolete replies are denied/cleared using actual local Auth and HTTP.
-- Cleanup removes only run-owned attendance/rosters/enrollments/students/converts/persons/dependencies in FK-safe order, including replacement lineage; unrelated fixtures survive partial failures.
-- A real compatible local Supabase HTTP stack plus Chromium/driver execution yields PASS; unavailable prerequisites remain BLOCKED and cannot close browser acceptance.
+- Run the Web app in Chromium with an authenticated user and the real hosted Supabase project; Docker and local Auth/PostgREST/Storage are not prerequisites.
+- In one explicitly authorized congregation, create a synthetic student with canonical identity, edit and restore that identity, create a class, enroll the student, and create a lesson/session without conversion-only side effects.
+- Save draft attendance, reload the Web app, reselect the scope and verify persisted marks; finalize and verify marks become read-only and progress includes the finalized session.
+- Cancel a finalized synthetic session and create a linked same-date replacement; preserve original history and verify only the non-canceled finalized replacement contributes to progress.
+- Remove only exact run-owned synthetic records and receipts in FK-safe order; verify test identifiers are absent and privacy-safe pre/post baseline counts remain unchanged.
+- Directly open/reload all exact application routes in the built static artifact and verify JS/WASM/assets retain their own bytes/MIME.
+- Verify hosted cross-congregation denial and existing-token revocation with an already authorized least-privilege identity. If none is available, record NOT RUN and retain overall T11 as PARTIAL; never alter live grants to manufacture a fixture.
+- Fresh OAuth/provider acceptance remains under O1/G2; Android Storage/photo and SAF remain under D2. Authenticated CRUD and route/MIME tests do not imply those outcomes.
 
 **Work steps:**
 
@@ -931,9 +938,9 @@ Replace the obsolete unscoped-create/transfer journey and prove persistent ident
 **Focused verification** (expected PASS, except the initial meaningful RED):
 
 ```text
-python3 -m unittest discover -s scripts -p 'test_unified_journey_runner.py'
-flutter test --no-pub --concurrency=1 test/workflows_test.dart
-python3 scripts/run_unified_journey.py
+flutter test --no-pub --concurrency=1 test/widgets/app_shell_test.dart test/workflows_test.dart
+python -m unittest discover -s scripts -p test_release_operations.py
+python scripts/web_preflight.py build/web
 ```
 
 ### Task 12: Prepare exact hosted-state inspection and local upgrade rehearsal
@@ -990,8 +997,8 @@ flutter test --no-pub --concurrency=1 test/operations/hosted_upgrade_preparation
 ## Local closing gate
 
 - [ ] Director verifies all task families, exact contracts, candidate hashes, full-suite/analyzer results and Sol review outcomes; every Critical/Important finding is closed, with explicit minor disposition.
-- [ ] Run `bash scripts/verify_unified.sh` and `pwsh -NoProfile -File scripts/verify_unified.ps1` against the same prepared local stack; retain complete command logs. Any FAIL/BLOCKED/INCOMPLETE keeps local acceptance open.
-- [ ] Execute the real Chromium journey with local Auth/Storage; mocked HTTP/widget evidence alone cannot close it. Verify cleanup after success and partial failure.
+- [x] Execute the authenticated Chromium journey against hosted Supabase with synthetic writes, persisted reload, exact cleanup and baseline checks; evidence is in the hosted Web report. Docker/local-stack execution is no longer required for this Web gate.
+- [ ] Test cross-congregation denial and existing-token revocation in hosted Chromium using an already authorized least-privilege identity. If unavailable, keep T11 PARTIAL; do not change production grants just to create a fixture.
 - [ ] Run `flutter build web --no-pub` plus `python3 scripts/web_preflight.py build/web`. Run the applicable Android build only with public configuration and the existing approved signing process.
 - [ ] Perform director whole-product review across canonical registration, Team, classes, enrollment, immutable attendance/replacements, progress and conversion follow-up. A collection of individually approved tasks is not assembled-product approval.
 - [ ] Write `docs/verification/ministry-corrective-local-report.md` with source/candidate identity, command/exit/evidence table, requirement R01-R11 disposition, live/fixture distinction and outstanding operational/device blockers. No hosted activation or completed delivery claim follows automatically.
@@ -1218,6 +1225,14 @@ The original test-first SQL RED and UI RED/GREEN checkboxes remain unchecked as 
 
 T12's dependent 006 integration now has separate [APPROVED_LOCAL review](../../../build/verification/corrective-release/T12/continuation-006/sol-final-review.md), with 17 real checkpoints and derived manifest SHA-256 `2e05cbb0a747d4b34321c6a60f5838e13f043c3d733ec314a299bddc99742fc9`. No hosted migration, parity/ledger repair, restore or release approval follows. T11 browser/cleanup/sentinel, current L0 assembled acceptance, H1/H2/H3, device/signing/APK/download gates remain pending.
 
+## 2026-10-25 Hosted-Web T11 acceptance amendment
+
+**Authority:** The user explicitly directed that Docker not be installed or used, that hosted Supabase testing count as the stronger Web integration evidence, and that remaining Web validation continue. This amendment supersedes earlier T11 instructions requiring a local Docker-backed Auth/PostgREST/Storage stack. A local Supabase stack is no longer a prerequisite for T11's Web lifecycle acceptance.
+
+**Revised T11 verdict:** The authenticated hosted-Web lifecycle, reload persistence, attendance finalization, cancellation/replacement lineage, progress, exact synthetic cleanup, direct-route handling and asset MIME checks are **PASS for that evidence category** on 2026-10-25. Overall T11 is **PARTIAL**, not PASS: hosted cross-congregation denial and existing-token revocation have not been exercised. Run those only with an already authorized least-privilege test identity; do not modify live user grants to manufacture one. If no such identity is available, retain the limitation rather than provisioning a local Docker stack. Fresh OAuth/provider evidence remains under O1/G2; Android Storage/photo and SAF remain under D2.
+
+**Evidence:** [Hosted Web write and lifecycle report](../../verification/2026-10-24-hosted-web-write-smoke.md), including synthetic cleanup, 13-route/4-asset static-host checks, final suite results and remaining limits. The requested Sol 6.1 low review is a separate next step and does not change T11 or release approval by itself.
+
 ## 2026-10-21 Web and Android functional-acceptance amendment
 
 **Authority and scope:** The user selected functional acceptance on Web and Android and directed that no further work be invested in Linux. Continue the existing T11/L0/O1/D0/D2 requirements on Windows; no replacement implementation plan or duplicate feature queue is created. Linux 23/25 acceptance remains **NOT EXECUTED / DEFERRED BY USER**, so T09/T10 ordinary acceptance and original-plan completion must not be claimed from this platform recut. This amendment does not waive failing checks or confer branch/release approval.
@@ -1228,10 +1243,10 @@ T12's dependent 006 integration now has separate [APPROVED_LOCAL review](../../.
 
 ### Ordered execution within existing units
 
-- [ ] **L0 visual and failure disposition:** complete for visuals and 528/529: all 24 golden cases executed, the Linux-generated B2 promotion was reverted to the pre-B2 Windows baselines (24/24 byte-identical to a fresh pinned-Windows capture), 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused), focused 23/23, authoritative pinned full suite 548/548, analyzer/web build/preflight green. Remaining L0 blockers are T11 live stack/browser journey and Android app acceptance. Preserve all negative/security assertions; rerun affected checks after any source change and record results against one candidate.
+- [ ] **L0 visual and failure disposition:** complete for visuals and 528/529: all 24 golden cases executed, the Linux-generated B2 promotion was reverted to the pre-B2 Windows baselines (24/24 byte-identical to a fresh pinned-Windows capture), 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused), focused 23/23, historical pinned suite 548/548; the current branch suite 566/566, analyzer, Web build and preflight pass on the available SDK. T11 lifecycle is covered by hosted Web evidence; remaining L0 blockers include hosted authorization boundaries, any outstanding responsive/accessibility checks, and Android app acceptance. Preserve negative/security assertions; bind future evidence to one candidate.
 - [ ] **B0/D0 readiness and debug smoke:** inspect current Flutter/Android SDK/JDK/Gradle, licenses, `adb devices -l`, available emulator/physical target, browser and callback connectivity, package/version and certificate continuity. Use existing Android configuration and S15/D0 gates; SDK paths alone are not operational proof. Release currently uses debug signing. The 2026-10-21 explicitly authorized debug APK build/install/login smoke is recorded in the local report and does not substitute for this readiness audit or release acceptance. Prepare a concrete G3 signing/custody/update-policy diff for separate approval; no key generation or signing-policy change follows from this amendment.
-- [ ] **B0/T11 local services:** diagnose the observed Windows Docker engine failure before changing configuration. Provision only an explicitly owned disposable loopback Supabase Auth/PostgREST/Storage stack and matching Chromium/ChromeDriver; verify ownership and health through the existing guarded runner. Preserve SQL, concurrency and unified local gate coverage. Missing prerequisites remain BLOCKED; no fake status, fixture substitution or hosted fallback.
-- [ ] **T11/L0 Web acceptance:** run the existing exact registration/canonical-edit/enroll/draft/finalize/read-only/progress/cancel/linked-replacement/fresh-session journey, scope-loss denial and FK-ordered cleanup with unrelated sentinel survival. Retain actual browser evidence. Complete L0's 360/768/1440, 200% text, keyboard, reduced-motion and error/empty/loading dispositions, web routing and existing web build/preflight. Bind command/exits/logs and approval to the same candidate. Real Google/OAuth evidence remains O1/G2 and may stay blocked under the hosted boundary below.
+- [x] **T11 hosted Web lifecycle:** the authenticated hosted-Supabase journey, full reload, finalized/canceled/linked-replacement history, aggregate progress, guarded cleanup, exact static routes and asset MIME were verified on 2026-10-25; see the dated report. Docker/local services are excluded by the 2026-10-25 amendment.
+- [ ] **T11 hosted authorization boundaries / L0 Web residuals:** test cross-congregation denial and existing-token revocation only with an already authorized least-privilege hosted identity; otherwise retain PARTIAL with the blocker. Complete any remaining L0 360/768/1440, 200% text, keyboard, reduced-motion, and error/empty/loading dispositions on the current candidate. Fresh OAuth/provider evidence stays under O1/G2.
 - [ ] **D0/D2 Android acceptance, only after predecessor gates and separate build/signing approval:** use the exact candidate and S15 A1–A8/D2 checks: install/update, cold/warm login return, cancellation/denial/back, proper greeting/Team authority, persisted complete academic journey after reopening, revocation/user switch, 200% text/back/resume, Storage/photo and SAF XLSX choose/cancel/write/reopen with accents. Emulator and physical-device observations, certificate/package/version/hash and update continuity remain the existing requirements; widget tests or a launch smoke do not replace them. Do not build or publish a **release** APK until all previously required pre-build gates and approvals have been satisfied; the 2026-10-21 debug build/install/login smoke is not release acceptance and is not this D2 journey. If real provider/backend or target prerequisites are unavailable, record the corresponding acceptance as BLOCKED rather than claim both platforms work.
 - [ ] **Independent assembled review:** preserve Luna Medium implementation and Sol 6.1 low stage review. Director reviews the complete candidate, test meaning, exact Web/Android evidence and remaining categories before any integration/publication. Update the existing local report and eventual delivery report independently; the current work is functional acceptance, not completed production activation/delivery.
 

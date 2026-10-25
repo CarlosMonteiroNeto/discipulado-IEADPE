@@ -748,8 +748,8 @@
     },
     {
       "id": 11,
-      "title": "Verify the current coupled journey in local Chromium with bounded cleanup",
-      "summary": "Replace the obsolete unscoped-create/transfer journey and prove persistent identity, immutable attendance, replacement and automatic follow-up through production UI.",
+      "title": "Verify the authenticated ministry journey in Chromium against hosted Supabase",
+      "summary": "Use the real hosted Auth/PostgREST service and Web client to prove persistent canonical identity, immutable attendance, replacement and follow-up without requiring a local Docker stack.",
       "spec_refs": [
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s05-canonical-handoff-reads",
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s06-immutable-finalization-and-replacement",
@@ -757,11 +757,13 @@
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s11-verification-and-release-gates"
       ],
       "touches": [
-        "integration_test/unified_journey_test.dart",
-        "scripts/run_unified_journey.py",
-        "scripts/test_unified_journey_runner.py",
-        "test/workflows_test.dart",
-        "docs/verification/unified-final-report.md"
+        "lib/widgets/app_shell.dart",
+        "test/widgets/app_shell_test.dart",
+        "scripts/web_preflight.py",
+        "scripts/test_release_operations.py",
+        "web/_redirects",
+        "docs/verification/2026-10-24-hosted-web-write-smoke.md",
+        "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md"
       ],
       "depends_on": [
         1,
@@ -773,47 +775,51 @@
         10
       ],
       "acceptance": [
-        "Registrar selects an allowed active congregation at create and cannot inspect protected lists; student registration without conversion fields creates no conversion/visit obligation.",
-        "Production UI creates/selects a canonical person, edits identity, enrolls once, creates lesson, drafts/finalizes, reopens read-only persisted marks/progress and shows effective discipleship/follow-up.",
-        "Explicit convert handoff still works with canonical lookup; no congregation transfer is attempted in the typed edit form.",
-        "A new finalize=true AND finalize=false write to finalized attendance is denied with unchanged storage; exact receipt replay succeeds.",
-        "Cancel original then create linked same-date replacement; retained original roster/marks remain unchanged; only finalized non-canceled replacement contributes to progress/follow-up.",
-        "Cross-congregation reads/writes, existing-token revocation, identity/scope changes and obsolete replies are denied/cleared using actual local Auth and HTTP.",
-        "Cleanup removes only run-owned attendance/rosters/enrollments/students/converts/persons/dependencies in FK-safe order, including replacement lineage; unrelated fixtures survive partial failures.",
-        "A real compatible local Supabase HTTP stack plus Chromium/driver execution yields PASS; unavailable prerequisites remain BLOCKED and cannot close browser acceptance."
+        "Run the Flutter Web app in Chromium with an authenticated user and the real authorized hosted Supabase project; Docker and local Supabase Auth/PostgREST/Storage are not prerequisites.",
+        "In one explicitly authorized congregation, create a synthetic student with canonical person identity, edit and restore that identity, create a class, enroll the student, and create a lesson/session without conversion-only side effects.",
+        "Save draft attendance, reload the Web app, reselect the scope and verify persisted marks; finalize and verify marks become read-only and progress reflects the finalized session.",
+        "Cancel a finalized synthetic session and create a linked same-date replacement; verify original history is retained and only the non-canceled finalized replacement contributes to progress.",
+        "Remove only exact run-owned synthetic records and receipts in FK-safe order; verify test identifiers are absent and protected pre/post baseline counts remain unchanged.",
+        "Directly open and reload every exact application route in the generated static Web artifact; verify JS/WASM/assets return their own bytes and MIME types.",
+        "Verify cross-congregation denial and existing-token revocation using an already authorized least-privilege hosted identity. If such a test identity is unavailable, record these cases NOT RUN and keep overall T11 PARTIAL; never alter live grants to manufacture a fixture.",
+        "Fresh OAuth/provider handshake remains under O1/G2; Android Storage/photo and SAF remain under D2. Do not infer those outcomes from authenticated hosted CRUD or static routes."
       ],
       "interfaces": {
         "consumes": [
-          "Completed production contracts/UI and loopback-only fixture runner; existing real local Auth Admin API for synthetic identities."
+          "Completed production contracts/UI, the hosted Supabase project, an authenticated user authorized for the selected congregation, and the existing verified backup/synthetic cleanup procedure."
         ],
         "produces": [
-          "Updated integration test and bounded lineage/canonical cleanup; new dated executed result in unified-final-report."
+          "Source-bound automated Web route/menu regressions and a dated hosted Chromium report with the exact candidate, performed actions, cleanup counts, screenshot hashes and explicit NOT RUN limits."
         ]
       },
       "verification": {
-        "command": "python3 -m unittest discover -s scripts -p 'test_unified_journey_runner.py'\nflutter test --no-pub --concurrency=1 test/workflows_test.dart\npython3 scripts/run_unified_journey.py",
+        "command": "flutter test --no-pub --concurrency=1 test/widgets/app_shell_test.dart\npython -m unittest discover -s scripts -p test_release_operations.py\npython scripts/web_preflight.py build/web\nflutter test --no-pub --concurrency=1",
         "new_test_files": [],
         "sql_scenarios": [],
         "python_test_modules": [
-          "test_unified_journey_runner"
+          "test_release_operations"
         ]
       },
       "steps": [
-        "Read cited spec sections and predecessor interfaces; check the task-owned paths and current migration numbering.",
-        "Author the named behavioral assertions, execute focused tests and retain an assertion/runtime RED with at least one test executed; never count compile/load failure as RED.",
-        "Implement only the owned behavior and exact contracts; preserve security, lock/replay ordering and existing historical data.",
-        "Run the listed focused verification; inspect expected results and repeat only for changed code or unresolved failures.",
-        "Director runs and inspects the authoritative configured full Flutter suite and analyzer through the pinned command runner; no ordinary task approval while gates are red.",
-        "Director captures HEAD plus full candidate/new-file digest, dispatches a read-only native gpt-6.1-sol reviewer with low effort, returns Critical/Important corrections to the same native Luna implementer and records re-review. Local commits/merges authorized; push unauthorized."
+        "Read the cited spec sections, the exact Web routes, ownership boundaries, and the latest dated hosted evidence.",
+        "Confirm the target authenticated user and authorized congregation through the UI; take and verify a recoverable backup and record privacy-safe baseline counts before creating synthetic rows.",
+        "Execute the acceptance workflow through Chromium using ordinary authenticated client requests; never place service-role or database credentials in Web configuration or evidence.",
+        "Capture persistence after reload, finalized immutability, linked replacement history, and aggregate progress; keep OAuth-provider and Android Storage/SAF verdicts separate.",
+        "Clean only exact run-owned synthetic records in a guarded FK-safe transaction and verify baseline counts and absence of all test identifiers.",
+        "Test cross-scope denial and revocation only if an already authorized least-privilege hosted identity exists. Otherwise record NOT RUN and retain the PARTIAL verdict without creating or changing production access.",
+        "Verify all exact static routes and asset MIME on a fresh server process, then run the Web preflight and automated regressions.",
+        "Capture candidate hashes, evidence paths and remaining limits; dispatch the read-only Sol 6.1 low review. Local commits are permitted; push/publication remain separately gated."
       ],
       "current_status": {
-        "status": "BLOCKED",
-        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified.",
-        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2",
+        "status": "PARTIAL",
+        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
+        "evidence_locator": "docs/verification/2026-10-24-hosted-web-write-smoke.md; test/widgets/app_shell_test.dart; scripts/test_release_operations.py; scripts/web_preflight.py",
         "branch_release_approval": false
       },
       "continuation_owners": [
-        "B0 / T11 local backend and client setup"
+        "Hosted T11 residual: cross-congregation denial and existing-token revocation when an already authorized least-privilege test identity exists",
+        "O1/G2: fresh OAuth/provider handshake and callback validation",
+        "D2: Android authenticated acceptance, Storage/photo and SAF"
       ],
       "quality_refs": [
         "docs/superpowers/specs/2026-10-20-ministry-corrective-release-design.md#s18-documentation-authority-inherited-coverage-and-engineering-assurance--2026-10-21",
@@ -955,9 +961,9 @@
     "units": [
       {
         "unit": "B0",
-        "status": "BLOCKED",
-        "scope": "Windows Docker remains unavailable (2026-10-21 recheck: com.docker.service stopped, WSL install-only stub; admin/reboot not performed); pinned SDK verified. Physical Android 14 target paired/connected; debug APK built/installed and login smoke run; full authenticated journey not run.",
-        "evidence_locator": "consolidation README; local report dated Windows continuation; local report T11 host blocker and Android debug smoke"
+        "status": "PARTIAL",
+        "scope": "User explicitly deferred Docker/local Supabase; this is no longer a T11/Web prerequisite. Hosted Web build/tests ran with the available SDK. Android readiness and authenticated device acceptance remain separate D0/D2 work.",
+        "evidence_locator": "2026-10-25 hosted Web report; consolidation README; local report dated Windows continuation"
       },
       {
         "unit": "B1",
@@ -1045,9 +1051,9 @@
       },
       {
         "unit": "T11",
-        "status": "BLOCKED",
-        "scope": "Journey source IMPLEMENTED; actual owned-stack Auth/PostgREST/Storage/Chromium execution, cleanup and sentinel survival unverified. 2026-10-21 host recheck: Docker daemon absent and WSL feature unavailable; no stack or browser journey was started. An Android debug login-screen smoke passed separately but does not exercise the journey.",
-        "evidence_locator": "integration_test/unified_journey_test.dart; local report guarded runner exit 2; local report T11 host blocker and Android debug smoke"
+        "status": "PARTIAL",
+        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
+        "evidence_locator": "docs/verification/2026-10-24-hosted-web-write-smoke.md; test/widgets/app_shell_test.dart; scripts/test_release_operations.py; scripts/web_preflight.py"
       },
       {
         "unit": "T12",
@@ -1058,8 +1064,8 @@
       {
         "unit": "L0",
         "status": "FAIL",
-        "scope": "Pinned 548/548 green; analyzer/web build/preflight pass; all 24 golden cases executed and restored to Windows baselines; 528/529 root-caused as a test-harness cross-lock wake race and disposed (32/32 direct, 6/6 focused). T11 live stack/browser and full Android authenticated acceptance remain open; a debug build/install/login smoke passed on 2026-10-21.",
-        "evidence_locator": "zip:final-local-candidate-manifest.json; tar:CHECKPOINT-T04-T07/checkpoint-report.json; local report 2026-10-21 L0 golden correction; local report T11 host blocker and Android debug smoke"
+        "scope": "Pinned historical 548/548, analyzer/Web build/preflight and golden evidence remain as recorded. Current branch 566/566 and Web build/preflight pass on the available Flutter SDK; hosted T11 lifecycle leg passes, but hosted cross-congregation/revocation and full Android authenticated acceptance remain open, so assembled L0 remains FAIL.",
+        "evidence_locator": "2026-10-25 hosted Web report and current branch commit; zip:final-local-candidate-manifest.json; consolidation README; local report 2026-10-21 L0 golden correction"
       },
       {
         "unit": "H0/H1",
@@ -1070,8 +1076,8 @@
       {
         "unit": "H2/O1",
         "status": "PARTIAL",
-        "scope": "Authorized production database migrations are applied; OAuth/grants/test writes and the actual real-role/Google/Storage journey remain open.",
-        "evidence_locator": "S15 A1-A8/G1/G2; activation report residual gates"
+        "scope": "Production database migrations are applied and synthetic hosted Web writes/cleanup were verified on 2026-10-25. Fresh OAuth/provider validation and separate grants/access-boundary and real Storage/photo cases remain open.",
+        "evidence_locator": "docs/verification/2026-10-22-production-database-activation.md; docs/verification/2026-10-24-hosted-web-write-smoke.md; S15 A1-A8/G1/G2"
       },
       {
         "unit": "H3",
@@ -1682,5 +1688,14 @@
         "state": "approved disposition not located; record source/current support decision unresolved; no assumed rejection or new theme implementation"
       }
     ]
+  },
+  "execution_amendment_2026_10_25": {
+    "goal": "Complete Web acceptance against the real hosted Supabase backend without installing or using Docker, then obtain an independent Web-focused branch review.",
+    "authority": "User explicitly directed no Docker, accepted synthetic hosted-Supabase writes followed by exact cleanup, and requested the hosted journey replace the local-stack Web gate.",
+    "supersedes": "Older Task 11 and B0 instructions that require a Docker-backed local Auth/PostgREST/Storage stack as a prerequisite for Web acceptance. Historical records are retained but no longer govern current T11 execution.",
+    "t11_verdict": "PARTIAL: hosted authenticated CRUD/lifecycle, persisted reload, finalization, cancellation/replacement, progress, guarded cleanup, 13 exact routes and 4 asset MIME checks PASS on 2026-10-25; cross-congregation denial and existing-token revocation NOT RUN. Docker/local Supabase is not required.",
+    "separate_gates": "Fresh OAuth/provider callback remains O1/G2. Android Storage/photo/SAF and authenticated device journey remain D2. T11 PARTIAL and this amendment do not approve the assembled release.",
+    "evidence": "docs/verification/2026-10-24-hosted-web-write-smoke.md",
+    "review_request": "Dispatch native gpt-6.1-sol at low reasoning effort for a read-only review of the current branch, focused on Web runtime behavior, auth/scope navigation, static deep routes, asset loading, and test/report alignment."
   }
 }

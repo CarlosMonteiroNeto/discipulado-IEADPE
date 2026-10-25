@@ -52,7 +52,7 @@ Ignored local screenshots are in `build/verification/hosted-web-write-smoke-2026
 - `web-class-list-after-cleanup-20261025.png` — SHA-256 `3ccf40513ac2e023c1b988ac53341459c7b18f2a4e952cd7ff4d1c1540deb27f`
 - `web-student-list-after-cleanup-20261025.png` — SHA-256 `9129109bed3b0b461c38c4918263dcf104d6259d23b575066af79853b0c4152d`
 
-This is observed authenticated hosted Web CRUD/lifecycle evidence. It does not exercise a fresh OAuth handshake, the local Auth/PostgREST/Storage/Chromium stack, or cross-congregation/revocation cases, so it does not convert plan gate T11 to PASS.
+This is observed authenticated hosted Web CRUD/lifecycle evidence. It does not exercise cross-congregation denial or existing-token revocation. Under the user's 2026-10-25 plan amendment, the hosted lifecycle is the intended Web acceptance environment; that leg passes, and overall T11 is PARTIAL pending those hosted authorization-boundary cases. Docker/local Supabase is explicitly not required. Fresh OAuth/provider remains O1/G2; Android Storage/photo remains D2.
 
 ### Static Web deep-link routing and final verification — 2026-10-25
 
@@ -65,6 +65,6 @@ Final review after all changes: `flutter test --no-pub --concurrency=1` passed *
 ## Limits and next gate
 
 - This confirms authenticated hosted Web creation, editing, enrollment, attendance, finalization, cancellation/replacement, aggregate progress, and targeted cleanup for synthetic records in one authorized congregation.
-- It does not cover cross-congregation access, revocation, or a fresh OAuth handshake.
-- Docker was not installed or used. Plan gate T11 remains blocked pending the owned local Auth/PostgREST/Storage/Chromium journey and its required sentinel cleanup. This hosted smoke does not close T11 or release gates.
+- It does not cover cross-congregation denial, existing-token revocation, or a fresh OAuth/provider handshake.
+- Under the 2026-10-25 amendment, T11's hosted Web lifecycle leg passes; overall T11 is PARTIAL only for the unrun authorization-boundary cases. Docker/local Supabase is not required. This evidence does not close O1/G2, D2, or release gates.
 - No Android/Wi-Fi debugging was run. Docker remained unused throughout.
