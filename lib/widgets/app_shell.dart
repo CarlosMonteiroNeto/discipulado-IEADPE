@@ -56,7 +56,10 @@ class AppShell extends StatelessWidget {
   };
 
   /// Routes remain authorized for deep links but are reached through Alunos.
-  static const hiddenFromMenu = {'/ministry/handoff'};
+  static const hiddenFromMenu = {
+    '/ministry/handoff',
+    '/ministry/students/register',
+  };
 
   static const _feedbackAction = '__base44_feedback__';
   static const _signOutAction = '__base44_sign_out__';

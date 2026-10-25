@@ -28,9 +28,43 @@ Screenshots were saved locally under the ignored `build/verification/hosted-web-
 - `class-list-after-cleanup.png` — SHA-256 `eb92198f2a8cc1c9f512834a9e8234ba2f94bf4c34ef945fe1649da061ca82f5`
 - `student-list-after-cleanup.png` — SHA-256 `393fac4e14f1702369c683ba9582c19bda295492e631a4d3ce69cc8878f1e381`
 
+## Continued hosted Web lifecycle validation — 2026-10-25
+
+This continuation ran on `codex/ministry-production-completion`, starting at local HEAD `2b682a087ed033e0cc5238e87697a908d8fe2d15`. It reused the verified encrypted full backup above; Docker was neither installed nor used. Synthetic writes were authorized by the user for this hosted Supabase test, with exact cleanup afterward.
+
+### Web defect fixed during the journey
+
+The `Cadastrar aluno` entry was exposed as a context-free generic menu route. Selecting it navigated to `/ministry/students/register` without the required `MinistryRouteContext`; the route guard redirected to `/register`, which is the unrelated new-convert form. The registration screen is reachable through `Alunos`, where `_openStudentRegistration()` supplies the required context. `AppShell.hiddenFromMenu` now hides only the direct menu shortcut while preserving that supported route. The focused widget test first failed on the expected menu assertion (RED), then `flutter test --no-pub --concurrency=1 --timeout=30s test/widgets/app_shell_test.dart` passed **8/8** (GREEN). The rebuilt Web bundle also showed `Equipe`, `Alunos`, `Turmas`, and `Frequência` with no context-free `Cadastrar aluno` entry.
+
+### Hosted synthetic workflow
+
+On authorized congregation Chafariz, the browser created `WEB JORNADA INTEGRADA 20261024` with synthetic education data, edited the linked canonical identity name, and restored that name. It created class `WEB JORNADA 20261024`, enrolled the synthetic student, created a session dated 2026-10-24, marked the student present, and saved the open attendance. After a full Web reload and normal congregation reselection, reopening the session showed the saved presence, confirming persistence across reload.
+
+The original session was finalized and displayed its marks read-only. The UI then canceled that synthetic session while retaining its history, created the fixed-date linked replacement, and finalized its attendance. The refreshed session list showed both sides of the replacement link. Enrollment progress showed 1 evaluated session, 1 presence, 0 absences, 0 excused marks, and 100% utilization; the canceled session was excluded from the aggregate.
+
+### Targeted cleanup and restored state
+
+The cleanup used the hosted Supabase CLI Management API as PostgreSQL `postgres`, with pre-delete guards on the exact Chafariz class, student, canonical person, sole test enrollment, the two linked sessions, their two roster/attendance rows, absence of convert references, and the 12 operation receipts created during this test. The transaction deleted only those rows and receipts. Follow-up SQL returned **24 congregations, 51 converts, 0 test people, 0 test students, 0 test classes, 0 classes in Chafariz, 0 test sessions, 0 test receipts, and 8 total mutation receipts**, matching the pre-run baseline. Refreshed Web pages showed `Nenhuma turma encontrada.` and `Nenhum aluno cadastrado nesta congregação.`
+
+Ignored local screenshots are in `build/verification/hosted-web-write-smoke-2026-10-24/`:
+
+- `web-progress-cancel-replacement.png` — SHA-256 `152a233b80348c1ae12504d299c632a36aebfd97ec9e49b0e3054130f8efd61b`
+- `web-class-list-after-cleanup-20261025.png` — SHA-256 `3ccf40513ac2e023c1b988ac53341459c7b18f2a4e952cd7ff4d1c1540deb27f`
+- `web-student-list-after-cleanup-20261025.png` — SHA-256 `9129109bed3b0b461c38c4918263dcf104d6259d23b575066af79853b0c4152d`
+
+This is observed authenticated hosted Web CRUD/lifecycle evidence. It does not exercise a fresh OAuth handshake, the local Auth/PostgREST/Storage/Chromium stack, or cross-congregation/revocation cases, so it does not convert plan gate T11 to PASS.
+
+### Static Web deep-link routing and final verification — 2026-10-25
+
+The first fresh-build inspection found that `build/web/_redirects` had only the six older application routes. A previously running local Pages fixture still held a broader rewrite in memory, which made one initial browser check misleading. A clean fixture request reproduced the actual issue: direct ministry URLs returned 404. The source rewrite list and Web preflight now require all 13 exact router paths, including the seven `/ministry...` routes; no wildcard proxy was added, so JS/WASM and other assets keep their own responses.
+
+The release-operation regression test failed on the newly covered ministry URL before the route list was extended; afterward `python -m unittest discover -s scripts -p test_release_operations.py` passed **5/5**. `python scripts/web_preflight.py build/web` passed. A restarted local Pages server served all **13/13** direct application routes from the rebuilt artifact and retained the expected MIME for **4/4** sampled assets. A real browser direct navigation to `/ministry/classes` loaded the Flutter app instead of returning 404; after congregation reselection, the empty-state Students page remained available and its registration flow opened from Alunos.
+
+Final review after all changes: `flutter test --no-pub --concurrency=1` passed **566/566**. `flutter analyze --no-pub` had passed with **No issues found** for the same Dart source state; the subsequent static-routing changes touched no Dart files. `flutter build web` passed after adding the exact redirects, and the generated artifact passed the Web preflight. Build emitted only the optional WASM-renderer suggestion and the existing unused CupertinoIcons-font notice; no build errors.
+
 ## Limits and next gate
 
-- This confirms authenticated hosted Web creation, editing, and targeted cleanup for classes and students in one authorized congregation.
-- It does not cover class sessions, attendance, enrollment lifecycle, cross-congregation access, revocation, or behavior in a fresh login session.
-- Docker was not installed or used. Plan gate T11 remains blocked pending the owned local Auth/PostgREST/Storage/Chromium journey and its required sentinel cleanup. This smoke does not close T11 or release gates.
-- No Android/Wi-Fi debugging and no full Flutter suite were run in this validation step.
+- This confirms authenticated hosted Web creation, editing, enrollment, attendance, finalization, cancellation/replacement, aggregate progress, and targeted cleanup for synthetic records in one authorized congregation.
+- It does not cover cross-congregation access, revocation, or a fresh OAuth handshake.
+- Docker was not installed or used. Plan gate T11 remains blocked pending the owned local Auth/PostgREST/Storage/Chromium journey and its required sentinel cleanup. This hosted smoke does not close T11 or release gates.
+- No Android/Wi-Fi debugging was run. Docker remained unused throughout.

@@ -32,7 +32,7 @@ void main() {
     );
   });
   testWidgets(
-    'combined manager reaches every ministry route through Menu and selection closes it',
+    'student registration is reached through Alunos, not a context-free Menu route',
     (t) async {
       t.view.physicalSize = const Size(360, 800);
       t.view.devicePixelRatio = 1;
@@ -53,15 +53,10 @@ void main() {
       expect(find.text('Menu').hitTestable(), findsOneWidget);
       await t.tap(find.byKey(const ValueKey('app-shell-bottom-menu')));
       await t.pumpAndSettle();
-      for (final label in [
-        'Equipe',
-        'Alunos',
-        'Cadastrar aluno',
-        'Turmas',
-        'Frequência',
-      ]) {
+      for (final label in ['Equipe', 'Alunos', 'Turmas', 'Frequência']) {
         expect(find.text(label).hitTestable(), findsOneWidget);
       }
+      expect(find.text('Cadastrar aluno').hitTestable(), findsNothing);
       expect(find.text('Novos convertidos').hitTestable(), findsNothing);
       expect(
         find.descendant(
@@ -70,7 +65,7 @@ void main() {
           ),
           matching: find.byIcon(Icons.person_add_alt_1_outlined),
         ),
-        findsOneWidget,
+        findsNothing,
       );
       await t.tap(find.text('Alunos').last);
       await t.pumpAndSettle();

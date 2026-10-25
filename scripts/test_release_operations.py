@@ -68,7 +68,13 @@ class ReleaseTest(unittest.TestCase):
             server = ThreadingHTTPServer(('127.0.0.1', 0), partial(Rewrite, directory=directory))
             Thread(target=server.serve_forever, daemon=True).start()
             try:
-                for route in ('/login', '/register', '/home', '/converts', '/admin', '/auth/callback?code=synthetic&next=%2Fregister'):
+                for route in (
+                    '/login', '/register', '/home', '/converts', '/admin',
+                    '/auth/callback?code=synthetic&next=%2Fregister',
+                    '/ministry', '/ministry/team', '/ministry/students',
+                    '/ministry/students/register', '/ministry/classes',
+                    '/ministry/attendance', '/ministry/handoff',
+                ):
                     with urlopen(f'http://127.0.0.1:{server.server_port}{route}') as response:
                         self.assertEqual(response.status, 200)
                         self.assertEqual(response.read(), b'synthetic Flutter shell')

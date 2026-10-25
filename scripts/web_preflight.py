@@ -2,7 +2,12 @@
 from pathlib import Path
 import argparse
 
-APPLICATION_ROUTES = {'/login', '/register', '/home', '/converts', '/admin', '/auth/callback'}
+APPLICATION_ROUTES = {
+    '/login', '/register', '/home', '/converts', '/admin', '/auth/callback',
+    '/ministry', '/ministry/team', '/ministry/students',
+    '/ministry/students/register', '/ministry/classes', '/ministry/attendance',
+    '/ministry/handoff',
+}
 
 
 def inspect(root):

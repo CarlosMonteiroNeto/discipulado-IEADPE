@@ -4,3 +4,10 @@
 /converts /index.html 200
 /admin /index.html 200
 /auth/callback /index.html 200
+/ministry /index.html 200
+/ministry/team /index.html 200
+/ministry/students /index.html 200
+/ministry/students/register /index.html 200
+/ministry/classes /index.html 200
+/ministry/attendance /index.html 200
+/ministry/handoff /index.html 200
