@@ -30,7 +30,7 @@ class RegisterPage extends StatefulWidget {
     this.onCancel,
     this.onSaved,
     this.initial,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
     required this.scope,
     this.publicIntakeRepository,
     this.turnstileChallengeFactory,
@@ -43,7 +43,7 @@ class RegisterPage extends StatefulWidget {
   final VoidCallback? onCancel;
   final ValueChanged<String>? onSaved;
   final ConvertRecord? initial;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
   final AccessScope scope;
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;

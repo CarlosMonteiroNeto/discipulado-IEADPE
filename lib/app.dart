@@ -15,7 +15,6 @@ import 'features/admin/admin_page.dart';
 import 'features/admin/congregation_repository.dart';
 import 'features/backup/backup_panel.dart';
 import 'features/backup/backup_repository.dart';
-import 'features/converts/convert_form.dart';
 import 'features/converts/congregation_order.dart';
 import 'features/converts/converts_page.dart';
 import 'features/converts/register_page.dart';
@@ -304,14 +303,14 @@ class ProtectedApplication extends StatefulWidget {
   const ProtectedApplication({
     super.key,
     required this.repository,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
     this.intendedRoute,
     this.publicIntakeRepository,
     this.turnstileChallengeFactory,
     this.onSignedOut,
   });
   final AuthRepository repository;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
   final String? intendedRoute;
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;
@@ -383,7 +382,7 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
 
   Future<Uint8List?> _pickPhoto() async {
     final token = _gateway.context;
-    final bytes = await widget.pickPhoto();
+    final bytes = await widget.pickPhoto?.call();
     await _validateExternalReturn();
     _gateway.ensureCurrent(token);
     return bytes;
@@ -466,7 +465,7 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
                         backup: _backup,
                         feedback: _feedback,
                         exporter: _exporter,
-                        pickPhoto: _pickPhoto,
+                        pickPhoto: widget.pickPhoto == null ? null : _pickPhoto,
                         publicIntakeRepository: widget.publicIntakeRepository,
                         turnstileChallengeFactory:
                             widget.turnstileChallengeFactory,
@@ -527,7 +526,7 @@ class _ProtectedFeatures extends StatefulWidget {
   final BackupRepository backup;
   final FeedbackRepository feedback;
   final FileExporter exporter;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;
   final Future<void> Function() onSignOut;

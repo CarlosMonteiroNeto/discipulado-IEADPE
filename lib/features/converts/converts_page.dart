@@ -2,8 +2,6 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import 'convert_form.dart';
-
 import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
 import '../../data/convert_repository.dart';
@@ -25,10 +23,10 @@ class ConvertsPage extends StatefulWidget {
     required this.photos,
     this.congregations = const [],
     this.onScopeRefresh,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
     this.revalidatePhotoAuthority,
   });
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
   final AccessScope scope;
   final ConvertRepository converts;
   final PhotoRepository photos;

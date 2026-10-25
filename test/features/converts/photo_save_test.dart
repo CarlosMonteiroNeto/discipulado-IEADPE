@@ -5,6 +5,7 @@ import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/features/photos/photo_repository.dart';
+import 'package:ieadpe_converts/features/photos/photo_crop.dart';
 import 'package:ieadpe_converts/features/converts/convert_form.dart';
 import 'package:ieadpe_converts/features/converts/convert_save_controller.dart';
 
@@ -12,11 +13,16 @@ import 'save_test.dart' show TestGateway;
 
 class Photos implements PhotoRepository {
   int uploads = 0;
+  NormalizedPhotoCrop? lastCrop;
   bool fail = false;
   VoidCallback? beforeReturn;
   @override
-  Future<PhotoAsset> upload(Uint8List bytes) async {
+  Future<PhotoAsset> upload(
+    Uint8List bytes, {
+    NormalizedPhotoCrop? crop,
+  }) async {
     uploads++;
+    lastCrop = crop;
     if (fail) throw const DataFailure('unavailable');
     beforeReturn?.call();
     return const PhotoAsset(id: 'asset', path: 'owner/asset.jpg');
@@ -27,17 +33,21 @@ class Photos implements PhotoRepository {
 }
 
 typedef VoidCallback = void Function();
-ConvertDraft photoDraft({bool remove = false, bool upload = true}) =>
-    ConvertDraft(
-      name: 'Pessoa',
-      landmark: 'Praça',
-      gender: Gender.female,
-      conversionDate: DateOnly(2026, 1, 1),
-      worshipType: '01 - Oração',
-      congregationId: 'congregation',
-      photoBytes: remove || !upload ? null : Uint8List.fromList([1, 2, 3]),
-      removePhoto: remove,
-    );
+ConvertDraft photoDraft({
+  bool remove = false,
+  bool upload = true,
+  NormalizedPhotoCrop? crop,
+}) => ConvertDraft(
+  name: 'Pessoa',
+  landmark: 'Praça',
+  gender: Gender.female,
+  conversionDate: DateOnly(2026, 1, 1),
+  worshipType: '01 - Oração',
+  congregationId: 'congregation',
+  photoBytes: remove || !upload ? null : Uint8List.fromList([1, 2, 3]),
+  photoCrop: crop,
+  removePhoto: remove,
+);
 ConvertRecord photoRecord({String? photoAssetId = 'attached-asset'}) =>
     ConvertRecord(
       id: 'existing',
@@ -53,6 +63,16 @@ ConvertRecord photoRecord({String? photoAssetId = 'attached-asset'}) =>
       personRevision: 1,
     );
 void main() {
+  test('save forwards the confirmed crop to the photo repository', () async {
+    final gateway = TestGateway()..fail = false;
+    final photos = Photos();
+    final crop = NormalizedPhotoCrop(left: .5, top: 0, size: 1);
+    final saver = ConvertSaveController(gateway: gateway, photos: photos);
+
+    await saver.save(photoDraft(crop: crop));
+
+    expect(photos.lastCrop, crop);
+  });
   test('failed upload never mutates convert; attach retry reuses asset and operation', () async {
     final gateway = TestGateway();
     final photos = Photos()..fail = true;

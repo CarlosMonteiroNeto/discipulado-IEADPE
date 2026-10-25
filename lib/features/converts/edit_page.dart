@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import '../../data/convert_repository.dart';
 import '../../domain/models.dart';
 import '../photos/photo_repository.dart';
-import 'convert_form.dart';
 import 'register_page.dart';
 
 class EditPage extends StatelessWidget {
@@ -17,7 +16,7 @@ class EditPage extends StatelessWidget {
     this.congregations = const [],
     this.onCancel,
     this.onSaved,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
     required this.scope,
     this.revalidatePhotoAuthority,
   });
@@ -27,7 +26,7 @@ class EditPage extends StatelessWidget {
   final List<Congregation> congregations;
   final VoidCallback? onCancel;
   final ValueChanged<String>? onSaved;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
   final AccessScope scope;
   final Future<bool> Function(String? congregationId)? revalidatePhotoAuthority;
   @override

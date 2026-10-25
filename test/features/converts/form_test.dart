@@ -3,13 +3,16 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
 import 'package:ieadpe_converts/features/converts/convert_form.dart';
+import 'package:ieadpe_converts/features/photos/photo_crop.dart';
 
 import '../../support/date_picker.dart';
+import 'save_test.dart' show TestGateway;
 
 const _congregationId = 'b0000000-0000-4000-8000-000000000001';
 
@@ -265,6 +268,145 @@ void main() {
     await tapSave(t, 'Atualizar');
     expect(submitted!.photoBytes, isNull);
     expect(submitted!.removePhoto, isFalse);
+  });
+  testWidgets('camera selection stores original bytes with confirmed crop', (
+    t,
+  ) async {
+    ConvertDraft? submitted;
+    ImageSource? selectedSource;
+    List<int>? cropInput;
+    const original = [255, 216, 1, 2];
+    final currentPhoto = Uint8List.fromList([255, 216, 9, 9]);
+    final crop = NormalizedPhotoCrop(left: .5, top: 0, size: 1);
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          photoAuthority: (_) => true,
+          existingPhoto: currentPhoto,
+          choosePhotoSource: (_) async => ImageSource.camera,
+          acquirePhoto: (source) async {
+            selectedSource = source;
+            return Uint8List.fromList(original);
+          },
+          cropPhoto: (_, source) async {
+            cropInput = source.toList();
+            return crop;
+          },
+          onSubmit: (draft) async => submitted = draft,
+        ),
+      ),
+    );
+
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+    final preview = t.widget<Image>(find.byType(Image)).image as MemoryImage;
+    expect(preview.bytes, currentPhoto);
+    await tapSave(t, 'Atualizar');
+
+    expect(selectedSource, ImageSource.camera);
+    expect(cropInput, original);
+    expect(submitted!.photoBytes, original);
+    expect(submitted!.photoCrop, crop);
+  });
+
+  testWidgets('canceling crop keeps the previous photo and form values', (
+    t,
+  ) async {
+    final previous = Uint8List.fromList([255, 216, 9, 9]);
+    ConvertDraft? submitted;
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          photoAuthority: (_) => true,
+          existingPhoto: previous,
+          choosePhotoSource: (_) async => ImageSource.gallery,
+          acquirePhoto: (_) async => Uint8List.fromList([255, 216, 1, 2]),
+          cropPhoto: (_, _) async => null,
+          onSubmit: (draft) async => submitted = draft,
+        ),
+      ),
+    );
+
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+    await tapSave(t, 'Atualizar');
+
+    expect(submitted!.photoBytes, isNull);
+    expect(submitted!.photoCrop, isNull);
+    expect(submitted!.removePhoto, isFalse);
+    expect(find.text('Remover foto'), findsOneWidget);
+  });
+
+  testWidgets('scope loss while crop is open cannot publish selected bytes', (
+    t,
+  ) async {
+    var authorized = true;
+    ConvertDraft? submitted;
+    final previous = Uint8List.fromList([255, 216, 9, 9]);
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          photoAuthority: (_) => authorized,
+          existingPhoto: previous,
+          choosePhotoSource: (_) async => ImageSource.camera,
+          acquirePhoto: (_) async => Uint8List.fromList([255, 216, 1, 2]),
+          revalidatePhotoAuthority: (_) async => true,
+          cropPhoto: (_, _) async {
+            authorized = false;
+            return NormalizedPhotoCrop(left: .25, top: 0, size: 1);
+          },
+          onSubmit: (draft) async => submitted = draft,
+        ),
+      ),
+    );
+
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+    await tapSave(t, 'Atualizar');
+
+    expect(submitted!.photoBytes, isNull);
+    expect(submitted!.photoCrop, isNull);
+    expect(submitted!.removePhoto, isFalse);
+  });
+
+  testWidgets('session invalidation during crop does not publish bytes', (
+    t,
+  ) async {
+    final gateway = TestGateway();
+    var submits = 0;
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          gateway: gateway,
+          photoAuthority: (_) => true,
+          choosePhotoSource: (_) async => ImageSource.camera,
+          acquirePhoto: (_) async => Uint8List.fromList([255, 216, 1, 2]),
+          revalidatePhotoAuthority: (_) async => true,
+          cropPhoto: (_, _) async {
+            gateway.boundary.invalidate();
+            return NormalizedPhotoCrop(left: .25, top: 0, size: 1);
+          },
+          onSubmit: (_) async => submits++,
+        ),
+      ),
+    );
+
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+
+    expect(
+      find.text('Nova foto selecionada. A foto atual será mantida até salvar.'),
+      findsNothing,
+    );
+    expect(submits, 0);
   });
   testWidgets(
     'future date uses Sao Paulo business today and keeps draft on failure',

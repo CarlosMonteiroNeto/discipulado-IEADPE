@@ -11,6 +11,9 @@ import '../../ui/br_input.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/unified_theme.dart';
 import '../people/person_fields.dart';
+import '../photos/photo_crop.dart';
+import '../photos/photo_crop_page.dart';
+import '../photos/photo_picker.dart';
 
 /// Only user-editable fields. Never serialize a read DTO into a command.
 class ConvertDraft {
@@ -28,6 +31,7 @@ class ConvertDraft {
     this.congregationId,
     this.age,
     this.photoBytes,
+    this.photoCrop,
     this.removePhoto = false,
   });
   final String name, landmark, worshipType;
@@ -39,6 +43,7 @@ class ConvertDraft {
   final bool preserveNullAddress;
   final int? age;
   final Uint8List? photoBytes;
+  final NormalizedPhotoCrop? photoCrop;
   final bool removePhoto;
   Map<String, Object?> payload() => {
     'congregation_id': congregationId,
@@ -69,12 +74,7 @@ class ConvertDraft {
 }
 
 Future<Uint8List?> pickConvertPhoto() async {
-  final file = await ImagePicker().pickImage(source: ImageSource.gallery);
-  if (file == null) return null;
-  if (await file.length() > 20 * 1024 * 1024) {
-    throw const DataFailure('invalid');
-  }
-  return file.readAsBytes();
+  return pickProfilePhoto(ImageSource.gallery);
 }
 
 class ConvertForm extends StatefulWidget {
@@ -85,7 +85,10 @@ class ConvertForm extends StatefulWidget {
     this.congregations = const [],
     this.onCancel,
     this.gateway,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
+    this.acquirePhoto = pickProfilePhoto,
+    this.choosePhotoSource = chooseProfilePhotoSource,
+    this.cropPhoto = showPhotoCrop,
     this.existingPhoto,
     this.now = DateTime.now,
     this.allowPhotos = false,
@@ -104,7 +107,16 @@ class ConvertForm extends StatefulWidget {
   final List<Congregation> congregations;
   final VoidCallback? onCancel;
   final Gateway? gateway;
-  final Future<Uint8List?> Function() pickPhoto;
+
+  /// Legacy injectable hook retained for existing form tests/callers.
+  final Future<Uint8List?> Function()? pickPhoto;
+  final Future<Uint8List?> Function(ImageSource source) acquirePhoto;
+  final Future<ImageSource?> Function(BuildContext context) choosePhotoSource;
+  final Future<NormalizedPhotoCrop?> Function(
+    BuildContext context,
+    Uint8List source,
+  )
+  cropPhoto;
   final Uint8List? existingPhoto;
   final DateTime Function() now;
   final bool allowPhotos;
@@ -146,6 +158,7 @@ class _ConvertFormState extends State<ConvertForm> {
   String? _congregation, _worship;
   Gender? _gender;
   Uint8List? _photo;
+  NormalizedPhotoCrop? _photoCrop;
   bool _removePhoto = false, _busy = false, _picking = false;
   String? _error;
   @override
@@ -193,13 +206,19 @@ class _ConvertFormState extends State<ConvertForm> {
       congregationId != null &&
       (widget.photoAuthority?.call(congregationId) ?? true);
 
+  void _clearSelectedPhoto() {
+    _photo?.fillRange(0, _photo!.length, 0);
+    _photo = null;
+    _photoCrop = null;
+  }
+
   void _selectCongregation(String? congregationId) {
     final wasAllowed = _photoAllowedFor(_congregation);
     final willBeAllowed = _photoAllowedFor(congregationId);
     setState(() {
       _congregation = congregationId;
       if (!willBeAllowed) {
-        _photo = null;
+        _clearSelectedPhoto();
         _removePhoto = false;
       }
     });
@@ -217,7 +236,7 @@ class _ConvertFormState extends State<ConvertForm> {
         _congregation != null &&
         (oldWidget.photoAuthority?.call(_congregation) ?? true);
     if (wasAllowed && !_photoAllowedFor(_congregation)) {
-      _photo = null;
+      _clearSelectedPhoto();
       _removePhoto = false;
       widget.onPhotoAuthorityRevoked?.call();
     }
@@ -254,7 +273,7 @@ class _ConvertFormState extends State<ConvertForm> {
       c.clear();
       c.dispose();
     }
-    _photo = null;
+    _clearSelectedPhoto();
     super.dispose();
   }
 
@@ -266,6 +285,33 @@ class _ConvertFormState extends State<ConvertForm> {
     } catch (_) {
       return false;
     }
+  }
+
+  Future<bool> _revalidatePhotoScope(
+    String? congregationId,
+    String? token,
+  ) async {
+    if (!_current(token) ||
+        congregationId != _congregation ||
+        !_photoAllowedFor(_congregation)) {
+      return false;
+    }
+    final authorized = await widget.revalidatePhotoAuthority?.call(
+      congregationId,
+    );
+    if (!_current(token)) return false;
+    if (authorized == false) {
+      if (mounted) {
+        setState(() {
+          _clearSelectedPhoto();
+          _removePhoto = false;
+          _error = 'Seu acesso mudou. Atualize a página antes de enviar fotos.';
+        });
+        widget.onPhotoAuthorityRevoked?.call();
+      }
+      return false;
+    }
+    return congregationId == _congregation && _photoAllowedFor(_congregation);
   }
 
   Future<void> _pick() async {
@@ -281,42 +327,50 @@ class _ConvertFormState extends State<ConvertForm> {
       _picking = true;
       _error = null;
     });
+    Uint8List? source;
     try {
-      final authorized = await widget.revalidatePhotoAuthority?.call(
-        congregationId,
-      );
-      if (authorized == false) {
-        if (mounted) {
-          setState(() {
-            _photo = null;
-            _removePhoto = false;
-            _error =
-                'Seu acesso mudou. Atualize a página antes de enviar fotos.';
-          });
-          widget.onPhotoAuthorityRevoked?.call();
+      if (!await _revalidatePhotoScope(congregationId, token)) return;
+      NormalizedPhotoCrop? crop;
+      if (widget.pickPhoto != null) {
+        source = await widget.pickPhoto!();
+      } else {
+        if (!mounted) return;
+        final imageSource = await widget.choosePhotoSource(context);
+        if (!_current(token) ||
+            congregationId != _congregation ||
+            !_photoAllowedFor(_congregation) ||
+            imageSource == null) {
+          return;
         }
-        return;
+        source = await widget.acquirePhoto(imageSource);
+        if (source == null) return;
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
+        if (!mounted) return;
+        crop = await widget.cropPhoto(context, source);
+        if (!_current(token) ||
+            congregationId != _congregation ||
+            !_photoAllowedFor(_congregation) ||
+            crop == null) {
+          return;
+        }
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
       }
-      if (!mounted ||
-          congregationId != _congregation ||
-          !_photoAllowedFor(_congregation)) {
-        return;
-      }
-      final bytes = await widget.pickPhoto();
+      if (source == null) return;
       if (!_current(token) ||
           congregationId != _congregation ||
           !_photoAllowedFor(_congregation)) {
         return;
       }
-      if (bytes != null) {
-        if (bytes.isEmpty || bytes.length > 20 * 1024 * 1024) {
-          throw const DataFailure('invalid');
-        }
-        setState(() {
-          _photo = Uint8List.fromList(bytes);
-          _removePhoto = false;
-        });
+      if (source.isEmpty || source.length > 20 * 1024 * 1024) {
+        throw const DataFailure('invalid');
       }
+      final selected = Uint8List.fromList(source);
+      setState(() {
+        _clearSelectedPhoto();
+        _photo = selected;
+        _photoCrop = crop;
+        _removePhoto = false;
+      });
     } catch (_) {
       if (_current(token)) {
         setState(
@@ -325,6 +379,7 @@ class _ConvertFormState extends State<ConvertForm> {
       }
     } finally {
       if (_current(token)) setState(() => _picking = false);
+      source?.fillRange(0, source.length, 0);
     }
   }
 
@@ -432,6 +487,9 @@ class _ConvertFormState extends State<ConvertForm> {
       photoBytes: !_photoAllowedFor(_congregation) || _photo == null
           ? null
           : Uint8List.fromList(_photo!),
+      photoCrop: !_photoAllowedFor(_congregation) || _photo == null
+          ? null
+          : _photoCrop,
       removePhoto: _photoAllowedFor(_congregation) && _removePhoto,
     );
     setState(() {
@@ -570,7 +628,7 @@ class _ConvertFormState extends State<ConvertForm> {
                           onPressed: _busy || widget.submissionLocked
                               ? null
                               : () => setState(() {
-                                  _photo = null;
+                                  _clearSelectedPhoto();
                                   _removePhoto = true;
                                 }),
                           child: const Text('Remover foto'),

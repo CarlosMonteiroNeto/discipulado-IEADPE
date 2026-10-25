@@ -186,28 +186,30 @@ void main() {
       expect(paths.last, contains('/storage/v1/object/'));
     },
   );
-  test(
-    'asset lookup uses RLS then authenticated bytes without a URL cache',
-    () async {
-      final gateway = await fixture.fixture((r) async {
-        if (r.uri.path == '/rest/v1/photo_assets') {
-          expect(r.uri.queryParameters['id'], 'eq.${fixture.id(1)}');
-          await fixture.respond(r, [
-            {
-              'id': fixture.id(1),
-              'path': '${fixture.id(88)}/${fixture.id(1)}.jpg',
-            },
-          ]);
-        } else {
-          expect(r.uri.queryParameters['cacheNonce'], isNotEmpty);
-          r.response.add([255, 216, 255, 217]);
-          await r.response.close();
-        }
-      });
-      await signIn(gateway);
-      final repository = PhotoRepository(gateway);
-      final asset = await repository.get(fixture.id(1));
-      expect(await repository.download(asset), [255, 216, 255, 217]);
-    },
-  );
+  test('asset lookup keeps legacy 192px JPEG downloads readable without a URL cache', () async {
+    final legacy192 = Uint8List.fromList(
+      image.encodeJpg(image.Image(width: 192, height: 192)),
+    );
+    final gateway = await fixture.fixture((r) async {
+      if (r.uri.path == '/rest/v1/photo_assets') {
+        expect(r.uri.queryParameters['id'], 'eq.${fixture.id(1)}');
+        await fixture.respond(r, [
+          {
+            'id': fixture.id(1),
+            'path': '${fixture.id(88)}/${fixture.id(1)}.jpg',
+          },
+        ]);
+      } else {
+        expect(r.uri.queryParameters['cacheNonce'], isNotEmpty);
+        r.response.add(legacy192);
+        await r.response.close();
+      }
+    });
+    await signIn(gateway);
+    final repository = PhotoRepository(gateway);
+    final asset = await repository.get(fixture.id(1));
+    final downloaded = await repository.download(asset);
+    expect(image.decodeJpg(downloaded)!.width, 192);
+    expect(downloaded, legacy192);
+  });
 }
