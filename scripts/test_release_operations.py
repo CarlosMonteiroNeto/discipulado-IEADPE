@@ -69,7 +69,7 @@ class ReleaseTest(unittest.TestCase):
             Thread(target=server.serve_forever, daemon=True).start()
             try:
                 for route in (
-                    '/login', '/register', '/home', '/converts', '/admin',
+                    '/login', '/register', '/home', '/converts', '/pending', '/admin',
                     '/auth/callback?code=synthetic&next=%2Fregister',
                     '/ministry', '/ministry/team', '/ministry/students',
                     '/ministry/students/register', '/ministry/classes',
@@ -90,3 +90,7 @@ class ReleaseTest(unittest.TestCase):
             finally:
                 server.shutdown()
                 server.server_close()
+
+
+if __name__ == '__main__':
+    unittest.main()

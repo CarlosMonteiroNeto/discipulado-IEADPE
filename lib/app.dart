@@ -21,6 +21,8 @@ import 'features/converts/converts_page.dart';
 import 'features/converts/register_page.dart';
 import 'features/intake/public_intake_page.dart';
 import 'features/intake/public_intake_repository.dart';
+import 'features/intake/pending_review_page.dart';
+import 'features/intake/pending_submission_repository.dart';
 import 'features/intake/turnstile_challenge.dart';
 import 'features/feedback/feedback_dialog.dart';
 import 'features/feedback/feedback_manager.dart';
@@ -780,6 +782,20 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
             onScopeRefresh: widget.router.refresh,
           ),
           onFeedback: () => setState(() => _overlay = 'manage'),
+        ),
+        '/pending' => PendingReviewPage(
+          key: ValueKey('pending-review:${widget.scope.hashCode}'),
+          repository: PendingSubmissionRepository(widget.gateway),
+          scope: widget.scope,
+          congregations: _catalog!
+              .where(
+                (congregation) =>
+                    congregation.archivedAt == null &&
+                    (widget.scope.isGlobalManager ||
+                        widget.scope.congregationIds.contains(congregation.id)),
+              )
+              .toList(growable: false),
+          onScopeRefresh: widget.router.refresh,
         ),
         _ => RegisterPage(
           converts: widget.converts,

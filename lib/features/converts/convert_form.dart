@@ -89,7 +89,9 @@ class ConvertForm extends StatefulWidget {
     this.existingPhoto,
     this.now = DateTime.now,
     this.allowPhotos = false,
+    this.allowCongregationChange = true,
     this.requireCongregation = true,
+    this.submitLabel,
     this.photoAuthority,
     this.submissionLocked = false,
     this.submitEnabled = true,
@@ -106,7 +108,9 @@ class ConvertForm extends StatefulWidget {
   final Uint8List? existingPhoto;
   final DateTime Function() now;
   final bool allowPhotos;
+  final bool allowCongregationChange;
   final bool requireCongregation;
+  final String? submitLabel;
   final bool Function(String? congregationId)? photoAuthority;
   final bool submissionLocked;
   final bool submitEnabled;
@@ -594,7 +598,11 @@ class _ConvertFormState extends State<ConvertForm> {
                     for (final c in congregations.entries)
                       DropdownMenuItem(value: c.key, child: Text(c.value)),
                   ],
-                  onChanged: _busy || _picking || widget.submissionLocked
+                  onChanged:
+                      !widget.allowCongregationChange ||
+                          _busy ||
+                          _picking ||
+                          widget.submissionLocked
                       ? null
                       : _selectCongregation,
                   validator: (v) => widget.requireCongregation && v == null
@@ -744,9 +752,10 @@ class _ConvertFormState extends State<ConvertForm> {
                       label: Text(
                         _busy
                             ? 'Salvando…'
-                            : widget.initial == null
-                            ? 'Cadastrar'
-                            : 'Atualizar',
+                            : widget.submitLabel ??
+                                  (widget.initial == null
+                                      ? 'Cadastrar'
+                                      : 'Atualizar'),
                       ),
                     ),
                   ],

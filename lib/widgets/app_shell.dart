@@ -33,6 +33,7 @@ class AppShell extends StatelessWidget {
     '/home': 'Início',
     '/register': 'Cadastrar',
     '/converts': 'Convertidos',
+    '/pending': 'Pendentes',
     '/admin': 'Admin',
     '/ministry': 'Discipulado',
     '/ministry/team': 'Equipe',
@@ -47,6 +48,7 @@ class AppShell extends StatelessWidget {
     '/home': Icons.home_outlined,
     '/register': Icons.person_add_alt_1_outlined,
     '/converts': Icons.people_outline,
+    '/pending': Icons.inbox_outlined,
     '/admin': Icons.settings_outlined,
     '/ministry': Icons.menu_book_outlined,
     '/ministry/team': Icons.groups_outlined,
@@ -75,6 +77,7 @@ class AppShell extends StatelessWidget {
       '/home',
       '/register',
       '/converts',
+      '/pending',
       '/admin',
       '/ministry',
     ])

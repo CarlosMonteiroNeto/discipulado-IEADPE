@@ -93,11 +93,13 @@ void main() {
       '/register',
       '/home',
       '/converts',
+      '/pending',
     ]);
     expect(routesFor(AccessScope(isSupervision: true)), [
       '/register',
       '/home',
       '/converts',
+      '/pending',
       '/admin',
     ]);
   });

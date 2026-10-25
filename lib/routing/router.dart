@@ -12,6 +12,7 @@ const _knownRoutes = {
   '/register',
   '/home',
   '/converts',
+  '/pending',
   '/admin',
   '/ministry',
   '/ministry/team',
@@ -34,6 +35,7 @@ List<String> routesFor(AccessScope scope) => [
   if (scope.isGlobalManager || scope.congregationIds.isNotEmpty) ...[
     '/home',
     '/converts',
+    '/pending',
   ],
   if (scope.isGlobalManager) '/admin',
   if (scope.hasMinistryAccess) ...[
