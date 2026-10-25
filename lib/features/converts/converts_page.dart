@@ -26,6 +26,7 @@ class ConvertsPage extends StatefulWidget {
     this.congregations = const [],
     this.onScopeRefresh,
     this.pickPhoto = pickConvertPhoto,
+    this.revalidatePhotoAuthority,
   });
   final Future<Uint8List?> Function() pickPhoto;
   final AccessScope scope;
@@ -33,6 +34,7 @@ class ConvertsPage extends StatefulWidget {
   final PhotoRepository photos;
   final List<Congregation> congregations;
   final Future<void> Function()? onScopeRefresh;
+  final Future<bool> Function(String? congregationId)? revalidatePhotoAuthority;
   @override
   State<ConvertsPage> createState() => _ConvertsPageState();
 }
@@ -197,6 +199,8 @@ class _ConvertsPageState extends State<ConvertsPage> {
       return EditPage(
         key: ValueKey('edit:${_editing!.id}:$_context'),
         initial: _editing!,
+        scope: widget.scope,
+        revalidatePhotoAuthority: widget.revalidatePhotoAuthority,
         pickPhoto: widget.pickPhoto,
         converts: widget.converts,
         photos: widget.photos,

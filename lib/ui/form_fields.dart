@@ -40,6 +40,7 @@ class AppTextFormField extends StatefulWidget {
     this.helperText,
     this.hintText,
     this.validator,
+    this.focusNode,
     this.keyboardType,
     this.inputFormatters,
     this.enabled = true,
@@ -66,6 +67,7 @@ class AppTextFormField extends StatefulWidget {
   final String? helperText;
   final String? hintText;
   final String? Function(String?)? validator;
+  final FocusNode? focusNode;
   final TextInputType? keyboardType;
   final List<TextInputFormatter>? inputFormatters;
   final bool enabled;
@@ -90,7 +92,8 @@ class AppTextFormField extends StatefulWidget {
 
 class AppTextFormFieldState extends State<AppTextFormField> {
   final _fieldKey = GlobalKey<FormFieldState<String>>();
-  late final FocusNode _focusNode;
+  late FocusNode _focusNode;
+  bool _ownsFocusNode = false;
   AutovalidateMode _autovalidateMode = AutovalidateMode.disabled;
 
   void validate() => _fieldKey.currentState?.validate();
@@ -98,7 +101,20 @@ class AppTextFormFieldState extends State<AppTextFormField> {
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode()..addListener(_handleFocusChange);
+    _focusNode = widget.focusNode ?? FocusNode();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void didUpdateWidget(covariant AppTextFormField oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.focusNode == widget.focusNode) return;
+    _focusNode.removeListener(_handleFocusChange);
+    if (_ownsFocusNode) _focusNode.dispose();
+    _focusNode = widget.focusNode ?? FocusNode();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode.addListener(_handleFocusChange);
   }
 
   void _handleFocusChange() {
@@ -111,9 +127,8 @@ class AppTextFormFieldState extends State<AppTextFormField> {
 
   @override
   void dispose() {
-    _focusNode
-      ..removeListener(_handleFocusChange)
-      ..dispose();
+    _focusNode.removeListener(_handleFocusChange);
+    if (_ownsFocusNode) _focusNode.dispose();
     super.dispose();
   }
 
@@ -163,6 +178,7 @@ class BrPhoneField extends StatelessWidget {
     this.required = false,
     this.enabled = true,
     this.onChanged,
+    this.focusNode,
   });
 
   final Key? fieldKey;
@@ -172,6 +188,7 @@ class BrPhoneField extends StatelessWidget {
   final bool required;
   final bool enabled;
   final ValueChanged<String>? onChanged;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) => AppTextFormField(
@@ -184,6 +201,7 @@ class BrPhoneField extends StatelessWidget {
     textInputAction: TextInputAction.next,
     inputFormatters: [BrPhoneInputFormatter()],
     validator: (value) => brPhoneValidationError(value, required: required),
+    focusNode: focusNode,
     onChanged: onChanged,
   );
 }
@@ -203,6 +221,7 @@ class BrDateField extends StatefulWidget {
     this.lastDate,
     this.initialDate,
     this.onChanged,
+    this.focusNode,
   });
 
   final Key? fieldKey;
@@ -217,6 +236,7 @@ class BrDateField extends StatefulWidget {
   final DateTime? lastDate;
   final DateTime? initialDate;
   final ValueChanged<DateTime?>? onChanged;
+  final FocusNode? focusNode;
 
   @override
   State<BrDateField> createState() => _BrDateFieldState();
@@ -320,6 +340,7 @@ class _BrDateFieldState extends State<BrDateField> {
         ],
       ),
       validator: widget.validator ?? (value) => brDateValidationError(value),
+      focusNode: widget.focusNode,
     );
   }
 }

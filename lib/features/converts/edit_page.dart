@@ -18,6 +18,8 @@ class EditPage extends StatelessWidget {
     this.onCancel,
     this.onSaved,
     this.pickPhoto = pickConvertPhoto,
+    required this.scope,
+    this.revalidatePhotoAuthority,
   });
   final ConvertRecord initial;
   final ConvertRepository converts;
@@ -26,6 +28,8 @@ class EditPage extends StatelessWidget {
   final VoidCallback? onCancel;
   final ValueChanged<String>? onSaved;
   final Future<Uint8List?> Function() pickPhoto;
+  final AccessScope scope;
+  final Future<bool> Function(String? congregationId)? revalidatePhotoAuthority;
   @override
   Widget build(BuildContext context) => RegisterPage(
     initial: initial,
@@ -35,5 +39,7 @@ class EditPage extends StatelessWidget {
     onCancel: onCancel,
     onSaved: onSaved,
     pickPhoto: pickPhoto,
+    scope: scope,
+    revalidatePhotoAuthority: revalidatePhotoAuthority,
   );
 }

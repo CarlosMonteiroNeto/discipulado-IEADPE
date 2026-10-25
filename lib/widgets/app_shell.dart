@@ -18,6 +18,7 @@ class AppShell extends StatelessWidget {
     required this.onSignOut,
     this.currentRoute = '/home',
     this.onFeedback,
+    this.publicMode = false,
   });
 
   final Widget child;
@@ -26,6 +27,7 @@ class AppShell extends StatelessWidget {
   final ValueChanged<String> onNavigate;
   final VoidCallback onSignOut;
   final VoidCallback? onFeedback;
+  final bool publicMode;
 
   static const labels = {
     '/home': 'Início',
@@ -93,9 +95,11 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final routes = routesFor(scope)
-        .where((route) => !hiddenFromMenu.contains(route))
-        .toList(growable: false);
+    final routes = publicMode
+        ? const ['/register', '/home']
+        : routesFor(scope)
+              .where((route) => !hiddenFromMenu.contains(route))
+              .toList(growable: false);
     final mobile = MediaQuery.sizeOf(context).width < 768;
     final hasOverflow = routes.length > 5;
     final primaryRoutes = mobile
@@ -156,25 +160,27 @@ class AppShell extends StatelessWidget {
                         onNavigate(route);
                       },
                     ),
-                  const Divider(),
-                  ListTile(
-                    key: const ValueKey('app-shell-drawer-feedback'),
-                    leading: const Icon(Icons.feedback_outlined),
-                    title: const Text('Enviar sugestão'),
-                    onTap: () {
-                      Navigator.of(drawerContext).pop();
-                      _feedback(drawerContext);
-                    },
-                  ),
-                  ListTile(
-                    key: const ValueKey('app-shell-drawer-sign-out'),
-                    leading: const Icon(Icons.logout),
-                    title: const Text('Sair'),
-                    onTap: () {
-                      Navigator.of(drawerContext).pop();
-                      onSignOut();
-                    },
-                  ),
+                  if (!publicMode) ...[
+                    const Divider(),
+                    ListTile(
+                      key: const ValueKey('app-shell-drawer-feedback'),
+                      leading: const Icon(Icons.feedback_outlined),
+                      title: const Text('Enviar sugestão'),
+                      onTap: () {
+                        Navigator.of(drawerContext).pop();
+                        _feedback(drawerContext);
+                      },
+                    ),
+                    ListTile(
+                      key: const ValueKey('app-shell-drawer-sign-out'),
+                      leading: const Icon(Icons.logout),
+                      title: const Text('Sair'),
+                      onTap: () {
+                        Navigator.of(drawerContext).pop();
+                        onSignOut();
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -354,7 +360,7 @@ class AppShell extends StatelessWidget {
                                     icon: const Icon(Icons.menu),
                                   ),
                                 )
-                              else ...[
+                              else if (!publicMode) ...[
                                 IconButton(
                                   tooltip: 'Sair',
                                   color: Colors.white,
@@ -510,11 +516,13 @@ class AppShell extends StatelessWidget {
               ),
             )
           : null,
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Enviar sugestão',
-        onPressed: () => _feedback(context),
-        child: const Icon(Icons.feedback_outlined),
-      ),
+      floatingActionButton: publicMode
+          ? null
+          : FloatingActionButton(
+              tooltip: 'Enviar sugestão',
+              onPressed: () => _feedback(context),
+              child: const Icon(Icons.feedback_outlined),
+            ),
     );
   }
 }

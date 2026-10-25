@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -180,6 +181,8 @@ void main() {
         host(
           ConvertForm(
             initial: record(),
+            allowPhotos: true,
+            photoAuthority: (_) => true,
             pickPhoto: () async => null,
             onSubmit: (d) async {
               saved = d;
@@ -195,6 +198,74 @@ void main() {
       expect(saved!.removePhoto, false);
     },
   );
+  testWidgets('photo authority is revalidated before opening the picker', (
+    t,
+  ) async {
+    var pickerCalls = 0;
+    var revocations = 0;
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          photoAuthority: (_) => true,
+          revalidatePhotoAuthority: (_) async => false,
+          onPhotoAuthorityRevoked: () => revocations++,
+          pickPhoto: () async {
+            pickerCalls++;
+            return Uint8List.fromList([1]);
+          },
+          onSubmit: (_) async {},
+        ),
+      ),
+    );
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+
+    expect(pickerCalls, 0);
+    expect(revocations, 1);
+    expect(
+      find.text('Seu acesso mudou. Atualize a página antes de enviar fotos.'),
+      findsOneWidget,
+    );
+  });
+  testWidgets('scope change clears selected photo bytes and removal state', (
+    t,
+  ) async {
+    final oldPhoto = Uint8List.fromList([1]);
+    var revocations = 0;
+    ConvertDraft? submitted;
+
+    Widget buildForm({required bool authorized}) {
+      final authorityAtBuild = authorized;
+      return host(
+        ConvertForm(
+          initial: record(),
+          allowPhotos: true,
+          photoAuthority: (_) => authorityAtBuild,
+          existingPhoto: oldPhoto,
+          pickPhoto: () async => Uint8List.fromList([2]),
+          onPhotoAuthorityRevoked: () => revocations++,
+          onSubmit: (draft) async => submitted = draft,
+        ),
+      );
+    }
+
+    await t.pumpWidget(buildForm(authorized: true));
+    await t.tap(find.text('Escolher foto'));
+    await t.pumpAndSettle();
+    expect(
+      find.text('Nova foto selecionada. A foto atual será mantida até salvar.'),
+      findsOneWidget,
+    );
+
+    await t.pumpWidget(buildForm(authorized: false));
+    expect(revocations, 1);
+    expect(find.text('Escolher foto'), findsNothing);
+    await tapSave(t, 'Atualizar');
+    expect(submitted!.photoBytes, isNull);
+    expect(submitted!.removePhoto, isFalse);
+  });
   testWidgets(
     'future date uses Sao Paulo business today and keeps draft on failure',
     (t) async {

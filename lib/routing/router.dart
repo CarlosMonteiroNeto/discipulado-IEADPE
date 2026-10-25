@@ -8,6 +8,7 @@ import '../features/auth/auth_repository.dart';
 import 'browser_route_history.dart';
 
 const _knownRoutes = {
+  '/',
   '/register',
   '/home',
   '/converts',
@@ -21,6 +22,8 @@ const _knownRoutes = {
   '/ministry/handoff',
 };
 bool isSafeRoute(String? value) => _knownRoutes.contains(value);
+bool isPublicRegistrationPath(String? value) =>
+    value == '/' || value == '/register';
 String safeRoute(String? value) {
   if (value == '/ministry/students/register') return '/ministry/students';
   return isSafeRoute(value) ? value! : '/register';
