@@ -34,24 +34,43 @@ SELECT pg_temp.assert_true((SELECT a.owner_id=auth.uid() AND a.status='pending' 
 DO $$ DECLARE p text:=(SELECT path FROM photos); BEGIN
  BEGIN PERFORM public.ieadpe_create_photo_draft(gen_random_uuid(),'{"path":"override"}');
   RAISE EXCEPTION 'ASSERTION: caller chose draft path'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
- BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p||'x','{"size":123,"mimetype":"image/jpeg"}');
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p||'x','{"contentLength":123,"mimetype":"image/jpeg"}');
   RAISE EXCEPTION 'ASSERTION: arbitrary path uploaded'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
- BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"size":1048577,"mimetype":"image/jpeg"}');
-  RAISE EXCEPTION 'ASSERTION: oversize uploaded'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
- BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"size":123,"mimetype":"image/png"}');
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"contentLength":123,"mimetype":"image/png"}');
   RAISE EXCEPTION 'ASSERTION: non JPEG uploaded'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"size":123,"mimetype":"image/jpeg"}');
+  RAISE EXCEPTION 'ASSERTION: upload accepted metadata key not supplied by Storage preflight'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"contentLength":0,"mimetype":"image/jpeg"}');
+  RAISE EXCEPTION 'ASSERTION: empty upload accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"contentLength":"123","mimetype":"image/jpeg"}');
+  RAISE EXCEPTION 'ASSERTION: string contentLength accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"contentLength":null,"mimetype":"image/jpeg"}');
+  RAISE EXCEPTION 'ASSERTION: null contentLength accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',p,'{"contentLength":1056769,"mimetype":"image/jpeg"}');
+  RAISE EXCEPTION 'ASSERTION: request envelope over cap accepted'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
-INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"size":123,"mimetype":"image/jpeg"}' FROM photos;
+SAVEPOINT photo_minimum_content_length;
+INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":1,"mimetype":"image/jpeg"}' FROM photos;
+ROLLBACK TO SAVEPOINT photo_minimum_content_length;
+SAVEPOINT photo_maximum_content_length;
+INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":1048576,"mimetype":"image/jpeg"}' FROM photos;
+ROLLBACK TO SAVEPOINT photo_maximum_content_length;
+-- Storage preflight contentLength includes the multipart envelope, while the
+-- bucket's file_size_limit enforces the actual JPEG size at 1 MiB.
+SAVEPOINT photo_multipart_envelope;
+INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":1056768,"mimetype":"image/jpeg"}' FROM photos;
+ROLLBACK TO SAVEPOINT photo_multipart_envelope;
+INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":123,"mimetype":"image/jpeg"}' FROM photos;
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM storage.objects), 'owner reads pending bytes metadata');
 DO $$ BEGIN
- BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"size":123,"mimetype":"image/jpeg"}' FROM photos
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":123,"mimetype":"image/jpeg"}' FROM photos
  ON CONFLICT(bucket_id,name) DO UPDATE SET metadata=excluded.metadata;
  RAISE EXCEPTION 'ASSERTION: upsert succeeded'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000003',true);
 SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects), 'other actor cannot read pending object');
 DO $$ BEGIN
- BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"size":123,"mimetype":"image/jpeg"}' FROM photos;
+ BEGIN INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":123,"mimetype":"image/jpeg"}' FROM photos;
  RAISE EXCEPTION 'ASSERTION: cross owner insert'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000001',true);
@@ -75,7 +94,7 @@ DO $$ DECLARE bad_id uuid; kind text; old_id uuid:=(SELECT id FROM photos WHERE 
    CASE WHEN kind='owner' THEN '80000000-0000-0000-0000-000000000003'::uuid ELSE auth.uid() END,
    auth.uid()::text||'/'||bad_id::text||'.jpg', CASE WHEN kind='state' THEN 'detached' ELSE 'pending' END,
    now()+CASE WHEN kind='expiry' THEN interval '-1 second' ELSE interval '1 hour' END);
-  IF kind<>'object' THEN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',auth.uid()::text||'/'||bad_id::text||'.jpg','{"size":123,"mimetype":"image/jpeg"}'); END IF;
+  IF kind<>'object' THEN INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('convert-photos',auth.uid()::text||'/'||bad_id::text||'.jpg','{"contentLength":123,"mimetype":"image/jpeg"}'); END IF;
   BEGIN PERFORM pg_temp.edit_convert_photo(gen_random_uuid(),convert_id,bad_id);
    RAISE EXCEPTION 'ASSERTION: invalid attachment accepted: %',kind; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
   PERFORM pg_temp.assert_true((SELECT photo_asset_id=old_id FROM public.converts WHERE id=convert_id), 'failed replacement preserves old photo: '||kind);
@@ -84,7 +103,7 @@ END $$;
 SET LOCAL ROLE authenticated;
 INSERT INTO photos(label,id) SELECT 'new',(public.ieadpe_create_photo_draft(gen_random_uuid(),'{}')->>'id')::uuid;
 UPDATE photos SET path=(SELECT a.path FROM public.photo_assets a WHERE a.id=photos.id) WHERE label='new';
-INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"size":123,"mimetype":"image/jpeg"}' FROM photos WHERE label='new';
+INSERT INTO storage.objects(bucket_id,name,metadata) SELECT 'convert-photos',path,'{"contentLength":123,"mimetype":"image/jpeg"}' FROM photos WHERE label='new';
 SELECT pg_temp.edit_convert_photo(gen_random_uuid(),(SELECT id FROM target),(SELECT id FROM photos WHERE label='new'));
 SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM storage.objects WHERE name=(SELECT path FROM photos WHERE label='old')), 'replacement hides detached old bytes');
 RESET ROLE;

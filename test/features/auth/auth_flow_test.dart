@@ -182,10 +182,7 @@ void main() {
     expect(routesFor(ministry), contains('/ministry/students/register'));
     expect(routesFor(ministry), isNot(contains('/converts')));
     expect(routesFor(campaign), isNot(contains('/ministry/students/register')));
-    expect(
-      safeRoute('/ministry/students/register'),
-      '/ministry/students/register',
-    );
+    expect(safeRoute('/ministry/students/register'), '/ministry/students');
   });
   test(
     'student registration route requires an authorized ministry scope',
@@ -198,7 +195,7 @@ void main() {
         intendedRoute: '/ministry/students/register',
       );
       await Future<void>.delayed(Duration.zero);
-      expect(allowed.route, '/ministry/students/register');
+      expect(allowed.route, '/ministry/students');
       expect(allowed.allowedRoutes, contains('/ministry/students/register'));
       allowed.dispose();
       await authorized.events.close();

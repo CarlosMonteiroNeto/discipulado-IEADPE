@@ -812,7 +812,7 @@
       ],
       "current_status": {
         "status": "PARTIAL",
-        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
+        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. A direct contextual student-registration URL safely falls back to Alunos and the normal Alunos action opens the contextual form. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
         "evidence_locator": "docs/verification/2026-10-24-hosted-web-write-smoke.md; test/widgets/app_shell_test.dart; scripts/test_release_operations.py; scripts/web_preflight.py",
         "branch_release_approval": false
       },
@@ -1052,7 +1052,7 @@
       {
         "unit": "T11",
         "status": "PARTIAL",
-        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
+        "scope": "Hosted authenticated Web lifecycle, persisted reload, finalization, linked cancellation/replacement, progress, exact synthetic cleanup, all 13 exact routes and 4 sampled asset MIME checks passed 2026-10-25. A direct contextual student-registration URL safely falls back to Alunos and the normal Alunos action opens the contextual form. Docker/local Supabase is explicitly deferred and is not required for this Web acceptance. Cross-congregation denial and existing-token revocation remain NOT RUN; O1/G2 OAuth and D2 Storage/SAF are separate gates.",
         "evidence_locator": "docs/verification/2026-10-24-hosted-web-write-smoke.md; test/widgets/app_shell_test.dart; scripts/test_release_operations.py; scripts/web_preflight.py"
       },
       {
@@ -1693,9 +1693,78 @@
     "goal": "Complete Web acceptance against the real hosted Supabase backend without installing or using Docker, then obtain an independent Web-focused branch review.",
     "authority": "User explicitly directed no Docker, accepted synthetic hosted-Supabase writes followed by exact cleanup, and requested the hosted journey replace the local-stack Web gate.",
     "supersedes": "Older Task 11 and B0 instructions that require a Docker-backed local Auth/PostgREST/Storage stack as a prerequisite for Web acceptance. Historical records are retained but no longer govern current T11 execution.",
-    "t11_verdict": "PARTIAL: hosted authenticated CRUD/lifecycle, persisted reload, finalization, cancellation/replacement, progress, guarded cleanup, 13 exact routes and 4 asset MIME checks PASS on 2026-10-25; cross-congregation denial and existing-token revocation NOT RUN. Docker/local Supabase is not required.",
+    "t11_verdict": "PARTIAL: hosted authenticated CRUD/lifecycle, persisted reload, finalization, cancellation/replacement, progress, guarded cleanup, 13 exact routes, 4 asset MIME checks and the safe Alunos fallback for a contextless student-registration deep link PASS on 2026-10-25; cross-congregation denial and existing-token revocation NOT RUN. Docker/local Supabase is not required.",
     "separate_gates": "Fresh OAuth/provider callback remains O1/G2. Android Storage/photo/SAF and authenticated device journey remain D2. T11 PARTIAL and this amendment do not approve the assembled release.",
     "evidence": "docs/verification/2026-10-24-hosted-web-write-smoke.md",
     "review_request": "Dispatch native gpt-6.1-sol at low reasoning effort for a read-only review of the current branch, focused on Web runtime behavior, auth/scope navigation, static deep routes, asset loading, and test/report alignment."
+  },
+  "web_completion_2026_10_25": {
+    "canonical_markdown_section": "canonical-web-completion-queue--2026-10-25",
+    "authority": "Sole active Web continuation queue; supersedes conflicting older workspace, continuation, commands and broader release wording. Historical tasks/evidence/gaps remain preserved.",
+    "goal": "Functional Web product with the reviewed branch pushed; no claim of Android release or hosting publication.",
+    "canonical_worktree": "C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion",
+    "branch": "codex/ministry-production-completion",
+    "status": "IN_PROGRESS",
+    "exclusions": [
+      "Docker: definitively excluded; never install or use",
+      "Local Supabase: not a prerequisite for this Web delivery",
+      "Android D0/D1/D2, APK/signing/G3/G4, device Storage/SAF: separate future plan, historical gaps retained",
+      "Linux: deferred"
+    ],
+    "authorization": "The user authorizes use/import of the complete known existing records as needed, a temporary least-privilege Auth identity with a bounded congregation grant, hosted photo-policy correction, test mutations and exact cleanup, plus pushing this feature branch once Web-ready. No other-user old-local-data inventory/upload journey is required. Prefer synthetic rows, record baseline, restore any real row used, and never log credentials/tokens. No merge target or hosting publication is authorized; credential rotation remains a separate owner/security operation.",
+    "evidence": "docs/verification/2026-10-24-hosted-web-write-smoke.md; docs/verification/2026-10-25-web-completion-validation.md; docs/verification/2026-10-25-web-completion-candidate.json.",
+  "review_state": "The previous GPT-6.1 Sol low review (manifest SHA-256 d3adab1c13af69253cb28aeb50e23352cc0eac6d93fcefe203c81d155afddfa4) is historical NOT READY from before hosted W2/W3 completion. The refreshed GPT-6.1 Sol low W5 review passed with zero Critical/Important findings against manifest SHA-256 e5648ecc6f4570d7f62de024a17d6c2c3b94a389f3f9c9a3fa3fcce69081628b; see docs/verification/2026-10-25-web-completion-review-w5.md. The pinned full suite then passed 572/572 (W6). Independent W7 review passed with zero Critical/Important findings and no pending Minor against manifest SHA-256 0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961; see docs/verification/2026-10-25-web-completion-review-w7.md. The existing service-role credential remains a production-use/hosting-publication residual, not a blocker to this source push; no new secret-like additions were found.",
+    "ordered_gates": [
+      {
+        "order": 1,
+        "id": "W1",
+        "title": "Candidate and evidence identity",
+        "status": "PASS",
+      "required": "Confirmed canonical worktree, branch, HEAD, 18 source/report digests and three Web artifact digests, pinned Flutter 3.47.7/Dart 3.13.5, Python/Node versions, Chromium-backed browser provider, and public-only configuration in the candidate manifest. The provider does not expose an exact Chromium version. Earlier 566/566 remains historical, not a fresh final run. Refresh the manifest after any source/report change and before W5/W7; prior digests are historical until refreshed."
+      },
+      {
+        "order": 2,
+        "id": "W2",
+        "title": "T11 hosted authorization boundaries",
+        "status": "PASS",
+      "required": "PASS: temporary confirmed Auth identity with exactly one Matriz direction grant. Its token saw assigned scope only and read an existing Matriz convert before revocation; an out-of-scope convert read/edit was denied without revision change. After grant deletion, the same still-issued token saw empty scope and the same previously readable Matriz convert returned empty; edit of that same row was denied with unchanged revision. Exact cleanup removed user/grant and preserved baseline counts; no real row/grant changed."
+      },
+      {
+        "order": 3,
+        "id": "W3",
+        "title": "O1/G2 Web provider and operational residuals",
+        "status": "PASS",
+      "required": "PASS: hosted policy migration 202610250001_storage_content_length_policy.sql and ledger entry applied; private JPEG bucket remains 1 MiB. Focused SQL regression, authenticated hosted API upload/create/attach/reload/read/cleanup, and Chromium UI photo create/reload/download/edit/preserve photo all passed with orientation6 fixture. API created/attached/read; UI performed the edit. Exact synthetic cleanup restored 24 congregations, 51 converts, zero photos/objects and no temporary user/grant/receipts/week guard. Local Google OAuth evidence remains; production-host callback and legacy service-role credential rotation remain explicit publication residuals. The hosted Ministry student table is empty and no existing convert was reclassified. Firefox/WebKit and dark-mode acceptance are not claimed."
+      },
+      {
+        "order": 4,
+        "id": "W4",
+        "title": "Fresh Web validation",
+      "status": "PASS",
+      "required": "On the current candidate, pinned flutter analyze --no-pub passed with no issues in 224.2s after a slow cold attempt; flutter build web --no-pub passed in 183.8s, and python scripts/web_preflight.py build/web passed. Focused changed-file analyzer and student registration widget tests passed (8/8); release-operation tests passed (5/5); fresh artifact smoke passed all 13 exact routes and four asset MIME checks. Existing authenticated routing/context-loss and source-matching hosted lifecycle evidence are documented. Reuse source-matching lifecycle evidence; do not repeat hosted writes without need. Diagnose every failure before a cause-specific regression/fix and focused rerun."
+      },
+      {
+        "order": 5,
+        "id": "W5",
+        "title": "General Web review before full suite",
+      "status": "PASS",
+      "required": "The refreshed Sol 6.1 low general Web review verified all 20 hashes/sizes and returned zero Critical and zero Important findings against manifest SHA-256 e5648ecc6f4570d7f62de024a17d6c2c3b94a389f3f9c9a3fa3fcce69081628b. Receipt: docs/verification/2026-10-25-web-completion-review-w5.md."
+      },
+      {
+        "order": 6,
+        "id": "W6",
+        "title": "Authoritative full suite",
+      "status": "PASS",
+      "required": "W5 passed. The pinned Flutter 3.47.7 SDK ran flutter test --no-pub --concurrency=1 once: 572/572 passed, exit 0, 14m39s. See docs/verification/2026-10-25-web-completion-validation.md."
+      },
+      {
+        "order": 7,
+        "id": "W7",
+        "title": "Final independent review and push readiness",
+      "status": "READY_TO_PUSH",
+      "required": "W5 and W6 passed. Independent Sol 6.1 low W7 review passed with zero Critical/Important and no Minor pending against manifest SHA-256 0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961; see docs/verification/2026-10-25-web-completion-review-w7.md. It verified Web behavior/evidence, full suite, analyzer/build/preflight, plan consistency, and security residuals, and cleared source push. The public origin repository and six-commit range plus working diff have no secret-like additions. The exposed legacy service-role credential remains an owner rotation requirement before production use/hosting publication and does not block the source-only push. Refresh the manifest for these documentary results, verify git diff --check and staged credential hygiene, commit, push codex/ministry-production-completion, and verify the remote tip matches the reviewed source commit. No merge or hosting publication is authorized; Android release and deployment remain separate."
+      }
+    ],
+    "completion_rule": "Candidate-bound W1-W6 evidence and W7 final independent review with explicit residual dispositions before Web-ready verdict and push; W7 finishes only after remote tip verification. General review PASS before complete suite, final independent assembled review afterward. Historical broader L0 FAIL is not a current Web verdict; no Android/deployment/publication inference."
   }
 }

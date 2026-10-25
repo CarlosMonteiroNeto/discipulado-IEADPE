@@ -295,6 +295,8 @@ class _ConvertFormState extends State<ConvertForm> {
         setState(
           () => _error = error is DataFailure && error.code == 'permission'
               ? 'Seu acesso mudou. Volte e atualize a página.'
+              : error is DataFailure && error.code == 'photo_upload'
+              ? 'Não foi possível enviar a foto. Seus dados foram mantidos. Tente novamente.'
               : 'Não foi possível salvar. Seus dados foram mantidos. Tente novamente.',
         );
       }

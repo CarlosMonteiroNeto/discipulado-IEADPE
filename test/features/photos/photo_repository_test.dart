@@ -79,6 +79,34 @@ void main() {
       '/storage/v1/object/convert-photos/${fixture.id(99)}/${fixture.id(1)}.jpg',
     ]);
   });
+  test(
+    'Storage upload denial is reported as a photo-specific failure',
+    () async {
+      final gateway = await fixture.fixture((r) async {
+        if (r.uri.path.endsWith('ieadpe_create_photo_draft')) {
+          await fixture.respond(r, {'id': fixture.id(1)});
+        } else {
+          await r.drain<void>();
+          await fixture.respond(r, {
+            'statusCode': '403',
+            'error': 'Unauthorized',
+            'message': 'new row violates row-level security policy',
+          }, 400);
+        }
+      });
+      await signIn(gateway);
+      await expectLater(
+        PhotoRepository(gateway).upload(sample()),
+        throwsA(
+          isA<DataFailure>().having(
+            (error) => error.code,
+            'code',
+            'photo_upload',
+          ),
+        ),
+      );
+    },
+  );
   test('authenticated download discards completion after invalidation', () async {
     final received = Completer<void>();
     final release = Completer<void>();

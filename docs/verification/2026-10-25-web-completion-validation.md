@@ -1,0 +1,83 @@
+# Web completion validation — 2026-10-25
+
+## Candidate and environment (W1)
+
+- Worktree: `C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion`
+- Branch: `codex/ministry-production-completion`
+- HEAD: `6f02664af3bd86ce5c71771c02e834eb83f9ab8c`; remote branch tip: `d8dc47e3799405df6723d9216f9e4fc792453477`; local branch was six commits ahead before this continuation.
+- Candidate source changes before this report: nine modified tracked files; their SHA-256 values are in the companion candidate manifest. No untracked source files existed before this report.
+- Resolved SDK: Flutter 3.47.7, framework `abaf9c5237`, engine `d8a2d6c768`, Dart 3.13.5. The default `flutter` command resolves to Flutter 3.47.2/Dart 3.13.2; all fresh W4 gates below explicitly used the repository's pinned SDK at `C:/Users/Carlos_Neto/.codex/tools/flutter-3.47.7-full/flutter/bin/flutter.bat`.
+- Python 3.12.10; Node.js 24.19.0.
+- Browser: Codex in-app browser, Chromium-backed. The CUA provider does not expose the exact browser/engine version, so no exact version is claimed.
+- Web build received only the configured public Supabase URL/anon key and local callback `http://127.0.0.1:8767/auth/callback`. The values are intentionally omitted. No service-role key was present in the environment used for this continuation.
+- Public build configuration contains only the public client configuration; no service-role or Google client secret is included in the Web bundle. Configuration key names and artifact digests are indexed in the candidate manifest.
+
+## W2 — hosted authorization boundaries
+
+The existing hosted lifecycle and exact-cleanup evidence remains in [the hosted Web report](2026-10-24-hosted-web-write-smoke.md). On 2026-10-25, using the user's explicit authorization, a temporary confirmed Auth identity received exactly one `Membro da direção da campanha` grant for Matriz. Its password-grant JWT returned exactly that congregation from `ieadpe_get_scope` and successfully read one existing Matriz convert. Before revocation, a direct PostgREST PATCH attempt against a convert in another congregation was denied without changing its revision. After deleting the Matriz grant, the same still-issued JWT returned an empty scope and the **same previously readable Matriz convert** returned an empty result; this same-row read transition is the decisive revocation proof. A direct PostgREST PATCH against that Matriz convert was also denied (401/403) with unchanged revision, as supplemental evidence only; it did not exercise the application's edit RPC. The grant and Auth identity were removed; baseline counts returned to 24 congregations, 51 converts, zero photos/objects, and no temporary users/grants. No real user's access rows were widened and no existing business record was changed.
+
+## W3 — hosted policy and Web photo lifecycle
+
+The prior Storage failure and root cause are preserved below as historical evidence. The authorized forward migration `202610250001_storage_content_length_policy.sql` was applied to hosted Supabase in one transaction with its ledger entry (`202610250001`, `storage_content_length_policy`). Verification confirmed the INSERT policy now uses numeric `metadata.contentLength` with the 1,056,768-byte envelope bound; the private bucket remains limited to 1,048,576 JPEG bytes. The migration did not change the read policy or other bucket settings.
+
+Hosted API probe with the temporary one-congregation identity passed: draft creation, multipart orientation-6 JPEG upload, pending-photo RLS read, authenticated download, synthetic convert create with attached asset, RLS reload, and attached-photo download. It also passed out-of-scope read/edit denial and same-token revocation. The API probe created/attached/reloaded/read the synthetic record; it did not perform the UI edit. API probe cleanup returned all recorded counts to baseline (24 congregations, 51 converts, zero photo assets, zero Storage objects, zero temporary users/grants).
+
+The authenticated Chromium Web UI completed the user-visible photo workflow with the repository's synthetic `orientation6.jpg`: using the already-signed-in global-manager session (separate from the least-privilege W2 identity), it loaded Matriz from the congregation picker, created a synthetic convert with its photo, found it through convert search, reloaded the browser and downloaded/rendered the stored image, edited the landmark, and showed the edited value while retaining the photo. The app displayed its success state after both create and edit. Exact cleanup removed the synthetic convert, canonical person, Storage object, photo asset, three mutation receipts, and the weekly guard created by the synthetic write; no weekly report existed for that scope/week. Final hosted counts returned to 24 congregations, 51 converts, zero photo assets/objects, zero temporary user/grant, and zero test receipts/guard. No real row or real user's grant was changed.
+
+The current hosted database has zero `ministry_students` rows (and zero converts with an active student link); the UI correctly shows the selected congregation and its empty student/class state. There is no hosted student record to import. Existing converts were not automatically reclassified as students because that would change their business meaning.
+
+## Earlier W3 diagnostics — pre-migration Storage denial (superseded by the follow-up above)
+
+This subsection records the baseline failure before the authorized hosted migration and successful W2/W3 follow-up. Do not treat its former blocked verdict as the current status.
+
+The dated [interactive callback record](2026-10-22-phase1-form-ux.md#authenticated-local-web-smoke--2026-10-24) records the user's completed Google sign-in after the local server applied the exact SPA rewrite. The authenticated app loaded Home/Admin; an authorized congregation could be selected, and scope was reselected after the direct-route context reset. This is fresh provider login evidence for the local callback, not production-host redirect acceptance.
+
+The private `convert-photos` Storage path is Web-relevant and was exercised with the repository's synthetic `orientation6.jpg` fixture and synthetic record markers. The browser created a pending photo draft, then the authenticated multipart upload was rejected. Captured response body (UUIDs and bearer token omitted): `statusCode=403`, `error=Unauthorized`, `message=new row violates row-level security policy`, `code=AccessDenied`. The HTTP response was 400 with this Storage error payload. At the time, the app translated the result to “Seu acesso mudou”, which did not identify the Storage policy denial; this copy was corrected and its form behavior now has a focused regression.
+
+Read-only inspection confirmed the hosted INSERT/SELECT policies and authenticated table grants match the migration contract. During the SDK attempts, the unique pending drafts had a live expiry and owner-matching paths; no Storage object or convert row was created. One bounded raw-binary diagnostic was then tried, without `x-upsert`: browser CORS preflight returned 200, the raw POST carried `Content-Type: image/jpeg` and `Content-Length: 1883`, and its HTTP 400 response body again contained `statusCode=403`, `Unauthorized`, and `new row violates row-level security policy`. The request JWT was decoded locally (never logged or emitted) as unexpired, `role=authenticated`, with `sub` matching the draft owner. The hosted `/storage/v1/version` endpoint now reports `1.80.2`. Its tagged upstream implementation runs the RLS preflight before transfer and supplies `metadata.mimetype` plus `metadata.contentLength`; the project's existing policy instead required `metadata.size`. This precisely explains the generic RLS denial for both transports, including the known declared raw-request length. See the tagged [Supabase Storage 1.80.2 uploader](https://github.com/supabase/storage/blob/v1.80.2/src/storage/uploader.ts), which constructs those preflight metadata fields at `prepareUpload`/`canUpload`.
+
+A forward migration, `supabase/migrations/202610250001_storage_content_length_policy.sql`, now checks numeric `metadata.contentLength`. In Storage 1.80.2 this preflight value is the whole HTTP request length; multipart requests include framing and form fields, so the policy allows an 8 KiB envelope above the 1 MiB JPEG limit. The private bucket's existing `file_size_limit=1048576` remains the authoritative actual file-part limit. The migration retains JPEG, owner, pending-state and expiry restrictions. The photo SQL scenario uses actual preflight metadata, rejects malformed/zero/over-cap request lengths, and verifies the lower bound plus an envelope allowance; it also retains MIME/path/owner denial cases. Its RED run failed at the valid `contentLength` insert with RLS under the prior policy; after the forward migration and multipart-envelope allowance, `python scripts/test_database.py photos_test.sql` passed against a fresh disposable loopback PostgreSQL database. This validates the local migration and fixture, not its application to hosted Supabase. The dashboard Storage log viewer was unavailable during the earlier attempt, but the hosted version endpoint and tagged runtime-source evidence supplied the metadata contract. All three hosted diagnostic drafts and their exact `create_photo_draft` receipts were removed in guarded transactions. Post-cleanup project totals returned to baseline: zero photo assets, zero objects in `convert-photos`, zero photo-draft receipts, and zero synthetic converts. No hosted policy, bucket setting, access grant, or credential has been changed. The photo Storage feature remains an unpassed Web gate until the owner authorizes the forward policy migration and the hosted upload/save/read/cleanup path passes.
+
+The Web form now reports Storage authorization denial as a photo-upload failure instead of claiming that general user access changed. Focused regressions pass for both Storage error mapping and the form message; this improves diagnosis but does not resolve the hosted Storage denial.
+
+The production activation report records ten pre-existing function-definition fingerprint differences and only extra service-role grants; it found no missing expected or unexpected `anon` grants. The separately exposed legacy service-role credential still has a documented rotation residual. It is not included in this Web build. Credential rotation is an owner/security operation and was not attempted. Rotation must be completed before external production publication.
+
+This validation targets the current Chromium-backed Web path. Firefox/WebKit and dark-mode acceptance were not exercised and are not claimed as supported Web targets by this review.
+
+## W4 — fresh Web validation
+
+Commands used the pinned Flutter 3.47.7/Dart 3.13.5 SDK.
+
+| Check | Result |
+|---|---|
+| Refreshed full `flutter analyze --no-pub` | PASS after the final student-form change; no issues; 224.2s with pinned SDK. The first cold attempt exceeded 11 minutes and approached 1 GB of Dart memory without diagnostics, so it was interrupted; a cache-warmed rerun completed successfully. |
+| Focused Dart analyzer for `students_page.dart` and its widget test | PASS; no issues |
+| Focused student-registration widget tests | PASS; 8/8, covering unknown-result immutable retry and editable form after `invalid`, `academic_invalid`, and `academic_conflict` rejections |
+| Fresh `flutter build web --no-pub --dart-define-from-file=<protected config> --dart-define=AUTH_CALLBACK_URL=http://127.0.0.1:8767/auth/callback` | PASS; 183.8s, pinned Flutter 3.47.7/Dart 3.13.5 |
+| `python scripts/web_preflight.py build/web` | PASS; fresh static artifact size/routing preflight |
+| `python -B -m unittest discover -s scripts -p test_release_operations.py` | PASS; 5/5 |
+| Direct-route/asset local HTTP smoke | PASS; all 13 declared routes returned the Flutter HTML fallback; four sampled JS/WASM/image assets returned expected MIME types and nonempty content |
+
+The first pinned-SDK build attempt exposed an ignored `.dart_tool` `objective_c` hook kernel compiled by Dart 3.13.2. It failed with `Invalid SDK hash`; `flutter pub get --offline` did not rebuild the cached hook. After recompiling only that ignored hook with Dart 3.13.5, the pinned Web build passed. No dependency lockfile or tracked source was changed by this recovery. The successful build emitted the existing optional WASM suggestion and CupertinoIcons font notice only.
+
+The prior authenticated-browser check loaded Admin. Opening `/ministry/students/register` directly lost transient route context and correctly settled at `/ministry/students`, not `/register`; after normal congregation reselection, the picker listed the user's authorized options and Chafariz showed its established empty Students/Classes state. After the final student-form code change, the fresh Web bundle passed the local direct-route/asset HTTP smoke and the changed widget behavior passed focused browser-targeted Flutter widget tests; the hosted Chromium workflow remains source-matching for convert/photo create, reload, edit, and cleanup. No additional hosted lifecycle writes were needed after the final student-form code change.
+
+## W5 findings addressed before refreshed review
+
+The historical Sol 6.1 low review identified two Important findings. W2 now proves the same Matriz record was readable before grant revocation and hidden to the same still-issued token afterward; an edit using that token was denied and the record revision remained unchanged. The student-registration form now treats the definitive `invalid`, `academic_invalid`, and `academic_conflict` failures as correctable outcomes, releasing the frozen form and Cancel action. Unknown outcomes continue to retain the immutable operation and disable edits/cancellation to avoid duplicate writes. Focused analyzer passed on the changed source/test, and the focused widget file passed 8/8, covering those three definitive failures plus immutable retry after an unknown result. Exact source and evidence hashes are in the refreshed candidate manifest.
+
+The refreshed general Web review by GPT-6.1 Sol low returned **PASS**, with zero Critical and zero Important findings, against manifest SHA-256 `e5648ecc6f4570d7f62de024a17d6c2c3b94a389f3f9c9a3fa3fcce69081628b`. The reviewer verified all 20 hashes/sizes and released W6. It clarified that the decisive revocation evidence is the same-row GET changing from allowed to empty on the same JWT; the direct PostgREST edit denial is supporting evidence only, not a test of the application edit RPC. See [the refreshed review receipt](2026-10-25-web-completion-review-w5.md).
+
+## Review and suite order
+
+The prior whole-branch Sol 6.1 low review is bound to manifest SHA-256 `d3adab1c13af69253cb28aeb50e23352cc0eac6d93fcefe203c81d155afddfa4`. It verified its candidate and returned **W5 NOT READY** before hosted W2/W3 evidence was completed; its verdict and scope remain in [the historical review receipt](2026-10-25-web-completion-review.md). That verdict is superseded by the refreshed W5 PASS in [the new review receipt](2026-10-25-web-completion-review-w5.md). The current full-project analyzer passes; the first cold attempt's resource behavior and successful cache-warmed rerun are recorded in W4.
+
+## W6 — authoritative full suite
+
+After W5 returned PASS, the pinned Flutter 3.47.7 SDK ran `flutter test --no-pub --concurrency=1` once. **PASS: 572/572; exit code 0; elapsed 14m39s.** The final runner output was `All tests passed!`. The full suite ran without Docker and does not constitute Android device/build acceptance. This is the final full-suite run for the current candidate; W7 final review also passed, leaving commit/push and remote-tip verification.
+
+## W7 — final independent review
+
+The independent GPT-6.1 Sol low review verified all 21 source/artifact hashes and sizes for manifest SHA-256 `0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961` and returned **PASS**: zero Critical, zero Important, no Minor findings pending. It explicitly cleared commit/push of the reviewed source branch. See [the final review receipt](2026-10-25-web-completion-review-w7.md). Commit and authorized push, followed by remote-tip verification, remain to complete W7.
+
+The refreshed W5 and independent W7 reviews passed with zero Critical/Important findings; W6 passed 572/572. Only the authorized commit/push and remote-tip verification remain. No Docker or Android/Wi-Fi test was run.

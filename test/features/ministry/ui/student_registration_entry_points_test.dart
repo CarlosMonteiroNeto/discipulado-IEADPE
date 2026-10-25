@@ -9,9 +9,14 @@ import 'package:ieadpe_converts/features/ministry/ui/students_page.dart';
 
 const _congregationId = 'b0000000-0000-4000-8000-000000000001';
 
-class _BrowserGateway implements ReadRpcGateway {
+class _BrowserGateway
+    implements ReadRpcGateway, StudentRegistrationCommandGateway {
   @override
   final boundary = ProtectedDataBoundary();
+
+  final registrationRequests =
+      <({String operationId, Map<String, Object?> payload})>[];
+  String? registrationFailure;
 
   @override
   String get context => boundary.generation;
@@ -44,6 +49,33 @@ class _BrowserGateway implements ReadRpcGateway {
     String operationId,
     Map<String, Object?> payload,
   ) async => MutationResult.applied(operationId: operationId, value: 'record');
+
+  @override
+  Future<MutationResult<PersonRegistrationResult>> registerStudent(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    registrationRequests.add((
+      operationId: operationId,
+      payload: Map<String, Object?>.from(payload),
+    ));
+    if (registrationFailure case final code?) {
+      throw DataFailure(code);
+    }
+    if (registrationRequests.length == 1) {
+      // The server may have committed before its response was lost.
+      throw const DataFailure('unavailable');
+    }
+    return MutationResult.applied(
+      operationId: operationId,
+      value: PersonRegistrationResult(
+        personId: payload['person_id']! as String,
+        studentId: payload['id']! as String,
+        personRevision: 1,
+        studentRevision: 1,
+      ),
+    );
+  }
 }
 
 void main() {
@@ -138,4 +170,136 @@ void main() {
     expect(find.byKey(const ValueKey('conversion_date')), findsNothing);
     expect(find.text('Data de conversão'), findsNothing);
   });
+
+  testWidgets(
+    'student registration retries an unknown result with its immutable intent',
+    (tester) async {
+      final gateway = _BrowserGateway();
+      var saved = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: StudentRegistrationPage(
+            repository: MinistryRepository(gateway),
+            congregationId: _congregationId,
+            onCancel: () {},
+            onSaved: (_) => saved = true,
+          ),
+        ),
+      );
+
+      await tester.enterText(
+        find.byKey(const ValueKey('person-name')),
+        'Aluna de teste',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('student-education')),
+        'Ensino médio',
+      );
+      await tester.ensureVisible(find.text('Cadastrar aluno'));
+      await tester.tap(find.text('Cadastrar aluno'));
+      await tester.pumpAndSettle();
+
+      expect(gateway.registrationRequests, hasLength(1));
+      expect(find.text('Tentar novamente'), findsOneWidget);
+      expect(find.text('Cadastrar aluno'), findsNothing);
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.descendant(
+                of: find.byKey(const ValueKey('person-name')),
+                matching: find.byType(TextFormField),
+              ),
+            )
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<TextFormField>(
+              find.descendant(
+                of: find.byKey(const ValueKey('student-education')),
+                matching: find.byType(TextFormField),
+              ),
+            )
+            .enabled,
+        isFalse,
+      );
+      expect(
+        tester
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Cancelar'),
+            )
+            .onPressed,
+        isNull,
+      );
+
+      await tester.ensureVisible(find.text('Tentar novamente'));
+      await tester.tap(find.text('Tentar novamente'));
+      await tester.pumpAndSettle();
+
+      expect(gateway.registrationRequests, hasLength(2));
+      final first = gateway.registrationRequests[0];
+      final retry = gateway.registrationRequests[1];
+      expect(retry.operationId, first.operationId);
+      expect(retry.payload, equals(first.payload));
+      expect(saved, isTrue);
+    },
+  );
+
+  for (final code in ['invalid', 'academic_invalid', 'academic_conflict']) {
+    testWidgets(
+      'student registration remains editable after definitive $code rejection',
+      (tester) async {
+        final gateway = _BrowserGateway()..registrationFailure = code;
+        var cancelled = false;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: StudentRegistrationPage(
+              repository: MinistryRepository(gateway),
+              congregationId: _congregationId,
+              onCancel: () => cancelled = true,
+              onSaved: (_) {},
+            ),
+          ),
+        );
+
+        await tester.enterText(
+          find.byKey(const ValueKey('person-name')),
+          'Aluna de teste',
+        );
+        await tester.ensureVisible(find.text('Cadastrar aluno'));
+        await tester.tap(find.text('Cadastrar aluno'));
+        await tester.pumpAndSettle();
+
+        expect(gateway.registrationRequests, hasLength(1));
+        expect(find.text('Tentar novamente'), findsNothing);
+        expect(
+          find.text(
+            'Não foi possível cadastrar o aluno. Confira os dados e tente novamente.',
+          ),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<TextFormField>(
+                find.descendant(
+                  of: find.byKey(const ValueKey('person-name')),
+                  matching: find.byType(TextFormField),
+                ),
+              )
+              .enabled,
+          isTrue,
+        );
+        final cancel = tester.widget<OutlinedButton>(
+          find.widgetWithText(OutlinedButton, 'Cancelar'),
+        );
+        expect(cancel.onPressed, isNotNull);
+        final cancelButton = find.widgetWithText(OutlinedButton, 'Cancelar');
+        await tester.ensureVisible(cancelButton);
+        await tester.tap(cancelButton);
+        await tester.pumpAndSettle();
+        expect(cancelled, isTrue);
+      },
+    );
+  }
 }

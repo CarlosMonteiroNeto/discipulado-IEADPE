@@ -82,21 +82,28 @@ class PhotoRepository {
       path: '$owner/${draft.value}.jpg',
     );
     asset.validate();
-    await _network(
-      token,
-      () => gateway.client.storage
-          .from('convert-photos')
-          .uploadBinary(
-            asset.path,
-            encoded,
-            fileOptions: const FileOptions(
-              contentType: 'image/jpeg',
-              cacheControl: '0',
-              upsert: false,
+    try {
+      await _network(
+        token,
+        () => gateway.client.storage
+            .from('convert-photos')
+            .uploadBinary(
+              asset.path,
+              encoded,
+              fileOptions: const FileOptions(
+                contentType: 'image/jpeg',
+                cacheControl: '0',
+                upsert: false,
+              ),
+              retryAttempts: 0,
             ),
-            retryAttempts: 0,
-          ),
-    );
+      );
+    } on DataFailure catch (error) {
+      if (error.code == 'permission') {
+        throw const DataFailure('photo_upload');
+      }
+      rethrow;
+    }
     return asset;
   }
 

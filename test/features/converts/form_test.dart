@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ieadpe_converts/data/supabase_gateway.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
@@ -57,6 +58,26 @@ void main() {
     await tapSave(t, 'Cadastrar');
     expect(find.text('Nome é obrigatório'), findsOneWidget);
     expect(find.text('Ponto de referência é obrigatório'), findsOneWidget);
+  });
+  testWidgets('photo upload failure does not claim that access changed', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      host(
+        ConvertForm(
+          initial: record(),
+          onSubmit: (_) async => throw const DataFailure('photo_upload'),
+        ),
+      ),
+    );
+    await tapSave(t, 'Atualizar');
+    expect(
+      find.text(
+        'Não foi possível enviar a foto. Seus dados foram mantidos. Tente novamente.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Seu acesso mudou'), findsNothing);
   });
   testWidgets(
     'age zero, optional nulls and legacy worship round trip; double press submits once',

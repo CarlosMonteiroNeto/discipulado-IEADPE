@@ -324,13 +324,16 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
       _maritalStatus;
   bool? _waterBaptized, _wantsBaptism;
   bool _busy = false;
+  bool _mutationAttempted = false;
   String? _error;
   String? _signature, _operationId, _studentId, _personId;
+  _PendingStudentRegistration? _pendingRegistration;
 
   @override
   void didUpdateWidget(covariant StudentRegistrationPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.congregationId != widget.congregationId) {
+    if (oldWidget.congregationId != widget.congregationId &&
+        _pendingRegistration == null) {
       for (final controller in [
         _name,
         _phone,
@@ -442,44 +445,89 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
       'congregation_id': widget.congregationId,
     };
     final signature = jsonEncode(fields);
+    final pending = _pendingRegistration;
+    if (pending != null && pending.signature != signature) {
+      setState(
+        () => _error = 'O envio anterior ainda está pendente. Tente novamente sem alterar os dados.',
+      );
+      return;
+    }
     if (_signature != signature) {
       _signature = signature;
       _operationId = const Uuid().v4();
       _studentId = const Uuid().v4();
       _personId = const Uuid().v4();
     }
+    final mutation =
+        pending ??
+        _PendingStudentRegistration(
+          signature: signature,
+          operationId: _operationId!,
+          studentId: _studentId!,
+          personId: _personId!,
+          congregationId: widget.congregationId,
+          person: person,
+          education: fields['education'] as String?,
+          maritalStatus: fields['marital_status'] as String?,
+          waterBaptized: _waterBaptized,
+          wantsBaptism: _wantsBaptism,
+        );
+    _pendingRegistration = mutation;
     final token = widget.repository.gateway.context;
     setState(() {
       _busy = true;
+      _mutationAttempted = true;
       _error = null;
     });
     try {
       final result = await widget.repository.registerStudent(
-        operationId: _operationId!,
-        studentId: _studentId!,
-        personId: _personId!,
-        congregationId: widget.congregationId,
-        person: person,
-        education: fields['education'] as String?,
-        maritalStatus: fields['marital_status'] as String?,
+        operationId: mutation.operationId,
+        studentId: mutation.studentId,
+        personId: mutation.personId,
+        congregationId: mutation.congregationId,
+        person: mutation.person,
+        education: mutation.education,
+        maritalStatus: mutation.maritalStatus,
         newConvert: false,
-        waterBaptized: _waterBaptized,
-        wantsBaptism: _wantsBaptism,
+        waterBaptized: mutation.waterBaptized,
+        wantsBaptism: mutation.wantsBaptism,
       );
       widget.repository.gateway.ensureCurrent(token);
-      if (mounted) widget.onSaved(result);
+      if (mounted) {
+        setState(() {
+          _pendingRegistration = null;
+          _mutationAttempted = false;
+          _error = null;
+        });
+        widget.onSaved(result);
+      }
     } catch (error) {
       if (mounted) {
-        setState(
-          () => _error = error is DataFailure && error.code == 'permission'
+        final ambiguous = _isAmbiguousRegistrationFailure(error);
+        setState(() {
+          _mutationAttempted = ambiguous;
+          _pendingRegistration = ambiguous ? mutation : null;
+          _error = error is DataFailure && error.code == 'permission'
               ? 'Seu acesso mudou. Volte e atualize a página.'
-              : 'Não foi possível cadastrar o aluno. Seus dados foram mantidos. Tente novamente.',
-        );
+              : ambiguous
+              ? 'O resultado do cadastro não foi confirmado. Mantenha os dados e tente novamente para evitar duplicidade.'
+              : 'Não foi possível cadastrar o aluno. Confira os dados e tente novamente.';
+        });
       }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
+
+  bool _isAmbiguousRegistrationFailure(Object error) =>
+      error is! DataFailure ||
+      !const {
+        'academic_conflict',
+        'academic_invalid',
+        'invalid',
+        'permission',
+        'stale',
+      }.contains(error.code);
 
   Widget _academicTextField(
     String key,
@@ -490,7 +538,7 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
     child: AppTextFormField(
       fieldKey: ValueKey(key),
       controller: controller,
-      enabled: !_busy,
+      enabled: !_busy && !_mutationAttempted,
       label: label,
     ),
   );
@@ -510,106 +558,117 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
       DropdownMenuItem(value: false, child: Text('Não')),
       DropdownMenuItem(value: true, child: Text('Sim')),
     ],
-    onChanged: _busy ? null : onChanged,
+    onChanged: _busy || _mutationAttempted ? null : onChanged,
   );
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    backgroundColor: Colors.transparent,
-    body: SafeArea(
-      child: SingleChildScrollView(
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.all(16),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 640),
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(20),
-                child: Form(
-                  key: _form,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Registrar aluno'),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Este cadastro cria a identidade e os dados acadêmicos do aluno. Ele não registra uma conversão.',
-                      ),
-                      const SizedBox(height: 16),
-                      PersonFields(
-                        name: _name,
-                        phone: _phone,
-                        birthDate: _birthDate,
-                        street: _street,
-                        district: _district,
-                        city: _city,
-                        postalCode: _postalCode,
-                        stateCode: _stateCode,
-                        enabled: !_busy,
-                        nameValidator: (value) {
-                          final name = value?.trim() ?? '';
-                          if (name.isEmpty) return 'Nome é obrigatório';
-                          if (name.length > 200) {
-                            return 'O nome deve ter até 200 caracteres';
-                          }
-                          return null;
-                        },
-                        birthDateValidator: brDateValidationError,
-                      ),
-                      _academicTextField(
-                        'student-education',
-                        'Escolaridade (opcional)',
-                        _education,
-                      ),
-                      _academicTextField(
-                        'student-marital-status',
-                        'Estado civil (opcional)',
-                        _maritalStatus,
-                      ),
-                      _answerField(
-                        'student-water-baptized',
-                        'Batizado nas águas?',
-                        _waterBaptized,
-                        (value) => setState(() => _waterBaptized = value),
-                      ),
-                      const SizedBox(height: 12),
-                      _answerField(
-                        'student-wants-baptism',
-                        'Deseja ser batizado?',
-                        _wantsBaptism,
-                        (value) => setState(() => _wantsBaptism = value),
-                      ),
-                      if (_error != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Semantics(
-                            liveRegion: true,
-                            child: Text(_error!),
-                          ),
+  Widget build(BuildContext context) => PopScope<void>(
+    canPop: !_mutationAttempted,
+    child: Scaffold(
+      backgroundColor: Colors.transparent,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.all(16),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 640),
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Form(
+                    key: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('Registrar aluno'),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Este cadastro cria a identidade e os dados acadêmicos do aluno. Ele não registra uma conversão.',
                         ),
-                      const SizedBox(height: 20),
-                      Wrap(
-                        alignment: WrapAlignment.end,
-                        spacing: 12,
-                        children: [
-                          OutlinedButton(
-                            onPressed: _busy ? null : widget.onCancel,
-                            child: const Text('Cancelar'),
-                          ),
-                          FilledButton.icon(
-                            onPressed: _busy ? null : _submit,
-                            icon: Icon(
-                              _busy ? Icons.hourglass_top : Icons.save_outlined,
+                        const SizedBox(height: 16),
+                        PersonFields(
+                          name: _name,
+                          phone: _phone,
+                          birthDate: _birthDate,
+                          street: _street,
+                          district: _district,
+                          city: _city,
+                          postalCode: _postalCode,
+                          stateCode: _stateCode,
+                          enabled: !_busy && !_mutationAttempted,
+                          nameValidator: (value) {
+                            final name = value?.trim() ?? '';
+                            if (name.isEmpty) return 'Nome é obrigatório';
+                            if (name.length > 200) {
+                              return 'O nome deve ter até 200 caracteres';
+                            }
+                            return null;
+                          },
+                          birthDateValidator: brDateValidationError,
+                        ),
+                        _academicTextField(
+                          'student-education',
+                          'Escolaridade (opcional)',
+                          _education,
+                        ),
+                        _academicTextField(
+                          'student-marital-status',
+                          'Estado civil (opcional)',
+                          _maritalStatus,
+                        ),
+                        _answerField(
+                          'student-water-baptized',
+                          'Batizado nas águas?',
+                          _waterBaptized,
+                          (value) => setState(() => _waterBaptized = value),
+                        ),
+                        const SizedBox(height: 12),
+                        _answerField(
+                          'student-wants-baptism',
+                          'Deseja ser batizado?',
+                          _wantsBaptism,
+                          (value) => setState(() => _wantsBaptism = value),
+                        ),
+                        if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Semantics(
+                              liveRegion: true,
+                              child: Text(_error!),
                             ),
-                            label: Text(
-                              _busy ? 'Salvando…' : 'Cadastrar aluno',
-                            ),
                           ),
-                        ],
-                      ),
-                    ],
+                        const SizedBox(height: 20),
+                        Wrap(
+                          alignment: WrapAlignment.end,
+                          spacing: 12,
+                          children: [
+                            OutlinedButton(
+                              onPressed: _busy || _mutationAttempted
+                                  ? null
+                                  : widget.onCancel,
+                              child: const Text('Cancelar'),
+                            ),
+                            FilledButton.icon(
+                              onPressed: _busy ? null : _submit,
+                              icon: Icon(
+                                _busy
+                                    ? Icons.hourglass_top
+                                    : Icons.save_outlined,
+                              ),
+                              label: Text(
+                                _busy
+                                    ? 'Salvando…'
+                                    : _pendingRegistration == null
+                                    ? 'Cadastrar aluno'
+                                    : 'Tentar novamente',
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -619,4 +678,30 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
       ),
     ),
   );
+}
+
+class _PendingStudentRegistration {
+  const _PendingStudentRegistration({
+    required this.signature,
+    required this.operationId,
+    required this.studentId,
+    required this.personId,
+    required this.congregationId,
+    required this.person,
+    required this.education,
+    required this.maritalStatus,
+    required this.waterBaptized,
+    required this.wantsBaptism,
+  });
+
+  final String signature;
+  final String operationId;
+  final String studentId;
+  final String personId;
+  final String congregationId;
+  final MinistryPersonDraft person;
+  final String? education;
+  final String? maritalStatus;
+  final bool? waterBaptized;
+  final bool? wantsBaptism;
 }

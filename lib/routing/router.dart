@@ -21,7 +21,11 @@ const _knownRoutes = {
   '/ministry/handoff',
 };
 bool isSafeRoute(String? value) => _knownRoutes.contains(value);
-String safeRoute(String? value) => isSafeRoute(value) ? value! : '/register';
+String safeRoute(String? value) {
+  if (value == '/ministry/students/register') return '/ministry/students';
+  return isSafeRoute(value) ? value! : '/register';
+}
+
 List<String> routesFor(AccessScope scope) => [
   '/register',
   if (scope.isGlobalManager || scope.congregationIds.isNotEmpty) ...[

@@ -649,7 +649,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         !registrationContextValid) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted && widget.router.route == '/ministry/students/register') {
-          widget.router.go('/register');
+          widget.router.go(safeRoute(widget.router.route));
         }
       });
       return const Center(child: Text('Cadastro de aluno indisponível.'));

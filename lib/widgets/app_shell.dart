@@ -55,7 +55,7 @@ class AppShell extends StatelessWidget {
     '/ministry/handoff': Icons.move_to_inbox_outlined,
   };
 
-  /// Routes remain authorized for deep links but are reached through Alunos.
+  /// Registration depends on transient context and is reopened from Alunos.
   static const hiddenFromMenu = {
     '/ministry/handoff',
     '/ministry/students/register',

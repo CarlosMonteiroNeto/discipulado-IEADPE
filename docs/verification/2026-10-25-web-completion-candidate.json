@@ -1,0 +1,169 @@
+{
+  "date": "2026-10-25",
+  "purpose": "Web source candidate after W5, W6 and W7 PASS; ready for commit and authorized branch push",
+  "worktree": "C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion",
+  "branch": "codex/ministry-production-completion",
+  "head": "6f02664af3bd86ce5c71771c02e834eb83f9ab8c",
+  "remote_head": "d8dc47e3799405df6723d9216f9e4fc792453477",
+  "source_files": [
+    {
+      "path": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.json",
+      "sha256": "994840279f093940428019cfe06a1edc34e21c211169c8a5192a8071bd952117",
+      "bytes": 134568
+    },
+    {
+      "path": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md",
+      "sha256": "3b8dcecc01d6f651bf913f9e94eafde43cb36311eeac648136b18c6816956cbe",
+      "bytes": 170349
+    },
+    {
+      "path": "docs/verification/2026-10-24-hosted-web-write-smoke.md",
+      "sha256": "28c6d4e6ec35da735dd4a7e2335894abc23c1f5cb41c247f0b97f6811b93e7a8",
+      "bytes": 11239
+    },
+    {
+      "path": "docs/verification/2026-10-25-web-completion-validation.md",
+      "sha256": "e77c93cbc4fbae8b4785b0d901b59ddab5e5daaa2a6a249b884b18642755a2cd",
+      "bytes": 16538
+    },
+    {
+      "path": "lib/app.dart",
+      "sha256": "e2894bee88bce6fd703c7367225997113e77e6e1a0eae4c8f3db6c2fbe7d6301",
+      "bytes": 29654
+    },
+    {
+      "path": "lib/features/converts/convert_form.dart",
+      "sha256": "541d21298236d31804366d2356b1f969d521ece79a2145376d403ae05d482810",
+      "bytes": 20596
+    },
+    {
+      "path": "lib/features/ministry/ui/students_page.dart",
+      "sha256": "9535578f7c6d5f78a7f21ec3ed9c23d0c14254ad94d093c21f045019301e0dad",
+      "bytes": 24924
+    },
+    {
+      "path": "lib/features/photos/photo_repository.dart",
+      "sha256": "9eeae2536609f2af5833019b079cf50f405265e636db11545b99f2c756e73c38",
+      "bytes": 4607
+    },
+    {
+      "path": "lib/routing/router.dart",
+      "sha256": "70338a40f078a3b8ca4b2e50746dd251f8f5c6cbe5c6e2ad8d368498a64acaba",
+      "bytes": 6888
+    },
+    {
+      "path": "lib/widgets/app_shell.dart",
+      "sha256": "bb2d6890febec115dad70b4696a66c1447479315e2c90839006f234c190e5139",
+      "bytes": 20099
+    },
+    {
+      "path": "test/features/auth/auth_flow_test.dart",
+      "sha256": "cf2bcb7e4b175c85b1ee02099b64ff1ceaede1cdcc07d953db585484e2575065",
+      "bytes": 13537
+    },
+    {
+      "path": "test/features/converts/form_test.dart",
+      "sha256": "5ffc1aa75dc4e41ef672b13e0a3b7c8a6ef6c6b4a8529de5dce84d60b1d6e399",
+      "bytes": 7992
+    },
+    {
+      "path": "test/features/ministry/ui/student_registration_entry_points_test.dart",
+      "sha256": "381f8d9c4c5ac0eface736d8d603437df8bab5dccf1fe3072defdcda31328b3b",
+      "bytes": 9741
+    },
+    {
+      "path": "test/features/photos/photo_repository_test.dart",
+      "sha256": "a595826db5e2eff7e12e90c630bb1589ad9d3faa7a597a039ae04385afde1da8",
+      "bytes": 7419
+    },
+    {
+      "path": "docs/verification/2026-10-25-web-completion-review.md",
+      "sha256": "335b3abd1be6d28a91145827233bc761dbcebcfafb98e9407fa2f3c67589e9e2",
+      "bytes": 5182
+    },
+    {
+      "path": "supabase/migrations/202610250001_storage_content_length_policy.sql",
+      "sha256": "29f775e83a63ad2afcc8811dbfd5cb49f9cacea9bab2c62d329b1de960968b87",
+      "bytes": 897
+    },
+    {
+      "path": "supabase/tests/database/photos_test.sql",
+      "sha256": "fc4a047f71198b0f5b7f0978d8c7c94f5722b03d0f6a5e978c18b06272507fbd",
+      "bytes": 12274
+    },
+    {
+      "path": "docs/verification/2026-10-25-web-completion-review-w5.md",
+      "sha256": "ff3442747a9c5509c08a8cc71abd7d89fd4b867dc852ffbadc7c639195fd4f17",
+      "bytes": 2115
+    },
+    {
+      "path": "docs/verification/2026-10-25-web-completion-review-w7.md",
+      "sha256": "a9e1be683591694e299c09df0eaf9076cd68851d44e04f0b5104134314f3834c",
+      "bytes": 1718
+    }
+  ],
+  "web_artifacts": [
+    {
+      "path": "build/web/index.html",
+      "sha256": "1e8232cdcc57c6b6ff91806bfc700818313cdfc531545688962d48ba35fc40b3",
+      "bytes": 1600
+    },
+    {
+      "path": "build/web/main.dart.js",
+      "sha256": "eaa458cfd55afe06c3c3f51d34c6be6b6806a7c8a36c25a71cd51434ed914273",
+      "bytes": 5507573
+    },
+    {
+      "path": "build/web/_redirects",
+      "sha256": "56d69539fac70478f296f9b0b84dc2bd79ef5f9204aca692cde068345337613b",
+      "bytes": 405
+    }
+  ],
+  "toolchain": {
+    "flutter": "3.47.7",
+    "dart": "3.13.5",
+    "python": "3.12.10",
+    "node": "24.19.0",
+    "browser": "Codex in-app browser, Chromium-backed; exact version not exposed by provider"
+  },
+  "build_configuration": {
+    "config_path": "<protected local config>",
+    "keys": [
+      "SUPABASE_PUBLISHABLE_KEY",
+      "SUPABASE_URL"
+    ],
+    "service_role_key_in_environment": false,
+    "google_client_secret_in_bundle": false
+  },
+  "review": {
+    "required_model": "GPT-6.1 Sol",
+    "reasoning": "low",
+    "status": "w5_w6_w7_pass_push_pending",
+    "receipt": "docs/verification/2026-10-25-web-completion-review-w7.md",
+    "critical_code_findings": 0,
+    "important_code_findings": 0,
+    "important_hosted_acceptance_blockers": 0,
+    "hosted_policy_applied": true,
+    "full_suite_started": true,
+    "previous_reviewed_candidate_manifest_sha256": "d3adab1c13af69253cb28aeb50e23352cc0eac6d93fcefe203c81d155afddfa4",
+    "w2_scope_revocation_passed": true,
+    "hosted_api_photo_flow_passed": true,
+    "hosted_browser_photo_flow_passed": true,
+    "refreshed_full_analyzer_passed": true,
+    "focused_student_registration_analyzer_passed": true,
+    "focused_student_registration_tests_passed": true,
+    "focused_student_registration_tests": "8/8",
+    "refreshed_web_build_passed": true,
+    "refreshed_web_preflight_passed": true,
+    "refreshed_route_asset_smoke_passed": true,
+    "w2_same_row_revocation_read_edit_passed": true,
+    "verdict": "W5_PASS_W6_PASS_W7_PASS",
+    "reviewed_candidate_manifest_sha256": "0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961",
+    "full_suite_passed": true,
+    "full_suite_test_count": 572,
+    "full_suite_elapsed": "14m39s",
+    "full_suite_exit_code": 0,
+    "w7_final_review_status": "pass_push_pending",
+    "final_reviewed_candidate_manifest_sha256": "0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961"
+  }
+}
