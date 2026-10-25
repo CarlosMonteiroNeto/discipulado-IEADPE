@@ -69,6 +69,9 @@ def check_convert_concurrency(psql, connection):
         ('{manager}','race-manager@example.test',now());
         INSERT INTO private.admin_allowlist VALUES('{manager}');
         INSERT INTO public.congregations(id,name) VALUES('{scope}','Synthetic concurrent');
+        -- Approved policy: immediate creation requires matching authority.
+        INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+        ('race-registrar@example.test','{registrar}','Membro da direção da campanha','{scope}');
     """)
     # Keep this real race scenario open even on Sunday before 20:00.
     # Closed-window eligibility belongs to weekly_test.sql, not this lock fixture.

@@ -9,7 +9,8 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
  ('99100000-0000-4000-8000-000000000001','p2-staff@example.test',now()),
  ('99100000-0000-4000-8000-000000000002','p2-global@example.test',now()),
  ('99100000-0000-4000-8000-000000000003','p2-other@example.test',now()),
- ('99100000-0000-4000-8000-000000000004','p2-registrar@example.test',now());
+ ('99100000-0000-4000-8000-000000000004','p2-registrar@example.test',now()),
+ ('99100000-0000-4000-8000-000000000005','p2-scoped@example.test',now());
 INSERT INTO public.congregations(id,name) VALUES
  ('99200000-0000-4000-8000-000000000001','P2 Scope A'),
  ('99200000-0000-4000-8000-000000000002','P2 Scope B'),
@@ -22,7 +23,9 @@ INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
  ('p2-global@example.test','99100000-0000-4000-8000-000000000002',
   'Membro da supervisão das campanhas',NULL),
  ('p2-other@example.test','99100000-0000-4000-8000-000000000003',
-  'Membro da direção da campanha','99200000-0000-4000-8000-000000000002');
+  'Membro da direção da campanha','99200000-0000-4000-8000-000000000002'),
+ ('p2-scoped@example.test','99100000-0000-4000-8000-000000000005',
+  'Membro da direção da campanha','99200000-0000-4000-8000-000000000001');
 
 SELECT set_config('request.jwt.claim.sub','99100000-0000-4000-8000-000000000001',true);
 DO $$
@@ -208,7 +211,6 @@ SELECT set_config('request.jwt.claim.sub','99100000-0000-4000-8000-000000000004'
 DO $$
 DECLARE
  scope_id uuid:='99200000-0000-4000-8000-000000000001';
- created jsonb;
  create_payload jsonb:=jsonb_build_object(
   'congregation_id','99200000-0000-4000-8000-000000000001',
   'person',jsonb_build_object('name','Registrar Created','phone',NULL,
@@ -217,12 +219,15 @@ DECLARE
    'conversion_date',private.business_today(),'worship_type','Culto regular',
    'age',NULL,'photo_asset_id',NULL));
 BEGIN
- created:=public.ieadpe_create_convert(
-  '99500000-0000-4000-8000-000000000011',create_payload);
- PERFORM pg_temp.assert_true(created ?& ARRAY['id','person_id','revision','person_revision'] AND
-  (SELECT c.congregation_id=scope_id AND c.name='Registrar Created'
-   FROM public.converts c WHERE c.id=(created->>'id')::uuid),
-  'authenticated registrar can create one convert in a selected active congregation');
+ -- Approved policy: authentication alone no longer permits official creation.
+ BEGIN
+  PERFORM public.ieadpe_create_convert(
+   '99500000-0000-4000-8000-000000000011',create_payload);
+  RAISE EXCEPTION 'ASSERTION: no-grant registrar created a convert';
+ EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+ PERFORM pg_temp.assert_true(NOT EXISTS(SELECT FROM public.converts c
+  WHERE c.name='Registrar Created' AND c.congregation_id=scope_id),
+  'no-grant registrar creates no official convert');
 
  BEGIN
   PERFORM public.ieadpe_ministry_list_converts(jsonb_build_object(
@@ -231,7 +236,8 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN
   PERFORM public.ieadpe_ministry_get_convert(jsonb_build_object(
-   'congregation_id',scope_id,'convert_id',created->>'id'));
+   'congregation_id',scope_id,
+   'convert_id','99300000-0000-4000-8000-000000000002'));
   RAISE EXCEPTION 'ASSERTION: registrar read a saved convert';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN
@@ -246,22 +252,51 @@ BEGIN
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
  BEGIN
   PERFORM public.ieadpe_edit_convert('99500000-0000-4000-8000-000000000013',
-   jsonb_build_object('id',created->>'id','congregation_id',scope_id,
+   jsonb_build_object('id','99300000-0000-4000-8000-000000000002',
+    'congregation_id',scope_id,
     'expected_revision',1,'expected_person_revision',1,
     'person',create_payload->'person','convert',create_payload->'convert'));
   RAISE EXCEPTION 'ASSERTION: registrar edited a saved convert';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+
+SELECT set_config('request.jwt.claim.sub','99100000-0000-4000-8000-000000000005',true);
+DO $$
+DECLARE
+ scope_id uuid:='99200000-0000-4000-8000-000000000001';
+ created jsonb;
+ create_payload jsonb:=jsonb_build_object(
+  'congregation_id','99200000-0000-4000-8000-000000000001',
+  'person',jsonb_build_object('name','Registrar Created','phone',NULL,
+   'birth_date',NULL,'address',NULL),
+  'convert',jsonb_build_object('landmark','Near the square','gender','female',
+   'conversion_date',private.business_today(),'worship_type','Culto regular',
+   'age',NULL,'photo_asset_id',NULL));
+BEGIN
+ -- A local direction grant permits immediate official creation in its scope.
+ created:=public.ieadpe_create_convert(
+  '99500000-0000-4000-8000-000000000015',create_payload);
+ PERFORM pg_temp.assert_true(created ?& ARRAY['id','person_id','revision','person_revision'] AND
+  created-ARRAY['id','person_id','revision','person_revision']='{}'::jsonb AND
+  (created->>'revision')::integer=1 AND (created->>'person_revision')::integer=1 AND
+  created->>'id'<>created->>'person_id' AND
+  (SELECT c.congregation_id=scope_id AND c.name='Registrar Created' AND
+   c.created_by='99100000-0000-4000-8000-000000000005' AND
+   p.congregation_id=scope_id AND p.name='Registrar Created' AND p.revision=1
+   FROM public.converts c JOIN public.ministry_people p ON p.id=c.person_id
+   WHERE c.id=(created->>'id')::uuid),
+  'scoped direction creates one canonical convert in its active congregation');
 
  create_payload:=jsonb_set(create_payload,'{congregation_id}',
   to_jsonb('99200000-0000-4000-8000-000000000003'::text));
  BEGIN
   PERFORM public.ieadpe_create_convert(
    '99500000-0000-4000-8000-000000000014',create_payload);
-  RAISE EXCEPTION 'ASSERTION: registrar created a convert in an archived congregation';
+  RAISE EXCEPTION 'ASSERTION: scoped direction created a convert in an archived congregation';
  EXCEPTION WHEN insufficient_privilege OR invalid_parameter_value THEN NULL; END;
  PERFORM pg_temp.assert_true(NOT EXISTS(SELECT FROM public.converts c
   WHERE c.name='Registrar Created' AND c.congregation_id='99200000-0000-4000-8000-000000000003'),
-  'registrar cannot create in an archived congregation');
+  'scoped direction cannot create in an archived congregation');
 END $$;
 
 DO $$

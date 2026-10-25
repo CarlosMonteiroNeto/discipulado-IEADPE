@@ -78,6 +78,9 @@
       "scenario": "photos_test.sql"
     },
     {
+      "scenario": "public_registration_authority_test.sql"
+    },
+    {
       "scenario": "student_academic_link_test.sql"
     },
     {

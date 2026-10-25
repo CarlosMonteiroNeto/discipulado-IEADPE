@@ -7,26 +7,29 @@ LANGUAGE sql STABLE SET search_path='' AS $$
 CREATE FUNCTION pg_temp.assert_true(ok boolean,label text) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN IF ok IS DISTINCT FROM true THEN RAISE EXCEPTION 'ASSERTION: %',label; END IF; END $$;
 INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
- ('50000000-0000-0000-0000-000000000001','registrar@example.test',now());
-SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000001',true);
+ ('50000000-0000-0000-0000-000000000001','registrar@example.test',now()),
+ ('50000000-0000-0000-0000-000000000002','manager@example.test',now()),
+ ('50000000-0000-0000-0000-000000000003','direction@example.test',now());
+INSERT INTO private.admin_allowlist VALUES('50000000-0000-0000-0000-000000000002');
 INSERT INTO public.congregations(id,name) VALUES
  ('51000000-0000-0000-0000-000000000001','Synthetic A'),
  ('51000000-0000-0000-0000-000000000002','Synthetic B'),
  ('51000000-0000-0000-0000-000000000003','Synthetic Registrar');
--- Keep the registrar smoke create outside A/B so the weekly guard assertions
+-- Approved policy: immediate creation requires matching authority. The local
+-- direction fixture covers both created scopes; the no-grant registrar keeps
+-- the read-denial and receipt-isolation assertions below.
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('direction@example.test','50000000-0000-0000-0000-000000000003','Membro da direção da campanha','51000000-0000-0000-0000-000000000001'),
+ ('direction@example.test','50000000-0000-0000-0000-000000000003','Membro da direção da campanha','51000000-0000-0000-0000-000000000003');
+SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000003',true);
+-- Keep the scoped smoke create outside A/B so the weekly guard assertions
 -- below still isolate the convert whose date is moved within its own scope.
 SELECT pg_temp.assert_true(public.ieadpe_create_convert(gen_random_uuid(),
  '{"congregation_id":"51000000-0000-0000-0000-000000000003",
    "person":{"name":"Synthetic","phone":null,"birth_date":null,"address":null},
    "convert":{"landmark":"Square","gender":"male","conversion_date":"2020-01-01","worship_type":"01 - Oração"}}') ? 'id',
- 'authenticated registration returns a persisted ID');
+ 'scoped registration returns a persisted ID');
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.converts),'registration persists exactly one convert');
-INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
- ('50000000-0000-0000-0000-000000000002','manager@example.test',now()),
- ('50000000-0000-0000-0000-000000000003','direction@example.test',now());
-INSERT INTO private.admin_allowlist VALUES('50000000-0000-0000-0000-000000000002');
-INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
- ('direction@example.test','50000000-0000-0000-0000-000000000003','Membro da direção da campanha','51000000-0000-0000-0000-000000000001');
 CREATE TEMP TABLE result(value jsonb);
 CREATE TEMP TABLE request(value jsonb);
 CREATE TEMP TABLE last_edit(value jsonb);
@@ -44,7 +47,8 @@ SELECT pg_temp.assert_true((SELECT value FROM result)=public.ieadpe_create_conve
   'person',(SELECT value->'person' FROM request),
   'congregation_id',(SELECT value->>'congregation_id' FROM request))),
  'canonical retry returns original result');
-SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.converts),'registrar cannot enumerate even after creation');
+SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000001',true);
+SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.converts),'no-grant registrar cannot enumerate even after authorized creation');
 SELECT pg_temp.assert_true((SELECT value ?& ARRAY['id','person_id','revision','person_revision']
  AND value-ARRAY['id','person_id','revision','person_revision']='{}'::jsonb
  AND (value->>'revision')::integer=1 AND (value->>'person_revision')::integer=1
@@ -58,6 +62,7 @@ SELECT pg_temp.assert_true((SELECT last_visit_date=conversion_date AND visit_cou
  AND NOT is_in_discipleship AND NOT is_discipleship_completed AND NOT is_deviated
  FROM public.converts WHERE id=(SELECT (value->>'id')::uuid FROM result)), 'server initializes source lifecycle fields');
 SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000003',true);
 DO $$ DECLARE bad jsonb; base jsonb:=jsonb_build_object(
  'congregation_id','51000000-0000-0000-0000-000000000001',
  'person',jsonb_build_object('name','Synthetic','phone',NULL,'birth_date',NULL,'address',NULL),
@@ -90,13 +95,14 @@ DO $$ DECLARE bad jsonb; base jsonb:=jsonb_build_object(
  END LOOP;
  BEGIN PERFORM public.ieadpe_create_convert('52000000-0000-0000-0000-000000000001',base);
   RAISE EXCEPTION 'ASSERTION: changed operation payload accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ PERFORM set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000001',true);
  BEGIN PERFORM public.ieadpe_edit_convert(gen_random_uuid(),jsonb_build_object(
   'id',(SELECT value->>'id' FROM result),
   'congregation_id','51000000-0000-0000-0000-000000000001',
   'expected_revision',1,'expected_person_revision',1,
   'person',jsonb_set((SELECT value->'person' FROM request),'{name}','"Denied"'::jsonb),
   'convert',(SELECT value->'convert' FROM request)));
-  RAISE EXCEPTION 'ASSERTION: registrar edited protected record'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  RAISE EXCEPTION 'ASSERTION: no-grant registrar edited protected record'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
 SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000003',true);
 DO $$ BEGIN
@@ -108,13 +114,15 @@ DO $$ BEGIN
   'convert',(SELECT value->'convert' FROM request)));
   RAISE EXCEPTION 'ASSERTION: direction moved outside authorized destination'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
--- Another actor may use the same operation ID without receiving the registrar receipt.
+-- Another actor may use the same operation ID without receiving the direction receipt.
+SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000002',true);
 SELECT public.ieadpe_edit_convert('52000000-0000-0000-0000-000000000001',jsonb_build_object(
  'id',(SELECT value->>'id' FROM result),
  'congregation_id','51000000-0000-0000-0000-000000000001',
  'expected_revision',1,'expected_person_revision',1,
  'person',jsonb_set((SELECT value->'person' FROM request),'{name}','"Other actor"'::jsonb),
  'convert',(SELECT value->'convert' FROM request)));
+SELECT set_config('request.jwt.claim.sub','50000000-0000-0000-0000-000000000003',true);
 UPDATE request SET value=jsonb_build_object(
  'congregation_id','51000000-0000-0000-0000-000000000001',
  'person',jsonb_set(value->'person','{name}','"Updated"'::jsonb),
