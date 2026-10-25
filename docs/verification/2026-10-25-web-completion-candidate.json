@@ -1,20 +1,20 @@
 {
   "date": "2026-10-25",
-  "purpose": "Web source candidate after W5, W6 and W7 PASS; ready for commit and authorized branch push",
+  "purpose": "Reviewed Web source commit pushed; this candidate records final docs-only completion status",
   "worktree": "C:/Users/Carlos_Neto/.codex/worktrees/ministry-production-completion",
   "branch": "codex/ministry-production-completion",
-  "head": "6f02664af3bd86ce5c71771c02e834eb83f9ab8c",
-  "remote_head": "d8dc47e3799405df6723d9216f9e4fc792453477",
+  "head": "14485929dcae4c53dcac5343b289f79e8c1068e7",
+  "remote_head": "14485929dcae4c53dcac5343b289f79e8c1068e7",
   "source_files": [
     {
       "path": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.json",
-      "sha256": "994840279f093940428019cfe06a1edc34e21c211169c8a5192a8071bd952117",
-      "bytes": 134568
+      "sha256": "9f6b8ef31ac8868e25878d162740495905dbac20c1754b6cc8b224929a9f0ee9",
+      "bytes": 134515
     },
     {
       "path": "docs/superpowers/plans/2026-10-20-ministry-corrective-release-plan.md",
-      "sha256": "3b8dcecc01d6f651bf913f9e94eafde43cb36311eeac648136b18c6816956cbe",
-      "bytes": 170349
+      "sha256": "5f83759e181b7b05fac3c0474a5e928019a70045f83ffa017e1ec13ceb89768a",
+      "bytes": 170169
     },
     {
       "path": "docs/verification/2026-10-24-hosted-web-write-smoke.md",
@@ -23,8 +23,8 @@
     },
     {
       "path": "docs/verification/2026-10-25-web-completion-validation.md",
-      "sha256": "e77c93cbc4fbae8b4785b0d901b59ddab5e5daaa2a6a249b884b18642755a2cd",
-      "bytes": 16538
+      "sha256": "6086270933119c4bb05a7d0d3db9205cf73e4e0834121b18f488c8c573e63c0b",
+      "bytes": 16808
     },
     {
       "path": "lib/app.dart",
@@ -98,8 +98,8 @@
     },
     {
       "path": "docs/verification/2026-10-25-web-completion-review-w7.md",
-      "sha256": "a9e1be683591694e299c09df0eaf9076cd68851d44e04f0b5104134314f3834c",
-      "bytes": 1718
+      "sha256": "c261cfa41a5ed317c71386ee6c663f5ce0b837441e1f8a882f12f59951b07f9b",
+      "bytes": 1884
     }
   ],
   "web_artifacts": [
@@ -138,7 +138,7 @@
   "review": {
     "required_model": "GPT-6.1 Sol",
     "reasoning": "low",
-    "status": "w5_w6_w7_pass_push_pending",
+    "status": "complete_source_pushed",
     "receipt": "docs/verification/2026-10-25-web-completion-review-w7.md",
     "critical_code_findings": 0,
     "important_code_findings": 0,
@@ -163,7 +163,15 @@
     "full_suite_test_count": 572,
     "full_suite_elapsed": "14m39s",
     "full_suite_exit_code": 0,
-    "w7_final_review_status": "pass_push_pending",
+    "w7_final_review_status": "pass_and_source_commit_pushed",
     "final_reviewed_candidate_manifest_sha256": "0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961"
+  },
+  "candidate_source_commit": "14485929dcae4c53dcac5343b289f79e8c1068e7",
+  "source_push": {
+    "branch": "codex/ministry-production-completion",
+    "repository": "CarlosMonteiroNeto/discipulado-IEADPE",
+    "commit": "14485929dcae4c53dcac5343b289f79e8c1068e7",
+    "remote_tip_verified": true,
+    "subsequent_changes": "documentation-only W7 completion record; no application source or Web artifact changed"
   }
 }

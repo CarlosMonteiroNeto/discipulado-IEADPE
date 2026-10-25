@@ -7,6 +7,7 @@
 - Reviewed candidate manifest SHA-256: `0d8f2f341717b45ac4e9ee370cf2bf483dc4eec62b75ae27bf02ff572d817961`.
 - Manifest verification: all 21 source/artifact hashes and sizes matched.
 - Verdict: **PASS**; zero Critical, zero Important, no Minor findings pending. The reviewer explicitly cleared commit/push of this source branch.
+- Reviewed source commit: `14485929dcae4c53dcac5343b289f79e8c1068e7`; the authorized push succeeded and the remote branch tip matched this SHA immediately afterward.
 
 ## Evidence confirmed
 
