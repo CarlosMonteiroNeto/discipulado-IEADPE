@@ -311,6 +311,46 @@ void main() {
     expect(submitted!.photoCrop, crop);
   });
 
+  testWidgets(
+    'authority is revalidated after source choice before acquisition',
+    (t) async {
+      var revalidations = 0;
+      var acquisitions = 0;
+      var cropCalls = 0;
+      await t.pumpWidget(
+        host(
+          ConvertForm(
+            initial: record(),
+            allowPhotos: true,
+            photoAuthority: (_) => true,
+            choosePhotoSource: (_) async => ImageSource.gallery,
+            revalidatePhotoAuthority: (_) async => ++revalidations == 1,
+            acquirePhoto: (_) async {
+              acquisitions++;
+              return Uint8List.fromList([255, 216, 1, 2]);
+            },
+            cropPhoto: (_, _) async {
+              cropCalls++;
+              return NormalizedPhotoCrop(left: .25, top: 0, size: 1);
+            },
+            onSubmit: (_) async {},
+          ),
+        ),
+      );
+
+      await t.tap(find.text('Escolher foto'));
+      await t.pumpAndSettle();
+
+      expect(revalidations, 2);
+      expect(acquisitions, 0);
+      expect(cropCalls, 0);
+      expect(
+        find.text('Seu acesso mudou. Atualize a página antes de enviar fotos.'),
+        findsOneWidget,
+      );
+    },
+  );
+
   testWidgets('canceling crop keeps the previous photo and form values', (
     t,
   ) async {

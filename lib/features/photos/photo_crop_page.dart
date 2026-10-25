@@ -29,6 +29,7 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
   late final int _previewHeight;
   late final int _sourceWidth;
   late final int _sourceHeight;
+  late final String? _errorMessage;
   bool _initialized = false;
   bool _interacting = false;
   double _viewportSize = 0;
@@ -43,22 +44,39 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
   @override
   void initState() {
     super.initState();
+    try {
+      _initializePreview();
+      _errorMessage = null;
+    } catch (_) {
+      _previewBytes = Uint8List(0);
+      _previewWidth = 1;
+      _previewHeight = 1;
+      _sourceWidth = 1;
+      _sourceHeight = 1;
+      _errorMessage = 'Não foi possível abrir esta imagem.';
+    }
+  }
+
+  void _initializePreview() {
     final oriented = _decodeOriented(widget.source);
-    _sourceWidth = oriented.width;
-    _sourceHeight = oriented.height;
     final ratio = math.min(
       1.0,
       _maximumPreviewDimension / math.max(oriented.width, oriented.height),
     );
-    _previewWidth = math.max(1, (oriented.width * ratio).round());
-    _previewHeight = math.max(1, (oriented.height * ratio).round());
+    final previewWidth = math.max(1, (oriented.width * ratio).round());
+    final previewHeight = math.max(1, (oriented.height * ratio).round());
     final preview = image.copyResize(
       oriented,
-      width: _previewWidth,
-      height: _previewHeight,
+      width: previewWidth,
+      height: previewHeight,
       interpolation: image.Interpolation.linear,
     );
-    _previewBytes = Uint8List.fromList(image.encodePng(preview));
+    final previewBytes = Uint8List.fromList(image.encodePng(preview));
+    _sourceWidth = oriented.width;
+    _sourceHeight = oriented.height;
+    _previewWidth = previewWidth;
+    _previewHeight = previewHeight;
+    _previewBytes = previewBytes;
   }
 
   image.Image _decodeOriented(Uint8List bytes) {
@@ -251,16 +269,16 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
     if (event is! KeyDownEvent) return KeyEventResult.ignored;
     switch (event.logicalKey) {
       case LogicalKeyboardKey.arrowLeft:
-        _nudge(8, 0);
-        return KeyEventResult.handled;
-      case LogicalKeyboardKey.arrowRight:
         _nudge(-8, 0);
         return KeyEventResult.handled;
+      case LogicalKeyboardKey.arrowRight:
+        _nudge(8, 0);
+        return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowUp:
-        _nudge(0, 8);
+        _nudge(0, -8);
         return KeyEventResult.handled;
       case LogicalKeyboardKey.arrowDown:
-        _nudge(0, -8);
+        _nudge(0, 8);
         return KeyEventResult.handled;
       case LogicalKeyboardKey.add:
       case LogicalKeyboardKey.equal:
@@ -289,7 +307,42 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
+  Widget build(BuildContext context) => _errorMessage == null
+      ? _buildCropPage(context)
+      : _buildInvalidImagePage(context);
+
+  Widget _buildInvalidImagePage(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Ajustar foto'),
+      leading: IconButton(
+        tooltip: 'Voltar sem selecionar foto',
+        onPressed: () => Navigator.of(context).maybePop(),
+        icon: const Icon(Icons.close),
+      ),
+    ),
+    body: SafeArea(
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.broken_image_outlined, size: 40),
+              const SizedBox(height: 12),
+              Text(_errorMessage!, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+                child: const Text('Voltar para o formulário'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget _buildCropPage(BuildContext context) => Scaffold(
     appBar: AppBar(
       title: const Text('Ajustar foto'),
       leading: IconButton(
@@ -400,22 +453,22 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
                       children: [
                         IconButton(
                           tooltip: 'Mover foto à esquerda',
-                          onPressed: () => _nudge(8, 0),
+                          onPressed: () => _nudge(-8, 0),
                           icon: const Icon(Icons.arrow_back),
                         ),
                         IconButton(
                           tooltip: 'Mover foto à direita',
-                          onPressed: () => _nudge(-8, 0),
+                          onPressed: () => _nudge(8, 0),
                           icon: const Icon(Icons.arrow_forward),
                         ),
                         IconButton(
                           tooltip: 'Mover foto para cima',
-                          onPressed: () => _nudge(0, 8),
+                          onPressed: () => _nudge(0, -8),
                           icon: const Icon(Icons.arrow_upward),
                         ),
                         IconButton(
                           tooltip: 'Mover foto para baixo',
-                          onPressed: () => _nudge(0, -8),
+                          onPressed: () => _nudge(0, 8),
                           icon: const Icon(Icons.arrow_downward),
                         ),
                       ],
@@ -485,7 +538,32 @@ Future<NormalizedPhotoCrop?> showPhotoCrop(
   BuildContext context,
   Uint8List source,
 ) => Navigator.of(context).push<NormalizedPhotoCrop>(
-  MaterialPageRoute<NormalizedPhotoCrop>(
+  _PhotoCropRoute(
+    disableAnimations: MediaQuery.of(context).disableAnimations,
     builder: (_) => PhotoCropPage(source: Uint8List.fromList(source)),
   ),
 );
+
+class _PhotoCropRoute extends MaterialPageRoute<NormalizedPhotoCrop> {
+  _PhotoCropRoute({required this.disableAnimations, required super.builder});
+
+  final bool disableAnimations;
+
+  @override
+  Duration get transitionDuration =>
+      disableAnimations ? Duration.zero : super.transitionDuration;
+
+  @override
+  Duration get reverseTransitionDuration =>
+      disableAnimations ? Duration.zero : super.reverseTransitionDuration;
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => disableAnimations
+      ? child
+      : super.buildTransitions(context, animation, secondaryAnimation, child);
+}

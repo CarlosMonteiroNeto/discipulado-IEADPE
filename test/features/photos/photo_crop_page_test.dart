@@ -34,10 +34,22 @@ class _HarnessState extends State<_Harness> {
   );
 }
 
+class _RecordingNavigatorObserver extends NavigatorObserver {
+  Route<dynamic>? pushed;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    pushed = route;
+    super.didPush(route, previousRoute);
+  }
+}
+
 Future<(_HarnessState, GlobalKey<_HarnessState>)> _open(
   WidgetTester tester, {
   Uint8List? source,
   double textScale = 1,
+  bool disableAnimations = true,
+  NavigatorObserver? observer,
 }) async {
   final key = GlobalKey<_HarnessState>();
   await tester.pumpWidget(
@@ -45,10 +57,11 @@ Future<(_HarnessState, GlobalKey<_HarnessState>)> _open(
       home: MediaQuery(
         data: MediaQueryData(
           textScaler: TextScaler.linear(textScale),
-          disableAnimations: true,
+          disableAnimations: disableAnimations,
         ),
         child: _Harness(key: key, source: source ?? _source()),
       ),
+      navigatorObservers: observer == null ? const [] : [observer],
     ),
   );
   await tester.tap(find.byKey(const ValueKey('open-crop')));
@@ -116,19 +129,101 @@ void main() {
     expect(crop.left, closeTo(.196, .025));
   });
 
-  testWidgets('keyboard position and zoom alternatives are available', (
+  testWidgets('keyboard and semantic controls move the displayed image', (
     tester,
   ) async {
-    final (harness, _) = await _open(tester);
-    expect(find.byTooltip('Mover foto à esquerda'), findsOneWidget);
-    expect(find.byTooltip('Mover foto à direita'), findsOneWidget);
-    expect(find.byTooltip('Mover foto para cima'), findsOneWidget);
-    expect(find.byTooltip('Mover foto para baixo'), findsOneWidget);
-    await tester.tap(find.byKey(const ValueKey('photo-crop-viewport')));
-    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
-    await _confirm(tester);
-    final crop = await harness.result;
-    expect(crop!.left, greaterThan(.25));
+    Future<NormalizedPhotoCrop> afterMove({
+      String? tooltip,
+      LogicalKeyboardKey? key,
+    }) async {
+      final (harness, _) = await _open(
+        tester,
+        source: _source(width: 400, height: 400),
+      );
+      await tester.ensureVisible(find.byTooltip('Aproximar foto'));
+      await tester.tap(find.byTooltip('Aproximar foto'));
+      await tester.pump();
+      if (tooltip != null) {
+        await tester.ensureVisible(find.byTooltip(tooltip));
+        await tester.tap(find.byTooltip(tooltip));
+      }
+      if (key != null) {
+        await tester.tap(find.byKey(const ValueKey('photo-crop-viewport')));
+        await tester.sendKeyEvent(key);
+      }
+      await _confirm(tester);
+      return (await harness.result)!;
+    }
+
+    const center = .04545;
+    expect(
+      (await afterMove(tooltip: 'Mover foto à esquerda')).left,
+      greaterThan(center),
+    );
+    expect(
+      (await afterMove(tooltip: 'Mover foto à direita')).left,
+      lessThan(center),
+    );
+    expect(
+      (await afterMove(tooltip: 'Mover foto para cima')).top,
+      greaterThan(center),
+    );
+    expect(
+      (await afterMove(tooltip: 'Mover foto para baixo')).top,
+      lessThan(center),
+    );
+    expect(
+      (await afterMove(key: LogicalKeyboardKey.arrowLeft)).left,
+      greaterThan(center),
+    );
+    expect(
+      (await afterMove(key: LogicalKeyboardKey.arrowRight)).left,
+      lessThan(center),
+    );
+    expect(
+      (await afterMove(key: LogicalKeyboardKey.arrowUp)).top,
+      greaterThan(center),
+    );
+    expect(
+      (await afterMove(key: LogicalKeyboardKey.arrowDown)).top,
+      lessThan(center),
+    );
+  });
+
+  testWidgets('corrupt image shows a recoverable crop message', (tester) async {
+    final (harness, _) = await _open(
+      tester,
+      source: Uint8List.fromList([1, 2, 3]),
+    );
+
+    expect(find.text('Não foi possível abrir esta imagem.'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.tap(find.text('Voltar para o formulário'));
+    await tester.pumpAndSettle();
+    expect(await harness.result, isNull);
+  });
+
+  testWidgets('crop route disables its transition when reduced motion is on', (
+    tester,
+  ) async {
+    final observer = _RecordingNavigatorObserver();
+    await _open(tester, observer: observer, disableAnimations: true);
+
+    expect(observer.pushed, isA<PageRoute<dynamic>>());
+    final route = observer.pushed! as PageRoute<dynamic>;
+    expect(route.transitionDuration, Duration.zero);
+    expect(route.reverseTransitionDuration, Duration.zero);
+  });
+
+  testWidgets('crop route keeps its normal transition when motion is allowed', (
+    tester,
+  ) async {
+    final observer = _RecordingNavigatorObserver();
+    await _open(tester, observer: observer, disableAnimations: false);
+
+    expect(observer.pushed, isA<PageRoute<dynamic>>());
+    final route = observer.pushed! as PageRoute<dynamic>;
+    expect(route.transitionDuration, isNot(Duration.zero));
   });
 
   testWidgets('360px viewport, 200% text and reduced motion stay usable', (

@@ -342,6 +342,7 @@ class _ConvertFormState extends State<ConvertForm> {
             imageSource == null) {
           return;
         }
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
         source = await widget.acquirePhoto(imageSource);
         if (source == null) return;
         if (!await _revalidatePhotoScope(congregationId, token)) return;
