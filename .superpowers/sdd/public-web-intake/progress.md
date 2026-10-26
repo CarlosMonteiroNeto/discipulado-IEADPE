@@ -366,3 +366,5 @@ Rulings:
 - Base: `9e27686a3e488f879a6ede2531d0c75db2c1997c`. Reviewer P2 finding: current configuration evidence was stale. The earlier observation that `SUPABASE_URL` was absent is preserved as historical; current presence-only check returned `SUPABASE_URL_PRESENT=True`, `SUPABASE_URL_HOST_MATCHES_INVENTORIED_PROJECT=True`, `PUBLIC_INTAKE_DATABASE_URL_PRESENT=False`, and `PUBLIC_INTAKE_TRUSTED_PROJECT_REF_PRESENT=False`. This does not unblock hosted acceptance.
 - Exact command and result are recorded in `.superpowers/sdd/public-web-intake/task-r1-fix-report.md`. Values are not displayed or stored; no Supabase CLI or analyzer was run.
 - Reviewer P3 minor deferred to R7 evidence close: explicitly label the pre-existing PASS table in `docs/verification/public-intake-acceptance.md` as T8 historical, to distinguish it from the refreshed R1 date/candidate.
+
+Task R1: complete (commits bed4cbe..f2daaec, review clean)
