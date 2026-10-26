@@ -377,3 +377,6 @@ Task R1: complete (commits bed4cbe..f2daaec, review clean)
 - Reserved external runner receipt: `C:\Users\Carlos_Neto\.codex\backups\public-intake-hosted-20261026\run-5655bd75-b699-47da-b3db-24d3e046e78a-evidence.json`; intentionally absent until runner STARTED/baseline receipt. No synthetic fixtures, hosted writes, migration/function changes, Docker startup, or publication occurred. Exact backup manifest/receipt remains external.
 - R2 does not authorize hosted execution or change the hosted acceptance status. Exact target typed confirmation, STARTED/baseline receipt, exact cleanup authorization, reviewed candidate and remaining service-specific prerequisites are still required. T3 authoritative address trust, Turnstile configuration, reviewer access and hosted browser journey remain blocked.
 - Report: `.superpowers/sdd/public-web-intake/task-r2-report.md`; acceptance update: `docs/verification/public-intake-acceptance.md`.
+
+Task R2: minor (deferred): restore full external manifest baseline/fixture/identity/receipt reconciliation wording in the main acceptance checklist and add the backup-manifest locator to the R2 report at R7 evidence close.
+Task R2: complete (commits 5f3b0f3..9e2b94e, review clean)
