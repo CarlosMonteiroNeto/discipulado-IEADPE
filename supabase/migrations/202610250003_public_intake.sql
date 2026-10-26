@@ -43,7 +43,7 @@ INSERT INTO private.public_intake_settings DEFAULT VALUES;
 CREATE TABLE private.public_intake_submissions (
  id uuid PRIMARY KEY,
  congregation_id uuid NOT NULL REFERENCES public.congregations(id),
- network_hash text NOT NULL CHECK(network_hash~'^[0-9a-f]{64}$'),
+ network_hash text CHECK(network_hash IS NULL OR network_hash~'^[0-9a-f]{64}$'),
  draft jsonb CHECK(draft IS NULL OR jsonb_typeof(draft)='object'),
  draft_digest text NOT NULL CHECK(draft_digest~'^[0-9a-f]{64}$'),
  status text NOT NULL DEFAULT 'pending'
@@ -76,7 +76,7 @@ CREATE INDEX public_intake_receipts_expiry ON private.public_intake_receipts(exp
 
 CREATE TABLE private.public_intake_accepted_events (
  submission_id uuid PRIMARY KEY REFERENCES private.public_intake_submissions(id),
- network_hash text NOT NULL CHECK(network_hash~'^[0-9a-f]{64}$'),
+ network_hash text CHECK(network_hash IS NULL OR network_hash~'^[0-9a-f]{64}$'),
  accepted_at timestamptz NOT NULL DEFAULT private.public_intake_now()
 );
 CREATE INDEX public_intake_events_network ON private.public_intake_accepted_events(network_hash,accepted_at);
@@ -257,8 +257,9 @@ END $$;
 -- Server-only intake. Failure messages are private typed codes mapped by T3:
 -- invalid_payload, operation_conflict, intake_paused, rate_limited,
 -- capacity_full, intake_unavailable. No client timestamp, actor or rate value
--- is accepted. Lock order is submission key -> network -> global capacity, and
--- all windows use the server instant.
+-- is accepted. Lock order is submission key -> optional network -> global
+-- capacity; the network lock/windows are skipped when no trusted hash exists.
+-- All rate windows use the server instant.
 CREATE FUNCTION public.ieadpe_receive_public_intake(request jsonb) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE submission_key uuid; network_key text; draft jsonb; scope_id uuid; digest text;
@@ -271,14 +272,14 @@ BEGIN
   request-ARRAY['submission_id','network_hash','draft']<>'{}'::jsonb OR
   NOT request ?& ARRAY['submission_id','network_hash','draft'] OR
   jsonb_typeof(request->'submission_id') IS DISTINCT FROM 'string' OR
-  jsonb_typeof(request->'network_hash') IS DISTINCT FROM 'string' OR
+  jsonb_typeof(request->'network_hash') NOT IN ('string','null') OR
   jsonb_typeof(request->'draft') IS DISTINCT FROM 'object' THEN
   RAISE EXCEPTION 'invalid_payload' USING ERRCODE='22023'; END IF;
  BEGIN submission_key:=(request->>'submission_id')::uuid;
  EXCEPTION WHEN invalid_text_representation THEN
   RAISE EXCEPTION 'invalid_payload' USING ERRCODE='22023'; END;
  network_key:=request->>'network_hash';
- IF network_key!~'^[0-9a-f]{64}$' THEN
+ IF network_key IS NOT NULL AND network_key!~'^[0-9a-f]{64}$' THEN
   RAISE EXCEPTION 'invalid_payload' USING ERRCODE='22023'; END IF;
  draft:=request->'draft';
  digest:=encode(sha256(convert_to(draft::text,'UTF8')),'hex');
@@ -306,15 +307,17 @@ BEGIN
   RAISE EXCEPTION 'intake_unavailable' USING ERRCODE='22023'; END IF;
  IF NOT settings.enabled THEN
   RAISE EXCEPTION 'intake_paused' USING ERRCODE='22023'; END IF;
- PERFORM pg_advisory_xact_lock(711039004,hashtext(network_key));
- SELECT count(*) INTO hourly_count FROM private.public_intake_accepted_events e
-  WHERE e.network_hash=network_key AND e.accepted_at>at_time-interval '1 hour' AND
-   e.accepted_at<=at_time;
- SELECT count(*) INTO daily_count FROM private.public_intake_accepted_events e
-  WHERE e.network_hash=network_key AND e.accepted_at>at_time-interval '1 day' AND
-   e.accepted_at<=at_time;
- IF hourly_count>=settings.hourly_network_limit OR daily_count>=settings.daily_network_limit THEN
-  RAISE EXCEPTION 'rate_limited' USING ERRCODE='22023'; END IF;
+ IF network_key IS NOT NULL THEN
+  PERFORM pg_advisory_xact_lock(711039004,hashtext(network_key));
+  SELECT count(*) INTO hourly_count FROM private.public_intake_accepted_events e
+   WHERE e.network_hash=network_key AND e.accepted_at>at_time-interval '1 hour' AND
+    e.accepted_at<=at_time;
+  SELECT count(*) INTO daily_count FROM private.public_intake_accepted_events e
+   WHERE e.network_hash=network_key AND e.accepted_at>at_time-interval '1 day' AND
+    e.accepted_at<=at_time;
+  IF hourly_count>=settings.hourly_network_limit OR daily_count>=settings.daily_network_limit THEN
+   RAISE EXCEPTION 'rate_limited' USING ERRCODE='22023'; END IF;
+ END IF;
  PERFORM pg_advisory_xact_lock(711039005,0);
  SELECT count(*) INTO active_count FROM private.public_intake_submissions s
   WHERE s.status='pending' AND s.expires_at>at_time;
@@ -343,6 +346,6 @@ GRANT EXECUTE ON FUNCTION public.ieadpe_receive_public_intake(jsonb) TO service_
 COMMENT ON FUNCTION public.ieadpe_public_congregations(jsonb) IS
  'T2 public names-only active congregation catalog. Request {limit,cursor}; response {items:[{id,name}],next_cursor}; UUID keyset ascending.';
 COMMENT ON FUNCTION public.ieadpe_receive_public_intake(jsonb) IS
- 'T2 server-only strict intake. Request {submission_id,network_hash,draft}; response {status:received}. Replay is digest-bound and never consumes a second slot.';
+ 'T2 server-only strict intake. Request {submission_id,network_hash:string|null,draft}; null hash skips per-network windows while global capacity remains enforced. Response {status:received}. Replay is digest-bound and never consumes a second slot.';
 
 COMMIT;

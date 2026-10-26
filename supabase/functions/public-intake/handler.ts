@@ -474,18 +474,19 @@ export function createIntakeHandler(
     const canonicalAddress = typeof trustedAddress === "string"
       ? canonicalIpAddress(trustedAddress)
       : null;
-    if (canonicalAddress === null) {
+    if (trustedAddress !== null && canonicalAddress === null) {
       return errorResponse("unavailable", 503, origin);
     }
-
-    let networkHash: string;
-    try {
-      networkHash = await dependencies.hashNetwork(canonicalAddress);
-    } catch {
-      return errorResponse("unavailable", 503, origin);
-    }
-    if (!/^[0-9a-f]{64}$/.test(networkHash)) {
-      return errorResponse("unavailable", 503, origin);
+    let networkHash: string | null = null;
+    if (canonicalAddress !== null) {
+      try {
+        networkHash = await dependencies.hashNetwork(canonicalAddress);
+      } catch {
+        return errorResponse("unavailable", 503, origin);
+      }
+      if (!/^[0-9a-f]{64}$/.test(networkHash)) {
+        return errorResponse("unavailable", 503, origin);
+      }
     }
 
     const rpcRequest: ReceiveIntakeRequest = {

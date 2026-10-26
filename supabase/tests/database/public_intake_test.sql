@@ -345,6 +345,8 @@ BEGIN
   'invalid_payload','intake rejects uppercase network hash');
  PERFORM pg_temp.reject(jsonb_set(r,'{network_hash}','1'),
   'invalid_payload','intake rejects numeric network hash');
+ PERFORM pg_temp.reject(jsonb_set(r,'{network_hash}','true'),
+  'invalid_payload','intake rejects boolean network hash');
  PERFORM pg_temp.reject(jsonb_set(r,'{draft}','null'),
   'invalid_payload','intake rejects null draft');
  PERFORM pg_temp.reject(jsonb_set(r,'{draft}','[]'),
@@ -450,6 +452,23 @@ SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM private.public_intake_submissi
  NOT EXISTS(SELECT FROM private.public_intake_receipts) AND
  NOT EXISTS(SELECT FROM private.public_intake_accepted_events),
  'pending_intake_is_private: every rejected request leaves no queue, receipt or event');
+
+-- Explicit null accepts without network windows and retains idempotency.
+SET LOCAL ROLE service_role;
+DO $$ DECLARE d jsonb:=(SELECT draft FROM intake_fixture WHERE label='valid'); BEGIN
+ PERFORM pg_temp.assert_true(pg_temp.receive('ce000000-0000-4000-8000-000000000002'::uuid,
+  NULL,d)='{"status":"received"}'::jsonb,'intake accepts explicit null network hash');
+ PERFORM pg_temp.assert_true(pg_temp.receive('ce000000-0000-4000-8000-000000000002'::uuid,
+  NULL,d)='{"status":"received"}'::jsonb,'intake null-hash replay remains idempotent');
+END $$;
+RESET ROLE;
+SELECT pg_temp.assert_true((SELECT network_hash IS NULL
+ FROM private.public_intake_submissions WHERE id='ce000000-0000-4000-8000-000000000002'::uuid) AND
+ (SELECT network_hash IS NULL FROM private.public_intake_accepted_events
+  WHERE submission_id='ce000000-0000-4000-8000-000000000002'::uuid) AND
+ (SELECT count(*)=1 FROM private.public_intake_submissions
+  WHERE id='ce000000-0000-4000-8000-000000000002'::uuid),
+ 'intake null hash remains server metadata and replay creates no second submission');
 
 -- Accepted submissions for any active congregation; no official rows are written.
 SELECT pg_temp.reset_intake(timestamptz '2026-10-25 12:00:00+00');
@@ -791,5 +810,22 @@ RESET ROLE;
 SELECT pg_temp.assert_true((SELECT count(*)=1000 FROM private.public_intake_submissions
  WHERE status='pending' AND expires_at>private.public_intake_now()),
  'global capacity: exactly 1000 active pending rows, no overshoot');
+
+-- Global capacity remains enforced when a request has no trusted network hash.
+SELECT pg_temp.reset_intake(timestamptz '2026-10-25 12:00:00+00');
+UPDATE private.public_intake_settings SET global_pending_limit=1;
+SET LOCAL ROLE service_role;
+DO $$
+DECLARE d jsonb:=(SELECT draft FROM intake_fixture WHERE label='valid');
+BEGIN
+ PERFORM pg_temp.assert_true(pg_temp.receive('d3000000-0000-4000-8000-000000000001'::uuid,
+  NULL,d)='{"status":"received"}'::jsonb,'global capacity null: first accepted');
+ PERFORM pg_temp.reject(pg_temp.request('d3000000-0000-4000-8000-000000000002'::uuid,
+  NULL,d),'capacity_full','global capacity null: second request rejected');
+END $$;
+RESET ROLE;
+SELECT pg_temp.assert_true((SELECT count(*)=1 FROM private.public_intake_submissions
+ WHERE status='pending' AND network_hash IS NULL),
+ 'global capacity null: no per-network data required and no capacity overshoot');
 
 ROLLBACK;

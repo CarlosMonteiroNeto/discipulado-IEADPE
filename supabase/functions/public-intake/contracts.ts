@@ -20,7 +20,7 @@ export interface IntakeSubmission {
 
 export interface ReceiveIntakeRequest {
   submission_id: string;
-  network_hash: string;
+  network_hash: string | null;
   draft: OfficialDraft;
 }
 

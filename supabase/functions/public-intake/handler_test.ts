@@ -21,7 +21,7 @@ type VerifyResult = {
 };
 type ReceiveInput = {
   submission_id: string;
-  network_hash: string;
+  network_hash: string | null;
   draft: Record<string, unknown>;
 };
 type HarnessOptions = {
@@ -429,29 +429,54 @@ Deno.test("lost_response_retry_uses_same_key", async () => {
   );
 });
 
-Deno.test("trusted_ip_cannot_be_spoofed", async () => {
+Deno.test("unresolved_address_uses_global_only_fallback_without_trusting_headers", async () => {
   const harness = makeHarness({
     resolveTrustedAddress: resolveSupabaseEdgeClientAddress,
   });
   const request = postRequest(encodePayload(validPayload()));
   request.headers.set("x-forwarded-for", "198.51.100.44");
   request.headers.set("cf-connecting-ip", "198.51.100.45");
-  await expectError(await harness.handler(request), 503, "unavailable");
+  request.headers.set("x-real-ip", "198.51.100.46");
+  const response = await harness.handler(request);
+  assertEquals(response.status, 202, "global-only fallback accepts after bot verification");
+  assertEquals(await response.json(), { status: "received" }, "returns generic receipt");
   assertEquals(
     harness.verifiedTokens,
     ["turnstile-token"],
     "bot verification still runs before the unresolved address blocks submission",
   );
   assertEquals(
-    harness.received.length,
-    0,
-    "unverified forwarding headers never reach the intake RPC",
+    harness.received.map((item) => item.network_hash),
+    [null],
+    "unverified forwarding headers never reach the intake RPC as an address hash",
   );
   assertEquals(
     harness.hashedAddresses.length,
     0,
     "unverified address is never HMACed",
   );
+});
+
+Deno.test("database_caller_forwards_null_network_hash", async () => {
+  const calls: Array<{ body: string }> = [];
+  const caller = createFixedRpcCaller({
+    supabaseUrl: "https://project.supabase.co/",
+    serviceCredential: "server-role-secret",
+    fetcher: async (_input, init) => {
+      calls.push({ body: String(init?.body) });
+      return new Response(JSON.stringify({ status: "received" }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    },
+  });
+  await caller({
+    submission_id: SUBMISSION_ID,
+    network_hash: null,
+    draft: validPayload().draft as Record<string, unknown>,
+  }, new AbortController().signal);
+  const sent = JSON.parse(calls[0].body) as { request: ReceiveInput };
+  assertEquals(sent.request.network_hash, null, "forwards the explicit null hash");
 });
 
 Deno.test("origin_policy_and_options_are_exact", async () => {
