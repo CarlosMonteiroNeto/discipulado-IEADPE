@@ -20,9 +20,9 @@ def inspect(root):
     if redirects.is_file():
         rules = [line.split() for line in redirects.read_text().splitlines()
                  if line.strip() and not line.lstrip().startswith('#')]
-        expected = [[route, '/index.html', '200'] for route in APPLICATION_ROUTES]
+        expected = [[route, '/', '200'] for route in APPLICATION_ROUTES]
         if sorted(rules) != sorted(expected):
-            issues.append('Use only exact application-route proxies to /index.html 200: '
+            issues.append('Use only exact application-route proxies to / 200: '
                           + ', '.join(sorted(APPLICATION_ROUTES))
                           + '. Wildcard proxies can replace JS/WASM/assets with HTML.')
     files = list(root.rglob('*')) if root.is_dir() else []

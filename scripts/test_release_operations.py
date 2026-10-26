@@ -12,6 +12,20 @@ from web_preflight import inspect
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_callback_proxy_avoids_index_html_canonical_redirect(self):
+        rules = [line.split() for line in Path('web/_redirects').read_text().splitlines()
+                 if line.strip() and not line.startswith('#')]
+        callback = next(rule for rule in rules if rule[0] == '/auth/callback')
+        self.assertEqual(callback, ['/auth/callback', '/', '200'])
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'index.html').write_text('synthetic shell')
+            (root / '_redirects').write_text(Path('web/_redirects').read_text())
+            self.assertEqual(inspect(root), [])
+            (root / '_redirects').write_text(
+                Path('web/_redirects').read_text().replace(' / 200', ' /index.html 200'))
+            self.assertTrue(inspect(root))
+
     def test_public_intake_runbook_pins_config_and_release_boundaries(self):
         runbook_path = Path('docs/operations/public-intake.md')
         runbook = runbook_path.read_text() if runbook_path.exists() else ''
@@ -31,17 +45,17 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn('verify_jwt = false', runbook)
         self.assertIn('private.public_intake_cleanup()', runbook)
         self.assertIn('BLOCKED', runbook)
-        self.assertIn('https://<verified-hostname>', runbook)
-        self.assertIn('T8 review/fix-round is recorded complete', runbook)
-        self.assertIn('no source-matched public-intake artifact manifest exists', runbook)
+        self.assertIn('https://discipulado-ieadpe.pages.dev', runbook)
+        self.assertIn('public-intake-release-candidate-20261026.json', runbook)
+        self.assertIn('https://discipulado-ieadpe.pages.dev', runbook)
 
     def test_public_intake_runbook_names_current_hosted_release_blockers(self):
         runbook_path = Path('docs/operations/public-intake.md')
         runbook = runbook_path.read_text() if runbook_path.exists() else ''
         for evidence in (
             '202610250002', '202610250003', '202610250004',
-            'trusted client-address', 'Turnstile', 'fresh external full-backup',
-            'PUBLIC_INTAKE_DATABASE_URL', 'host identity is unverified',
+            'client-address', 'Turnstile', 'fresh post-acceptance full database archive',
+            'TLS Session Pooler', 'mobile',
         ):
             with self.subTest(evidence=evidence):
                 self.assertIn(evidence, runbook)
