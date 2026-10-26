@@ -380,3 +380,5 @@ Task R1: complete (commits bed4cbe..f2daaec, review clean)
 
 Task R2: minor (deferred): restore full external manifest baseline/fixture/identity/receipt reconciliation wording in the main acceptance checklist and add the backup-manifest locator to the R2 report at R7 evidence close.
 Task R2: complete (commits 5f3b0f3..9e2b94e, review clean)
+
+Task R2: complete (commits 5f3b0f3..9e2b94e, review approved with P3 nits deferred to R7)
