@@ -99,6 +99,21 @@ void main() {
     expect(await cancelled.result, isNull);
   });
 
+  testWidgets(
+    'crop preview preserves source aspect ratio inside the viewport',
+    (tester) async {
+      await _open(tester, source: _source(width: 400, height: 200));
+
+      final viewport = find.byKey(const ValueKey('photo-crop-viewport'));
+      final preview = find.descendant(
+        of: viewport,
+        matching: find.byType(Image),
+      );
+
+      expect(tester.getSize(preview), const Size(400, 200));
+    },
+  );
+
   testWidgets('zoom retains the selected center and reset restores framing', (
     tester,
   ) async {

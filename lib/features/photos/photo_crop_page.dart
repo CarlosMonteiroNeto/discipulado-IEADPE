@@ -394,15 +394,22 @@ class _PhotoCropPageState extends State<PhotoCropPage> {
                                 child: Stack(
                                   fit: StackFit.expand,
                                   children: [
-                                    Transform(
+                                    OverflowBox(
                                       alignment: Alignment.topLeft,
-                                      transform: _transform.value,
-                                      child: Image.memory(
-                                        _previewBytes,
-                                        width: _previewWidth.toDouble(),
-                                        height: _previewHeight.toDouble(),
-                                        fit: BoxFit.fill,
-                                        gaplessPlayback: true,
+                                      minWidth: _previewWidth.toDouble(),
+                                      maxWidth: _previewWidth.toDouble(),
+                                      minHeight: _previewHeight.toDouble(),
+                                      maxHeight: _previewHeight.toDouble(),
+                                      child: Transform(
+                                        alignment: Alignment.topLeft,
+                                        transform: _transform.value,
+                                        child: Image.memory(
+                                          _previewBytes,
+                                          width: _previewWidth.toDouble(),
+                                          height: _previewHeight.toDouble(),
+                                          fit: BoxFit.fill,
+                                          gaplessPlayback: true,
+                                        ),
                                       ),
                                     ),
                                     IgnorePointer(

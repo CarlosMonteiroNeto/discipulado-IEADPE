@@ -1,5 +1,11 @@
 # Public Intake Acceptance Evidence
 
+## Mobile photo source and crop preview — 2026-10-26
+
+The user confirmed camera capture and gallery selection both work on the phone. The first crop screen showed the preview as a small square in the upper-left. Investigation found that `StackFit.expand` constrained the `Image` to the square viewport while `PhotoCropPage` computed its transform from the preview's decoded dimensions. The regression test reproduced the mismatch (400×200 source laid out as 480×480). `OverflowBox` now preserves the preview's decoded aspect/dimensions under the existing clipped viewport and transform; original source bytes, crop coordinates, and post-confirm 512×512 JPEG processing are unchanged.
+
+Verification on the feature checkout: photo suite 36/36; full Flutter suite 646/646; targeted Dart analysis of both changed files reports no issues; `flutter build web --release` succeeded with the existing public build-defines file; `scripts/web_preflight.py build/web` passed. Full-project `flutter analyze --no-pub` completed with three informational `unnecessary_underscores` notices in `test/features/intake/pending_submission_repository_test.dart` (lines 134, 165 and 190), outside this change. The release build emitted a Cupertino icon font notice; no Cupertino icon references exist in application/test source. No new phone observation of this corrected preview is recorded yet.
+
 ## Public-origin mobile submission and approval — 2026-10-26
 
 The user submitted the agreed fictitious `TESTE CELULAR` from a physical phone using the public registration URL. The authenticated browser queue showed exactly one pending submission for Matriz. The operator approved that item through the published review UI; the queue then showed no pending requests. Official name search showed exactly one matching Matriz record, and the same one-result search succeeded after a full browser reload. This verifies the public-origin mobile-submission -> pending -> approval -> persisted official-record journey; the report does not store the submitted phone/address/birth-date values.
