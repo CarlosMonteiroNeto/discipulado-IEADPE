@@ -1,6 +1,16 @@
 # Public Web Intake and Profile Photos
 
-Status: approved by the user on 2026-10-25. Product implementation is explicitly deferred to a smaller model through SDD. This document defines the new increment; inherited plans are evidence and contracts, not work to replay.
+Status: approved by the user on 2026-10-25. Implementation has since been reported complete on `feat/public-web-intake`; runtime/hosted acceptance remains incomplete. Resume from current evidence rather than restarting implementation. This document defines the increment; inherited plans are evidence and contracts, not work to replay.
+
+## Runtime acceptance clarification — 2026-10-26
+
+No local PostgreSQL server is required. Hosted Supabase supplies the database; local `psql`/`pg_dump` client tools, if needed, are distinct from a database server and may be used without Docker. Use the already agreed backup-first hosted procedure. Existing local SQL PASS entries and hosted INCOMPLETE entries can describe different environments/candidates; reconcile rather than overwrite their evidence.
+
+The current remaining acceptance work includes confirming/applying missing reviewed migrations, deploying the function for controlled testing, backup/connection readiness, trusted-address resolution, safely isolated limits/concurrency coverage and the actual anonymous-to-approved browser journey. Verify each against current state. Do not equate missing local tools with missing product functionality or silently mark hosted checks passed.
+
+For address trust, retain the original Spec rule: if no authoritative source is proven, keep Turnstile and global capacity protections and explicitly report the per-network limiter incomplete. Do not substitute spoofable headers, weaken checks silently or introduce a paid proxy. Any resulting release-criteria change needs a concrete user decision; independent acceptance work continues.
+
+Public site publication remains separately authorized. This clarification defines how to resume acceptance; it does not itself perform or broaden authorization for hosted writes. Follow the existing recorded testing authorization and ask only for a genuinely missing target/secret/access or a necessary live activation decision.
 
 Testing-method amendment requested by the user: Docker is not installed and is not a prerequisite. Local unit/widget/processor tests remain local. Database and integrated browser checks use the existing hosted Supabase with a fresh verified backup, run-owned synthetic records/identities, transaction rollback or exact guarded cleanup, and before/after reconciliation. Reuse the procedure in `docs/verification/2026-10-24-hosted-web-write-smoke.md` and its continuation; never reset the hosted schema, replay the disposable database harness, overwrite real records or restore a whole dump over concurrent writes. Native PostgreSQL restore rehearsal is optional when already available; otherwise report the backup verification limitation. Detailed execution safeguards are in the plan's database-testing amendment. This authorizes the chosen testing method, not site publication or paid services.
 

@@ -1,5 +1,15 @@
 # Public Web Intake — SDD Controller Handoff
 
+## Current resume instructions — 2026-10-26
+
+The feature is implemented on `feat/public-web-intake` at `C:\Users\Carlos_Neto\.local\share\opencode\worktree\efb495\public-web-intake`. Do not follow the original new-checkout/import/T1-start instructions below when resuming this branch. Read the Spec's Runtime acceptance clarification and the plan's Resume acceptance first section; complete R1–R7 against current progress/evidence. No Docker or local PostgreSQL server is required; missing client tools and missing hosted readiness are different issues. Preserve existing testing authorization boundaries and do not infer publication authorization.
+
+Short resume prompt:
+
+```text
+Resume feat/public-web-intake in C:\Users\Carlos_Neto\.local\share\opencode\worktree\efb495\public-web-intake. Read applicable instructions, then the 2026-10-25 public-web-intake Spec, plan and SDD handoff under docs/superpowers/. Follow their 2026-10-26 runtime-acceptance amendment and complete R1–R7. Do not restart completed tasks. Docker/local PostgreSQL server are not prerequisites: use the agreed backup-first hosted verification, with synthetic fixtures, exact cleanup and reconciliation. Investigate actual remaining blockers, continue independent work, and report source-bound results. Do not publish the site.
+```
+
 The user approved the Spec on 2026-10-25 and requested that a smaller model implement later via SDD. Do not start from historical closed plans or from the old local `flutter-supabase` checkout.
 
 The user subsequently amended testing: Docker is unavailable. No Docker installation or local Supabase startup is required. Use local unit/widget/processor checks and the existing hosted database for integration tests, following the plan's backup-first reversible-testing protocol and the historical hosted smoke procedure. Fresh backup/integrity verification, synthetic run-owned records/identities, guarded rollback or exact cleanup, and baseline reconciliation are mandatory. Never point the disposable database runner at hosted data, remove its safety guards, reset schemas, overwrite real records or restore a whole dump over legitimate new writes. Use the separate non-destructive hosted runner defined in T1. Native PostgreSQL restore rehearsal is optional if already available; missing Docker is not a blocker.
