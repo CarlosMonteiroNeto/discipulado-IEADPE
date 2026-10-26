@@ -1,5 +1,13 @@
 # Public Intake Acceptance Evidence
 
+## Launch follow-up — 2026-10-26
+
+The user explicitly deferred the Free-tier usage snapshot, accepting possible Free-limit interruption and no automatic paid activation. This gate is deferred by the user, not measured or passed.
+
+Read-only dashboard inspection of the successful `public-intake` POST/202 invocation at 2026-10-26 13:20:34 America/Sao_Paulo checked both Details and Raw. That invocation showed request/response metadata (including IP/network-derived location and browser information), not the submitted draft/person fields or Turnstile token. No provider configuration was changed. This is evidence for the inspected invocation only, not proof of universal non-retention or a provider-wide guarantee. Earlier blanket body-visibility uncertainty should be read with this bounded observation; actual metadata access/retention still follows provider controls.
+
+Before the first Pages deployment, the existing configured release passed `python scripts/web_preflight.py build/web`; all 42 asset SHA-256 hashes matched the external reviewed manifest for source `e768261`. No `lib`, `web`, or dependency source changes exist between that candidate and the current documentation-only head. Public HTTPS/OAuth/mobile acceptance still requires the first deployment and actual checks. No publication occurred during this preparation.
+
 Date: 2026-10-26 (R7 evidence close)
 Implementation baseline: `origin/main` at `846a320619d3d8240df391a8b218c713bcceedc3`
 T8 checkout baseline: T7 reviewed commit `d75ee355a5b197fd09485771608ed7864dac04b9`
