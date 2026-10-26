@@ -1,5 +1,13 @@
 # Public Intake Acceptance Evidence
 
+## Public OAuth routing fix and successful sign-in — 2026-10-26
+
+The first live Google attempt exposed a Pages routing defect: direct GET/HEAD `/auth/callback?next=%2Fhome` returned HTTP 308 with Location `/?next=%2Fhome`. `/register` also redirected to `/`. Earlier route checks followed redirects, so their HTTP 200 results did not prove path preservation. Root cause: exact proxies targeted `/index.html`, invoking Pages HTML canonicalization. Commit `45535fc` changes only static route targets to `/` with status 200, aligns preflight and adds the regression assertion. Initial RED failed at the expected callback target; final release-operation suite passed 10/10. Stale documentation assertions were updated to the actual configured host/artifact state.
+
+Redeployed as `https://8010813b.discipulado-ieadpe.pages.dev`, retaining the original 41 non-routing assets byte-for-byte. Curl GETs with redirect following disabled returned HTTP 200 and zero redirects for the canonical `/auth/callback?next=%2Fhome` and `/register`; HEAD showed no Location header on canonical and immutable callback endpoints. A Python urllib probe returned 403 while curl/browser requests succeeded, so that client-specific result is not counted as passing route evidence. No app bundle rebuild or database mutation was required.
+
+The user then completed a fresh Google sign-in. The browser returned through `/auth/callback`, established an authenticated session and rendered the protected shell with sign-out and authorized Convertidos/Pendentes/Admin/Discipulado navigation. Início navigated to canonical `/home`. This supersedes the prior fresh-login/account-selection-only limitation; it does not establish the remaining mobile-device or public-origin anonymous submission/approval checks. No authorization codes/tokens are stored in this report.
+
 ## First authorized Pages deployment — 2026-10-26
 
 The user explicitly approved first publication to `https://discipulado-ieadpe.pages.dev` and validation there. Wrangler 4.153.0 deployed the reviewed `build/web` to the existing Pages project's production branch `main`, tagged with source `e768261cfdf3bea538a6b9272190c9158bb24ad2`; immutable deployment URL: `https://9b00cc50.discipulado-ieadpe.pages.dev`. This supersedes older NOT AUTHORIZED / NOT PUBLISHED statements for this first deployment only. No paid services or plan changes were enabled.
