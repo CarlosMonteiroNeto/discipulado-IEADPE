@@ -160,6 +160,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         self.assertEqual(ownership["persistent_rows_expected"], 0)
         self.assertEqual(len(digest), 64)
 
+    def test_t2_smoke_asserts_select_privileges_for_every_private_queue_table_and_role(self):
+        sql = (ROOT / "supabase/tests/database/public_intake_hosted_smoke_test.sql").read_text(
+            encoding="utf-8")
+        queue_tables = (
+            "private.public_intake_submissions", "private.public_intake_receipts",
+            "private.public_intake_accepted_events", "private.public_intake_decisions",
+        )
+        roles = ("anon", "authenticated", "service_role")
+        for table in queue_tables:
+            for role in roles:
+                with self.subTest(table=table, role=role):
+                    self.assertIn(
+                        f"NOT has_table_privilege('{role}','{table}','SELECT')", sql)
+
     def test_cleanup_and_unscoped_persistent_mutations_are_rejected(self):
         with self.assertRaises(runner.SafetyError):
             runner.validate_scenario_sql(
@@ -429,6 +443,15 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertTrue(manifest["run_ownership"]["fixture_ids"])
             self.assertEqual(manifest["run_ownership"]["auth_user_ids"], [])
             self.assertEqual(manifest["run_ownership"]["operation_receipt_ids"], [])
+            owned_intake_receipt = runner._run_owned_uuid(
+                run_id, runner.T2_SMOKE_SUBMISSION_PLACEHOLDER)
+            self.assertEqual(manifest["run_ownership"]["intake_receipt_ids"],
+                             [owned_intake_receipt])
+            self.assertEqual(manifest["run_ownership"]["intake_receipts"], [{
+                "table": "private.public_intake_receipts",
+                "submission_id": owned_intake_receipt,
+                "persistent_after_rollback": False,
+            }])
             self.assertNotIn("operator@", evidence.read_text(encoding="utf-8"))
             self.assertNotIn("sslmode", evidence.read_text(encoding="utf-8"))
 

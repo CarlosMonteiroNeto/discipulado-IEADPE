@@ -44,6 +44,15 @@ SELECT pg_temp.assert_true(
  NOT has_table_privilege('anon','private.public_intake_submissions','SELECT') AND
  NOT has_table_privilege('authenticated','private.public_intake_submissions','SELECT') AND
  NOT has_table_privilege('service_role','private.public_intake_submissions','SELECT') AND
+ NOT has_table_privilege('anon','private.public_intake_receipts','SELECT') AND
+ NOT has_table_privilege('authenticated','private.public_intake_receipts','SELECT') AND
+ NOT has_table_privilege('service_role','private.public_intake_receipts','SELECT') AND
+ NOT has_table_privilege('anon','private.public_intake_accepted_events','SELECT') AND
+ NOT has_table_privilege('authenticated','private.public_intake_accepted_events','SELECT') AND
+ NOT has_table_privilege('service_role','private.public_intake_accepted_events','SELECT') AND
+ NOT has_table_privilege('anon','private.public_intake_decisions','SELECT') AND
+ NOT has_table_privilege('authenticated','private.public_intake_decisions','SELECT') AND
+ NOT has_table_privilege('service_role','private.public_intake_decisions','SELECT') AND
  NOT has_function_privilege('anon','public.ieadpe_receive_public_intake(jsonb)','EXECUTE') AND
  NOT has_function_privilege('authenticated','public.ieadpe_receive_public_intake(jsonb)','EXECUTE') AND
  has_function_privilege('service_role','public.ieadpe_receive_public_intake(jsonb)','EXECUTE'),

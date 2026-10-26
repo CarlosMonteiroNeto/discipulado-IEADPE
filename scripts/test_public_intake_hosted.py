@@ -30,7 +30,7 @@ SCENARIOS = {
 SCENARIO_SHA256 = {
     "public_registration_authority_test.sql": "684312d66140af244bf1da42170dccf1c092ce3ae93f0577f735b3201b056cf3",
     "public_intake_test.sql": "a50a8229bdbfbf09dba8c19eb4d65a4ff79068bc089c0f12df8e707d54edd6b5",
-    "public_intake_hosted_smoke_test.sql": "dc62f035075d61a146a6d19d595e1a38b2d9d3db362feca1f0b0caa615d23479",
+    "public_intake_hosted_smoke_test.sql": "d925b46d128cac8c20a2884c6335da22bfeb0235f211ecae31df30dd0f13a95b",
     "pending_review_test.sql": "30ddb13864fbfcb607a95ed0e9f1a6d0df2b4baf599dc05f3a220b6d1e261463",
 }
 T2_SMOKE_SUBMISSION_PLACEHOLDER = "0f100000-0000-4000-8000-000000000001"
@@ -276,6 +276,10 @@ def run_ownership(sql: str) -> dict:
         r"ieadpe_review_pending_intake|call_review)\s*\(\s*'(" + UUID_PATTERN + r")'"
     )
     receipt_ids = sorted(set(match.group(1).lower() for match in receipt_pattern.finditer(sql)))
+    intake_receipt_match = re.search(
+        r"(?is)\bsubmission_id\s+uuid\s*:=\s*'(" + UUID_PATTERN + r")'\s*;", sql)
+    intake_receipt_ids = (
+        sorted({intake_receipt_match.group(1).lower()}) if intake_receipt_match else [])
     return {
         "fixture_ids": all_ids,
         "auth_user_ids": auth_ids,
@@ -283,6 +287,15 @@ def run_ownership(sql: str) -> dict:
         "operation_receipts": [
             {"operation_id": operation_id, "persistent_after_rollback": False}
             for operation_id in receipt_ids
+        ],
+        "intake_receipt_ids": intake_receipt_ids,
+        "intake_receipts": [
+            {
+                "table": "private.public_intake_receipts",
+                "submission_id": submission_id,
+                "persistent_after_rollback": False,
+            }
+            for submission_id in intake_receipt_ids
         ],
         "persistent_rows_expected": 0,
         "disposition": "all SQL fixtures and receipts are inside the explicit rollback transaction",
