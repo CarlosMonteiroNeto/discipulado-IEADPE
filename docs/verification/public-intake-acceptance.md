@@ -1,12 +1,16 @@
 # Public Intake Acceptance Evidence
 
-Date: 2026-10-26 (R1 evidence reconciliation)
+Date: 2026-10-26 (R7 evidence close)
 Implementation baseline: `origin/main` at `846a320619d3d8240df391a8b218c713bcceedc3`
 T8 checkout baseline: T7 reviewed commit `d75ee355a5b197fd09485771608ed7864dac04b9`
 Execution checkout: `feat/public-web-intake` in the isolated `public-web-intake` worktree
-Current source candidate: `bed4cbe2887b38db98d13e109b8cd033707ee3ae` (R1 documentation reconciliation is recorded separately).
+Current source candidate: `f0c960d87b75662ccbb3581311815290a6a160a2` (R3 hosted-runner safety fixes; no product/UI migrations were deployed).
 
 T9 release handoff and current operator prerequisites: [Public Web intake operations](../operations/public-intake.md). The hosted gates below remain BLOCKED/INCOMPLETE; that runbook is not evidence of deployment or authorization.
+
+## T8 historical candidate checks
+
+The following T8 PASS/INCOMPLETE results describe the earlier T8 source candidate and remain historical receipts. R1 refreshed only the three named local SQL scenarios; R3 changed only the hosted verification runner. The new current-candidate checks are recorded below and do not convert any hosted gate to PASS.
 
 ## Acceptance status
 
@@ -49,29 +53,35 @@ A fresh external full custom-format backup was verified against that project by 
 
 TLS readiness was verified with client-only PostgreSQL 17.11 tools and `PGSSLMODE=require`: authenticated `SELECT 1 AS safe_probe` returned `1`, and `pg_dump` completed. The database URL was held only in process environment; `PUBLIC_INTAKE_DATABASE_URL` remains absent from persistent process environment and no credential value is recorded here. No Docker was started.
 
-The next runner evidence path is reserved externally at `C:\Users\Carlos_Neto\.codex\backups\public-intake-hosted-20261026\run-5655bd75-b699-47da-b3db-24d3e046e78a-evidence.json`. It remains absent until the hosted runner writes its STARTED/baseline receipt. No synthetic fixture or hosted write exists. The exact external backup manifest and validation receipt remain outside Git. Project and backup details are recorded in `.superpowers/sdd/public-web-intake/task-r2-report.md` without secrets or dump contents.
+The runner evidence path is external at `C:\Users\Carlos_Neto\.codex\backups\public-intake-hosted-20261026\run-5655bd75-b699-47da-b3db-24d3e046e78a-evidence.json`; R3 later wrote a redacted BLOCKED receipt there after target confirmation and a TLS identity probe. No synthetic fixture or hosted scenario was dispatched. The exact external backup manifest and validation receipt remain outside Git. Project and backup details are recorded in `.superpowers/sdd/public-web-intake/task-r2-report.md` without secrets or dump contents.
 
-These checks satisfy the backup, archive/recovery-path, TLS, and external evidence-path prerequisites only. They do not authorize or claim hosted SQL acceptance, migration/deployment, function deployment, or browser verification. The general hosted write gate and service-specific prerequisites remain blocked.
+These checks satisfy the backup, archive/recovery-path, TLS identity-probe, and external evidence-path prerequisites only. They do not authorize or claim hosted SQL acceptance, migration/deployment, function deployment, or browser verification. The general hosted write gate and service-specific prerequisites remain blocked.
 
 Local versions were Flutter 3.47.2 / Dart 3.13.2, Python 3.12.10, and Deno 2.9.8, versus the repository CI pin Flutter 3.47.7 / Dart 3.13.5. No shared SDK or CI pin was changed.
 
 ## Amended hosted acceptance status
 
+### R3 hosted runner evidence (2026-10-26)
+
+The current hosted-runner offline suite passed 27/27. Target validation now accepts only the verified direct endpoint or the project-scoped shared Session Pooler shape, rejects libpq query overrides and inherited `PG*` routing values, and keeps the password out of argv/output. Missing migrations are inventoried through the authenticated CLI; psql does not query the protected `supabase_migrations` schema.
+
+The external run receipt records `status=BLOCKED`, `target_confirmed=true`, `baseline_scope=unavailable`, `blocker_code=baseline_unavailable`, `scenario_dispatched=false`, and `hosted_write_attempted=false`. The authenticated CLI login passed the TLS database identity probe but was denied access to a required application schema during baseline collection. Therefore the runner stopped before migration inventory or scenario dispatch. The separate read-only CLI migration inventory at 2026-10-26 04:00 UTC showed 37 remote migrations: `202610250001` applied and `202610250002`–`004` pending; the function list was empty. No fixture, grant, record, object, migration, or function was changed.
+
 The amended plan makes Docker unnecessary for acceptance and requires backup-first hosted checks. None of the following hosted gates has passed; T8 hosted acceptance remains **INCOMPLETE**.
 
-General hosted write readiness is BLOCKED. R2 established the exact project/ref, fresh external full-backup archive and manifest, checksum/readability/recovery-path evidence, TLS connection readiness, and reserved a new external run evidence path. Before a hosted runner write or synthetic hosted fixture, still require typed confirmation of the exact target, a STARTED/baseline receipt in the new evidence manifest, and an exact run-owned cleanup plan with authorization. The reviewed migration/function candidate and remaining service-specific prerequisites below must also be ready. No hosted action is authorized by this follow-up.
+General hosted write readiness is BLOCKED. R2 established the exact project/ref, fresh external full-backup archive and manifest, checksum/readability/recovery-path evidence, and TLS identity-probe readiness. R3 confirmed the exact target and wrote an external receipt, but the CLI-generated PostgreSQL login could not read the application baseline schema; the receipt is BLOCKED with `baseline_scope=unavailable`. No scenario SQL, fixture, hosted write, migration, or deployment occurred. Before resuming a hosted write, provide a protected TLS database URL/role with required baseline and scenario privileges and create a separate external run-owned evidence manifest containing before/after baseline, fixture/identity/receipt IDs, reconciliation result, and exact guarded cleanup plan. Additive migrations/function activation still need the separately authorized coordinated candidate; publication remains separate.
 
 | Hosted gate | Status | Evidence and resumption prerequisites |
 |---|---|---|
 | Hosted migration/schema readiness | BLOCKED | Read-only migration list shows `202610250001` applied and `202610250002`–`202610250004` pending. No migration was applied. Resume only after a fresh external full backup and manifest are verified, then review and coordinate the exact migration candidate and deployment. |
 | Hosted functions readiness | BLOCKED | Read-only functions list is empty. No function was deployed. T3's production address resolver in `supabase/functions/public-intake/handler.ts` still fails closed because no authoritative managed gateway address source is verified. Resume after reviewed function candidate/deployment and authoritative address-trust evidence. |
-| Hosted runner / database journey | BLOCKED | T1 offline runner suite passed 11/11 at `69fcb29`; T2 offline suite passed 15/15 at `91e4f71`, using fake subprocesses. R2 verified the fresh external full backup/archive/recovery path and TLS connection; no hosted runner was executed and `PUBLIC_INTAKE_DATABASE_URL` remains absent from persistent process environment. Before resumption, provide typed target confirmation; let the runner create the reserved external STARTED/baseline evidence receipt; and have an exact run-owned cleanup plan and authorization. The reviewed scenario/function candidate and all service-specific prerequisites must also be ready. |
+| Hosted runner / database journey | BLOCKED | Current hosted-runner offline suite passed 27/27. The real runner confirmed target and TLS identity, then wrote an external BLOCKED receipt because its CLI login lacks the baseline schema privileges. No scenario was dispatched. Provide a protected TLS URL/role with required baseline and scenario privileges before resuming; the reviewed scenario/function candidate and service-specific gates must also be ready. |
 | Hosted T2 limits and concurrency | BLOCKED / INCOMPLETE | T2 hosted smoke explicitly refuses the legacy shared-table `TRUNCATE` scenario and `--concurrency`; rate-window/capacity limits, cleanup and concurrency are not hosted-verified. Keep those gates incomplete until a reviewed, non-interfering run-owned fixture/race design supports exact cleanup and reconciliation. |
 | Hosted bot verification | BLOCKED | Hosted Turnstile hostname and server configuration were not verified or changed. Resume after confirming the real hostname and matching server-side Turnstile configuration. |
 | Hosted reviewer access | BLOCKED | No temporary synthetic reviewer identities or grants were created. Resume only with temporary synthetic reviewer identities/grants, a bounded run-owned fixture, and exact cleanup authorization. |
-| Hosted anonymous browser journey | BLOCKED | No hosted browser journey ran, and no hosted PASS or user completion observation is claimed. This is blocked by missing backup/DB readiness, pending schema and absent functions, T3's fail-closed address trust, unverified Turnstile configuration, and absent reviewer identities/grants. Resume only after all those prerequisites are independently reviewed and available. |
+| Hosted anonymous browser journey | BLOCKED | No hosted browser journey ran, and no hosted PASS or user completion observation is claimed. This is blocked by the insufficient database role, pending schema and absent function, T3's fail-closed address trust, unverified hostname/Turnstile configuration, and absent reviewer identities/grants. Resume only after those prerequisites are independently reviewed and available. |
 
-Read-only hosted evidence and constraints are recorded in `.superpowers/sdd/public-web-intake/progress.md`, `.superpowers/sdd/public-web-intake/task-1-hosted-runner-report.md`, and `.superpowers/sdd/public-web-intake/task-2-hosted-safety-report.md`. T1/T2's offline PASS results establish runner contracts only, not hosted behavior. No hosted migration, function deployment, Auth user, grant, record, or Turnstile setting was changed.
+Read-only hosted evidence and constraints are recorded in `.superpowers/sdd/public-web-intake/progress.md`, `.superpowers/sdd/public-web-intake/task-r1-report.md`, `.superpowers/sdd/public-web-intake/task-r2-report.md`, and `.superpowers/sdd/public-web-intake/task-r3-report.md`. Offline PASS results establish runner contracts only, not hosted behavior. No hosted migration, function deployment, Auth user, grant, record, or Turnstile setting was changed.
 
 ## Journey and security design
 
