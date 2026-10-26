@@ -30,6 +30,180 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         }), encoding="utf-8")
         return manifest
 
+    def test_preproduction_allows_only_the_digest_pinned_rollback_capacity_reset(self):
+        scenario = (ROOT / "supabase/tests/database/public_intake_test.sql").read_text(encoding="utf-8")
+
+        with self.assertRaises(runner.SafetyError):
+            runner.validate_scenario_sql(scenario, "public_intake_test.sql")
+        runner.validate_scenario_sql(scenario, "public_intake_test.sql", preproduction=True)
+
+    def test_preproduction_rejects_truncate_of_any_other_application_table(self):
+        unsafe = "BEGIN; TRUNCATE public.converts CASCADE; ROLLBACK;"
+
+        with self.assertRaises(runner.SafetyError):
+            runner.validate_scenario_sql(unsafe, "public_intake_test.sql", preproduction=True)
+
+    def test_preproduction_does_not_unblock_legacy_concurrency_helper(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            marker = directory / "subprocess-called"
+            fake = directory / "fake.py"
+            fake.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(marker)!r}).write_text('called')\n", encoding="utf-8")
+            backup = self.make_backup(directory)
+            evidence = directory / "blocked.json"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require"
+                ),
+            })
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                "--scenario", "public_intake_test.sql", "--preproduction", "--concurrency",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake)]),
+            ], text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2)
+            self.assertFalse(marker.exists())
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "BLOCKED")
+            self.assertFalse(manifest["hosted_subprocesses_invoked"])
+            self.assertFalse(manifest["scenario_dispatched"])
+
+    def test_preproduction_capacity_sql_dispatches_only_after_backup_and_exact_target_confirmation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "psql-calls.jsonl"
+            snapshot = {
+                "counts": {
+                    "public.converts": 0, "public.ministry_people": 0,
+                    "public.weekly_reports": 0, "private.mutation_receipts": 0,
+                    "public.photo_assets": 0, "storage.objects": 0, "auth.users": 0,
+                    "private.congregation_week_guards": 0, "public.user_access": 0,
+                    "private.public_intake_submissions": 0,
+                    "private.public_intake_receipts": 0,
+                    "private.public_intake_decisions": 0,
+                    "private.public_intake_accepted_events": 0,
+                },
+                "revisions": {
+                    "public.converts": {"max": 0, "distribution": {}},
+                    "public.ministry_people": {"max": 0, "distribution": {}},
+                    "private.public_intake_submissions": {"max": 0, "distribution": {}},
+                },
+                "settings": {"enabled": True, "global_pending_limit": 1000},
+                "grants": {}, "migrations": ["202610250002", "202610250003"],
+            }
+            fake_psql = directory / "fake_psql.py"
+            fake_psql.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "stdin=sys.stdin.read()\n"
+                "with open(os.environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps({'args':args, 'stdin':stdin})+'\\n')\n"
+                "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                f"print({json.dumps(snapshot)!r} if \"'counts'\" in sql else ('t' if '-c' in args else ''))\n",
+                encoding="utf-8",
+            )
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "open(os.environ['FAKE_SUPABASE_CAPTURE'],'a').write(json.dumps(args)+'\\n')\n"
+                "if args[:2] == ['projects','list']:\n"
+                " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']:\n"
+                " print(json.dumps({'migrations':["
+                "{'local':'202610250002','remote':'202610250002','time':'202610250002'},"
+                "{'local':'202610250003','remote':'202610250003','time':'202610250003'}]}))\n"
+                "else: sys.exit(9)\n", encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            evidence = directory / "preproduction-evidence.json"
+            run_id = "01234567-89ab-4cde-8fab-0123456789ab"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require"
+                ),
+                "FAKE_PSQL_CAPTURE": str(capture),
+                "FAKE_SUPABASE_CAPTURE": str(directory / "supabase-calls.jsonl"),
+            })
+            self.assertEqual(
+                runner._remote_applied_migrations(
+                    [sys.executable, str(fake_supabase)], "abcdefghijklmnopqrst", env),
+                ["202610250002", "202610250003"],
+            )
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", run_id,
+                "--scenario", "public_intake_test.sql", "--preproduction",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(
+                result.returncode, 0,
+                result.stdout + result.stderr +
+                (evidence.read_text(encoding="utf-8") if evidence.exists() else "") +
+                ((directory / "supabase-calls.jsonl").read_text(encoding="utf-8")
+                 if (directory / "supabase-calls.jsonl").exists() else ""),
+            )
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            scenario_call = next(call for call in calls if "-f" in call["args"])
+            self.assertIn("TRUNCATE private.public_intake_decisions", scenario_call["stdin"])
+            self.assertTrue(scenario_call["stdin"].rstrip().endswith("ROLLBACK;"))
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["execution_mode"], "preproduction")
+            self.assertEqual(manifest["status"], "PASS")
+            self.assertTrue(manifest["target_confirmed"])
+            self.assertTrue(manifest["scenario_dispatched"])
+            self.assertTrue(manifest["hosted_write_attempted"])
+            self.assertTrue(manifest["reconciled"])
+            self.assertNotIn("fake-secret", evidence.read_text(encoding="utf-8"))
+
+    def test_preproduction_wrong_typed_target_stops_before_database_subprocess(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            marker = directory / "psql-called"
+            fake_psql = directory / "fake_psql.py"
+            fake_psql.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(marker)!r}).write_text('called')\n", encoding="utf-8")
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "import json\nprint(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n", encoding="utf-8")
+            backup = self.make_backup(directory)
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require"
+                ),
+            })
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                "--scenario", "public_intake_test.sql", "--preproduction",
+                "--backup-manifest", str(backup),
+                "--evidence-manifest", str(directory / "unconfirmed-evidence.json"),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="wrong-project\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2)
+            self.assertFalse(marker.exists())
+
     def test_target_confirmation_accepts_only_project_scoped_session_pooler(self):
         project_ref = "abcdefghijklmnopqrst"
         base = {

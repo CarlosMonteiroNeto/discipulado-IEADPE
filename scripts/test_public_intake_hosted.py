@@ -126,7 +126,7 @@ def _strip_sql_comments(sql: str) -> str:
     return re.sub(r"(?m)--[^\r\n]*", " ", sql)
 
 
-def validate_scenario_sql(sql: str, scenario_name: str) -> None:
+def validate_scenario_sql(sql: str, scenario_name: str, *, preproduction: bool = False) -> None:
     if scenario_name not in SCENARIOS:
         raise SafetyError("scenario is not allowlisted")
     code = _strip_sql_comments(sql).strip()
@@ -134,7 +134,7 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
         raise SafetyError("scenario must be a single explicit rollback transaction")
     forbidden = re.compile(
         r"(?is)\b(?:COMMIT|END\s+TRANSACTION|ABORT\s+TRANSACTION|"
-        r"DROP|TRUNCATE|ALTER|VACUUM|ANALYZE|REINDEX|CLUSTER|REFRESH|"
+        r"DROP|" + (r"" if preproduction else r"TRUNCATE|") + r"ALTER|VACUUM|ANALYZE|REINDEX|CLUSTER|REFRESH|"
         r"CREATE\s+(?:DATABASE|SCHEMA|ROLE|USER|EXTENSION|SUBSCRIPTION)|"
         r"COPY\s+[^;]*\bPROGRAM)\b"
     )
@@ -146,7 +146,18 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
         ((schema.lower() + ".") if schema else "") + function.lower()
         for schema, function in SQL_CALL.findall(code)
     }
-    if not calls <= APPROVED_SQL_CALLS:
+    preproduction_capacity_calls = {
+        "any", "catalog_expected", "catalog_result", "generate_series", "intake_clock",
+        "intake_dates", "intake_fixture", "intake_result", "lpad", "not", "nullif",
+        "pg_temp.receive", "pg_temp.request", "pg_temp.reset_intake", "pg_temp.seed_event",
+        "private.public_intake_accepted_events", "private.public_intake_decisions",
+        "to_regclass",
+    }
+    allowed_calls = APPROVED_SQL_CALLS | (
+        preproduction_capacity_calls
+        if preproduction and scenario_name == "public_intake_test.sql" else set()
+    )
+    if not calls <= allowed_calls:
         raise SafetyError("scenario contains an unapproved SQL function or expression")
     create_functions = re.findall(
         r"(?is)\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)",
@@ -181,6 +192,19 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
             raise SafetyError("test clock override is not allowed for this scenario")
     statements = [part.strip() for part in code.split(";") if part.strip()]
     for statement in statements:
+        if re.match(r"(?is)^TRUNCATE\b", statement):
+            normalized = re.sub(r"\s+", " ", statement).strip().lower()
+            normalized = re.sub(r",\s+", ",", normalized)
+            allowed_capacity_reset = (
+                preproduction
+                and scenario_name == "public_intake_test.sql"
+                and normalized == (
+                    "truncate private.public_intake_decisions,private.public_intake_receipts,"
+                    "private.public_intake_accepted_events,private.public_intake_submissions cascade"
+                )
+            )
+            if not allowed_capacity_reset:
+                raise SafetyError("TRUNCATE is permitted only for the pinned pre-production capacity fixture")
         if re.match(r"(?is)^GRANT\b", statement):
             granted = re.search(r"(?is)\bON\s+([a-z_][a-z0-9_,\s]*?)\s+TO\b", statement)
             allowed_grant_targets = {
@@ -206,7 +230,7 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
                 and scenario_name in ("public_intake_test.sql", "pending_review_test.sql")
             )
             safe_temp_clock = (
-                re.match(r"(?is)^UPDATE\s+(?:intake_clock|review_clock)\b", statement)
+                re.match(r"(?is)^UPDATE\s+(?:pg_temp\.)?(?:intake_clock|review_clock)\b", statement)
                 and scenario_name in ("public_intake_test.sql", "pending_review_test.sql")
             )
             t1_temp_scope = (
@@ -225,7 +249,8 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
         raise SafetyError("scenario has no run-owned fixture identifiers")
 
 
-def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT) -> tuple[str, str]:
+def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT,
+                  *, preproduction: bool = False) -> tuple[str, str]:
     if scenario_name not in SCENARIOS or Path(scenario_name).name != scenario_name:
         raise SafetyError("scenario name is not allowlisted")
     path = (repository / "supabase/tests/database" / scenario_name).resolve()
@@ -241,7 +266,7 @@ def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT) -> t
     source_digest = hashlib.sha256(original.encode("utf-8")).hexdigest()
     if source_digest != SCENARIO_SHA256[scenario_name]:
         raise SafetyError("scenario content does not match the reviewed digest")
-    validate_scenario_sql(original, scenario_name)
+    validate_scenario_sql(original, scenario_name, preproduction=preproduction)
 
     def namespaced(match: re.Match[str]) -> str:
         derived = uuid.uuid5(run_uuid, match.group(0).lower())
@@ -652,6 +677,7 @@ def _write_blocked_evidence(args: argparse.Namespace, run_id: str, reason: str) 
         "project_ref": args.project_ref,
         "scenario": args.scenario,
         "scenario_sha256": None,
+        "execution_mode": "preproduction" if args.preproduction else "guarded",
         "target_confirmed": False,
         "hosted_subprocesses_invoked": False,
         "hosted_write_attempted": False,
@@ -675,6 +701,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="new output path outside the repository")
     parser.add_argument("--concurrency", action="store_true",
                         help="request the separately gated hosted concurrency scenario")
+    parser.add_argument("--preproduction", action="store_true",
+                        help="enable reviewed pre-production scenarios after backup and target confirmation")
     parser.add_argument("--psql-command-json",
                         help=argparse.SUPPRESS)
     parser.add_argument("--supabase-command-json", help=argparse.SUPPRESS)
@@ -697,13 +725,14 @@ def main(argv: list[str] | None = None) -> int:
             _write_blocked_evidence(args, run_id, reason)
             print("Hosted scenario BLOCKED; no Supabase CLI or psql subprocesses were invoked.", file=sys.stderr)
             return 2
-        if args.scenario in T2_HOSTED_BLOCKED_SCENARIOS:
+        if args.scenario in T2_HOSTED_BLOCKED_SCENARIOS and not args.preproduction:
             _write_blocked_evidence(args, run_id, T2_HOSTED_BLOCKED_SCENARIOS[args.scenario])
             print("Hosted T2 capacity scenario BLOCKED; no Supabase CLI or psql subprocesses were invoked.",
                   file=sys.stderr)
             return 2
         backup = validate_backup_manifest(args.backup_manifest, args.project_ref)
-        sql, scenario_digest = load_scenario(args.scenario, run_id)
+        sql, scenario_digest = load_scenario(
+            args.scenario, run_id, preproduction=args.preproduction)
         _confirm_target(args.project_ref, os.environ)
         supabase_command = _verify_account_project(args, os.environ.copy())
         evidence_path = _evidence_path(args.evidence_manifest, ROOT)
@@ -728,6 +757,7 @@ def main(argv: list[str] | None = None) -> int:
             "project_ref": args.project_ref,
             "scenario": args.scenario,
             "scenario_sha256": scenario_digest,
+            "execution_mode": "preproduction" if args.preproduction else "guarded",
             "required_migrations": list(required_versions),
             "applied_migrations": None,
             "missing_migrations": None,
@@ -819,8 +849,9 @@ def main(argv: list[str] | None = None) -> int:
             ownership = run_ownership(sql)
             if not ownership["fixture_ids"]:
                 raise SafetyError("run-owned fixture identifiers could not be enumerated")
-            if args.scenario != "public_intake_hosted_smoke_test.sql" and (
-                    not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]):
+            if (args.scenario != "public_intake_hosted_smoke_test.sql"
+                    and not (args.preproduction and args.scenario == "public_intake_test.sql") and (
+                    not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"])):
                 raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
         evidence.update({
             "applied_migrations": applied_migrations,
@@ -871,6 +902,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             evidence["hosted_write_attempted"] = True
             _write_evidence(evidence_path, evidence)
+        evidence["hosted_write_attempted"] = True
         evidence["scenario_dispatched"] = True
         _write_evidence(evidence_path, evidence)
         try:
