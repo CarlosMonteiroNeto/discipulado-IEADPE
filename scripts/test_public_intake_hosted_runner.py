@@ -713,6 +713,77 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 self.assertTrue(psql_calls)
                 self.assertFalse(any("supabase_migrations" in call["sql"] for call in psql_calls))
                 self.assertFalse(any("-f" in call["args"] for call in psql_calls))
+
+    def test_baseline_access_failure_writes_external_blocked_evidence_without_scenario(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            psql_capture = directory / "psql-calls.jsonl"
+            cli_capture = directory / "supabase-calls.jsonl"
+            fake_psql = directory / "fake_psql.py"
+            fake_psql.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                "with open(os.environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps({'args':args,'sql':sql})+'\\n')\n"
+                "if 'current_database()' in sql: print('t')\n"
+                "else:\n"
+                " print('permission denied for schema private', file=sys.stderr)\n"
+                " sys.exit(7)\n",
+                encoding="utf-8",
+            )
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "with open(os.environ['FAKE_SUPABASE_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps(args)+'\\n')\n"
+                "if args[:2] == ['projects','list']: "
+                "print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']: "
+                "print(json.dumps({'migrations':[]}))\n"
+                "else: sys.exit(9)\n",
+                encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            evidence = directory / "baseline-denied.json"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/"
+                    "postgres?sslmode=require"
+                ),
+                "FAKE_PSQL_CAPTURE": str(psql_capture),
+                "FAKE_SUPABASE_CAPTURE": str(cli_capture),
+            })
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst",
+                "--run-id", "01234567-89ab-4cde-8fab-0123456789ab",
+                "--scenario", "public_registration_authority_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertTrue(evidence.is_file())
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "BLOCKED")
+            self.assertTrue(manifest["target_confirmed"])
+            self.assertEqual(manifest["baseline"], None)
+            self.assertEqual(manifest["baseline_scope"], "unavailable")
+            self.assertEqual(manifest["blocker_code"], "baseline_unavailable")
+            self.assertFalse(manifest["hosted_write_attempted"])
+            self.assertFalse(manifest["scenario_dispatched"])
+            self.assertIsNone(manifest["run_ownership"])
+            self.assertFalse(manifest["migration_inventory_verified"])
+            self.assertNotIn("permission denied", evidence.read_text(encoding="utf-8"))
+            psql_calls = [json.loads(line) for line in psql_capture.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(psql_calls), 2)
+            self.assertFalse(any("-f" in call["args"] for call in psql_calls))
     def test_authenticated_account_missing_project_is_rejected_before_psql(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)

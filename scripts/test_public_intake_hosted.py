@@ -722,16 +722,6 @@ def main(argv: list[str] | None = None) -> int:
         if target_result.lower() not in ("t", "true"):
             raise SafetyError("connected database identity probe did not confirm the target")
         required_versions = SCENARIOS[args.scenario]
-        try:
-            core_baseline = json.loads(_psql(
-                base, process_env,
-                _baseline_query(args.scenario, include_intake_schema=False)))
-        except json.JSONDecodeError as exc:
-            raise SafetyError("core baseline state response was invalid") from exc
-        core_baseline["migrations"] = None
-        if not _validate_snapshot(core_baseline, allow_unverified_migrations=True):
-            raise SafetyError("core baseline state response was incomplete")
-
         evidence = {
             "status": "STARTED",
             "run_id": run_id,
@@ -749,16 +739,45 @@ def main(argv: list[str] | None = None) -> int:
             "hosted_write_attempted": False,
             "scenario_dispatched": False,
             "transaction_policy": "scenario explicitly ends in ROLLBACK",
-            "baseline": core_baseline,
-            "baseline_scope": "core-only",
-            "baseline_note": "core baseline recorded while authenticated migration inventory is pending",
+            "baseline": None,
+            "baseline_scope": "unavailable",
+            "baseline_note": "read-only core baseline is pending",
             "run_ownership": None,
             "hosted_preflight": None,
             "after": None,
             "reconciled": False,
-            "cleanup_outcome": "pending migration inventory; scenario was not dispatched",
+            "cleanup_outcome": "pending read-only baseline; scenario was not dispatched",
             "started_at": utc_now().isoformat(),
         }
+        _write_evidence(evidence_path, evidence)
+        try:
+            core_baseline = json.loads(_psql(
+                base, process_env,
+                _baseline_query(args.scenario, include_intake_schema=False)))
+            if not isinstance(core_baseline, dict):
+                raise SafetyError("core baseline state response was incomplete")
+            core_baseline["migrations"] = None
+            if not _validate_snapshot(core_baseline, allow_unverified_migrations=True):
+                raise SafetyError("core baseline state response was incomplete")
+        except (SafetyError, OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+            evidence.update({
+                "status": "BLOCKED",
+                "reason": "BLOCKED: read-only core baseline could not be verified",
+                "baseline_note": "baseline unavailable; the connected role could not read required application state",
+                "blocker_code": "baseline_unavailable",
+                "cleanup_outcome": "not applicable; scenario was not dispatched and no fixture was created",
+                "completed_at": utc_now().isoformat(),
+            })
+            _write_evidence(evidence_path, evidence)
+            print("Hosted scenario BLOCKED; read-only core baseline could not be verified.",
+                  file=sys.stderr)
+            return 2
+        evidence.update({
+            "baseline": core_baseline,
+            "baseline_scope": "core-only",
+            "baseline_note": "core baseline recorded while authenticated migration inventory is pending",
+            "cleanup_outcome": "pending migration inventory; scenario was not dispatched",
+        })
         _write_evidence(evidence_path, evidence)
         try:
             remote_migrations = _remote_applied_migrations(
