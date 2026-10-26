@@ -374,6 +374,15 @@ class UnifiedGateContractTests(unittest.TestCase):
         self.assertNotIn("SERVICE_ROLE_KEY", status_step)
         self.assertNotIn("DB_URL", status_step)
 
+    def test_workflow_pins_deno_before_running_unified_gate(self) -> None:
+        workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
+        deno_step = workflow.find("      - uses: denoland/setup-deno@v2")
+        gate_step = workflow.index("      - name: Run the unified gate")
+
+        self.assertNotEqual(deno_step, -1, "workflow must install Deno with denoland/setup-deno@v2")
+        self.assertLess(deno_step, gate_step, "Deno must be installed before the unified gate")
+        self.assertIn("          deno-version: v2.9.8", workflow[deno_step:gate_step])
+
     def test_workflow_pins_flutter_font_hashes_and_compatible_browser_pair(self) -> None:
         workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
         self.assertIn("flutter-version: '3.47.7'", workflow)
