@@ -2,6 +2,8 @@
 
 The user approved the Spec on 2026-10-25 and requested that a smaller model implement later via SDD. Do not start from historical closed plans or from the old local `flutter-supabase` checkout.
 
+The user subsequently amended testing: Docker is unavailable. No Docker installation or local Supabase startup is required. Use local unit/widget/processor checks and the existing hosted database for integration tests, following the plan's backup-first reversible-testing protocol and the historical hosted smoke procedure. Fresh backup/integrity verification, synthetic run-owned records/identities, guarded rollback or exact cleanup, and baseline reconciliation are mandatory. Never point the disposable database runner at hosted data, remove its safety guards, reset schemas, overwrite real records or restore a whole dump over legitimate new writes. Use the separate non-destructive hosted runner defined in T1. Native PostgreSQL restore rehearsal is optional if already available; missing Docker is not a blocker.
+
 ## Copy-ready controller prompt
 
 Implement the approved public Web intake increment using `superpowers:subagent-driven-development` and these documents:
@@ -15,7 +17,7 @@ Use the currently selected smaller model for implementation; do not switch to a 
 
 Execute T1 through T9 in plan order for the simplest low-cost workflow. T5 can follow T2 independently of T3/T4, and T7 can follow T1, but parallelism is optional and must avoid shared migrations/form/router ownership. Do not split tasks into token-sized fragments that cannot be reviewed independently. Ask the human only for genuine product/external blockers. Unresolved hosted network-address trust blocks the limiter/release; it does not block photo work or local review tests.
 
-After T8, perform a whole-increment review, then finish T9's local runbook/artifact proposal. Publication, live SQL changes, credentials/account setup and hosted synthetic mutations require their separate authorization. Prepare the concrete candidate first; never infer publication authorization from Spec approval. No APK/signing/release or paid services. Report PASS/FAIL/BLOCKED with source and command evidence.
+After T8, perform a whole-increment review, then finish T9's runbook/artifact proposal. Controlled hosted synthetic tests and reviewed additive changes required for them follow the user's explicit testing-method amendment, not the older blanket deferral of hosted verification. Site publication, destructive operations, unrelated production changes and paid services remain outside that authorization. Prepare coordinated SQL/function/UI changes before activation; do not break the live registration path with intermediate changes. No APK/signing/release project. Report PASS/FAIL/BLOCKED with source and command evidence, including backup/cleanup outcomes.
 
 ## Compact task dispatch template
 
