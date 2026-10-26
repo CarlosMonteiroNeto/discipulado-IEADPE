@@ -132,12 +132,18 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "f.write(json.dumps({'args':sys.argv[1:], 'stdin':sys.stdin.read()})+'\\n')\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
-                f"print({json.dumps(snapshot)!r} if \"'counts'\" in sql else ('[]' if 'jsonb_agg(version ORDER BY version)' in sql else ('t' if '-c' in args else '')))\n",
+                f"print({json.dumps(snapshot)!r} if \"'counts'\" in sql else ('t' if '-c' in args else ''))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
-                "import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                "import json, sys\n"
+                "args=sys.argv[1:]\n"
+                "if args[:2] == ['projects','list']: "
+                "print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']: "
+                "print(json.dumps({'migrations':[]}))\n"
+                "else: sys.exit(9)\n",
                 encoding="utf-8",
             )
             backup = self.make_backup(directory)
@@ -208,13 +214,18 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "f.write(json.dumps({'args':args, 'sql':sql, 'stdin':stdin})+'\\n')\n"
                 "if 'private.public_intake_submissions' in sql: sys.exit(7)\n"
                 "if \"'counts'\" in sql: print(" + repr(json.dumps(core_snapshot)) + ")\n"
-                "elif 'jsonb_agg(version ORDER BY version)' in sql: print('[]')\n"
                 "elif '-c' in args: print('t')\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
-                "import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                "import json, sys\n"
+                "args=sys.argv[1:]\n"
+                "if args[:2] == ['projects','list']: "
+                "print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']: "
+                "print(json.dumps({'migrations':[]}))\n"
+                "else: sys.exit(9)\n",
                 encoding="utf-8",
             )
             backup = self.make_backup(directory)
@@ -513,12 +524,23 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
                 "if 'private.public_intake_submissions' in sql: sys.exit(7)\n"
-                f"print({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else ({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else '')))\n",
+                "if 'supabase_migrations' in sql: sys.exit(8)\n"
+                f"print({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else ''))\n",
                 encoding="utf-8")
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
-                "import json\n"
-                "print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n", encoding="utf-8")
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "with open(os.environ['FAKE_SUPABASE_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps(args)+'\\n')\n"
+                "if args[:2] == ['projects','list']:\n"
+                " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']:\n"
+                " print(json.dumps({'migrations':["
+                "{'local':'202610250001','remote':'202610250001','time':'202610250001'},"
+                "{'local':'202610250002','remote':'202610250002','time':'202610250002'},"
+                "{'local':'202610250003','remote':'','time':''}]}))\n"
+                "else: sys.exit(9)\n", encoding="utf-8")
             backup = self.make_backup(directory)
             evidence = directory / "evidence.json"
             run_id = "01234567-89ab-4cde-8fab-0123456789ab"
@@ -531,6 +553,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                     "aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
                 ),
                 "FAKE_PSQL_CAPTURE": str(capture),
+                "FAKE_SUPABASE_CAPTURE": str(directory / "supabase-calls.jsonl"),
                 "PGHOST": "untrusted.example",
                 "PGPORT": "6543",
                 "PGUSER": "untrusted-user",
@@ -576,6 +599,15 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertEqual(manifest["baseline_scope"], "core-only")
             self.assertIn("authority scenario", manifest["baseline_note"])
             self.assertNotIn("postgresql://", " ".join(" ".join(call["args"]) for call in calls))
+            self.assertFalse(any("supabase_migrations" in call["args"][-1] for call in calls))
+            cli_calls = [json.loads(line) for line in
+                         (directory / "supabase-calls.jsonl").read_text(encoding="utf-8").splitlines()]
+            migration_call = next(args for args in cli_calls if args[:2] == ["migration", "list"])
+            self.assertIn("--linked", migration_call)
+            self.assertIn("--project-ref", migration_call)
+            self.assertIn("abcdefghijklmnopqrst", migration_call)
+            self.assertIn("--output-format", migration_call)
+            self.assertIn("json", migration_call)
             self.assertNotIn("FAKE_PRIVATE_QUERY_RESULT", result.stdout + result.stderr)
             self.assertIn(run_id.replace("-", "")[8:], scenario_call["stdin"])
             self.assertNotIn("aa000000-0000-4000-8000-000000000001", scenario_call["stdin"])
@@ -596,6 +628,91 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertEqual(len(ownership["operation_receipt_ids"]), len(ownership["operation_receipts"]))
             self.assertEqual(ownership["persistent_rows_expected"], 0)
 
+    def test_failed_or_malformed_cli_migration_inventory_writes_blocked_evidence(self):
+        for mode in ("failed", "malformed"):
+            with self.subTest(mode=mode), tempfile.TemporaryDirectory() as temp:
+                directory = Path(temp)
+                psql_capture = directory / "psql-calls.jsonl"
+                fake_psql = directory / "fake_psql.py"
+                core_snapshot = {
+                    "counts": {
+                        "public.converts": 1, "public.ministry_people": 1,
+                        "public.weekly_reports": 1, "private.mutation_receipts": 1,
+                        "public.photo_assets": 1, "storage.objects": 1,
+                        "auth.users": 1, "private.congregation_week_guards": 1,
+                        "public.user_access": 1,
+                    },
+                    "revisions": {
+                        "public.converts": {"max": 1, "distribution": {"1": 1}},
+                        "public.ministry_people": {"max": 1, "distribution": {"1": 1}},
+                    },
+                    "settings": None, "grants": {},
+                }
+                fake_psql.write_text(
+                    "import json, os, sys\n"
+                    "args=sys.argv[1:]\n"
+                    "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                    "with open(os.environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                    "f.write(json.dumps({'args':args,'sql':sql})+'\\n')\n"
+                    "if 'supabase_migrations' in sql: sys.exit(8)\n"
+                    f"print({json.dumps(core_snapshot)!r} if \"'counts'\" in sql else 't')\n",
+                    encoding="utf-8",
+                )
+                cli_capture = directory / "supabase-calls.jsonl"
+                fake_supabase = directory / "fake_supabase.py"
+                fake_supabase.write_text(
+                    "import json, os, sys\n"
+                    "args=sys.argv[1:]\n"
+                    "with open(os.environ['FAKE_SUPABASE_CAPTURE'], 'a', encoding='utf-8') as f: "
+                    "f.write(json.dumps(args)+'\\n')\n"
+                    "if args[:2] == ['projects','list']:\n"
+                    " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                    "elif args[:2] == ['migration','list']:\n"
+                    " if os.environ['FAKE_MIGRATION_MODE']=='failed': sys.exit(9)\n"
+                    " print('not-json')\n"
+                    "else: sys.exit(10)\n",
+                    encoding="utf-8",
+                )
+                backup = self.make_backup(directory)
+                evidence = directory / "evidence.json"
+                env = os.environ.copy()
+                env.update({
+                    "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                    "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                    "PUBLIC_INTAKE_DATABASE_URL": (
+                        "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/"
+                        "postgres?sslmode=require"
+                    ),
+                    "FAKE_PSQL_CAPTURE": str(psql_capture),
+                    "FAKE_SUPABASE_CAPTURE": str(cli_capture),
+                    "FAKE_MIGRATION_MODE": mode,
+                })
+                result = subprocess.run([
+                    sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                    "--project-ref", "abcdefghijklmnopqrst",
+                    "--run-id", "01234567-89ab-4cde-8fab-0123456789ab",
+                    "--scenario", "public_registration_authority_test.sql",
+                    "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                    "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                    "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+                ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertTrue(evidence.is_file())
+                manifest = json.loads(evidence.read_text(encoding="utf-8"))
+                self.assertEqual(manifest["status"], "BLOCKED")
+                self.assertTrue(manifest["target_confirmed"])
+                self.assertEqual(manifest["baseline_scope"], "core-only")
+                self.assertFalse(manifest["migration_inventory_verified"])
+                self.assertIsNone(manifest["baseline"]["migrations"])
+                self.assertFalse(manifest["hosted_write_attempted"])
+                self.assertFalse(manifest["scenario_dispatched"])
+                self.assertIsNone(manifest["run_ownership"])
+                self.assertIn("inventory", manifest["reason"].lower())
+                psql_calls = [json.loads(line) for line in psql_capture.read_text(encoding="utf-8").splitlines()]
+                self.assertTrue(psql_calls)
+                self.assertFalse(any("supabase_migrations" in call["sql"] for call in psql_calls))
+                self.assertFalse(any("-f" in call["args"] for call in psql_calls))
     def test_authenticated_account_missing_project_is_rejected_before_psql(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
@@ -689,15 +806,22 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
                 f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
-                f"({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else "
                 f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
                 "('t' if '-c' in args else (__import__('os').environ.get('FAKE_SMOKE_RESULT', 'T2_SMOKE_PASS') "
-                "if 'pg_temp.run_smoke();' in stdin else '')))))\n",
+                "if 'pg_temp.run_smoke();' in stdin else ''))))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
-                "import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                "import json, sys\n"
+                "args=sys.argv[1:]\n"
+                "if args[:2] == ['projects','list']:\n"
+                " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']:\n"
+                " print(json.dumps({'migrations':["
+                "{'local':'202610250002','remote':'202610250002','time':'202610250002'},"
+                "{'local':'202610250003','remote':'202610250003','time':'202610250003'}]}))\n"
+                "else: sys.exit(9)\n",
                 encoding="utf-8",
             )
             backup = self.make_backup(directory)
@@ -722,7 +846,10 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(len(calls), 6)
             self.assertIn("current_database()", calls[0]["args"][-1])
-            self.assertIn("jsonb_agg(version ORDER BY version)", calls[1]["args"][-1])
+            self.assertIn("'counts'", calls[1]["args"][-1])
+            self.assertFalse(any(
+                "supabase_migrations" in " ".join(call["args"]) for call in calls
+            ))
             self.assertIn("'counts'", calls[2]["args"][-1])
             self.assertIn("two_slot_capacity_headroom", calls[3]["args"][-1])
             self.assertIn("+ 1 < s.global_pending_limit", calls[3]["args"][-1])
@@ -810,14 +937,23 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
                 f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
-                f"({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else "
                 f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
-                "('t' if '-c' in args else ''))))\n",
+                "('t' if '-c' in args else '')))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
-            fake_supabase.write_text("import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
-                                     encoding="utf-8")
+            fake_supabase.write_text(
+                "import json, sys\n"
+                "args=sys.argv[1:]\n"
+                "if args[:2] == ['projects','list']:\n"
+                " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']:\n"
+                " print(json.dumps({'migrations':["
+                "{'local':'202610250002','remote':'202610250002','time':'202610250002'},"
+                "{'local':'202610250003','remote':'202610250003','time':'202610250003'}]}))\n"
+                "else: sys.exit(9)\n",
+                encoding="utf-8",
+            )
             backup = self.make_backup(directory)
             evidence = directory / "blocked-headroom.json"
             env = os.environ.copy()

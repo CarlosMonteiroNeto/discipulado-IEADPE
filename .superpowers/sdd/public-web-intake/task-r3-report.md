@@ -40,3 +40,15 @@ RED: `python -m unittest scripts.test_public_intake_hosted_runner.HostedRunnerSa
 The controller found that the runner's use of the full connection URI as `PGDATABASE` did not connect with the short-lived CLI credential, while the same fields worked through standard libpq environment variables. The runner now parses the already validated URL into separate `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGDATABASE=postgres`, and `PGSSLMODE=require` values. It removes inherited `PG*` overrides and the original database URL from the psql environment; the credential stays out of argv and logs.
 
 RED: the fake psql regression using the accepted shared Session Pooler URL captured the prior `PGDATABASE` URI and inherited hostile `PGHOST`, `PGPORT`, `PGUSER`, `PGPASSWORD`, `PGSSLMODE`, `PGHOSTADDR`, `PGSERVICE`, and `PGOPTIONS` values. GREEN: `python -m unittest discover -s scripts -p 'test_public_intake_hosted*.py' -v` — 25 tests passed; `python -m py_compile scripts/test_public_intake_hosted.py scripts/test_public_intake_hosted_runner.py` and `git diff --check` passed. No credential or real database connection was used in this fix round.
+
+## Authenticated migration inventory fix
+
+The controller confirmed the CLI-created database role cannot read the protected `supabase_migrations` schema. Migration state is now obtained from the already authenticated Supabase CLI using `migration list --linked --project-ref <ref> --output-format json`. The runner validates the JSON shape, row types, remote version syntax, and duplicates, then records only the required applied versions in evidence. A failed or malformed inventory updates the preexisting STARTED receipt to safe BLOCKED evidence and stops before scenario dispatch. The psql baseline now reads only application tables; it no longer queries Supabase's protected migration ledger. Authority baseline scope remains core-only even if migration 002 is present.
+
+Updated the T2 smoke offline fixture to assert the obsolete psql ledger query is absent and have CLI fixtures provide the migration inventory. The first broader run exposed one stale test assertion that still expected psql to query `supabase_migrations`; after replacing that assertion with an explicit absence check, the focused T2 smoke runner regression passed. RED for the CLI-driven behavior was captured in the prior migration-inventory implementation round; this update removes stale fake-process behavior and asserts the protected-ledger boundary.
+
+No remote calls, credentials, hosted scenarios, migrations, functions, or publication were used in this fix. Final verification results are recorded after the full offline run below.
+
+- `python -m unittest discover -s scripts -p 'test_public_intake_hosted*.py' -v` — 26 tests passed, including malformed/failed CLI inventory, missing-schema BLOCKED paths, authority core-only baseline, and rollback-only T2 smoke.
+- `python -m py_compile scripts/test_public_intake_hosted.py scripts/test_public_intake_hosted_runner.py` — passed.
+- `git diff --check` — passed.

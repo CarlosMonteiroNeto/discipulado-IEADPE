@@ -42,6 +42,7 @@ T2_HOSTED_BLOCKED_SCENARIOS = {
 }
 MAX_BACKUP_AGE = timedelta(hours=24)
 PROJECT_REF = re.compile(r"^[a-z0-9]{20}$")
+MIGRATION_VERSION = re.compile(r"^(?:[0-9]{8}|[0-9]{10}|[0-9]{12}|[0-9]{14})$")
 UUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
 UUID_LITERAL = re.compile(r"(?i)\b" + UUID_PATTERN + r"\b")
 DANGEROUS_FUNCTION = re.compile(
@@ -374,7 +375,7 @@ def _psql_environment(database_url: str, source_env: dict[str, str]) -> dict[str
     return result
 
 
-def _verify_account_project(args: argparse.Namespace, env: dict[str, str]) -> None:
+def _supabase_command(args: argparse.Namespace) -> list[str]:
     if args.supabase_command_json:
         try:
             command = json.loads(args.supabase_command_json)
@@ -388,9 +389,24 @@ def _verify_account_project(args: argparse.Namespace, env: dict[str, str]) -> No
         if not cli:
             raise SafetyError("authenticated Supabase CLI is unavailable")
         executable = [cli]
+    return executable
+
+
+def _supabase_environment(source_env: dict[str, str]) -> dict[str, str]:
+    result = {
+        key: value for key, value in source_env.items()
+        if not key.upper().startswith("PG")
+    }
+    result.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+    return result
+
+
+def _verify_account_project(args: argparse.Namespace, env: dict[str, str]) -> list[str]:
+    executable = _supabase_command(args)
     result = subprocess.run(
         [*executable, "projects", "list", "--output-format", "json"],
-        text=True, capture_output=True, timeout=60, env=env, check=False,
+        text=True, capture_output=True, timeout=60,
+        env=_supabase_environment(env), check=False,
     )
     if result.returncode != 0:
         raise SafetyError("authenticated Supabase project listing failed")
@@ -403,6 +419,45 @@ def _verify_account_project(args: argparse.Namespace, env: dict[str, str]) -> No
             isinstance(item, dict) and item.get("id", item.get("ref")) == args.project_ref
             for item in projects):
         raise SafetyError("current authenticated Supabase account cannot confirm the project ref")
+    return executable
+
+
+def _remote_applied_migrations(command: list[str], project_ref: str,
+                               env: dict[str, str]) -> list[str]:
+    try:
+        result = subprocess.run(
+            [*command, "migration", "list", "--linked", "--project-ref", project_ref,
+             "--output-format", "json"],
+            text=True, capture_output=True, timeout=90,
+            env=_supabase_environment(env), check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SafetyError("authenticated migration inventory failed") from exc
+    if result.returncode != 0:
+        raise SafetyError("authenticated migration inventory failed")
+    try:
+        payload = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise SafetyError("authenticated migration inventory was not valid JSON") from exc
+    rows = payload.get("migrations") if isinstance(payload, dict) else None
+    if not isinstance(rows, list):
+        raise SafetyError("authenticated migration inventory was incomplete")
+    versions = []
+    for row in rows:
+        if not isinstance(row, dict) or not {"local", "remote", "time"} <= row.keys():
+            raise SafetyError("authenticated migration inventory was incomplete")
+        if any(row[field] is not None and not isinstance(row[field], str)
+               for field in ("local", "remote", "time")):
+            raise SafetyError("authenticated migration inventory was incomplete")
+        remote = row["remote"]
+        if remote in (None, ""):
+            continue
+        if not MIGRATION_VERSION.fullmatch(remote):
+            raise SafetyError("authenticated migration inventory contained an invalid version")
+        versions.append(remote)
+    if len(versions) != len(set(versions)):
+        raise SafetyError("authenticated migration inventory contained duplicate versions")
+    return sorted(versions)
 
 
 def _psql(base: list[str], env: dict[str, str], sql: str, stdin: str | None = None) -> str:
@@ -423,14 +478,6 @@ def _evidence_path(value: str, repository: Path) -> Path:
         raise SafetyError("evidence manifest must be a new external path")
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
-
-
-def _migration_ledger_query(scenario_name: str) -> str:
-    versions = ",".join("'" + version + "'" for version in SCENARIOS[scenario_name])
-    return (
-        "SELECT coalesce(jsonb_agg(version ORDER BY version),'[]'::jsonb)::text "
-        "FROM supabase_migrations.schema_migrations WHERE version IN (" + versions + ");"
-    )
 
 
 def _baseline_query(scenario_name: str, include_intake_schema: bool | None = None) -> str:
@@ -506,20 +553,17 @@ def _baseline_query(scenario_name: str, include_intake_schema: bool | None = Non
                     "'" + table + "." + role + ".select',has_table_privilege('" + role + "','" +
                     table + "','SELECT')"
                 )
-    migration_versions = ",".join("'" + version + "'" for version in SCENARIOS[scenario_name])
     return (
         "SELECT jsonb_build_object(" +
         "'counts',jsonb_build_object(" + count_pairs + ")," +
         "'revisions',jsonb_build_object(" + revision_pairs + ")," +
         "'settings'," + settings_query + "," +
-        "'grants',jsonb_build_object(" + ",".join(grant_pairs) + ")," +
-        "'migrations',to_jsonb(ARRAY(SELECT version FROM supabase_migrations.schema_migrations "
-        "WHERE version IN (" + migration_versions + ") ORDER BY version))" +
+        "'grants',jsonb_build_object(" + ",".join(grant_pairs) + ")" +
         ")::text;"
     )
 
 
-def _validate_snapshot(snapshot: object) -> bool:
+def _validate_snapshot(snapshot: object, allow_unverified_migrations: bool = False) -> bool:
     if not isinstance(snapshot, dict) or set(snapshot) != {"counts", "revisions", "settings", "grants", "migrations"}:
         return False
     if not isinstance(snapshot["counts"], dict) or any(
@@ -537,6 +581,8 @@ def _validate_snapshot(snapshot: object) -> bool:
     if not isinstance(snapshot["grants"], dict) or any(
             not isinstance(value, bool) for value in snapshot["grants"].values()):
         return False
+    if snapshot["migrations"] is None and allow_unverified_migrations:
+        return True
     if not isinstance(snapshot["migrations"], list) or any(
             not isinstance(value, str) for value in snapshot["migrations"]):
         return False
@@ -659,7 +705,7 @@ def main(argv: list[str] | None = None) -> int:
         backup = validate_backup_manifest(args.backup_manifest, args.project_ref)
         sql, scenario_digest = load_scenario(args.scenario, run_id)
         _confirm_target(args.project_ref, os.environ)
-        _verify_account_project(args, os.environ.copy())
+        supabase_command = _verify_account_project(args, os.environ.copy())
         evidence_path = _evidence_path(args.evidence_manifest, ROOT)
         base = _psql_command(args)
         # Keep connection credentials in separate libpq fields, never in argv.
@@ -677,24 +723,76 @@ def main(argv: list[str] | None = None) -> int:
             raise SafetyError("connected database identity probe did not confirm the target")
         required_versions = SCENARIOS[args.scenario]
         try:
-            applied_migrations = json.loads(_psql(
-                base, process_env, _migration_ledger_query(args.scenario)))
+            core_baseline = json.loads(_psql(
+                base, process_env,
+                _baseline_query(args.scenario, include_intake_schema=False)))
         except json.JSONDecodeError as exc:
-            raise SafetyError("migration ledger response was invalid") from exc
-        if not isinstance(applied_migrations, list) or any(
-                not isinstance(version, str) for version in applied_migrations):
-            raise SafetyError("migration ledger response was incomplete")
+            raise SafetyError("core baseline state response was invalid") from exc
+        core_baseline["migrations"] = None
+        if not _validate_snapshot(core_baseline, allow_unverified_migrations=True):
+            raise SafetyError("core baseline state response was incomplete")
+
+        evidence = {
+            "status": "STARTED",
+            "run_id": run_id,
+            "project_ref": args.project_ref,
+            "scenario": args.scenario,
+            "scenario_sha256": scenario_digest,
+            "required_migrations": list(required_versions),
+            "applied_migrations": None,
+            "missing_migrations": None,
+            "migration_inventory_verified": False,
+            "backup_sha256": backup["sha256"],
+            "backup_created_at": backup["created_at"],
+            "target_confirmed": True,
+            "hosted_subprocesses_invoked": True,
+            "hosted_write_attempted": False,
+            "scenario_dispatched": False,
+            "transaction_policy": "scenario explicitly ends in ROLLBACK",
+            "baseline": core_baseline,
+            "baseline_scope": "core-only",
+            "baseline_note": "core baseline recorded while authenticated migration inventory is pending",
+            "run_ownership": None,
+            "hosted_preflight": None,
+            "after": None,
+            "reconciled": False,
+            "cleanup_outcome": "pending migration inventory; scenario was not dispatched",
+            "started_at": utc_now().isoformat(),
+        }
+        _write_evidence(evidence_path, evidence)
+        try:
+            remote_migrations = _remote_applied_migrations(
+                supabase_command, args.project_ref, os.environ.copy())
+        except SafetyError:
+            evidence["status"] = "BLOCKED"
+            evidence["baseline_note"] = (
+                "only core baseline is available; authenticated migration inventory could not be verified"
+            )
+            evidence["reason"] = "BLOCKED: authenticated migration inventory could not be verified"
+            evidence["cleanup_outcome"] = "not applicable; scenario was not dispatched and no fixture was created"
+            evidence["completed_at"] = utc_now().isoformat()
+            _write_evidence(evidence_path, evidence)
+            print("Hosted scenario BLOCKED; authenticated migration inventory could not be verified.",
+                  file=sys.stderr)
+            return 2
+        applied_migrations = sorted(set(required_versions) & set(remote_migrations))
         missing_migrations = sorted(set(required_versions) - set(applied_migrations))
         include_intake_schema = (
             args.scenario != "public_registration_authority_test.sql" and not missing_migrations
         )
         baseline_scope = "scenario" if include_intake_schema else "core-only"
+        if include_intake_schema:
+            try:
+                baseline = json.loads(_psql(
+                    base, process_env,
+                    _baseline_query(args.scenario, include_intake_schema=True)))
+            except json.JSONDecodeError as exc:
+                raise SafetyError("baseline state response was invalid") from exc
+        else:
+            baseline = core_baseline.copy()
+        baseline["migrations"] = applied_migrations
         counts_sql = _baseline_query(
             args.scenario, include_intake_schema=include_intake_schema)
-        try:
-            baseline = json.loads(_psql(base, process_env, counts_sql))
-        except json.JSONDecodeError as exc:
-            raise SafetyError("baseline state response was invalid") from exc
         if not _validate_snapshot(baseline):
             raise SafetyError("baseline state response was incomplete")
         ownership = None
@@ -705,22 +803,10 @@ def main(argv: list[str] | None = None) -> int:
             if args.scenario != "public_intake_hosted_smoke_test.sql" and (
                     not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]):
                 raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
-        evidence = {
-            "status": "STARTED",
-            "run_id": run_id,
-            "project_ref": args.project_ref,
-            "scenario": args.scenario,
-            "scenario_sha256": scenario_digest,
-            "required_migrations": list(required_versions),
+        evidence.update({
             "applied_migrations": applied_migrations,
             "missing_migrations": missing_migrations,
-            "backup_sha256": backup["sha256"],
-            "backup_created_at": backup["created_at"],
-            "target_confirmed": True,
-            "hosted_subprocesses_invoked": True,
-            "hosted_write_attempted": False,
-            "scenario_dispatched": False,
-            "transaction_policy": "scenario explicitly ends in ROLLBACK",
+            "migration_inventory_verified": True,
             "baseline": baseline,
             "baseline_scope": baseline_scope,
             "baseline_note": (
@@ -730,12 +816,8 @@ def main(argv: list[str] | None = None) -> int:
                 if missing_migrations else None
             ),
             "run_ownership": ownership,
-            "hosted_preflight": None,
-            "after": None,
-            "reconciled": False,
             "cleanup_outcome": "pending transaction rollback and reconciliation",
-            "started_at": utc_now().isoformat(),
-        }
+        })
         _write_evidence(evidence_path, evidence)
         if missing_migrations:
             evidence["status"] = "BLOCKED"
@@ -777,6 +859,7 @@ def main(argv: list[str] | None = None) -> int:
         except (SafetyError, OSError, subprocess.TimeoutExpired):
             try:
                 failed_after = json.loads(_psql(base, process_env, counts_sql))
+                failed_after["migrations"] = applied_migrations
                 if _validate_snapshot(failed_after):
                     evidence["after"] = failed_after
                     evidence["reconciled"] = failed_after == baseline
@@ -794,6 +877,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.scenario == "public_intake_hosted_smoke_test.sql" and scenario_output != "T2_SMOKE_PASS":
             try:
                 after = json.loads(_psql(base, process_env, counts_sql))
+                after["migrations"] = applied_migrations
                 evidence["after"] = after
                 evidence["reconciled"] = _validate_snapshot(after) and after == baseline
             except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
@@ -826,6 +910,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SafetyError("T2 smoke did not complete safely; external evidence was preserved") from None
         try:
             after = json.loads(_psql(base, process_env, counts_sql))
+            after["migrations"] = applied_migrations
         except json.JSONDecodeError as exc:
             evidence["status"] = "FAIL"
             evidence["failure"] = "after-state response was invalid; raw database output withheld"
