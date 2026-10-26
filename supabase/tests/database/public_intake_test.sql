@@ -87,6 +87,27 @@ BEGIN
  UPDATE pg_temp.intake_clock SET value=clock_value;
 END $$;
 
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET pending_ttl=interval '29 days'$$,
+ '23514',NULL,'pending retention is fixed at 30 days'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET pending_ttl=interval '31 days'$$,
+ '23514',NULL,'pending retention is fixed at 30 days'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET receipt_retention=interval '31 days'$$,
+ '23514',NULL,'digest receipt retention is fixed at 30 days'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET decision_retention=interval '89 days'$$,
+ '23514',NULL,'decision metadata retention is fixed at 90 days'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET decision_retention=interval '91 days'$$,
+ '23514',NULL,'decision metadata retention is fixed at 90 days'
+);
+
 -- Catalog fixtures: 103 active rows and one archived row. UUID order is the
 -- public order; generated rows sort after the named fixtures.
 INSERT INTO public.congregations(id,name) VALUES

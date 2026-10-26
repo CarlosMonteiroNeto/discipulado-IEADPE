@@ -46,6 +46,17 @@ class ReleaseTest(unittest.TestCase):
             with self.subTest(evidence=evidence):
                 self.assertIn(evidence, runbook)
 
+    def test_public_intake_retention_is_fixed_and_limits_are_configurable(self):
+        runbook = Path('docs/operations/public-intake.md').read_text()
+        self.assertIn('pending drafts expire after exactly 30 days', runbook)
+        self.assertIn('decision metadata is retained for exactly 90 days', runbook)
+        self.assertIn('only abuse and capacity limits are operator-configurable', runbook)
+
+    def test_ministry_contract_marks_no_grant_creation_as_superseded(self):
+        contract = Path('docs/integration/ministry-contracts.md').read_text()
+        self.assertIn('without a matching campaign grant, registration follows public pending intake', contract)
+        self.assertIn('superseded by the public-intake authority migration', contract)
+
     def test_preflight_rejects_proxy_that_shadows_assets(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

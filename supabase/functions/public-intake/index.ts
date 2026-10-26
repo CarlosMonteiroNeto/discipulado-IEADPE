@@ -5,23 +5,12 @@ import {
   hmacSha256,
   resolveSupabaseEdgeClientAddress,
 } from "./handler.ts";
+import { isSupabaseUrl } from "./config.ts";
 
 function csv(value: string | undefined): string[] {
   return (value ?? "").split(",").map((item) => item.trim()).filter((item) =>
     item.length > 0
   );
-}
-
-function isSupabaseUrl(value: string | undefined): value is string {
-  if (value === undefined || value.length === 0) return false;
-  try {
-    const url = new URL(value);
-    return (url.protocol === "https:" || url.protocol === "http:") &&
-      url.username.length === 0 && url.password.length === 0 &&
-      url.pathname === "/" && url.search.length === 0 && url.hash.length === 0;
-  } catch {
-    return false;
-  }
 }
 
 function isCanonicalOrigin(value: string): boolean {

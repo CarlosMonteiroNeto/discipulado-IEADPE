@@ -24,11 +24,12 @@ CREATE TABLE private.public_intake_settings (
  hourly_network_limit integer NOT NULL DEFAULT 20 CHECK(hourly_network_limit>0),
  daily_network_limit integer NOT NULL DEFAULT 200 CHECK(daily_network_limit>0),
  global_pending_limit integer NOT NULL DEFAULT 1000 CHECK(global_pending_limit>0),
- pending_ttl interval NOT NULL DEFAULT interval '30 days' CHECK(pending_ttl>interval '0'),
+ pending_ttl interval NOT NULL DEFAULT interval '30 days'
+  CHECK(pending_ttl=interval '30 days'),
  receipt_retention interval NOT NULL DEFAULT interval '30 days'
-  CHECK(receipt_retention>=interval '30 days'),
+  CHECK(receipt_retention=interval '30 days'),
  decision_retention interval NOT NULL DEFAULT interval '90 days'
-  CHECK(decision_retention>=interval '90 days'),
+  CHECK(decision_retention=interval '90 days'),
  updated_at timestamptz NOT NULL DEFAULT now()
 );
 INSERT INTO private.public_intake_settings DEFAULT VALUES;

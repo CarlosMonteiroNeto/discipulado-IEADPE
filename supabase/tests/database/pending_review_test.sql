@@ -87,7 +87,7 @@ CREATE TEMP TABLE review_clock(value timestamptz NOT NULL);
 INSERT INTO review_clock VALUES ('2026-10-25 12:00:00+00');
 CREATE OR REPLACE FUNCTION private.public_intake_now() RETURNS timestamptz
 LANGUAGE sql STABLE SET search_path='' AS $$ SELECT value FROM pg_temp.review_clock $$;
-UPDATE private.public_intake_settings SET decision_retention = interval '120 days';
+UPDATE private.public_intake_settings SET decision_retention = interval '90 days';
 
 INSERT INTO auth.users(id, email, email_confirmed_at) VALUES
   ('da000000-0000-4000-8000-000000000001', 'review-a@example.test', now()),
@@ -378,13 +378,13 @@ SELECT pg_temp.assert_true(
   (SELECT outcome='approved' AND reviewer_uid='da000000-0000-4000-8000-000000000001' AND
           official_convert_id=(SELECT (value->>'official_convert_id')::uuid
                                FROM rpc_results WHERE label='approved') AND
-          retained_until=decided_at+interval '120 days' AND
+          retained_until=decided_at+interval '90 days' AND
           corrected_draft_digest ~ '^[0-9a-f]{64}$' AND
           to_jsonb(d)::text NOT ILIKE '%Corrected Confidential Person%'
    FROM private.public_intake_decisions d
    WHERE submission_id='dc000000-0000-4000-8000-000000000001') AND
   (SELECT outcome='rejected' AND reviewer_uid='da000000-0000-4000-8000-000000000001' AND
-          official_convert_id IS NULL AND retained_until=decided_at+interval '120 days' AND
+          official_convert_id IS NULL AND retained_until=decided_at+interval '90 days' AND
           to_jsonb(d)::text NOT ILIKE '%Pending Beta%'
    FROM private.public_intake_decisions d
    WHERE submission_id='dc000000-0000-4000-8000-000000000002'),
@@ -537,11 +537,15 @@ SELECT pg_temp.assert_true(
   'revoked review writes neither decision nor operation receipt'
 );
 
--- The minimum retention is enforced and cleanup removes a decision exactly at
--- the configured expiry boundary, not one instant earlier.
+-- The fixed retention policy is enforced and cleanup removes a decision exactly
+-- at the expiry boundary, not one instant earlier.
 SELECT pg_temp.expect_failure(
   $$UPDATE private.public_intake_settings SET decision_retention=interval '89 days'$$,
-  '23514',NULL,'decision retention cannot be set below 90 days'
+  '23514',NULL,'decision metadata retention cannot be set below 90 days'
+);
+SELECT pg_temp.expect_failure(
+  $$UPDATE private.public_intake_settings SET decision_retention=interval '91 days'$$,
+  '23514',NULL,'decision metadata retention cannot be set above 90 days'
 );
 UPDATE private.public_intake_settings SET decision_retention=interval '90 days';
 SELECT pg_temp.seed_pending(

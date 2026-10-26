@@ -81,6 +81,9 @@
       "scenario": "photos_test.sql"
     },
     {
+      "scenario": "public_intake_hosted_smoke_test.sql"
+    },
+    {
       "scenario": "public_intake_test.sql"
     },
     {

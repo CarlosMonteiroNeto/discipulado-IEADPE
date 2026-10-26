@@ -69,7 +69,7 @@ The following **private function environment values** belong only in Supabase Ed
 
 | Name | Purpose / rule |
 |---|---|
-| `SUPABASE_URL` | HTTPS URL of the confirmed backend. This source accepts HTTP URLs, so the operator must reject any non-HTTPS hosted URL. |
+| `SUPABASE_URL` | HTTPS URL of the confirmed backend. Function configuration accepts HTTP only for explicit loopback development hosts. |
 | `SUPABASE_SERVICE_ROLE_KEY` | Server-only service credential; never a Dart define or public artifact value. |
 | `TURNSTILE_SECRET_KEY` | Server-only Siteverify secret paired with the public key. |
 | `INTAKE_NETWORK_HASH_SECRET` | Server-only HMAC key; rotate only with an explicit limiter-window decision. |
@@ -90,7 +90,7 @@ The public site key is not read by the function. The Edge invocation view may re
 
 ## Quotas, pause, limits, and bounded retention
 
-The initial SQL defaults are 20 accepted submissions per trusted network hash per rolling hour, 200 per rolling day, 1,000 active pending globally, 30-day pending TTL, at least 30-day digest receipt retention and at least 90-day decision retention. These are configurable starter limits, not measured traffic needs. Church Wi-Fi may group legitimate users; tune only from reviewed operational evidence. There is no browser fingerprinting. The per-network limit is **not active in production** while T3 cannot verify a trusted client address.
+Retention follows fixed policy: pending drafts expire after exactly 30 days, digest-only receipts are retained for exactly 30 days, and minimal decision metadata is retained for exactly 90 days. Operators cannot extend or shorten these periods; only abuse and capacity limits are operator-configurable. The initial settings are 20 accepted submissions per trusted network hash per rolling hour, 200 per rolling day and 1,000 active pending globally, not measured traffic needs. Church Wi-Fi may group legitimate users; tune these limits only from reviewed operational evidence. There is no browser fingerprinting. The per-network limit is **not active in production** while T3 cannot verify a trusted client address.
 
 Pause public intake by setting the one private settings row's `enabled` value false using an audited, authorized operator SQL session. This rejects new submissions and preserves safe same-key replay behavior. To resume, first resolve the incident and verify trusted address, Turnstile, queue headroom and service health; then explicitly set `enabled` true and confirm. Example SQL (execute only against the independently confirmed project, with an approved database-owner credential; do not commit credentials):
 
@@ -140,7 +140,7 @@ Rollback is an application/configuration response, not destructive schema revers
 | Reviewed build/asset manifest | **BLOCKED**: no source-matched public-intake artifact manifest exists. `docs/verification/2026-10-25-web-completion-candidate.json` names the separate `codex/ministry-production-completion` worktree/commit and does not describe this branch's public-intake source. Do not reuse it as this candidate's manifest. A configured release build/hash and final whole-branch review must be produced after hosted prerequisites are met. |
 | Free static host / URL | **BLOCKED**: repository describes Cloudflare Pages as a proposal/convention only. Existing host, account/site, exact hostname and HTTPS URL are unverified; do not create or publish a site from this proposal. |
 | Migrations / Edge Function | **BLOCKED**: locally versioned migrations and function/config are not hosted-applied/deployed or hosted-tested. Migrations `202610250002`–`004` are pending in the read-only evidence; no hosted functions are deployed. |
-| Local implementation evidence | **PASS locally only**: T8 acceptance records 645/645 Flutter tests, both public-intake SQL scenarios with local concurrency, 18/18 Deno handler tests, and the local exact-route/artifact checks. No hosted migration/function behavior is inferred from these checks. |
+| Local implementation evidence | **Historical T8 PASS only**: T8 acceptance records 645/645 Flutter tests, both public-intake SQL scenarios with local concurrency, 18/18 Deno handler tests, and the local exact-route/artifact checks for its reviewed revision. The final-review migration changes have SQL fixture assertions but no runtime SQL verification yet. No hosted migration/function behavior is inferred from these checks. |
 | Turnstile / callback / origins | **BLOCKED**: production hostname, Siteverify secret, allowed origin/callback and invocation-body retention decision are unverified. |
 | Hosted synthetic journey / rollback | **BLOCKED/INCOMPLETE**: fresh backup/manifest and TLS DB URL absent; trusted address unverified; temporary synthetic reviewers/grants absent; T2 limit/concurrency hosted checks incomplete. No rollback rehearsal has occurred. |
 | Synthetic cleanup | **Not exercised on hosted data**: the reviewed hosted runner is designed for run-namespaced rollback fixtures and external before/after reconciliation; no hosted fixture IDs exist for this candidate. T2 shared-table limit/concurrency helpers remain excluded. |

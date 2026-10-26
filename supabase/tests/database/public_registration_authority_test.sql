@@ -81,7 +81,9 @@ DO $$ BEGIN
   RAISE EXCEPTION 'ASSERTION: cross-congregation actor created an official convert';
  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
 END $$;
-SELECT set_config('request.jwt.claim.sub','aa000000-0000-4000-8000-000000000001',true);
+-- A global manager is otherwise authorized for any active congregation, so
+-- this denial isolates the archived-congregation guard from scope mismatch.
+SELECT set_config('request.jwt.claim.sub','aa000000-0000-4000-8000-000000000004',true);
 DO $$ BEGIN
  BEGIN
   PERFORM public.ieadpe_create_convert(

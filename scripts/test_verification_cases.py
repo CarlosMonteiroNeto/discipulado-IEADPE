@@ -48,6 +48,13 @@ class VerificationManifestTests(unittest.TestCase):
             "seed_scenario": "ministry_session_management_test.sql",
         })
 
+    def test_public_intake_hosted_smoke_is_covered_by_guarded_sql_gate(self) -> None:
+        result = validate()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        scenarios = {entry["scenario"] for entry in data["sql"]}
+        self.assertIn("public_intake_hosted_smoke_test.sql", scenarios)
+
     def test_generated_argv_preserves_seed_order_and_all_ten_races(self) -> None:
         result = subprocess.run(
             [sys.executable, str(TOOL), "--cases-json"], cwd=ROOT,
