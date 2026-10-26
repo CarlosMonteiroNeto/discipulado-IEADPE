@@ -24,12 +24,21 @@ SCENARIO_DIR = (ROOT / "supabase/tests/database").resolve()
 SCENARIOS = {
     "public_registration_authority_test.sql": ("202610250002",),
     "public_intake_test.sql": ("202610250002", "202610250003"),
+    "public_intake_hosted_smoke_test.sql": ("202610250002", "202610250003"),
     "pending_review_test.sql": ("202610250002", "202610250003", "202610250004"),
 }
 SCENARIO_SHA256 = {
     "public_registration_authority_test.sql": "684312d66140af244bf1da42170dccf1c092ce3ae93f0577f735b3201b056cf3",
     "public_intake_test.sql": "a50a8229bdbfbf09dba8c19eb4d65a4ff79068bc089c0f12df8e707d54edd6b5",
+    "public_intake_hosted_smoke_test.sql": "dc62f035075d61a146a6d19d595e1a38b2d9d3db362feca1f0b0caa615d23479",
     "pending_review_test.sql": "30ddb13864fbfcb607a95ed0e9f1a6d0df2b4baf599dc05f3a220b6d1e261463",
+}
+T2_SMOKE_SUBMISSION_PLACEHOLDER = "0f100000-0000-4000-8000-000000000001"
+T2_HOSTED_BLOCKED_SCENARIOS = {
+    "public_intake_test.sql": (
+        "BLOCKED: full rolling-window/capacity boundaries depend on a long transaction-level "
+        "global intake lock and the shared live pending count; use the short hosted smoke scenario"
+    ),
 }
 MAX_BACKUP_AGE = timedelta(hours=24)
 PROJECT_REF = re.compile(r"^[a-z0-9]{20}$")
@@ -42,13 +51,16 @@ DANGEROUS_FUNCTION = re.compile(
 )
 APPROVED_SQL_CALLS = {
     "and", "auth.users", "bool_and", "coalesce", "convert_to", "count", "created",
-    "drafts", "encode", "exists", "format", "has_function_privilege", "in",
+    "drafts", "encode", "exists", "format", "has_function_privilege", "has_table_privilege", "in",
     "jsonb_array_elements", "jsonb_array_length", "jsonb_build_object", "jsonb_set",
-    "jsonb_typeof", "now", "payload", "pg_temp.assert_true", "pg_temp.call_get",
+    "jsonb_typeof", "now", "payload", "intake_smoke_scope", "pg_temp.assert_true", "pg_temp.call_get",
     "pg_temp.call_list", "pg_temp.call_review", "pg_temp.draft", "pg_temp.expect_failure",
-    "pg_temp.reject", "pg_temp.review_payload", "pg_temp.seed_pending", "private.convert_registration_command",
-    "private.public_intake_cleanup", "private.public_intake_now", "private.public_intake_submissions",
-    "public.congregations", "public.ieadpe_create_convert", "public.ieadpe_create_photo_draft",
+    "pg_temp.reject", "pg_temp.review_payload", "pg_temp.run_smoke", "pg_temp.seed_pending",
+    "private.convert_registration_command",
+    "private.business_today", "private.public_intake_cleanup", "private.public_intake_now",
+    "private.public_intake_submissions", "public.congregations", "public.ieadpe_create_convert",
+    "public.ieadpe_create_photo_draft", "public.ieadpe_public_congregations",
+    "public.ieadpe_receive_public_intake",
     "public.ieadpe_get_pending_intake", "public.ieadpe_list_pending_intake",
     "public.ieadpe_ministry_list_converts", "public.ieadpe_review_pending_intake",
     "or", "public.user_access", "repeat", "review_clock", "rpc_results", "select", "set_config",
@@ -140,7 +152,7 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
         code,
     )
     allowed_functions = {"pg_temp." + name for name in
-                         ("assert_true", "expect_failure", "reject", "draft", "request", "receive", "seed_pending",
+                         ("assert_true", "expect_failure", "reject", "draft", "request", "receive", "run_smoke", "seed_pending",
                           "review_payload", "call_list", "call_get", "call_review",
                           "reset_intake", "seed_event", "expect_failure")}
     if scenario_name in ("public_intake_test.sql", "pending_review_test.sql"):
@@ -174,11 +186,16 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
                 "public_registration_authority_test.sql": {"payload", "created", "drafts"},
                 "public_intake_test.sql": {"catalog_expected", "catalog_result", "intake_fixture", "intake_dates",
                                            "intake_result"},
+                "public_intake_hosted_smoke_test.sql": {"intake_smoke_scope"},
                 "pending_review_test.sql": {"rpc_results"},
             }[scenario_name]
             targets = {item.strip().lower() for item in granted.group(1).split(",")} if granted else set()
             if not targets or not targets <= allowed_grant_targets:
-                raise SafetyError("grants are allowed only on T1 temporary fixtures")
+                raise SafetyError("grants are allowed only on scenario temporary fixtures")
+        if (scenario_name == "public_intake_hosted_smoke_test.sql"
+                and re.match(r"(?is)^INSERT\s+INTO\b", statement)
+                and not re.match(r"(?is)^INSERT\s+INTO\s+intake_smoke_scope\b", statement)):
+            raise SafetyError("T2 smoke inserts are allowed only into its transaction-local scope fixture")
         if re.match(r"(?is)^REVOKE\b", statement):
             raise SafetyError("privilege revocation is not permitted in hosted scenarios")
         if re.match(r"(?is)^(?:UPDATE|DELETE\s+FROM)\b", statement):
@@ -406,7 +423,10 @@ def _baseline_query(scenario_name: str) -> str:
             "public.ieadpe_review_pending_intake(uuid,jsonb)",
         ))
     if scenario_name != "public_registration_authority_test.sql":
-        signatures.append("public.ieadpe_receive_public_intake(jsonb)")
+        signatures.extend((
+            "public.ieadpe_public_congregations(jsonb)",
+            "public.ieadpe_receive_public_intake(jsonb)",
+        ))
     grant_pairs = []
     for signature in signatures:
         key = signature.replace("'", "")
@@ -415,6 +435,15 @@ def _baseline_query(scenario_name: str) -> str:
                 "'" + key + "." + role + "',coalesce(has_function_privilege('" + role + "',"
                 "to_regprocedure('" + signature + "'),'EXECUTE'),false)"
             )
+    if scenario_name != "public_registration_authority_test.sql":
+        for table in (
+                "private.public_intake_submissions", "private.public_intake_receipts",
+                "private.public_intake_accepted_events", "private.public_intake_decisions"):
+            for role in ("anon", "authenticated", "service_role"):
+                grant_pairs.append(
+                    "'" + table + "." + role + ".select',has_table_privilege('" + role + "','" +
+                    table + "','SELECT')"
+                )
     migration_versions = ",".join("'" + version + "'" for version in SCENARIOS[scenario_name])
     return (
         "SELECT jsonb_build_object(" +
@@ -456,6 +485,76 @@ def _write_evidence(path: Path, evidence: dict) -> None:
     path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
 
+def _run_owned_uuid(run_id: str, source_uuid: str) -> str:
+    return str(uuid.uuid5(uuid.UUID(run_id), source_uuid.lower()))
+
+
+def _t2_smoke_preflight_query(run_id: str) -> str:
+    submission_id = _run_owned_uuid(run_id, T2_SMOKE_SUBMISSION_PLACEHOLDER)
+    network_hash = hashlib.sha256(
+        f"public-intake-hosted-smoke:{submission_id}".encode("utf-8")
+    ).hexdigest()
+    return (
+        "SELECT jsonb_build_object("
+        "'two_slot_capacity_headroom',coalesce((SELECT "
+        "(SELECT count(*) FROM private.public_intake_submissions q "
+        "WHERE q.status='pending' AND q.expires_at>private.public_intake_now()) "
+        "+ 1 < s.global_pending_limit FROM private.public_intake_settings s "
+        "WHERE s.singleton AND s.global_pending_limit>0),false),"
+        "'intake_enabled',coalesce((SELECT enabled FROM private.public_intake_settings "
+        "WHERE singleton),false),"
+        "'submission_id_unused',NOT EXISTS(SELECT FROM private.public_intake_submissions "
+        "WHERE id='" + submission_id + "'::uuid),"
+        "'network_hash_unused',NOT EXISTS(SELECT FROM private.public_intake_accepted_events "
+        "WHERE network_hash='" + network_hash + "'),"
+        "'cleanup_candidates_absent',NOT EXISTS("
+        "SELECT FROM private.public_intake_submissions s WHERE s.status='pending' "
+        "AND s.expires_at<=private.public_intake_now() UNION ALL "
+        "SELECT FROM private.public_intake_receipts r "
+        "JOIN private.public_intake_submissions s ON s.id=r.submission_id "
+        "WHERE r.expires_at<=private.public_intake_now() AND s.status<>'pending' UNION ALL "
+        "SELECT FROM private.public_intake_accepted_events e "
+        "WHERE e.accepted_at<=private.public_intake_now()-interval '2 days' UNION ALL "
+        "SELECT FROM private.public_intake_decisions d "
+        "WHERE d.retained_until<=private.public_intake_now()),"
+        "'active_congregation_available',EXISTS(SELECT FROM public.congregations "
+        "WHERE archived_at IS NULL))::text;"
+    )
+
+
+def _validate_t2_smoke_preflight(value: object) -> tuple[dict[str, bool], list[str]]:
+    fields = {
+        "two_slot_capacity_headroom", "intake_enabled", "submission_id_unused",
+        "network_hash_unused", "cleanup_candidates_absent", "active_congregation_available",
+    }
+    if not isinstance(value, dict) or set(value) != fields or any(
+            not isinstance(value[name], bool) for name in fields):
+        return {}, sorted(fields)
+    failed = sorted(name for name in fields if not value[name])
+    return value, failed
+
+
+def _write_blocked_evidence(args: argparse.Namespace, run_id: str, reason: str) -> Path:
+    if not PROJECT_REF.fullmatch(args.project_ref):
+        raise SafetyError("project ref format is invalid")
+    path = _evidence_path(args.evidence_manifest, ROOT)
+    _write_evidence(path, {
+        "status": "BLOCKED",
+        "run_id": run_id,
+        "project_ref": args.project_ref,
+        "scenario": args.scenario,
+        "scenario_sha256": None,
+        "target_confirmed": False,
+        "hosted_subprocesses_invoked": False,
+        "hosted_write_attempted": False,
+        "reason": reason,
+        "cleanup_outcome": "not applicable; no hosted subprocess or write was attempted",
+        "started_at": utc_now().isoformat(),
+        "completed_at": utc_now().isoformat(),
+    })
+    return path
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-ref", required=True)
@@ -466,7 +565,7 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--evidence-manifest", required=True,
                         help="new output path outside the repository")
     parser.add_argument("--concurrency", action="store_true",
-                        help="run the separately reviewed intake concurrency scenario")
+                        help="request the separately gated hosted concurrency scenario")
     parser.add_argument("--psql-command-json",
                         help=argparse.SUPPRESS)
     parser.add_argument("--supabase-command-json", help=argparse.SUPPRESS)
@@ -477,13 +576,23 @@ def main(argv: list[str] | None = None) -> int:
     parser = _parser()
     args = parser.parse_args(argv)
     try:
-        if args.concurrency:
-            raise SafetyError(
-                "hosted concurrency is blocked until the existing race helper removes global TRUNCATE and uses run-owned fixtures"
-            )
         run_id = str(uuid.UUID(args.run_id))
         if run_id != args.run_id.lower():
             raise SafetyError("run id must use canonical UUID syntax")
+        if args.concurrency:
+            reason = (
+                "BLOCKED: the disposable concurrency helper truncates shared queue tables and commits "
+                "fixed Auth, access-grant, and official-record fixtures; hosted race cleanup and traffic "
+                "isolation are not proven"
+            )
+            _write_blocked_evidence(args, run_id, reason)
+            print("Hosted scenario BLOCKED; no Supabase CLI or psql subprocesses were invoked.", file=sys.stderr)
+            return 2
+        if args.scenario in T2_HOSTED_BLOCKED_SCENARIOS:
+            _write_blocked_evidence(args, run_id, T2_HOSTED_BLOCKED_SCENARIOS[args.scenario])
+            print("Hosted T2 capacity scenario BLOCKED; no Supabase CLI or psql subprocesses were invoked.",
+                  file=sys.stderr)
+            return 2
         backup = validate_backup_manifest(args.backup_manifest, args.project_ref)
         sql, scenario_digest = load_scenario(args.scenario, run_id)
         _confirm_target(args.project_ref, os.environ)
@@ -520,7 +629,10 @@ def main(argv: list[str] | None = None) -> int:
         if not _validate_snapshot(baseline):
             raise SafetyError("baseline state response was incomplete")
         ownership = run_ownership(sql)
-        if not ownership["fixture_ids"] or not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]:
+        if not ownership["fixture_ids"]:
+            raise SafetyError("run-owned fixture identifiers could not be enumerated")
+        if args.scenario != "public_intake_hosted_smoke_test.sql" and (
+                not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]):
             raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
         evidence = {
             "status": "STARTED",
@@ -532,17 +644,41 @@ def main(argv: list[str] | None = None) -> int:
             "backup_sha256": backup["sha256"],
             "backup_created_at": backup["created_at"],
             "target_confirmed": True,
+            "hosted_subprocesses_invoked": True,
+            "hosted_write_attempted": False,
             "transaction_policy": "scenario explicitly ends in ROLLBACK",
             "baseline": baseline,
             "run_ownership": ownership,
+            "hosted_preflight": None,
             "after": None,
             "reconciled": False,
             "cleanup_outcome": "pending transaction rollback and reconciliation",
             "started_at": utc_now().isoformat(),
         }
         _write_evidence(evidence_path, evidence)
+        if args.scenario == "public_intake_hosted_smoke_test.sql":
+            try:
+                preflight = json.loads(_psql(
+                    base, process_env, _t2_smoke_preflight_query(run_id)))
+            except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
+                preflight = {}
+            preflight, failed_checks = _validate_t2_smoke_preflight(preflight)
+            evidence["hosted_preflight"] = preflight or None
+            if failed_checks:
+                evidence["status"] = "BLOCKED"
+                evidence["reason"] = (
+                    "BLOCKED: T2 smoke preflight could not prove " + ", ".join(failed_checks)
+                )
+                evidence["cleanup_outcome"] = "scenario was not dispatched; no test fixture was created"
+                evidence["completed_at"] = utc_now().isoformat()
+                _write_evidence(evidence_path, evidence)
+                print("Hosted T2 smoke BLOCKED by read-only preflight; scenario was not dispatched.",
+                      file=sys.stderr)
+                return 2
+            evidence["hosted_write_attempted"] = True
+            _write_evidence(evidence_path, evidence)
         try:
-            _psql(base, process_env, "SELECT 1;", stdin=sql)
+            scenario_output = _psql(base, process_env, "SELECT 1;", stdin=sql)
         except (SafetyError, OSError, subprocess.TimeoutExpired):
             try:
                 failed_after = json.loads(_psql(base, process_env, counts_sql))
@@ -560,6 +696,39 @@ def main(argv: list[str] | None = None) -> int:
             evidence["completed_at"] = utc_now().isoformat()
             _write_evidence(evidence_path, evidence)
             raise SafetyError("scenario execution failed; external evidence was preserved") from None
+        if args.scenario == "public_intake_hosted_smoke_test.sql" and scenario_output != "T2_SMOKE_PASS":
+            try:
+                after = json.loads(_psql(base, process_env, counts_sql))
+                evidence["after"] = after
+                evidence["reconciled"] = _validate_snapshot(after) and after == baseline
+            except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
+                evidence["cleanup_outcome"] = "post-smoke state unavailable; operator recovery required"
+            if isinstance(scenario_output, str) and scenario_output.startswith("T2_SMOKE_BLOCKED:"):
+                reason_code = scenario_output.removeprefix("T2_SMOKE_BLOCKED:")
+                allowed_block_reasons = {
+                    "active_congregation", "lock_timeout", "capacity_full",
+                    "intake_paused", "rate_limited", "operation_conflict",
+                }
+                if reason_code in allowed_block_reasons:
+                    evidence["status"] = "BLOCKED"
+                    evidence["reason"] = "BLOCKED: T2 smoke runtime guard reported " + reason_code
+                else:
+                    evidence["status"] = "FAIL"
+                    evidence["failure"] = "smoke returned an unrecognized status; raw output withheld"
+            else:
+                evidence["status"] = "FAIL"
+                evidence["failure"] = "smoke did not return its reviewed success marker; raw output withheld"
+            if evidence["reconciled"]:
+                evidence["cleanup_outcome"] = "transaction rollback verified; no fixture rows remain"
+            elif evidence["status"] == "BLOCKED":
+                evidence["cleanup_outcome"] = "state did not reconcile after blocked smoke; operator recovery required"
+            evidence["completed_at"] = utc_now().isoformat()
+            _write_evidence(evidence_path, evidence)
+            if evidence["status"] == "BLOCKED" and evidence["reconciled"]:
+                print("Hosted T2 smoke BLOCKED by a runtime guard; rollback reconciled and evidence preserved.",
+                      file=sys.stderr)
+                return 2
+            raise SafetyError("T2 smoke did not complete safely; external evidence was preserved") from None
         try:
             after = json.loads(_psql(base, process_env, counts_sql))
         except json.JSONDecodeError as exc:

@@ -131,13 +131,34 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         self.assertIn("run-0123456789ab4cde8fab0123456789ab-authority-scope-a@example.test", sql)
         self.assertEqual(len(source_digest), 64)
 
-    def test_t2_and_t5_scenarios_are_transactional_and_namespace_dynamic_fixture_ids(self):
+    def test_t2_full_capacity_scenario_is_rejected_for_hosted_execution(self):
         run_id = "01234567-89ab-4cde-8fab-0123456789ab"
+        sql = (ROOT / "supabase/tests/database/public_intake_test.sql").read_text(encoding="utf-8")
         with self.assertRaisesRegex(runner.SafetyError, "prohibited"):
-            runner.load_scenario("public_intake_test.sql", run_id, ROOT)
+            runner.validate_scenario_sql(sql, "public_intake_test.sql")
+        self.assertIn("TRUNCATE private.public_intake_decisions", sql)
         sql, _ = runner.load_scenario("pending_review_test.sql", run_id, ROOT)
         self.assertNotIn("'review-a@example.test'", sql)
         self.assertIn("run-0123456789ab4cde8fab0123456789ab-review-a@example.test", sql)
+
+    def test_t2_hosted_smoke_scenario_is_short_run_owned_and_rollback_only(self):
+        run_id = "01234567-89ab-4cde-8fab-0123456789ab"
+        sql, digest = runner.load_scenario("public_intake_hosted_smoke_test.sql", run_id, ROOT)
+        self.assertTrue(sql.startswith("BEGIN;"))
+        self.assertTrue(sql.rstrip().endswith("ROLLBACK;"))
+        self.assertNotRegex(sql, r"(?i)\b(?:TRUNCATE|COMMIT|UPDATE|DELETE)\b")
+        self.assertIn("SET LOCAL statement_timeout='5s';", sql)
+        self.assertIn("SET LOCAL lock_timeout='2s';", sql)
+        self.assertEqual(sql.count("INSERT INTO intake_smoke_scope"), 1)
+        self.assertIn("GRANT SELECT ON intake_smoke_scope TO service_role", sql)
+        self.assertNotRegex(sql, r"(?i)INSERT\s+INTO\s+(?:public|private)\.")
+        self.assertNotIn("private.business_today()", sql)
+        self.assertIn("'conversion_date','2000-01-01'", sql)
+        self.assertNotIn("0f100000-0000-4000-8000-000000000001", sql)
+        ownership = runner.run_ownership(sql)
+        self.assertTrue(ownership["fixture_ids"])
+        self.assertEqual(ownership["persistent_rows_expected"], 0)
+        self.assertEqual(len(digest), 64)
 
     def test_cleanup_and_unscoped_persistent_mutations_are_rejected(self):
         with self.assertRaises(runner.SafetyError):
@@ -285,26 +306,258 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertFalse(marker.exists())
             self.assertNotIn("operator@", result.stdout + result.stderr)
 
-    def test_hosted_concurrency_refuses_existing_global_truncate_helper(self):
+    def test_short_t2_smoke_preflights_and_records_rollback_evidence(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
-            marker = directory / "psql-called"
-            fake = directory / "fake_psql.py"
-            fake.write_text(
-                "from pathlib import Path\n"
-                f"Path({str(marker)!r}).write_text('called')\n", encoding="utf-8")
+            capture = directory / "psql-calls.jsonl"
+            fake_psql = directory / "fake_psql.py"
+            snapshot = {
+                "counts": {
+                    "public.converts": 4, "public.ministry_people": 4,
+                    "public.weekly_reports": 2, "private.mutation_receipts": 5,
+                    "public.photo_assets": 1, "storage.objects": 1,
+                    "auth.users": 6, "private.congregation_week_guards": 3,
+                    "public.user_access": 6, "private.public_intake_submissions": 3,
+                    "private.public_intake_receipts": 3, "private.public_intake_decisions": 1,
+                    "private.public_intake_accepted_events": 3,
+                },
+                "revisions": {
+                    "public.converts": {"max": 2, "distribution": {"1": 3, "2": 1}},
+                    "public.ministry_people": {"max": 1, "distribution": {"1": 4}},
+                    "private.public_intake_submissions": {"max": 1, "distribution": {"1": 3}},
+                },
+                "settings": {"enabled": True, "global_pending_limit": 1000},
+                "grants": {
+                    "public.ieadpe_create_convert(uuid,jsonb).anon": False,
+                    "public.ieadpe_create_convert(uuid,jsonb).authenticated": True,
+                    "public.ieadpe_create_convert(uuid,jsonb).service_role": True,
+                    "public.ieadpe_create_photo_draft(uuid,jsonb).anon": False,
+                    "public.ieadpe_create_photo_draft(uuid,jsonb).authenticated": True,
+                    "public.ieadpe_create_photo_draft(uuid,jsonb).service_role": True,
+                    "public.ieadpe_receive_public_intake(jsonb).anon": False,
+                    "public.ieadpe_receive_public_intake(jsonb).authenticated": False,
+                    "public.ieadpe_receive_public_intake(jsonb).service_role": True,
+                    "public.ieadpe_public_congregations(jsonb).anon": True,
+                    "public.ieadpe_public_congregations(jsonb).authenticated": True,
+                    "public.ieadpe_public_congregations(jsonb).service_role": False,
+                    "private.public_intake_submissions.anon.select": False,
+                    "private.public_intake_submissions.authenticated.select": False,
+                    "private.public_intake_submissions.service_role.select": False,
+                    "private.public_intake_receipts.anon.select": False,
+                    "private.public_intake_receipts.authenticated.select": False,
+                    "private.public_intake_receipts.service_role.select": False,
+                    "private.public_intake_accepted_events.anon.select": False,
+                    "private.public_intake_accepted_events.authenticated.select": False,
+                    "private.public_intake_accepted_events.service_role.select": False,
+                    "private.public_intake_decisions.anon.select": False,
+                    "private.public_intake_decisions.authenticated.select": False,
+                    "private.public_intake_decisions.service_role.select": False,
+                },
+                "migrations": ["202610250002", "202610250003"],
+            }
+            preflight = {
+                "two_slot_capacity_headroom": True, "intake_enabled": True,
+                "submission_id_unused": True, "network_hash_unused": True,
+                "cleanup_candidates_absent": True,
+                "active_congregation_available": True,
+            }
+            fake_psql.write_text(
+                "import json, sys\n"
+                "stdin=sys.stdin.read()\n"
+                "with open(__import__('os').environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps({'args':sys.argv[1:], 'stdin':stdin})+'\\n')\n"
+                "args=sys.argv[1:]\n"
+                "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
+                f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
+                "('t' if '-c' in args else (__import__('os').environ.get('FAKE_SMOKE_RESULT', 'T2_SMOKE_PASS') "
+                "if 'pg_temp.run_smoke();' in stdin else ''))))\n",
+                encoding="utf-8",
+            )
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                encoding="utf-8",
+            )
             backup = self.make_backup(directory)
+            evidence = directory / "t2-smoke-evidence.json"
+            run_id = "01234567-89ab-4cde-8fab-0123456789ab"
             env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "FAKE_PSQL_CAPTURE": str(capture),
+            })
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", run_id,
+                "--scenario", "public_intake_hosted_smoke_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(calls), 6)
+            self.assertIn("current_database()", calls[0]["args"][-1])
+            self.assertIn("count(DISTINCT version)", calls[1]["args"][-1])
+            self.assertIn("'counts'", calls[2]["args"][-1])
+            self.assertIn("two_slot_capacity_headroom", calls[3]["args"][-1])
+            self.assertIn("+ 1 < s.global_pending_limit", calls[3]["args"][-1])
+            self.assertIn("cleanup_candidates_absent", calls[3]["args"][-1])
+            owned_id = runner._run_owned_uuid(run_id, runner.T2_SMOKE_SUBMISSION_PLACEHOLDER)
+            owned_network = hashlib.sha256(
+                f"public-intake-hosted-smoke:{owned_id}".encode("utf-8")).hexdigest()
+            self.assertIn(owned_id, calls[3]["args"][-1])
+            self.assertIn(owned_network, calls[3]["args"][-1])
+            self.assertIn("-f", calls[4]["args"])
+            self.assertIn("'counts'", calls[5]["args"][-1])
+            scenario = calls[4]["stdin"]
+            self.assertTrue(scenario.startswith("BEGIN;"))
+            self.assertTrue(scenario.rstrip().endswith("ROLLBACK;"))
+            self.assertEqual(scenario.count("first_response:=public.ieadpe_receive_public_intake("), 1)
+            self.assertEqual(scenario.count("replay_response:=public.ieadpe_receive_public_intake("), 1)
+            self.assertIn("SELECT pg_temp.run_smoke();", scenario)
+            self.assertNotIn("TRUNCATE", scenario.upper())
+            self.assertNotIn("operator@", " ".join(" ".join(call["args"]) for call in calls))
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "PASS")
+            self.assertTrue(manifest["reconciled"])
+            self.assertTrue(manifest["hosted_preflight"]["two_slot_capacity_headroom"])
+            self.assertEqual(manifest["run_ownership"]["persistent_rows_expected"], 0)
+            self.assertTrue(manifest["run_ownership"]["fixture_ids"])
+            self.assertEqual(manifest["run_ownership"]["auth_user_ids"], [])
+            self.assertEqual(manifest["run_ownership"]["operation_receipt_ids"], [])
+            self.assertNotIn("operator@", evidence.read_text(encoding="utf-8"))
+            self.assertNotIn("sslmode", evidence.read_text(encoding="utf-8"))
+
+            blocked_evidence = directory / "t2-smoke-lock-blocked.json"
+            env["FAKE_SMOKE_RESULT"] = "T2_SMOKE_BLOCKED:lock_timeout"
+            blocked_result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", run_id,
+                "--scenario", "public_intake_hosted_smoke_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(blocked_evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+            self.assertEqual(blocked_result.returncode, 2)
+            blocked_manifest = json.loads(blocked_evidence.read_text(encoding="utf-8"))
+            self.assertEqual(blocked_manifest["status"], "BLOCKED")
+            self.assertIn("lock_timeout", blocked_manifest["reason"])
+            self.assertTrue(blocked_manifest["reconciled"])
+            self.assertIn("rollback", blocked_manifest["cleanup_outcome"].lower())
+
+    def test_t2_smoke_capacity_preflight_writes_blocked_manifest_before_scenario(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "psql-calls.jsonl"
+            fake_psql = directory / "fake_psql.py"
+            snapshot = {
+                "counts": {"public.converts": 0, "public.ministry_people": 0,
+                           "public.weekly_reports": 0, "private.mutation_receipts": 0,
+                           "public.photo_assets": 0, "storage.objects": 0, "auth.users": 0,
+                           "private.congregation_week_guards": 0, "public.user_access": 0,
+                           "private.public_intake_submissions": 0, "private.public_intake_receipts": 0,
+                           "private.public_intake_decisions": 0, "private.public_intake_accepted_events": 0},
+                "revisions": {"public.converts": {"max": 0, "distribution": {}},
+                              "public.ministry_people": {"max": 0, "distribution": {}},
+                              "private.public_intake_submissions": {"max": 0, "distribution": {}}},
+                "settings": {"enabled": True, "global_pending_limit": 1},
+                "grants": {}, "migrations": ["202610250002", "202610250003"],
+            }
+            preflight = {
+                "two_slot_capacity_headroom": False, "intake_enabled": True,
+                "submission_id_unused": True, "network_hash_unused": True,
+                "cleanup_candidates_absent": True,
+                "active_congregation_available": True,
+            }
+            fake_psql.write_text(
+                "import json, sys\n"
+                "with open(__import__('os').environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps({'args':sys.argv[1:], 'stdin':sys.stdin.read()})+'\\n')\n"
+                "args=sys.argv[1:]\n"
+                "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
+                f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
+                "('t' if '-c' in args else '')))\n",
+                encoding="utf-8",
+            )
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text("import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                                     encoding="utf-8")
+            backup = self.make_backup(directory)
+            evidence = directory / "blocked-headroom.json"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "FAKE_PSQL_CAPTURE": str(capture),
+            })
             result = subprocess.run([
                 sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
                 "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
-                "--scenario", "public_intake_test.sql", "--concurrency",
-                "--backup-manifest", str(backup), "--evidence-manifest", str(directory / "evidence.json"),
-                "--psql-command-json", json.dumps([sys.executable, str(fake)]),
-            ], text=True, capture_output=True, env=env, cwd=ROOT)
+                "--scenario", "public_intake_hosted_smoke_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
             self.assertNotEqual(result.returncode, 0)
-            self.assertFalse(marker.exists())
-            self.assertNotIn("truncate", result.stdout + result.stderr.lower())
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(len(calls), 4)
+            self.assertNotIn("-f", calls[-1]["args"])
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "BLOCKED")
+            self.assertFalse(manifest["hosted_write_attempted"])
+            self.assertTrue(manifest["hosted_subprocesses_invoked"])
+            self.assertEqual(manifest["hosted_preflight"]["two_slot_capacity_headroom"], False)
+            self.assertIn("capacity", manifest["reason"].lower())
+            self.assertEqual(manifest["run_ownership"]["persistent_rows_expected"], 0)
+
+    def test_t2_capacity_scenario_and_concurrency_write_blocked_evidence_without_subprocesses(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            psql_marker = directory / "psql-called"
+            fake = directory / "fake_psql.py"
+            fake.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(psql_marker)!r}).write_text('called')\n", encoding="utf-8")
+            supabase_marker = directory / "supabase-called"
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(supabase_marker)!r}).write_text('called')\n", encoding="utf-8")
+            backup = self.make_backup(directory)
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+            })
+            for suffix, extra_args in (("scenario", []), ("concurrency", ["--concurrency"])):
+                psql_marker.unlink(missing_ok=True)
+                supabase_marker.unlink(missing_ok=True)
+                evidence = directory / f"{suffix}-blocked.json"
+                args = [
+                    sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                    "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                    "--scenario", "public_intake_test.sql", *extra_args,
+                    "--backup-manifest", str(backup), "--evidence-manifest", str(evidence),
+                    "--psql-command-json", json.dumps([sys.executable, str(fake)]),
+                    "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+                ]
+                result = subprocess.run(args, text=True, capture_output=True, env=env, cwd=ROOT)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertFalse(psql_marker.exists())
+                self.assertFalse(supabase_marker.exists())
+                self.assertIn("BLOCKED", result.stdout + result.stderr)
+                manifest = json.loads(evidence.read_text(encoding="utf-8"))
+                self.assertEqual(manifest["status"], "BLOCKED")
+                self.assertFalse(manifest["hosted_subprocesses_invoked"])
+                self.assertFalse(manifest["hosted_write_attempted"])
+                self.assertTrue(manifest["reason"])
 
 
 if __name__ == "__main__":
