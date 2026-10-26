@@ -5,6 +5,8 @@ Implementation baseline: `origin/main` at `846a320619d3d8240df391a8b218c713bccee
 T8 checkout baseline: T7 reviewed commit `d75ee355a5b197fd09485771608ed7864dac04b9`
 Execution checkout: `feat/public-web-intake` in the isolated `public-web-intake` worktree
 
+T9 release handoff and current operator prerequisites: [Public Web intake operations](../operations/public-intake.md). The hosted gates below remain BLOCKED/INCOMPLETE; that runbook is not evidence of deployment or authorization.
+
 ## Acceptance status
 
 | Gate | Status | Evidence |

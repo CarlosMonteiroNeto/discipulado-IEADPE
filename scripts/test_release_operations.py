@@ -12,6 +12,40 @@ from web_preflight import inspect
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_public_intake_runbook_pins_config_and_release_boundaries(self):
+        runbook_path = Path('docs/operations/public-intake.md')
+        runbook = runbook_path.read_text() if runbook_path.exists() else ''
+        for public_define in (
+            'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY',
+            'AUTH_CALLBACK_URL', 'TURNSTILE_SITE_KEY',
+        ):
+            with self.subTest(public_define=public_define):
+                self.assertIn(public_define, runbook)
+        for server_value in (
+            'SUPABASE_SERVICE_ROLE_KEY', 'TURNSTILE_SECRET_KEY',
+            'INTAKE_NETWORK_HASH_SECRET', 'INTAKE_ALLOWED_ORIGINS',
+            'INTAKE_ALLOWED_HOSTNAMES',
+        ):
+            with self.subTest(server_value=server_value):
+                self.assertIn(server_value, runbook)
+        self.assertIn('verify_jwt = false', runbook)
+        self.assertIn('private.public_intake_cleanup()', runbook)
+        self.assertIn('BLOCKED', runbook)
+        self.assertIn('https://<verified-hostname>', runbook)
+        self.assertIn('T8 review/fix-round is recorded complete', runbook)
+        self.assertIn('no source-matched public-intake artifact manifest exists', runbook)
+
+    def test_public_intake_runbook_names_current_hosted_release_blockers(self):
+        runbook_path = Path('docs/operations/public-intake.md')
+        runbook = runbook_path.read_text() if runbook_path.exists() else ''
+        for evidence in (
+            '202610250002', '202610250003', '202610250004',
+            'trusted client-address', 'Turnstile', 'fresh external full-backup',
+            'PUBLIC_INTAKE_DATABASE_URL', 'host identity is unverified',
+        ):
+            with self.subTest(evidence=evidence):
+                self.assertIn(evidence, runbook)
+
     def test_preflight_rejects_proxy_that_shadows_assets(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
