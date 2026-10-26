@@ -30,7 +30,7 @@ SCENARIOS = {
 }
 SCENARIO_SHA256 = {
     "public_registration_authority_test.sql": "6700394711d988fceaa10da0e8a892cd704bb2fa4cbcf2b9138ee90dcd0ec732",
-    "public_intake_test.sql": "70dfbc1b2fb7ba81023167f5d730cfddc9c7679f712157b5bd0bb6f2f09f128d",
+    "public_intake_test.sql": "a2597e38910e61d56db4ca1bdb289d6a9d4a7f9f212c26d26db29dd80acd51fa",
     "public_intake_hosted_smoke_test.sql": "d77c8256e10c4fc1310d28afaa8baf47ea22c68f6dd2cb1c8f57db41eb772b7d",
     "pending_review_test.sql": "6663d00030d4a0d6f3276b70937b9942dfd89f7a6a67c614e902066bc449664d",
 }
@@ -272,17 +272,28 @@ def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT,
         raise SafetyError("scenario content does not match the reviewed digest")
     validate_scenario_sql(original, scenario_name, preproduction=preproduction)
 
-    def namespaced(match: re.Match[str]) -> str:
-        derived = uuid.uuid5(run_uuid, match.group(0).lower())
-        return str(derived)
-
-    transformed = UUID_LITERAL.sub(namespaced, original)
-    # Dynamic UUID series in the T2 scenario use a fixed first 24 hex digits
-    # followed by a generated suffix. Namespace that prefix as well.
+    # Dynamic UUID series use a fixed first 24 characters followed by a
+    # generated 12-digit suffix. Keep literal references to those generated
+    # IDs under the same run-owned prefix.
     prefix_pattern = re.compile(
         r"(?<=')([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-)(?='\s*\|\|)", re.IGNORECASE)
+    dynamic_prefixes = {
+        match.group(1).lower(): str(uuid.uuid5(
+            run_uuid, match.group(1).lower() + "000000000000"))[:-12]
+        for match in prefix_pattern.finditer(original)
+    }
+
+    def namespaced(match: re.Match[str]) -> str:
+        fixture_id = match.group(0).lower()
+        for source_prefix, target_prefix in dynamic_prefixes.items():
+            suffix = fixture_id[len(source_prefix):] if fixture_id.startswith(source_prefix) else ""
+            if len(suffix) == 12 and suffix.isdigit():
+                return target_prefix + suffix
+        return str(uuid.uuid5(run_uuid, fixture_id))
+
+    transformed = UUID_LITERAL.sub(namespaced, original)
     transformed = prefix_pattern.sub(
-        lambda match: str(uuid.uuid5(run_uuid, match.group(1).lower() + "000000000000"))[:-12],
+        lambda match: dynamic_prefixes[match.group(1).lower()],
         transformed,
     )
     # Namespace every synthetic test email to avoid collisions across runs.

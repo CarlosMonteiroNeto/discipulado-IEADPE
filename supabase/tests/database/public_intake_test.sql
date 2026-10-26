@@ -155,6 +155,11 @@ UPDATE public.congregations SET archived_at=now()
 CREATE TEMP TABLE catalog_expected(n bigint);
 INSERT INTO catalog_expected
  SELECT count(*) FROM public.congregations WHERE archived_at IS NULL;
+CREATE TEMP TABLE official_row_baseline AS
+SELECT (SELECT count(*) FROM public.converts) AS converts,
+       (SELECT count(*) FROM public.ministry_people) AS ministry_people,
+       (SELECT count(*) FROM private.mutation_receipts) AS mutation_receipts,
+       (SELECT count(*) FROM public.photo_assets) AS photo_assets;
 CREATE TEMP TABLE catalog_result(label text PRIMARY KEY,value jsonb);
 GRANT ALL ON catalog_expected,catalog_result TO anon;
 
@@ -173,7 +178,8 @@ SELECT pg_temp.assert_true(
   FROM catalog_result WHERE label='page1'),
  'catalog_is_names_only: exact response keys');
 SELECT pg_temp.assert_true(
- (SELECT jsonb_array_length(value->'items')=2 AND value->>'next_cursor'='ba000000-0000-4000-8000-000000000002'
+ (SELECT jsonb_array_length(value->'items')=2 AND
+   value->>'next_cursor'=(value->'items'->1->>'id')
   FROM catalog_result WHERE label='page1'),
  'catalog_is_names_only: keyset page and cursor');
 SELECT pg_temp.assert_true(
@@ -211,7 +217,9 @@ BEGIN
    previous:=(item->>'id')::uuid; seen:=seen||previous; total:=total+1;
   END LOOP;
   cursor_id:=nullif(page->>'next_cursor','')::uuid; pages:=pages+1;
-  PERFORM pg_temp.assert_true(pages<=60,'catalog_is_names_only: pagination is bounded');
+  PERFORM pg_temp.assert_true(
+   pages<=((SELECT n FROM catalog_expected)+1)/2,
+   'catalog_is_names_only: pagination is bounded by expected rows');
   EXIT WHEN cursor_id IS NULL;
  END LOOP;
  PERFORM pg_temp.assert_true(total=(SELECT n FROM catalog_expected),
@@ -509,8 +517,10 @@ SELECT pg_temp.assert_true(
   FROM private.public_intake_accepted_events e),
  'pending_intake_is_private: accepted events carry only network hash metadata');
 SELECT pg_temp.assert_true(
- NOT EXISTS(SELECT FROM public.converts) AND NOT EXISTS(SELECT FROM public.ministry_people) AND
- NOT EXISTS(SELECT FROM private.mutation_receipts) AND NOT EXISTS(SELECT FROM public.photo_assets),
+ (SELECT count(*) FROM public.converts)=(SELECT converts FROM official_row_baseline) AND
+ (SELECT count(*) FROM public.ministry_people)=(SELECT ministry_people FROM official_row_baseline) AND
+ (SELECT count(*) FROM private.mutation_receipts)=(SELECT mutation_receipts FROM official_row_baseline) AND
+ (SELECT count(*) FROM public.photo_assets)=(SELECT photo_assets FROM official_row_baseline),
  'pending_intake_is_private: intake writes no official or photo rows');
 SELECT pg_temp.assert_true(
  (SELECT NOT (to_jsonb(r)::text ILIKE '%Ana Silva%') FROM private.public_intake_receipts r

@@ -3,6 +3,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tempfile
@@ -36,6 +37,29 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         with self.assertRaises(runner.SafetyError):
             runner.validate_scenario_sql(scenario, "public_intake_test.sql")
         runner.validate_scenario_sql(scenario, "public_intake_test.sql", preproduction=True)
+
+    def test_catalog_pagination_cursor_assertion_uses_returned_page(self):
+        scenario = (ROOT / "supabase/tests/database/public_intake_test.sql").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "value->>'next_cursor'=(value->'items'->1->>'id')",
+            scenario,
+        )
+
+    def test_catalog_pagination_bound_scales_with_existing_congregations(self):
+        scenario = (ROOT / "supabase/tests/database/public_intake_test.sql").read_text(encoding="utf-8")
+
+        self.assertIn(
+            "pages<=((SELECT n FROM catalog_expected)+1)/2",
+            scenario,
+        )
+
+    def test_intake_only_assertion_preserves_preexisting_official_rows(self):
+        scenario = (ROOT / "supabase/tests/database/public_intake_test.sql").read_text(encoding="utf-8")
+
+        self.assertIn("CREATE TEMP TABLE official_row_baseline AS", scenario)
+        self.assertIn("(SELECT count(*) FROM public.converts)=(SELECT converts FROM official_row_baseline)", scenario)
+        self.assertIn("(SELECT count(*) FROM private.mutation_receipts)=(SELECT mutation_receipts FROM official_row_baseline)", scenario)
 
     def test_preproduction_rejects_truncate_of_any_other_application_table(self):
         unsafe = "BEGIN; TRUNCATE public.converts CASCADE; ROLLBACK;"
@@ -786,6 +810,19 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         self.assertNotIn("aa000000-0000-4000-8000-000000000001", sql)
         self.assertIn("run-0123456789ab4cde8fab0123456789ab-authority-scope-a@example.test", sql)
         self.assertEqual(len(source_digest), 64)
+
+    def test_dynamic_series_ids_match_their_literal_references(self):
+        sql, _ = runner.load_scenario(
+            "public_intake_test.sql", "01234567-89ab-4cde-8fab-0123456789ab", ROOT,
+            preproduction=True)
+        generated = re.search(
+            r"(?is)SELECT \('([0-9a-f-]{24})'\|\|lpad\(i::text,12,'0'\)\)::uuid,.*?"
+            r"FROM generate_series\(1,105\) i;",
+            sql,
+        )
+
+        self.assertIsNotNone(generated)
+        self.assertIn(f"'{generated.group(1)}000000000001'::uuid", sql)
 
     def test_t2_full_capacity_scenario_is_rejected_for_hosted_execution(self):
         run_id = "01234567-89ab-4cde-8fab-0123456789ab"
