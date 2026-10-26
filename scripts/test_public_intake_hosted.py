@@ -26,9 +26,35 @@ SCENARIOS = {
     "public_intake_test.sql": ("202610250002", "202610250003"),
     "pending_review_test.sql": ("202610250002", "202610250003", "202610250004"),
 }
+SCENARIO_SHA256 = {
+    "public_registration_authority_test.sql": "684312d66140af244bf1da42170dccf1c092ce3ae93f0577f735b3201b056cf3",
+    "public_intake_test.sql": "a50a8229bdbfbf09dba8c19eb4d65a4ff79068bc089c0f12df8e707d54edd6b5",
+    "pending_review_test.sql": "30ddb13864fbfcb607a95ed0e9f1a6d0df2b4baf599dc05f3a220b6d1e261463",
+}
 MAX_BACKUP_AGE = timedelta(hours=24)
 PROJECT_REF = re.compile(r"^[a-z0-9]{20}$")
-UUID_LITERAL = re.compile(r"(?i)\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b")
+UUID_PATTERN = r"[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+UUID_LITERAL = re.compile(r"(?i)\b" + UUID_PATTERN + r"\b")
+DANGEROUS_FUNCTION = re.compile(
+    r"(?i)\b(?:pg_terminate_backend|pg_cancel_backend|pg_reload_conf|pg_read_file|"
+    r"pg_read_binary_file|pg_write_file|pg_write_binary_file|pg_ls_dir|pg_sleep|"
+    r"pg_advisory_lock|pg_advisory_xact_lock|dblink|lo_import|lo_export)\s*\("
+)
+APPROVED_SQL_CALLS = {
+    "and", "auth.users", "bool_and", "coalesce", "convert_to", "count", "created",
+    "drafts", "encode", "exists", "format", "has_function_privilege", "in",
+    "jsonb_array_elements", "jsonb_array_length", "jsonb_build_object", "jsonb_set",
+    "jsonb_typeof", "now", "payload", "pg_temp.assert_true", "pg_temp.call_get",
+    "pg_temp.call_list", "pg_temp.call_review", "pg_temp.draft", "pg_temp.expect_failure",
+    "pg_temp.reject", "pg_temp.review_payload", "pg_temp.seed_pending", "private.convert_registration_command",
+    "private.public_intake_cleanup", "private.public_intake_now", "private.public_intake_submissions",
+    "public.congregations", "public.ieadpe_create_convert", "public.ieadpe_create_photo_draft",
+    "public.ieadpe_get_pending_intake", "public.ieadpe_list_pending_intake",
+    "public.ieadpe_ministry_list_converts", "public.ieadpe_review_pending_intake",
+    "or", "public.user_access", "repeat", "review_clock", "rpc_results", "select", "set_config",
+    "sha256", "storage.objects", "sum", "to_jsonb", "to_regprocedure", "values",
+}
+SQL_CALL = re.compile(r"(?i)\b(?:([a-z_][a-z0-9_$]*)\s*\.\s*)?([a-z_][a-z0-9_$]*)\s*\(")
 
 
 class SafetyError(ValueError):
@@ -101,6 +127,14 @@ def validate_scenario_sql(sql: str, scenario_name: str) -> None:
     )
     if forbidden.search(code):
         raise SafetyError("scenario contains a prohibited or non-transactional operation")
+    if DANGEROUS_FUNCTION.search(code):
+        raise SafetyError("scenario calls an unapproved or privileged SQL function")
+    calls = {
+        ((schema.lower() + ".") if schema else "") + function.lower()
+        for schema, function in SQL_CALL.findall(code)
+    }
+    if not calls <= APPROVED_SQL_CALLS:
+        raise SafetyError("scenario contains an unapproved SQL function or expression")
     create_functions = re.findall(
         r"(?is)\bCREATE\s+(?:OR\s+REPLACE\s+)?FUNCTION\s+([a-z_][a-z0-9_]*\.[a-z_][a-z0-9_]*)",
         code,
@@ -186,8 +220,10 @@ def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT) -> t
     if str(run_uuid) != run_id.lower():
         raise SafetyError("run id must use canonical UUID syntax")
     original = path.read_text(encoding="utf-8")
-    validate_scenario_sql(original, scenario_name)
     source_digest = hashlib.sha256(original.encode("utf-8")).hexdigest()
+    if source_digest != SCENARIO_SHA256[scenario_name]:
+        raise SafetyError("scenario content does not match the reviewed digest")
+    validate_scenario_sql(original, scenario_name)
 
     def namespaced(match: re.Match[str]) -> str:
         derived = uuid.uuid5(run_uuid, match.group(0).lower())
@@ -212,6 +248,28 @@ def load_scenario(scenario_name: str, run_id: str, repository: Path = ROOT) -> t
     if "authority-" in original and "authority-" in transformed and run_uuid.hex not in transformed:
         raise SafetyError("fixture ownership could not be established")
     return transformed, source_digest
+
+
+def run_ownership(sql: str) -> dict:
+    all_ids = sorted(set(UUID_LITERAL.findall(sql)))
+    auth_statement = re.search(r"(?is)INSERT\s+INTO\s+auth\.users\b.*?\bVALUES\s*(.*?);", sql)
+    auth_ids = sorted(set(UUID_LITERAL.findall(auth_statement.group(1)))) if auth_statement else []
+    receipt_pattern = re.compile(
+        r"(?is)\b(?:ieadpe_create_convert|ieadpe_create_photo_draft|"
+        r"ieadpe_review_pending_intake|call_review)\s*\(\s*'(" + UUID_PATTERN + r")'"
+    )
+    receipt_ids = sorted(set(match.group(1).lower() for match in receipt_pattern.finditer(sql)))
+    return {
+        "fixture_ids": all_ids,
+        "auth_user_ids": auth_ids,
+        "operation_receipt_ids": receipt_ids,
+        "operation_receipts": [
+            {"operation_id": operation_id, "persistent_after_rollback": False}
+            for operation_id in receipt_ids
+        ],
+        "persistent_rows_expected": 0,
+        "disposition": "all SQL fixtures and receipts are inside the explicit rollback transaction",
+    }
 
 
 def _confirm_target(project_ref: str, env: dict[str, str]) -> str:
@@ -317,8 +375,85 @@ def _baseline_query(scenario_name: str) -> str:
             "private.public_intake_decisions": "SELECT count(*)::bigint FROM private.public_intake_decisions",
             "private.public_intake_accepted_events": "SELECT count(*)::bigint FROM private.public_intake_accepted_events",
         })
-    pairs = ",".join("'" + key + "',(" + query + ")" for key, query in counts.items())
-    return "SELECT jsonb_build_object(" + pairs + ")::text;"
+    count_pairs = ",".join("'" + key + "',(" + query + ")" for key, query in counts.items())
+    def revision_snapshot(table: str) -> str:
+        return (
+            "jsonb_build_object('max',coalesce((SELECT max(revision) FROM " + table + "),0)::bigint,"
+            "'distribution',coalesce((SELECT jsonb_object_agg(revision,row_count) FROM ("
+            "SELECT revision,count(*)::bigint AS row_count FROM " + table +
+            " GROUP BY revision) AS buckets),'{}'::jsonb))"
+        )
+
+    revisions = {
+        "public.converts": revision_snapshot("public.converts"),
+        "public.ministry_people": revision_snapshot("public.ministry_people"),
+    }
+    if scenario_name != "public_registration_authority_test.sql":
+        revisions["private.public_intake_submissions"] = revision_snapshot("private.public_intake_submissions")
+    revision_pairs = ",".join("'" + key + "'," + query for key, query in revisions.items())
+    settings_query = (
+        "(SELECT to_jsonb(s) FROM private.public_intake_settings s WHERE singleton)"
+        if scenario_name != "public_registration_authority_test.sql" else "NULL::jsonb"
+    )
+    signatures = [
+        "public.ieadpe_create_convert(uuid,jsonb)",
+        "public.ieadpe_create_photo_draft(uuid,jsonb)",
+    ]
+    if scenario_name == "pending_review_test.sql":
+        signatures.extend((
+            "public.ieadpe_list_pending_intake(jsonb)",
+            "public.ieadpe_get_pending_intake(jsonb)",
+            "public.ieadpe_review_pending_intake(uuid,jsonb)",
+        ))
+    if scenario_name != "public_registration_authority_test.sql":
+        signatures.append("public.ieadpe_receive_public_intake(jsonb)")
+    grant_pairs = []
+    for signature in signatures:
+        key = signature.replace("'", "")
+        for role in ("anon", "authenticated", "service_role"):
+            grant_pairs.append(
+                "'" + key + "." + role + "',coalesce(has_function_privilege('" + role + "',"
+                "to_regprocedure('" + signature + "'),'EXECUTE'),false)"
+            )
+    migration_versions = ",".join("'" + version + "'" for version in SCENARIOS[scenario_name])
+    return (
+        "SELECT jsonb_build_object(" +
+        "'counts',jsonb_build_object(" + count_pairs + ")," +
+        "'revisions',jsonb_build_object(" + revision_pairs + ")," +
+        "'settings'," + settings_query + "," +
+        "'grants',jsonb_build_object(" + ",".join(grant_pairs) + ")," +
+        "'migrations',to_jsonb(ARRAY(SELECT version FROM supabase_migrations.schema_migrations "
+        "WHERE version IN (" + migration_versions + ") ORDER BY version))" +
+        ")::text;"
+    )
+
+
+def _validate_snapshot(snapshot: object) -> bool:
+    if not isinstance(snapshot, dict) or set(snapshot) != {"counts", "revisions", "settings", "grants", "migrations"}:
+        return False
+    if not isinstance(snapshot["counts"], dict) or any(
+            not isinstance(value, int) or value < 0 for value in snapshot["counts"].values()):
+        return False
+    if not isinstance(snapshot["revisions"], dict) or any(
+            not isinstance(value, dict) or not isinstance(value.get("max"), int)
+            or value["max"] < 0 or not isinstance(value.get("distribution"), dict)
+            or any(not str(key).isdigit() or not isinstance(count, int) or count < 0
+                   for key, count in value["distribution"].items())
+            for value in snapshot["revisions"].values()):
+        return False
+    if snapshot["settings"] is not None and not isinstance(snapshot["settings"], dict):
+        return False
+    if not isinstance(snapshot["grants"], dict) or any(
+            not isinstance(value, bool) for value in snapshot["grants"].values()):
+        return False
+    if not isinstance(snapshot["migrations"], list) or any(
+            not isinstance(value, str) for value in snapshot["migrations"]):
+        return False
+    return True
+
+
+def _write_evidence(path: Path, evidence: dict) -> None:
+    path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -379,21 +514,16 @@ def main(argv: list[str] | None = None) -> int:
             raise SafetyError("required additive migrations are not confirmed as applied")
         counts_sql = _baseline_query(args.scenario)
         try:
-            baseline_counts = json.loads(_psql(base, process_env, counts_sql))
+            baseline = json.loads(_psql(base, process_env, counts_sql))
         except json.JSONDecodeError as exc:
-            raise SafetyError("baseline count response was invalid") from exc
-        if not isinstance(baseline_counts, dict) or any(
-                not isinstance(value, int) or value < 0 for value in baseline_counts.values()):
-            raise SafetyError("baseline count response was incomplete")
-        _psql(base, process_env, "SELECT 1;", stdin=sql)
-        try:
-            after_counts = json.loads(_psql(base, process_env, counts_sql))
-        except json.JSONDecodeError as exc:
-            raise SafetyError("after-count response was invalid") from exc
-        if after_counts != baseline_counts:
-            raise SafetyError("before/after database counts did not reconcile")
+            raise SafetyError("baseline state response was invalid") from exc
+        if not _validate_snapshot(baseline):
+            raise SafetyError("baseline state response was incomplete")
+        ownership = run_ownership(sql)
+        if not ownership["fixture_ids"] or not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]:
+            raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
         evidence = {
-            "status": "PASS",
+            "status": "STARTED",
             "run_id": run_id,
             "project_ref": args.project_ref,
             "scenario": args.scenario,
@@ -403,12 +533,53 @@ def main(argv: list[str] | None = None) -> int:
             "backup_created_at": backup["created_at"],
             "target_confirmed": True,
             "transaction_policy": "scenario explicitly ends in ROLLBACK",
-            "before_counts": baseline_counts,
-            "after_counts": after_counts,
-            "reconciled": True,
-            "completed_at": utc_now().isoformat(),
+            "baseline": baseline,
+            "run_ownership": ownership,
+            "after": None,
+            "reconciled": False,
+            "cleanup_outcome": "pending transaction rollback and reconciliation",
+            "started_at": utc_now().isoformat(),
         }
-        evidence_path.write_text(json.dumps(evidence, indent=2) + "\n", encoding="utf-8")
+        _write_evidence(evidence_path, evidence)
+        try:
+            _psql(base, process_env, "SELECT 1;", stdin=sql)
+        except (SafetyError, OSError, subprocess.TimeoutExpired):
+            try:
+                failed_after = json.loads(_psql(base, process_env, counts_sql))
+                if _validate_snapshot(failed_after):
+                    evidence["after"] = failed_after
+                    evidence["reconciled"] = failed_after == baseline
+                    evidence["cleanup_outcome"] = (
+                        "transaction rollback verified" if evidence["reconciled"]
+                        else "count or state mismatch; operator recovery required"
+                    )
+            except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
+                evidence["cleanup_outcome"] = "post-failure state unavailable; operator recovery required"
+            evidence["status"] = "FAIL"
+            evidence["failure"] = "scenario execution failed; raw database output withheld"
+            evidence["completed_at"] = utc_now().isoformat()
+            _write_evidence(evidence_path, evidence)
+            raise SafetyError("scenario execution failed; external evidence was preserved") from None
+        try:
+            after = json.loads(_psql(base, process_env, counts_sql))
+        except json.JSONDecodeError as exc:
+            evidence["status"] = "FAIL"
+            evidence["failure"] = "after-state response was invalid; raw database output withheld"
+            evidence["cleanup_outcome"] = "post-run state unavailable; operator recovery required"
+            evidence["completed_at"] = utc_now().isoformat()
+            _write_evidence(evidence_path, evidence)
+            raise SafetyError("after-state response was invalid; external evidence was preserved") from exc
+        evidence["after"] = after
+        evidence["reconciled"] = _validate_snapshot(after) and after == baseline
+        evidence["status"] = "PASS" if evidence["reconciled"] else "FAIL"
+        evidence["cleanup_outcome"] = (
+            "transaction rollback verified" if evidence["reconciled"]
+            else "count or state mismatch; operator recovery required"
+        )
+        evidence["completed_at"] = utc_now().isoformat()
+        _write_evidence(evidence_path, evidence)
+        if not evidence["reconciled"]:
+            raise SafetyError("before/after state did not reconcile; external evidence was preserved")
         print("Hosted scenario completed; redacted evidence manifest written.")
         return 0
     except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired, EOFError) as exc:

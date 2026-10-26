@@ -69,6 +69,60 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             bad.write_text("BEGIN; DROP SCHEMA public CASCADE; ROLLBACK;", encoding="utf-8")
             with self.assertRaises(runner.SafetyError):
                 runner.validate_scenario_sql(bad.read_text(encoding="utf-8"), bad.name)
+        with self.assertRaises(runner.SafetyError):
+            runner.validate_scenario_sql(
+                "BEGIN; SELECT pg_terminate_backend(123); ROLLBACK;",
+                "public_registration_authority_test.sql")
+        with self.assertRaises(runner.SafetyError):
+            runner.validate_scenario_sql(
+                "BEGIN; SELECT public.unreviewed_side_effect(); ROLLBACK;",
+                "public_registration_authority_test.sql")
+
+    def test_changed_scenario_with_dangerous_function_fails_before_any_cli(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            repository = directory / "repo"
+            scripts = repository / "scripts"
+            scenarios = repository / "supabase/tests/database"
+            scripts.mkdir(parents=True)
+            scenarios.mkdir(parents=True)
+            (scripts / "test_public_intake_hosted.py").write_bytes(
+                (ROOT / "scripts/test_public_intake_hosted.py").read_bytes())
+            canonical = ROOT / "supabase/tests/database/public_registration_authority_test.sql"
+            changed_scenario = canonical.read_text(encoding="utf-8").replace(
+                "ROLLBACK;",
+                "SELECT pg_terminate_backend(pg_backend_pid());\nROLLBACK;",
+            )
+            (scenarios / canonical.name).write_text(changed_scenario, encoding="utf-8")
+            psql_marker = directory / "psql-called"
+            supabase_marker = directory / "supabase-called"
+            fake_psql = directory / "fake_psql.py"
+            fake_psql.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(psql_marker)!r}).write_text('called')\n", encoding="utf-8")
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "from pathlib import Path\n"
+                f"Path({str(supabase_marker)!r}).write_text('called')\n", encoding="utf-8")
+            backup = self.make_backup(directory)
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+            })
+            result = subprocess.run([
+                sys.executable, str(scripts / "test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                "--scenario", "public_registration_authority_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(directory / "evidence.json"),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], text=True, capture_output=True, env=env, cwd=repository)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(psql_marker.exists())
+            self.assertFalse(supabase_marker.exists())
+            self.assertFalse((directory / "evidence.json").exists())
 
     def test_t1_fixture_ids_are_namespaced_to_the_run(self):
         sql, source_digest = runner.load_scenario(
@@ -127,6 +181,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             directory = Path(temp)
             capture = directory / "calls.jsonl"
             fake = directory / "fake_psql.py"
+            snapshot = {
+                "counts": {"public.converts": 0, "public.ministry_people": 0,
+                           "public.weekly_reports": 0, "private.mutation_receipts": 0,
+                           "public.photo_assets": 0, "storage.objects": 0,
+                           "auth.users": 0, "private.congregation_week_guards": 0,
+                           "public.user_access": 0},
+                "revisions": {"public.converts": {"max": 1, "distribution": {"1": 0}},
+                              "public.ministry_people": {"max": 1, "distribution": {"1": 0}}},
+                "settings": None,
+                "grants": {"public.ieadpe_create_convert(uuid,jsonb).anon": False,
+                           "public.ieadpe_create_convert(uuid,jsonb).authenticated": True},
+                "migrations": ["202610250002"],
+            }
+            snapshot_json = json.dumps(snapshot)
             fake.write_text(
                 "import json, os, sys\n"
                 "from pathlib import Path\n"
@@ -135,10 +203,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "print('FAKE_PRIVATE_QUERY_RESULT', file=sys.stderr)\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
-                "print(json.dumps({'public.converts':0,'public.ministry_people':0,'public.weekly_reports':0,"
-                "'private.mutation_receipts':0,'public.photo_assets':0,'private.congregation_week_guards':0,"
-                "'storage.objects':0,'auth.users':0,'public.user_access':0}) "
-                "if 'jsonb_build_object' in sql else ('t' if '-c' in args else ''))\n",
+                f"print({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else ''))\n",
                 encoding="utf-8")
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
@@ -175,8 +240,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             manifest_text = evidence.read_text(encoding="utf-8")
             self.assertNotIn("operator@", manifest_text)
             self.assertNotIn("sslmode", manifest_text)
+            self.assertNotIn("example.test", manifest_text)
             self.assertIn("PASS", manifest_text)
             self.assertIn('"reconciled": true', manifest_text)
+            manifest = json.loads(manifest_text)
+            self.assertIn("revisions", manifest["baseline"])
+            self.assertIn("settings", manifest["baseline"])
+            self.assertIn("grants", manifest["baseline"])
+            self.assertIn("migrations", manifest["baseline"])
+            ownership = manifest["run_ownership"]
+            self.assertTrue(ownership["fixture_ids"])
+            self.assertTrue(ownership["auth_user_ids"])
+            self.assertTrue(ownership["operation_receipt_ids"])
+            self.assertEqual(len(ownership["operation_receipt_ids"]), len(ownership["operation_receipts"]))
+            self.assertEqual(ownership["persistent_rows_expected"], 0)
 
     def test_authenticated_account_missing_project_is_rejected_before_psql(self):
         with tempfile.TemporaryDirectory() as temp:
