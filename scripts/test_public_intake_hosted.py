@@ -28,10 +28,10 @@ SCENARIOS = {
     "pending_review_test.sql": ("202610250002", "202610250003", "202610250004"),
 }
 SCENARIO_SHA256 = {
-    "public_registration_authority_test.sql": "684312d66140af244bf1da42170dccf1c092ce3ae93f0577f735b3201b056cf3",
-    "public_intake_test.sql": "a50a8229bdbfbf09dba8c19eb4d65a4ff79068bc089c0f12df8e707d54edd6b5",
-    "public_intake_hosted_smoke_test.sql": "d925b46d128cac8c20a2884c6335da22bfeb0235f211ecae31df30dd0f13a95b",
-    "pending_review_test.sql": "30ddb13864fbfcb607a95ed0e9f1a6d0df2b4baf599dc05f3a220b6d1e261463",
+    "public_registration_authority_test.sql": "6700394711d988fceaa10da0e8a892cd704bb2fa4cbcf2b9138ee90dcd0ec732",
+    "public_intake_test.sql": "5ff4106b3201a28370032749dd1217ea8fac79bc88face4c302167320d8dcace",
+    "public_intake_hosted_smoke_test.sql": "d77c8256e10c4fc1310d28afaa8baf47ea22c68f6dd2cb1c8f57db41eb772b7d",
+    "pending_review_test.sql": "667032cc9dbb6a859e2f81b40d7bd3285c2cca427165d41c2dd3b4087c7230a6",
 }
 T2_SMOKE_SUBMISSION_PLACEHOLDER = "0f100000-0000-4000-8000-000000000001"
 T2_HOSTED_BLOCKED_SCENARIOS = {

@@ -292,7 +292,9 @@ BEGIN
     official_id := (official_result->>'id')::uuid;
   END IF;
   SELECT * INTO settings FROM private.public_intake_settings WHERE singleton FOR SHARE;
-  IF NOT FOUND OR settings.decision_retention<>interval '90 days' THEN
+  IF NOT FOUND OR extract(year from settings.decision_retention)<>0 OR
+     extract(month from settings.decision_retention)<>0 OR
+     settings.decision_retention<>interval '90 days' THEN
     RAISE EXCEPTION 'intake_unavailable' USING ERRCODE='22023';
   END IF;
   UPDATE private.public_intake_submissions SET

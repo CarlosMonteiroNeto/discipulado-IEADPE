@@ -827,13 +827,11 @@ Deno.test("database_caller_uses_only_fixed_service_role_rpc", async () => {
     string,
     unknown
   >;
-  assertEquals(Object.keys(sent).sort(), [
-    "draft",
-    "network_hash",
-    "submission_id",
-  ], "forwards only fixed RPC fields");
+  assertEquals(Object.keys(sent), ["request"], "uses the named RPC argument");
+  assertEquals(sent.request, request, "forwards only fixed RPC fields");
+  const sentRequest = sent.request as Record<string, unknown>;
   assertEquals(
-    sent.submission_id,
+    sentRequest.submission_id,
     SUBMISSION_ID,
     "keeps the submission idempotency key",
   );

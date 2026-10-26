@@ -547,6 +547,10 @@ SELECT pg_temp.expect_failure(
   $$UPDATE private.public_intake_settings SET decision_retention=interval '91 days'$$,
   '23514',NULL,'decision metadata retention cannot be set above 90 days'
 );
+SELECT pg_temp.expect_failure(
+  $$UPDATE private.public_intake_settings SET decision_retention=interval '3 months'$$,
+  '23514',NULL,'calendar months cannot alias the fixed 90-day decision retention'
+);
 UPDATE private.public_intake_settings SET decision_retention=interval '90 days';
 SELECT pg_temp.seed_pending(
   'dc000000-0000-4000-8000-000000000006',
@@ -561,7 +565,8 @@ INSERT INTO rpc_results VALUES ('retention_reject', public.ieadpe_review_pending
 ));
 RESET ROLE;
 SELECT pg_temp.assert_true(
-  (SELECT retained_until=decided_at+interval '90 days'
+  (SELECT retained_until=decided_at+interval '90 days' AND
+          retained_until='2027-01-23 12:00:00+00'::timestamptz
    FROM private.public_intake_decisions
    WHERE submission_id='dc000000-0000-4000-8000-000000000006'),
   'decision retention uses the exact configured 90-day boundary'

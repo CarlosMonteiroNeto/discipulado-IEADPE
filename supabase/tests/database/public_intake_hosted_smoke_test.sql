@@ -38,7 +38,7 @@ RESET ROLE;
 
 SELECT pg_temp.assert_true(
  NOT has_table_privilege('anon','public.congregations','SELECT') AND
- NOT has_table_privilege('authenticated','public.congregations','SELECT') AND
+ has_table_privilege('authenticated','public.congregations','SELECT') AND
  has_function_privilege('anon','public.ieadpe_public_congregations(jsonb)','EXECUTE') AND
  has_function_privilege('authenticated','public.ieadpe_public_congregations(jsonb)','EXECUTE') AND
  NOT has_table_privilege('anon','private.public_intake_submissions','SELECT') AND

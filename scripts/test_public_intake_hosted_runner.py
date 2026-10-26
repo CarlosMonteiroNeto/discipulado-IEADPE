@@ -124,6 +124,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertFalse(supabase_marker.exists())
             self.assertFalse((directory / "evidence.json").exists())
 
+    def test_modified_safe_scenario_is_rejected_by_reviewed_digest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repository = Path(temp)
+            scenario_dir = repository / "supabase/tests/database"
+            scenario_dir.mkdir(parents=True)
+            source = (ROOT / "supabase/tests/database/public_intake_hosted_smoke_test.sql").read_text(
+                encoding="utf-8")
+            (scenario_dir / "public_intake_hosted_smoke_test.sql").write_text(
+                source + "\n-- unreviewed harmless edit\n", encoding="utf-8")
+            with self.assertRaisesRegex(runner.SafetyError, "reviewed digest"):
+                runner.load_scenario(
+                    "public_intake_hosted_smoke_test.sql",
+                    "01234567-89ab-4cde-8fab-0123456789ab", repository)
+
     def test_t1_fixture_ids_are_namespaced_to_the_run(self):
         sql, source_digest = runner.load_scenario(
             "public_registration_authority_test.sql", "01234567-89ab-4cde-8fab-0123456789ab", ROOT)
@@ -173,6 +187,35 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 with self.subTest(table=table, role=role):
                     self.assertIn(
                         f"NOT has_table_privilege('{role}','{table}','SELECT')", sql)
+
+    def test_fixed_retention_contract_rejects_calendar_interval_components(self):
+        intake_migration = (ROOT / "supabase/migrations/202610250003_public_intake.sql").read_text(
+            encoding="utf-8")
+        review_migration = (ROOT / "supabase/migrations/202610250004_pending_review.sql").read_text(
+            encoding="utf-8")
+        settings_constraints = intake_migration.split("CREATE TABLE private.public_intake_settings", 1)[1].split(
+            ");", 1)[0]
+        writer = review_migration.split("CREATE FUNCTION public.ieadpe_review_pending_intake", 1)[1]
+        self.assertIn("extract(month from pending_ttl)=0", settings_constraints)
+        self.assertIn("extract(year from pending_ttl)=0", settings_constraints)
+        self.assertIn("extract(month from decision_retention)=0", settings_constraints)
+        self.assertIn("extract(year from decision_retention)=0", settings_constraints)
+        self.assertIn("extract(month from settings.decision_retention)<>0", writer)
+        self.assertIn("extract(year from settings.decision_retention)<>0", writer)
+
+    def test_reviewed_scenario_pins_match_allowlisted_sources(self):
+        for scenario_name, expected_digest in runner.SCENARIO_SHA256.items():
+            with self.subTest(scenario=scenario_name):
+                source = (ROOT / "supabase/tests/database" / scenario_name).read_text(encoding="utf-8")
+                actual_digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+                self.assertEqual(actual_digest, expected_digest)
+
+    def test_smoke_preserves_authenticated_congregation_select(self):
+        sql = (ROOT / "supabase/tests/database/public_intake_hosted_smoke_test.sql").read_text(
+            encoding="utf-8")
+        self.assertIn("NOT has_table_privilege('anon','public.congregations','SELECT')", sql)
+        self.assertNotIn("NOT has_table_privilege('authenticated','public.congregations','SELECT')", sql)
+        self.assertIn("has_table_privilege('authenticated','public.congregations','SELECT')", sql)
 
     def test_cleanup_and_unscoped_persistent_mutations_are_rejected(self):
         with self.assertRaises(runner.SafetyError):

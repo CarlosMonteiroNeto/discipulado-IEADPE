@@ -550,7 +550,7 @@ export function createFixedRpcCaller(options: {
         apikey: options.serviceCredential,
         authorization: `Bearer ${options.serviceCredential}`,
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify({ request }),
       signal,
     });
     if (!response.ok) {
