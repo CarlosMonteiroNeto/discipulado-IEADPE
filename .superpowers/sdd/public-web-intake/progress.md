@@ -342,3 +342,12 @@ Rulings:
 - SQL runtime verification remains **INCOMPLETE**: no native PostgreSQL/psql target is installed. No Docker, local Supabase, hosted SQL, migration apply, deploy, account change, or publication was performed.
 - Full report: `.superpowers/sdd/public-web-intake/follow-up-fix-report.md`.
 - Implementation commit: `9924817e075d4770f7d8aaa88a1ef4c470827cb5` (`fix: honor public intake RPC and retention contracts`). The receipt and report were committed separately afterward.
+
+## Final Sol 6.1 review follow-up: time-component retention aliases (2026-10-25)
+
+- Baseline: `c3c0daf7785bedea02d1d5e7ceb29594cd404509`, clean branch `feat/public-web-intake`. Investigation confirmed PostgreSQL's interval fields are stored separately as months, days, and microseconds; hour/minute/second representations can compare as exact 30-/90-day lengths while containing time components.
+- TDD RED/GREEN: extended the offline migration-contract test to require hour, minute, and second checks alongside year/month in both settings constraints and T5 writer guard. It failed first on missing `extract(hour from pending_ttl)=0`; it passes after adding all required component checks. SQL fixtures add 720/43,200/2,592,000-unit pending aliases and 2,160/129,600/7,776,000-unit decision aliases. Reviewed scenario pins recomputed after fixture edits.
+- Verification: hosted-runner tests 19/19; verification-manifest tests 10/10; release-operation tests 9/9. `python scripts/verification_cases.py --validate` passed (34 SQL scenarios, 10 concurrency cases); relevant `py_compile`, all scenario-pin comparisons and `git diff --check` passed.
+- SQL runtime verification remains **INCOMPLETE**; native PostgreSQL is unavailable. No Docker, local Supabase, hosted SQL, migration apply, deploy, account change, or publication was performed.
+- Full report: `.superpowers/sdd/public-web-intake/follow-up-fix-report.md`.
+- Implementation commit: `ea73412a231342ff454212ab2b170ed586cfba25` (`fix: reject time-based retention aliases`); report and progress receipt committed separately afterward.

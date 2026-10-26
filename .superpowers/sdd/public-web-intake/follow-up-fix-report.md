@@ -44,3 +44,22 @@ SQL runtime verification is **INCOMPLETE**. No native PostgreSQL/`psql` target i
 
 - `9924817e075d4770f7d8aaa88a1ef4c470827cb5` — `fix: honor public intake RPC and retention contracts`
 - The report and progress receipt are committed separately.
+
+## Follow-up: reject time-component aliases
+
+The next Sol 6.1 review found that hour, minute, or second fields could still pass interval equality. PostgreSQL documents interval storage as separate month, day, and microsecond fields because month length varies and a calendar day can span 23 or 25 hours across daylight-saving transitions ([date/time types](https://www.postgresql.org/docs/16/datatype-datetime.html)). Its `EXTRACT` function exposes interval subfields ([date/time functions](https://www.postgresql.org/docs/16/functions-datetime.html)). The fixed-retention checks now require zero year, month, hour, minute, and second components in both T2 settings constraints and T5's writer guard, in addition to the exact 30-/90-day equality.
+
+TDD RED: the offline source-contract test failed on the missing `hour` check. GREEN: all five components are asserted zero in each settings constraint, and T5 rejects nonzero year/month/hour/minute/second fields. Transactional SQL fixtures now reject equivalent aliases: 720 hours, 43,200 minutes, and 2,592,000 seconds for pending retention; 2,160 hours, 129,600 minutes, and 7,776,000 seconds for decision retention. T5 repeats all time-component rejection cases. Refreshed the T2/T5 SQL scenario digests from normalized file contents.
+
+SQL runtime verification remains **INCOMPLETE** because no native PostgreSQL target is available; no database execution or external side effect was attempted. The follow-up verification results and commit are recorded in the progress ledger.
+
+### Verification receipt
+
+- `python -m unittest discover -s scripts -p 'test_public_intake_hosted*.py' -v` — 19 passed.
+- `python -m unittest discover -s scripts -p test_verification_cases.py -v` — 10 passed.
+- `python -m unittest discover -s scripts -p test_release_operations.py -v` — 9 passed.
+- `python scripts/verification_cases.py --validate` — 34 scenarios and 10 concurrency cases validated.
+- `py_compile` for the hosted runner, its tests, verification tests, and release tests — passed.
+- All allowlisted SQL files match their reviewed SHA-256 pins; `git diff --check` passed.
+- Updated T2/T5 digests: `public_intake_test.sql` — `ab555bb7086a4693d7becfb4938774a848c384261947930332bc993fc1ae7c3b`; `pending_review_test.sql` — `6663d00030d4a0d6f3276b70937b9942dfd89f7a6a67c614e902066bc449664d`.
+- Implementation commit: `ea73412a231342ff454212ab2b170ed586cfba25` (`fix: reject time-based retention aliases`).
