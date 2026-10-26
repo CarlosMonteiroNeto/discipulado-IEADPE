@@ -26,11 +26,15 @@ CREATE TABLE private.public_intake_settings (
  global_pending_limit integer NOT NULL DEFAULT 1000 CHECK(global_pending_limit>0),
  pending_ttl interval NOT NULL DEFAULT interval '30 days'
   CHECK(extract(year from pending_ttl)=0 AND extract(month from pending_ttl)=0 AND
+        extract(hour from pending_ttl)=0 AND extract(minute from pending_ttl)=0 AND
+        extract(second from pending_ttl)=0 AND
         pending_ttl=interval '30 days'),
  receipt_retention interval NOT NULL DEFAULT interval '30 days'
   CHECK(receipt_retention=interval '30 days'),
  decision_retention interval NOT NULL DEFAULT interval '90 days'
   CHECK(extract(year from decision_retention)=0 AND extract(month from decision_retention)=0 AND
+        extract(hour from decision_retention)=0 AND extract(minute from decision_retention)=0 AND
+        extract(second from decision_retention)=0 AND
         decision_retention=interval '90 days'),
  updated_at timestamptz NOT NULL DEFAULT now()
 );

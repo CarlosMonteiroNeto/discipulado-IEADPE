@@ -294,6 +294,9 @@ BEGIN
   SELECT * INTO settings FROM private.public_intake_settings WHERE singleton FOR SHARE;
   IF NOT FOUND OR extract(year from settings.decision_retention)<>0 OR
      extract(month from settings.decision_retention)<>0 OR
+     extract(hour from settings.decision_retention)<>0 OR
+     extract(minute from settings.decision_retention)<>0 OR
+     extract(second from settings.decision_retention)<>0 OR
      settings.decision_retention<>interval '90 days' THEN
     RAISE EXCEPTION 'intake_unavailable' USING ERRCODE='22023';
   END IF;

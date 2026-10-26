@@ -551,6 +551,18 @@ SELECT pg_temp.expect_failure(
   $$UPDATE private.public_intake_settings SET decision_retention=interval '3 months'$$,
   '23514',NULL,'calendar months cannot alias the fixed 90-day decision retention'
 );
+SELECT pg_temp.expect_failure(
+  $$UPDATE private.public_intake_settings SET decision_retention=interval '2160 hours'$$,
+  '23514',NULL,'hours cannot alias the fixed 90-day decision retention'
+);
+SELECT pg_temp.expect_failure(
+  $$UPDATE private.public_intake_settings SET decision_retention=interval '129600 minutes'$$,
+  '23514',NULL,'minutes cannot alias the fixed 90-day decision retention'
+);
+SELECT pg_temp.expect_failure(
+  $$UPDATE private.public_intake_settings SET decision_retention=interval '7776000 seconds'$$,
+  '23514',NULL,'seconds cannot alias the fixed 90-day decision retention'
+);
 UPDATE private.public_intake_settings SET decision_retention=interval '90 days';
 SELECT pg_temp.seed_pending(
   'dc000000-0000-4000-8000-000000000006',

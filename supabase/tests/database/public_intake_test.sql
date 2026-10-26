@@ -100,6 +100,18 @@ SELECT pg_temp.expect_failure(
  '23514',NULL,'calendar month cannot alias the fixed 30-day pending retention'
 );
 SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET pending_ttl=interval '720 hours'$$,
+ '23514',NULL,'hours cannot alias the fixed 30-day pending retention'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET pending_ttl=interval '43200 minutes'$$,
+ '23514',NULL,'minutes cannot alias the fixed 30-day pending retention'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET pending_ttl=interval '2592000 seconds'$$,
+ '23514',NULL,'seconds cannot alias the fixed 30-day pending retention'
+);
+SELECT pg_temp.expect_failure(
  $$UPDATE private.public_intake_settings SET receipt_retention=interval '31 days'$$,
  '23514',NULL,'digest receipt retention is fixed at 30 days'
 );
@@ -114,6 +126,18 @@ SELECT pg_temp.expect_failure(
 SELECT pg_temp.expect_failure(
  $$UPDATE private.public_intake_settings SET decision_retention=interval '3 months'$$,
  '23514',NULL,'calendar months cannot alias the fixed 90-day decision retention'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET decision_retention=interval '2160 hours'$$,
+ '23514',NULL,'hours cannot alias the fixed 90-day decision retention'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET decision_retention=interval '129600 minutes'$$,
+ '23514',NULL,'minutes cannot alias the fixed 90-day decision retention'
+);
+SELECT pg_temp.expect_failure(
+ $$UPDATE private.public_intake_settings SET decision_retention=interval '7776000 seconds'$$,
+ '23514',NULL,'seconds cannot alias the fixed 90-day decision retention'
 );
 
 -- Catalog fixtures: 103 active rows and one archived row. UUID order is the

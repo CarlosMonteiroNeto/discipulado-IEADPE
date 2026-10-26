@@ -29,9 +29,9 @@ SCENARIOS = {
 }
 SCENARIO_SHA256 = {
     "public_registration_authority_test.sql": "6700394711d988fceaa10da0e8a892cd704bb2fa4cbcf2b9138ee90dcd0ec732",
-    "public_intake_test.sql": "5ff4106b3201a28370032749dd1217ea8fac79bc88face4c302167320d8dcace",
+    "public_intake_test.sql": "ab555bb7086a4693d7becfb4938774a848c384261947930332bc993fc1ae7c3b",
     "public_intake_hosted_smoke_test.sql": "d77c8256e10c4fc1310d28afaa8baf47ea22c68f6dd2cb1c8f57db41eb772b7d",
-    "pending_review_test.sql": "667032cc9dbb6a859e2f81b40d7bd3285c2cca427165d41c2dd3b4087c7230a6",
+    "pending_review_test.sql": "6663d00030d4a0d6f3276b70937b9942dfd89f7a6a67c614e902066bc449664d",
 }
 T2_SMOKE_SUBMISSION_PLACEHOLDER = "0f100000-0000-4000-8000-000000000001"
 T2_HOSTED_BLOCKED_SCENARIOS = {

@@ -198,10 +198,16 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         writer = review_migration.split("CREATE FUNCTION public.ieadpe_review_pending_intake", 1)[1]
         self.assertIn("extract(month from pending_ttl)=0", settings_constraints)
         self.assertIn("extract(year from pending_ttl)=0", settings_constraints)
+        for field in ("hour", "minute", "second"):
+            self.assertIn(f"extract({field} from pending_ttl)=0", settings_constraints)
         self.assertIn("extract(month from decision_retention)=0", settings_constraints)
         self.assertIn("extract(year from decision_retention)=0", settings_constraints)
+        for field in ("hour", "minute", "second"):
+            self.assertIn(f"extract({field} from decision_retention)=0", settings_constraints)
         self.assertIn("extract(month from settings.decision_retention)<>0", writer)
         self.assertIn("extract(year from settings.decision_retention)<>0", writer)
+        for field in ("hour", "minute", "second"):
+            self.assertIn(f"extract({field} from settings.decision_retention)<>0", writer)
 
     def test_reviewed_scenario_pins_match_allowlisted_sources(self):
         for scenario_name, expected_digest in runner.SCENARIO_SHA256.items():
