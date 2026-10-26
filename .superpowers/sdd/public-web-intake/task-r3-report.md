@@ -20,3 +20,11 @@ The runner also rejected a missing required migration before writing its externa
 - `git diff --check` — passed.
 
 All end-to-end runner tests used fake CLI/psql processes. No real database, Supabase CLI, secret, hosted scenario, migration, function, or site was accessed or changed. T2 limits/rate/concurrency and hosted journey acceptance remain incomplete and BLOCKED pending controller coordination and safe synthetic race fixtures.
+
+## Independent review fix round 1
+
+Review confirmed two gaps. First, libpq URI query options could override host, user, address, database, or port while the authority portion still passed validation. `_confirm_target` now permits only the single `sslmode=require` query entry; regression cases reject each override and duplicate TLS keys while retaining valid direct and Session Pooler URLs.
+
+Second, the runner attempted the full scenario baseline before checking migration state, which referenced queue tables absent when migrations `202610250002`/`003` are pending. It now queries the migration ledger independently, uses a core-only baseline that avoids intake tables/settings/grants when a required migration is missing, writes STARTED with available baseline and migration evidence, then BLOCKED with exact missing versions. No run ownership is recorded and no scenario SQL is dispatched in this path.
+
+RED: the new override cases accepted host/user/hostaddr/dbname/port parameters; the fake T2 missing-schema process failed before creating its evidence receipt. GREEN: `python -m unittest discover -s scripts -p 'test_public_intake_hosted*.py' -v` — 25 tests passed; `python -m py_compile scripts/test_public_intake_hosted.py scripts/test_public_intake_hosted_runner.py` and `git diff --check` passed. Fake processes only; no remote target was called.

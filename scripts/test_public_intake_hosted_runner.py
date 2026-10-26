@@ -80,6 +80,31 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                         **base, "PUBLIC_INTAKE_DATABASE_URL": database_url,
                     })
 
+    def test_target_confirmation_rejects_libpq_query_overrides(self):
+        project_ref = "abcdefghijklmnopqrst"
+        base = {
+            "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": project_ref,
+            "SUPABASE_URL": f"https://{project_ref}.supabase.co",
+        }
+        overrides = (
+            "host=other.example",
+            "user=postgres.otherprojectref000",
+            "hostaddr=203.0.113.42",
+            "dbname=other_database",
+            "port=6543",
+            "sslmode=require&sslmode=prefer",
+        )
+        for override in overrides:
+            with self.subTest(override=override):
+                url = (
+                    f"postgresql://postgres.{project_ref}:secret@"
+                    f"aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require&{override}"
+                )
+                with self.assertRaises(runner.SafetyError):
+                    runner._confirm_target(project_ref, {
+                        **base, "PUBLIC_INTAKE_DATABASE_URL": url,
+                    })
+
     def test_missing_required_migrations_writes_blocked_baseline_without_scenario_dispatch(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
@@ -107,7 +132,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "f.write(json.dumps({'args':sys.argv[1:], 'stdin':sys.stdin.read()})+'\\n')\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
-                f"print({json.dumps(snapshot)!r} if \"'counts'\" in sql else ('[]' if 'array_agg' in sql else ('t' if '-c' in args else '')))\n",
+                f"print({json.dumps(snapshot)!r} if \"'counts'\" in sql else ('[]' if 'jsonb_agg(version ORDER BY version)' in sql else ('t' if '-c' in args else '')))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
@@ -143,7 +168,10 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertEqual(manifest["status"], "BLOCKED")
             self.assertTrue(manifest["target_confirmed"])
             self.assertEqual(manifest["required_migrations"], ["202610250002"])
+            self.assertEqual(manifest["applied_migrations"], [])
             self.assertEqual(manifest["missing_migrations"], ["202610250002"])
+            self.assertEqual(manifest["baseline_scope"], "core-only")
+            self.assertIsNone(manifest["run_ownership"])
             self.assertFalse(manifest["hosted_write_attempted"])
             self.assertFalse(manifest["scenario_dispatched"])
             self.assertIn("baseline", manifest)
@@ -151,6 +179,79 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
             self.assertFalse(any("-f" in call["args"] for call in calls))
             self.assertNotIn("postgresql://", evidence_path.read_text(encoding="utf-8"))
+
+    def test_missing_intake_migrations_writes_limited_baseline_without_queue_tables_or_scenario(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "psql-calls.jsonl"
+            fake_psql = directory / "fake_psql.py"
+            core_snapshot = {
+                "counts": {
+                    "public.converts": 4, "public.ministry_people": 4,
+                    "public.weekly_reports": 2, "private.mutation_receipts": 5,
+                    "public.photo_assets": 1, "storage.objects": 1,
+                    "auth.users": 6, "private.congregation_week_guards": 3,
+                    "public.user_access": 6,
+                },
+                "revisions": {
+                    "public.converts": {"max": 2, "distribution": {"1": 3, "2": 1}},
+                    "public.ministry_people": {"max": 1, "distribution": {"1": 4}},
+                },
+                "settings": None, "grants": {}, "migrations": [],
+            }
+            fake_psql.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                "stdin=sys.stdin.read()\n"
+                "with open(os.environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
+                "f.write(json.dumps({'args':args, 'sql':sql, 'stdin':stdin})+'\\n')\n"
+                "if 'private.public_intake_submissions' in sql: sys.exit(7)\n"
+                "if \"'counts'\" in sql: print(" + repr(json.dumps(core_snapshot)) + ")\n"
+                "elif 'jsonb_agg(version ORDER BY version)' in sql: print('[]')\n"
+                "elif '-c' in args: print('t')\n",
+                encoding="utf-8",
+            )
+            fake_supabase = directory / "fake_supabase.py"
+            fake_supabase.write_text(
+                "import json; print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            evidence_path = directory / "missing-intake-migrations.json"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://cli_login_postgres.abcdefghijklmnopqrst:secret@"
+                    "aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
+                ),
+                "FAKE_PSQL_CAPTURE": str(capture),
+            })
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", "01234567-89ab-4cde-8fab-0123456789ab",
+                "--scenario", "public_intake_hosted_smoke_test.sql",
+                "--backup-manifest", str(backup), "--evidence-manifest", str(evidence_path),
+                "--psql-command-json", json.dumps([sys.executable, str(fake_psql)]),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_supabase)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+            self.assertTrue(evidence_path.is_file())
+            manifest = json.loads(evidence_path.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "BLOCKED")
+            self.assertEqual(manifest["applied_migrations"], [])
+            self.assertEqual(manifest["missing_migrations"], ["202610250002", "202610250003"])
+            self.assertEqual(manifest["baseline_scope"], "core-only")
+            self.assertIsNone(manifest["run_ownership"])
+            self.assertFalse(manifest["hosted_write_attempted"])
+            self.assertFalse(manifest["scenario_dispatched"])
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            self.assertTrue(calls)
+            self.assertFalse(any("private.public_intake_submissions" in call["sql"] for call in calls))
+            self.assertFalse(any("-f" in call["args"] for call in calls))
 
     def test_missing_and_wrong_project_backup_manifests_fail_closed(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -409,7 +510,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "print('FAKE_PRIVATE_QUERY_RESULT', file=sys.stderr)\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
-                f"print({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else ''))\n",
+                f"print({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else ({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else '')))\n",
                 encoding="utf-8")
             fake_supabase = directory / "fake_supabase.py"
             fake_supabase.write_text(
@@ -554,9 +655,10 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
                 f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
+                f"({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else "
                 f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
                 "('t' if '-c' in args else (__import__('os').environ.get('FAKE_SMOKE_RESULT', 'T2_SMOKE_PASS') "
-                "if 'pg_temp.run_smoke();' in stdin else ''))))\n",
+                "if 'pg_temp.run_smoke();' in stdin else '')))))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
@@ -584,21 +686,21 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(len(calls), 5)
+            self.assertEqual(len(calls), 6)
             self.assertIn("current_database()", calls[0]["args"][-1])
-            self.assertIn("'counts'", calls[1]["args"][-1])
-            self.assertIn("'migrations'", calls[1]["args"][-1])
-            self.assertIn("two_slot_capacity_headroom", calls[2]["args"][-1])
-            self.assertIn("+ 1 < s.global_pending_limit", calls[2]["args"][-1])
-            self.assertIn("cleanup_candidates_absent", calls[2]["args"][-1])
+            self.assertIn("jsonb_agg(version ORDER BY version)", calls[1]["args"][-1])
+            self.assertIn("'counts'", calls[2]["args"][-1])
+            self.assertIn("two_slot_capacity_headroom", calls[3]["args"][-1])
+            self.assertIn("+ 1 < s.global_pending_limit", calls[3]["args"][-1])
+            self.assertIn("cleanup_candidates_absent", calls[3]["args"][-1])
             owned_id = runner._run_owned_uuid(run_id, runner.T2_SMOKE_SUBMISSION_PLACEHOLDER)
             owned_network = hashlib.sha256(
                 f"public-intake-hosted-smoke:{owned_id}".encode("utf-8")).hexdigest()
-            self.assertIn(owned_id, calls[2]["args"][-1])
-            self.assertIn(owned_network, calls[2]["args"][-1])
-            self.assertIn("-f", calls[3]["args"])
-            self.assertIn("'counts'", calls[4]["args"][-1])
-            scenario = calls[3]["stdin"]
+            self.assertIn(owned_id, calls[3]["args"][-1])
+            self.assertIn(owned_network, calls[3]["args"][-1])
+            self.assertIn("-f", calls[4]["args"])
+            self.assertIn("'counts'", calls[5]["args"][-1])
+            scenario = calls[4]["stdin"]
             self.assertTrue(scenario.startswith("BEGIN;"))
             self.assertTrue(scenario.rstrip().endswith("ROLLBACK;"))
             self.assertEqual(scenario.count("first_response:=public.ieadpe_receive_public_intake("), 1)
@@ -674,8 +776,9 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
                 f"print({json.dumps(preflight)!r} if 'two_slot_capacity_headroom' in sql else "
+                f"({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else "
                 f"({json.dumps(snapshot)!r} if \"'counts'\" in sql else "
-                "('t' if '-c' in args else '')))\n",
+                "('t' if '-c' in args else ''))))\n",
                 encoding="utf-8",
             )
             fake_supabase = directory / "fake_supabase.py"
@@ -700,7 +803,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
             self.assertNotEqual(result.returncode, 0)
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
-            self.assertEqual(len(calls), 3)
+            self.assertEqual(len(calls), 4)
             self.assertNotIn("-f", calls[-1]["args"])
             manifest = json.loads(evidence.read_text(encoding="utf-8"))
             self.assertEqual(manifest["status"], "BLOCKED")

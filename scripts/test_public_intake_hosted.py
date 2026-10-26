@@ -326,7 +326,8 @@ def _confirm_target(project_ref: str, env: dict[str, str]) -> str:
     if (configured_url.scheme != "https" or configured_url.hostname != f"{project_ref}.supabase.co"
             or database_url.scheme not in ("postgres", "postgresql")
             or not (valid_direct or valid_pooler) or database_url.path != "/postgres"
-            or database_url.fragment or query.get("sslmode") != ["require"]):
+            or database_url.fragment or set(query) != {"sslmode"}
+            or query.get("sslmode") != ["require"]):
         raise SafetyError("trusted project URL and SSL database URL must identify the same project")
     return project_ref
 
@@ -398,7 +399,17 @@ def _evidence_path(value: str, repository: Path) -> Path:
     return path
 
 
-def _baseline_query(scenario_name: str) -> str:
+def _migration_ledger_query(scenario_name: str) -> str:
+    versions = ",".join("'" + version + "'" for version in SCENARIOS[scenario_name])
+    return (
+        "SELECT coalesce(jsonb_agg(version ORDER BY version),'[]'::jsonb)::text "
+        "FROM supabase_migrations.schema_migrations WHERE version IN (" + versions + ");"
+    )
+
+
+def _baseline_query(scenario_name: str, include_intake_schema: bool | None = None) -> str:
+    if include_intake_schema is None:
+        include_intake_schema = scenario_name != "public_registration_authority_test.sql"
     counts = {
         "public.converts": "SELECT count(*)::bigint FROM public.converts",
         "public.ministry_people": "SELECT count(*)::bigint FROM public.ministry_people",
@@ -410,7 +421,7 @@ def _baseline_query(scenario_name: str) -> str:
         "private.congregation_week_guards": "SELECT coalesce(sum(conversion_count),0)::bigint FROM private.congregation_week_guards",
         "public.user_access": "SELECT count(*)::bigint FROM public.user_access",
     }
-    if scenario_name != "public_registration_authority_test.sql":
+    if include_intake_schema:
         counts.update({
             "private.public_intake_submissions": "SELECT count(*)::bigint FROM private.public_intake_submissions",
             "private.public_intake_receipts": "SELECT count(*)::bigint FROM private.public_intake_receipts",
@@ -430,12 +441,12 @@ def _baseline_query(scenario_name: str) -> str:
         "public.converts": revision_snapshot("public.converts"),
         "public.ministry_people": revision_snapshot("public.ministry_people"),
     }
-    if scenario_name != "public_registration_authority_test.sql":
+    if include_intake_schema:
         revisions["private.public_intake_submissions"] = revision_snapshot("private.public_intake_submissions")
     revision_pairs = ",".join("'" + key + "'," + query for key, query in revisions.items())
     settings_query = (
         "(SELECT to_jsonb(s) FROM private.public_intake_settings s WHERE singleton)"
-        if scenario_name != "public_registration_authority_test.sql" else "NULL::jsonb"
+        if include_intake_schema else "NULL::jsonb"
     )
     signatures = [
         "public.ieadpe_create_convert(uuid,jsonb)",
@@ -447,7 +458,7 @@ def _baseline_query(scenario_name: str) -> str:
             "public.ieadpe_get_pending_intake(jsonb)",
             "public.ieadpe_review_pending_intake(uuid,jsonb)",
         ))
-    if scenario_name != "public_registration_authority_test.sql":
+    if include_intake_schema:
         signatures.extend((
             "public.ieadpe_public_congregations(jsonb)",
             "public.ieadpe_receive_public_intake(jsonb)",
@@ -460,7 +471,7 @@ def _baseline_query(scenario_name: str) -> str:
                 "'" + key + "." + role + "',coalesce(has_function_privilege('" + role + "',"
                 "to_regprocedure('" + signature + "'),'EXECUTE'),false)"
             )
-    if scenario_name != "public_registration_authority_test.sql":
+    if include_intake_schema:
         for table in (
                 "private.public_intake_submissions", "private.public_intake_receipts",
                 "private.public_intake_accepted_events", "private.public_intake_decisions"):
@@ -640,19 +651,32 @@ def main(argv: list[str] | None = None) -> int:
         if target_result.lower() not in ("t", "true"):
             raise SafetyError("connected database identity probe did not confirm the target")
         required_versions = SCENARIOS[args.scenario]
-        counts_sql = _baseline_query(args.scenario)
+        try:
+            applied_migrations = json.loads(_psql(
+                base, process_env, _migration_ledger_query(args.scenario)))
+        except json.JSONDecodeError as exc:
+            raise SafetyError("migration ledger response was invalid") from exc
+        if not isinstance(applied_migrations, list) or any(
+                not isinstance(version, str) for version in applied_migrations):
+            raise SafetyError("migration ledger response was incomplete")
+        missing_migrations = sorted(set(required_versions) - set(applied_migrations))
+        baseline_scope = "core-only" if missing_migrations else "scenario"
+        counts_sql = _baseline_query(
+            args.scenario, include_intake_schema=not missing_migrations)
         try:
             baseline = json.loads(_psql(base, process_env, counts_sql))
         except json.JSONDecodeError as exc:
             raise SafetyError("baseline state response was invalid") from exc
         if not _validate_snapshot(baseline):
             raise SafetyError("baseline state response was incomplete")
-        ownership = run_ownership(sql)
-        if not ownership["fixture_ids"]:
-            raise SafetyError("run-owned fixture identifiers could not be enumerated")
-        if args.scenario != "public_intake_hosted_smoke_test.sql" and (
-                not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]):
-            raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
+        ownership = None
+        if not missing_migrations:
+            ownership = run_ownership(sql)
+            if not ownership["fixture_ids"]:
+                raise SafetyError("run-owned fixture identifiers could not be enumerated")
+            if args.scenario != "public_intake_hosted_smoke_test.sql" and (
+                    not ownership["auth_user_ids"] or not ownership["operation_receipt_ids"]):
+                raise SafetyError("run-owned fixture, Auth, and receipt identifiers could not be enumerated")
         evidence = {
             "status": "STARTED",
             "run_id": run_id,
@@ -660,6 +684,8 @@ def main(argv: list[str] | None = None) -> int:
             "scenario": args.scenario,
             "scenario_sha256": scenario_digest,
             "required_migrations": list(required_versions),
+            "applied_migrations": applied_migrations,
+            "missing_migrations": missing_migrations,
             "backup_sha256": backup["sha256"],
             "backup_created_at": backup["created_at"],
             "target_confirmed": True,
@@ -668,6 +694,11 @@ def main(argv: list[str] | None = None) -> int:
             "scenario_dispatched": False,
             "transaction_policy": "scenario explicitly ends in ROLLBACK",
             "baseline": baseline,
+            "baseline_scope": baseline_scope,
+            "baseline_note": (
+                "feature-schema tables/settings/grants were omitted because required migrations are missing"
+                if missing_migrations else None
+            ),
             "run_ownership": ownership,
             "hosted_preflight": None,
             "after": None,
@@ -676,10 +707,8 @@ def main(argv: list[str] | None = None) -> int:
             "started_at": utc_now().isoformat(),
         }
         _write_evidence(evidence_path, evidence)
-        missing_migrations = sorted(set(required_versions) - set(baseline["migrations"]))
         if missing_migrations:
             evidence["status"] = "BLOCKED"
-            evidence["missing_migrations"] = missing_migrations
             evidence["reason"] = (
                 "BLOCKED: required migrations are not confirmed as applied: "
                 + ", ".join(missing_migrations)
