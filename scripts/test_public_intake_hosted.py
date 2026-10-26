@@ -16,6 +16,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import uuid
 from urllib.parse import parse_qs, unquote, urlparse
 
@@ -29,7 +30,7 @@ SCENARIOS = {
 }
 SCENARIO_SHA256 = {
     "public_registration_authority_test.sql": "6700394711d988fceaa10da0e8a892cd704bb2fa4cbcf2b9138ee90dcd0ec732",
-    "public_intake_test.sql": "ab555bb7086a4693d7becfb4938774a848c384261947930332bc993fc1ae7c3b",
+    "public_intake_test.sql": "70dfbc1b2fb7ba81023167f5d730cfddc9c7679f712157b5bd0bb6f2f09f128d",
     "public_intake_hosted_smoke_test.sql": "d77c8256e10c4fc1310d28afaa8baf47ea22c68f6dd2cb1c8f57db41eb772b7d",
     "pending_review_test.sql": "6663d00030d4a0d6f3276b70937b9942dfd89f7a6a67c614e902066bc449664d",
 }
@@ -331,12 +332,17 @@ def run_ownership(sql: str) -> dict:
     }
 
 
-def _confirm_target(project_ref: str, env: dict[str, str]) -> str:
+def _confirm_target(project_ref: str, env: dict[str, str], *, management_api: bool = False) -> str:
     if not PROJECT_REF.fullmatch(project_ref):
         raise SafetyError("project ref format is invalid")
     if env.get("PUBLIC_INTAKE_TRUSTED_PROJECT_REF") != project_ref:
         raise SafetyError("project ref does not match trusted local configuration")
     configured_url = urlparse(env.get("SUPABASE_URL", ""))
+    if management_api:
+        if (configured_url.scheme != "https"
+                or configured_url.hostname != f"{project_ref}.supabase.co"):
+            raise SafetyError("trusted project URL and project ref do not match")
+        return project_ref
     database_url = urlparse(env.get("PUBLIC_INTAKE_DATABASE_URL", ""))
     try:
         port = database_url.port
@@ -498,6 +504,54 @@ def _psql(base: list[str], env: dict[str, str], sql: str, stdin: str | None = No
     if result.returncode != 0:
         raise SafetyError("database preflight or scenario execution failed")
     return result.stdout.strip()
+
+
+def _management_api_rows(command: list[str], project_ref: str, env: dict[str, str], sql: str) -> list:
+    """Execute SQL through an explicitly linked Supabase Management API request."""
+    temporary_path = None
+    try:
+        with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", suffix=".sql", delete=False) as stream:
+            stream.write(sql)
+            temporary_path = Path(stream.name)
+        result = subprocess.run(
+            [*command, "db", "query", "--linked", "--project-ref", project_ref,
+             "--file", str(temporary_path), "--output-format", "json"],
+            text=True, capture_output=True, timeout=120,
+            env=_supabase_environment(env), check=False,
+        )
+        if result.returncode != 0:
+            raise SafetyError("authenticated Management API query failed")
+        try:
+            payload = json.loads(result.stdout)
+        except (json.JSONDecodeError, TypeError) as exc:
+            raise SafetyError("Management API query response was not valid JSON") from exc
+        rows = payload.get("rows") if isinstance(payload, dict) else None
+        if not isinstance(rows, list):
+            raise SafetyError("Management API query response did not contain rows")
+        return rows
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SafetyError("authenticated Management API query failed") from exc
+    finally:
+        if temporary_path is not None:
+            temporary_path.unlink(missing_ok=True)
+
+
+def _management_api_scalar(command: list[str], project_ref: str,
+                           env: dict[str, str], sql: str) -> str:
+    rows = _management_api_rows(command, project_ref, env, sql)
+    if (len(rows) != 1 or not isinstance(rows[0], dict) or len(rows[0]) != 1
+            or not isinstance(next(iter(rows[0].values())), (str, int, float, bool))):
+        raise SafetyError("Management API query result was incomplete")
+    value = next(iter(rows[0].values()))
+    return str(value).strip()
+
+
+def _database_query(args: argparse.Namespace, command: list[str], env: dict[str, str],
+                    sql: str, stdin: str | None = None) -> str:
+    if args.management_api:
+        return _management_api_scalar(command, args.project_ref, env, stdin if stdin is not None else sql)
+    return _psql(command, env, sql, stdin=stdin)
 
 
 def _evidence_path(value: str, repository: Path) -> Path:
@@ -706,6 +760,8 @@ def _parser() -> argparse.ArgumentParser:
                         help="request the separately gated hosted concurrency scenario")
     parser.add_argument("--preproduction", action="store_true",
                         help="enable reviewed pre-production scenarios after backup and target confirmation")
+    parser.add_argument("--management-api", action="store_true",
+                        help="use the authenticated Supabase CLI Management API for database queries")
     parser.add_argument("--psql-command-json",
                         help=argparse.SUPPRESS)
     parser.add_argument("--supabase-command-json", help=argparse.SUPPRESS)
@@ -736,23 +792,36 @@ def main(argv: list[str] | None = None) -> int:
         backup = validate_backup_manifest(args.backup_manifest, args.project_ref)
         sql, scenario_digest = load_scenario(
             args.scenario, run_id, preproduction=args.preproduction)
-        _confirm_target(args.project_ref, os.environ)
+        _confirm_target(args.project_ref, os.environ, management_api=args.management_api)
         supabase_command = _verify_account_project(args, os.environ.copy())
         evidence_path = _evidence_path(args.evidence_manifest, ROOT)
-        base = _psql_command(args)
-        # Keep connection credentials in separate libpq fields, never in argv.
-        process_env = _psql_environment(
-            os.environ["PUBLIC_INTAKE_DATABASE_URL"], os.environ.copy())
+        if args.management_api:
+            base = supabase_command
+            process_env = _supabase_environment(os.environ.copy())
+        else:
+            base = _psql_command(args)
+            # Keep connection credentials in separate libpq fields, never in argv.
+            process_env = _psql_environment(
+                os.environ["PUBLIC_INTAKE_DATABASE_URL"], os.environ.copy())
 
         confirmation = input("Type the exact project ref to confirm this hosted run: ").strip()
         if confirmation != args.project_ref:
             raise SafetyError("typed project confirmation did not match")
-        target_result = _psql(
-            base, process_env,
-            "SELECT current_database() = 'postgres' AND current_setting('server_version_num') <> '';"
-        )
-        if target_result.lower() not in ("t", "true"):
-            raise SafetyError("connected database identity probe did not confirm the target")
+        if args.management_api:
+            identity_rows = _management_api_rows(
+                base, args.project_ref, process_env,
+                "SELECT current_database() AS current_database, current_user AS current_user;")
+            if (len(identity_rows) != 1 or not isinstance(identity_rows[0], dict)
+                    or identity_rows[0].get("current_database") != "postgres"
+                    or identity_rows[0].get("current_user") != "postgres"):
+                raise SafetyError("connected database identity probe did not confirm the target")
+        else:
+            target_result = _database_query(
+                args, base, process_env,
+                "SELECT current_database() = 'postgres' AND current_setting('server_version_num') <> '';"
+            )
+            if target_result.lower() not in ("t", "true"):
+                raise SafetyError("connected database identity probe did not confirm the target")
         required_versions = SCENARIOS[args.scenario]
         evidence = {
             "status": "STARTED",
@@ -761,6 +830,7 @@ def main(argv: list[str] | None = None) -> int:
             "scenario": args.scenario,
             "scenario_sha256": scenario_digest,
             "execution_mode": "preproduction" if args.preproduction else "guarded",
+            "database_transport": "management_api" if args.management_api else "psql",
             "required_migrations": list(required_versions),
             "applied_migrations": None,
             "missing_migrations": None,
@@ -784,8 +854,8 @@ def main(argv: list[str] | None = None) -> int:
         }
         _write_evidence(evidence_path, evidence)
         try:
-            core_baseline = json.loads(_psql(
-                base, process_env,
+            core_baseline = json.loads(_database_query(
+                args, base, process_env,
                 _baseline_query(args.scenario, include_intake_schema=False)))
             if not isinstance(core_baseline, dict):
                 raise SafetyError("core baseline state response was incomplete")
@@ -835,8 +905,8 @@ def main(argv: list[str] | None = None) -> int:
         baseline_scope = "scenario" if include_intake_schema else "core-only"
         if include_intake_schema:
             try:
-                baseline = json.loads(_psql(
-                    base, process_env,
+                baseline = json.loads(_database_query(
+                    args, base, process_env,
                     _baseline_query(args.scenario, include_intake_schema=True)))
             except json.JSONDecodeError as exc:
                 raise SafetyError("baseline state response was invalid") from exc
@@ -886,8 +956,8 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         if args.scenario == "public_intake_hosted_smoke_test.sql":
             try:
-                preflight = json.loads(_psql(
-                    base, process_env, _t2_smoke_preflight_query(run_id)))
+                preflight = json.loads(_database_query(
+                    args, base, process_env, _t2_smoke_preflight_query(run_id)))
             except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
                 preflight = {}
             preflight, failed_checks = _validate_t2_smoke_preflight(preflight)
@@ -909,10 +979,11 @@ def main(argv: list[str] | None = None) -> int:
         evidence["scenario_dispatched"] = True
         _write_evidence(evidence_path, evidence)
         try:
-            scenario_output = _psql(base, process_env, "SELECT 1;", stdin=sql)
+            scenario_output = _database_query(
+                args, base, process_env, "SELECT 1;", stdin=sql)
         except (SafetyError, OSError, subprocess.TimeoutExpired):
             try:
-                failed_after = json.loads(_psql(base, process_env, counts_sql))
+                failed_after = json.loads(_database_query(args, base, process_env, counts_sql))
                 failed_after["migrations"] = applied_migrations
                 if _validate_snapshot(failed_after):
                     evidence["after"] = failed_after
@@ -930,7 +1001,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SafetyError("scenario execution failed; external evidence was preserved") from None
         if args.scenario == "public_intake_hosted_smoke_test.sql" and scenario_output != "T2_SMOKE_PASS":
             try:
-                after = json.loads(_psql(base, process_env, counts_sql))
+                after = json.loads(_database_query(args, base, process_env, counts_sql))
                 after["migrations"] = applied_migrations
                 evidence["after"] = after
                 evidence["reconciled"] = _validate_snapshot(after) and after == baseline
@@ -963,7 +1034,7 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             raise SafetyError("T2 smoke did not complete safely; external evidence was preserved") from None
         try:
-            after = json.loads(_psql(base, process_env, counts_sql))
+            after = json.loads(_database_query(args, base, process_env, counts_sql))
             after["migrations"] = applied_migrations
         except json.JSONDecodeError as exc:
             evidence["status"] = "FAIL"

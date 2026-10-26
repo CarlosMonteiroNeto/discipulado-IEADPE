@@ -155,6 +155,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 result.returncode, 0,
                 result.stdout + result.stderr +
                 (evidence.read_text(encoding="utf-8") if evidence.exists() else "") +
+                (capture.read_text(encoding="utf-8") if capture.exists() else "") +
                 ((directory / "supabase-calls.jsonl").read_text(encoding="utf-8")
                  if (directory / "supabase-calls.jsonl").exists() else ""),
             )
@@ -231,6 +232,176 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             ),
         }
         self.assertEqual(runner._confirm_target(project_ref, env), project_ref)
+
+    def test_management_api_target_confirmation_does_not_require_database_url(self):
+        project_ref = "abcdefghijklmnopqrst"
+        env = {
+            "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": project_ref,
+            "SUPABASE_URL": f"https://{project_ref}.supabase.co",
+        }
+
+        self.assertEqual(
+            runner._confirm_target(project_ref, env, management_api=True), project_ref)
+
+    def test_management_api_mode_runs_full_preproduction_scenario_without_database_url(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "management-calls.jsonl"
+            fake_cli = directory / "fake_supabase.py"
+            snapshot = {
+                "counts": {"public.converts": 0, "public.ministry_people": 0,
+                           "public.weekly_reports": 0, "private.mutation_receipts": 0,
+                           "public.photo_assets": 0, "storage.objects": 0, "auth.users": 0,
+                           "private.congregation_week_guards": 0, "public.user_access": 0},
+                "revisions": {"public.converts": {"max": 0, "distribution": {}},
+                              "public.ministry_people": {"max": 0, "distribution": {}}},
+                "settings": None, "grants": {},
+            }
+            preflight = {
+                "two_slot_capacity_headroom": True, "intake_enabled": True,
+                "submission_id_unused": True, "network_hash_unused": True,
+                "cleanup_candidates_absent": True, "active_congregation_available": True,
+            }
+            fake_cli.write_text(
+                "import json, os, pathlib, sys\n"
+                "args=sys.argv[1:]\n"
+                "with open(os.environ['FAKE_SUPABASE_CAPTURE'],'a',encoding='utf-8') as f:\n"
+                " f.write(json.dumps({'args':args,'file_exists':pathlib.Path(args[args.index('--file')+1]).exists() if '--file' in args else None})+'\\n')\n"
+                "if args[:2] == ['projects','list']:\n"
+                " print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n"
+                "elif args[:2] == ['migration','list']:\n"
+                " print(json.dumps({'migrations':[{'local':'202610250002','remote':'202610250002','time':'202610250002'},{'local':'202610250003','remote':'202610250003','time':'202610250003'}]}))\n"
+                "elif args[:2] == ['db','query']:\n"
+                " sql=pathlib.Path(args[args.index('--file')+1]).read_text()\n"
+                f" snapshot=json.loads({json.dumps(snapshot)!r})\n"
+                f" preflight=json.loads({json.dumps(preflight)!r})\n"
+                " if 'current_database() AS current_database' in sql: rows=[{'current_database':'postgres','current_user':'postgres'}]\n"
+                " elif 'two_slot_capacity_headroom' in sql: rows=[{'text':json.dumps(preflight)}]\n"
+                " elif \"'counts'\" in sql: rows=[{'text':json.dumps(snapshot)}]\n"
+                " elif 'SELECT pg_temp.run_smoke();' in sql: rows=[{'?column?':'T2_SMOKE_PASS'}]\n"
+                " else: sys.exit(9)\n"
+                " print(json.dumps({'rows':rows,'ignored_metadata':'must not be parsed'}))\n"
+                "else: sys.exit(9)\n", encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            evidence = directory / "management-evidence.json"
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "FAKE_SUPABASE_CAPTURE": str(capture),
+            })
+            env.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id",
+                "01234567-89ab-4cde-8fab-0123456789ab",
+                "--scenario", "public_intake_hosted_smoke_test.sql", "--preproduction",
+                "--management-api", "--backup-manifest", str(backup),
+                "--evidence-manifest", str(evidence),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_cli)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr +
+                             (capture.read_text(encoding="utf-8") if capture.exists() else "") +
+                             (evidence.read_text(encoding="utf-8") if evidence.exists() else ""))
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["status"], "PASS")
+            self.assertTrue(manifest["migration_inventory_verified"])
+            self.assertTrue(manifest["scenario_dispatched"])
+            self.assertTrue(manifest["reconciled"])
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            db_calls = [call for call in calls if call["args"][:2] == ["db", "query"]]
+            self.assertGreaterEqual(len(db_calls), 5)
+            for call in db_calls:
+                self.assertIn("--linked", call["args"])
+                self.assertEqual(call["args"][call["args"].index("--project-ref") + 1],
+                                 "abcdefghijklmnopqrst")
+                self.assertEqual(call["args"][-2:], ["--output-format", "json"])
+                self.assertTrue(call["file_exists"])
+                self.assertFalse(Path(call["args"][call["args"].index("--file") + 1]).exists())
+            self.assertNotIn("PUBLIC_INTAKE_DATABASE_URL", env)
+            self.assertNotIn("ignored_metadata", evidence.read_text(encoding="utf-8"))
+
+    def test_management_api_wrong_account_target_fails_before_database_query(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "calls.jsonl"
+            fake_cli = directory / "fake_supabase.py"
+            fake_cli.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "with open(os.environ['FAKE_CALLS'],'a') as f: f.write(json.dumps(args)+'\\n')\n"
+                "print(json.dumps([{'id':'wrongprojectref000000'}]))\n",
+                encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "FAKE_CALLS": str(capture),
+            })
+            env.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                "--scenario", "public_intake_hosted_smoke_test.sql", "--preproduction",
+                "--management-api", "--backup-manifest", str(backup),
+                "--evidence-manifest", str(directory / "wrong-target.json"),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_cli)]),
+            ], text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2)
+            self.assertNotIn("wrongprojectref", result.stdout + result.stderr)
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(calls, [["projects", "list", "--output-format", "json"]])
+
+    def test_management_api_wrong_typed_target_fails_before_database_query(self):
+        with tempfile.TemporaryDirectory() as temp:
+            directory = Path(temp)
+            capture = directory / "calls.jsonl"
+            fake_cli = directory / "fake_supabase.py"
+            fake_cli.write_text(
+                "import json, os, sys\n"
+                "args=sys.argv[1:]\n"
+                "with open(os.environ['FAKE_CALLS'],'a') as f: f.write(json.dumps(args)+'\\n')\n"
+                "print(json.dumps([{'id':'abcdefghijklmnopqrst'}]))\n",
+                encoding="utf-8",
+            )
+            backup = self.make_backup(directory)
+            env = os.environ.copy()
+            env.update({
+                "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
+                "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
+                "FAKE_CALLS": str(capture),
+            })
+            env.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+            result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id", str(uuid.uuid4()),
+                "--scenario", "public_intake_hosted_smoke_test.sql", "--preproduction",
+                "--management-api", "--backup-manifest", str(backup),
+                "--evidence-manifest", str(directory / "unconfirmed.json"),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_cli)]),
+            ], input="wrong-project\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(result.returncode, 2)
+            calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(calls, [["projects", "list", "--output-format", "json"]])
+
+    def test_management_api_cli_failure_does_not_leak_raw_output(self):
+        with tempfile.TemporaryDirectory() as temp:
+            fake_cli = Path(temp) / "fake_supabase.py"
+            fake_cli.write_text(
+                "import sys\nprint('postgresql://operator:secret@db.example.invalid')\nsys.exit(9)\n",
+                encoding="utf-8",
+            )
+            with self.assertRaises(runner.SafetyError) as raised:
+                runner._management_api_rows(
+                    [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", {}, "SELECT 1;")
+            self.assertNotIn("secret", str(raised.exception))
+            self.assertNotIn("postgresql://", str(raised.exception))
 
     def test_target_confirmation_rejects_unsafe_pooler_shapes(self):
         project_ref = "abcdefghijklmnopqrst"
