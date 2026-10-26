@@ -660,9 +660,12 @@ def main(argv: list[str] | None = None) -> int:
                 not isinstance(version, str) for version in applied_migrations):
             raise SafetyError("migration ledger response was incomplete")
         missing_migrations = sorted(set(required_versions) - set(applied_migrations))
-        baseline_scope = "core-only" if missing_migrations else "scenario"
+        include_intake_schema = (
+            args.scenario != "public_registration_authority_test.sql" and not missing_migrations
+        )
+        baseline_scope = "scenario" if include_intake_schema else "core-only"
         counts_sql = _baseline_query(
-            args.scenario, include_intake_schema=not missing_migrations)
+            args.scenario, include_intake_schema=include_intake_schema)
         try:
             baseline = json.loads(_psql(base, process_env, counts_sql))
         except json.JSONDecodeError as exc:
@@ -696,6 +699,8 @@ def main(argv: list[str] | None = None) -> int:
             "baseline": baseline,
             "baseline_scope": baseline_scope,
             "baseline_note": (
+                "authority scenario baseline omits the intake feature schema"
+                if args.scenario == "public_registration_authority_test.sql" else
                 "feature-schema tables/settings/grants were omitted because required migrations are missing"
                 if missing_migrations else None
             ),

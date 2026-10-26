@@ -483,7 +483,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertFalse(marker.exists())
             self.assertNotIn("operator@", result.stdout + result.stderr)
 
-    def test_fake_psql_receives_only_target_probe_baseline_and_owned_scenario(self):
+    def test_authority_scenario_baseline_ignores_absent_intake_schema(self):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             capture = directory / "calls.jsonl"
@@ -510,6 +510,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "print('FAKE_PRIVATE_QUERY_RESULT', file=sys.stderr)\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
+                "if 'private.public_intake_submissions' in sql: sys.exit(7)\n"
                 f"print({json.dumps(snapshot['migrations'])!r} if 'jsonb_agg(version ORDER BY version)' in sql else ({snapshot_json!r} if 'jsonb_build_object' in sql else ('t' if '-c' in args else '')))\n",
                 encoding="utf-8")
             fake_supabase = directory / "fake_supabase.py"
@@ -540,6 +541,12 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             scenario_call = calls[-2]
             self.assertIn("-c", " ".join(calls[0]["args"]))
             self.assertIn("-f", " ".join(scenario_call["args"]))
+            baseline_call = next(call for call in calls if "'counts'" in call["args"][-1])
+            self.assertNotIn("private.public_intake_", baseline_call["args"][-1])
+            manifest = json.loads(evidence.read_text(encoding="utf-8"))
+            self.assertEqual(manifest["applied_migrations"], ["202610250002"])
+            self.assertEqual(manifest["baseline_scope"], "core-only")
+            self.assertIn("authority scenario", manifest["baseline_note"])
             self.assertNotIn("postgresql://", " ".join(" ".join(call["args"]) for call in calls))
             self.assertNotIn("FAKE_PRIVATE_QUERY_RESULT", result.stdout + result.stderr)
             self.assertIn(run_id.replace("-", "")[8:], scenario_call["stdin"])
@@ -550,7 +557,6 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertNotIn("example.test", manifest_text)
             self.assertIn("PASS", manifest_text)
             self.assertIn('"reconciled": true', manifest_text)
-            manifest = json.loads(manifest_text)
             self.assertIn("revisions", manifest["baseline"])
             self.assertIn("settings", manifest["baseline"])
             self.assertIn("grants", manifest["baseline"])
