@@ -332,7 +332,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             env.update({
                 "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
                 "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
-                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
             })
             result = subprocess.run([
                 sys.executable, str(scripts / "test_public_intake_hosted.py"),
@@ -506,7 +506,9 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 "import json, os, sys\n"
                 "from pathlib import Path\n"
                 "with open(os.environ['FAKE_PSQL_CAPTURE'], 'a', encoding='utf-8') as f: "
-                "f.write(json.dumps({'args':sys.argv[1:], 'stdin':sys.stdin.read()})+'\\n')\n"
+                "f.write(json.dumps({'args':sys.argv[1:], 'stdin':sys.stdin.read(), 'connection_env':"
+                "{key:os.environ.get(key) for key in ('PGHOST','PGPORT','PGUSER','PGPASSWORD','PGDATABASE',"
+                "'PGSSLMODE','PGHOSTADDR','PGSERVICE','PGOPTIONS','PUBLIC_INTAKE_DATABASE_URL')}})+'\\n')\n"
                 "print('FAKE_PRIVATE_QUERY_RESULT', file=sys.stderr)\n"
                 "args=sys.argv[1:]\n"
                 "sql=args[args.index('-c')+1] if '-c' in args else ''\n"
@@ -524,8 +526,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             env.update({
                 "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
                 "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
-                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "PUBLIC_INTAKE_DATABASE_URL": (
+                    "postgresql://cli_login_postgres.abcdefghijklmnopqrst:secret%40value@"
+                    "aws-1-us-west-2.pooler.supabase.com:5432/postgres?sslmode=require"
+                ),
                 "FAKE_PSQL_CAPTURE": str(capture),
+                "PGHOST": "untrusted.example",
+                "PGPORT": "6543",
+                "PGUSER": "untrusted-user",
+                "PGPASSWORD": "untrusted-password",
+                "PGDATABASE": "untrusted-db",
+                "PGSSLMODE": "disable",
+                "PGHOSTADDR": "203.0.113.8",
+                "PGSERVICE": "untrusted-service",
+                "PGOPTIONS": "-c sslmode=disable",
             })
             result = subprocess.run([
                 sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
@@ -538,6 +552,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
             self.assertGreaterEqual(len(calls), 4)
+            target_env = calls[0]["connection_env"]
+            self.assertEqual(target_env, {
+                "PGHOST": "aws-1-us-west-2.pooler.supabase.com",
+                "PGPORT": "5432",
+                "PGUSER": "cli_login_postgres.abcdefghijklmnopqrst",
+                "PGPASSWORD": "secret@value",
+                "PGDATABASE": "postgres",
+                "PGSSLMODE": "require",
+                "PGHOSTADDR": None,
+                "PGSERVICE": None,
+                "PGOPTIONS": None,
+                "PUBLIC_INTAKE_DATABASE_URL": None,
+            })
+            self.assertNotIn("secret@value", " ".join(" ".join(call["args"]) for call in calls))
             scenario_call = calls[-2]
             self.assertIn("-c", " ".join(calls[0]["args"]))
             self.assertIn("-f", " ".join(scenario_call["args"]))
@@ -584,7 +612,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             env.update({
                 "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
                 "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
-                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
             })
             result = subprocess.run([
                 sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
@@ -679,7 +707,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             env.update({
                 "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
                 "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
-                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
                 "FAKE_PSQL_CAPTURE": str(capture),
             })
             result = subprocess.run([
@@ -796,7 +824,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             env.update({
                 "PUBLIC_INTAKE_TRUSTED_PROJECT_REF": "abcdefghijklmnopqrst",
                 "SUPABASE_URL": "https://abcdefghijklmnopqrst.supabase.co",
-                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
+                "PUBLIC_INTAKE_DATABASE_URL": "postgresql://operator:fake-secret@db.abcdefghijklmnopqrst.supabase.co/postgres?sslmode=require",
                 "FAKE_PSQL_CAPTURE": str(capture),
             })
             result = subprocess.run([

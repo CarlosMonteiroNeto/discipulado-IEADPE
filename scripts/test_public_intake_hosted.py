@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIO_DIR = (ROOT / "supabase/tests/database").resolve()
@@ -348,6 +348,32 @@ def _psql_command(args: argparse.Namespace) -> list[str]:
     return [executable]
 
 
+def _psql_environment(database_url: str, source_env: dict[str, str]) -> dict[str, str]:
+    parsed = urlparse(database_url)
+    try:
+        port = parsed.port or 5432
+    except ValueError as exc:
+        raise SafetyError("database connection URL is invalid") from exc
+    username = unquote(parsed.username or "")
+    password = unquote(parsed.password or "")
+    if not parsed.hostname or not username or not password:
+        raise SafetyError("database connection URL must include host and credentials")
+    result = {
+        key: value for key, value in source_env.items()
+        if not key.upper().startswith("PG")
+    }
+    result.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+    result.update({
+        "PGHOST": parsed.hostname,
+        "PGPORT": str(port),
+        "PGUSER": username,
+        "PGPASSWORD": password,
+        "PGDATABASE": "postgres",
+        "PGSSLMODE": "require",
+    })
+    return result
+
+
 def _verify_account_project(args: argparse.Namespace, env: dict[str, str]) -> None:
     if args.supabase_command_json:
         try:
@@ -636,10 +662,9 @@ def main(argv: list[str] | None = None) -> int:
         _verify_account_project(args, os.environ.copy())
         evidence_path = _evidence_path(args.evidence_manifest, ROOT)
         base = _psql_command(args)
-        process_env = os.environ.copy()
-        # Keep the credential-bearing URL out of argv and all output streams.
-        process_env["PGDATABASE"] = process_env["PUBLIC_INTAKE_DATABASE_URL"]
-        process_env.pop("PUBLIC_INTAKE_DATABASE_URL", None)
+        # Keep connection credentials in separate libpq fields, never in argv.
+        process_env = _psql_environment(
+            os.environ["PUBLIC_INTAKE_DATABASE_URL"], os.environ.copy())
 
         confirmation = input("Type the exact project ref to confirm this hosted run: ").strip()
         if confirmation != args.project_ref:
