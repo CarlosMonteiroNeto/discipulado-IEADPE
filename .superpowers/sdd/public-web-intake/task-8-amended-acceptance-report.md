@@ -25,15 +25,19 @@ Hosted evidence is separate and remains blocked/incomplete:
 - T3's production address resolver remains fail-closed because an authoritative managed gateway address source has not been verified. No function deployment or trusted-address bypass occurred.
 - Hosted Turnstile hostname/configuration and temporary synthetic reviewer identities/grants are not available. No hosted anonymous browser journey or user/disability/device completion observations are claimed.
 
-Resumption requires a fresh external full backup with checksum, readability and restore-path manifest; a secure TLS database connection; a coordinated, reviewed migration/function candidate; authoritative address-trust evidence; verified real Turnstile hostname and server configuration; temporary synthetic reviewer identities/grants; and exact cleanup authorization. T2 hosted limits/concurrency additionally require a reviewed non-interfering run-owned fixture design with exact cleanup and reconciliation.
+General hosted write readiness remains BLOCKED. Before any hosted runner write or synthetic hosted fixture, confirm the exact project/ref and require typed confirmation of that target; verify a fresh external full-backup archive and manifest with checksum, readability and restore-path evidence; use a secure TLS database connection; and prepare a new external run-owned evidence manifest recording the baseline and after-state, fixture/identity/receipt IDs, reconciliation result, and exact run-owned cleanup plan with authorization. The coordinated, reviewed migration/function candidate must be ready. Service-specific prerequisites remain authoritative address-trust evidence, the verified real Turnstile hostname and server configuration, and temporary synthetic reviewer identities/grants. T2 hosted limits/concurrency additionally require a reviewed non-interfering run-owned fixture design with exact cleanup and reconciliation. These conditions do not authorize a hosted action; hosted acceptance remains BLOCKED/INCOMPLETE.
 
 Detailed status and evidence source paths are maintained in `docs/verification/public-intake-acceptance.md` and the SDD ledger `progress.md`. Existing loopback-only guards remain intact.
 
 ## Verification
 
-- `python -m unittest scripts.test_unified_gate.UnifiedGateContractTests.test_workflow_pins_deno_before_running_unified_gate -v` — PASS after the workflow change.
 - `python -m unittest scripts.test_unified_gate.UnifiedGateContractTests.test_workflow_pins_deno_before_running_unified_gate -v` — PASS, 1/1.
 - `python -m py_compile scripts/test_unified_gate.py` — PASS.
 - `git diff --check` — PASS.
 
-No broader test suite or service-backed test was run, consistent with the offline-only scope.
+
+## Independent review fix round 1
+
+The review found that general hosted write readiness omitted an explicit exact project/ref confirmation and the external run-owned manifest requirements for baseline/after reconciliation and exact cleanup. It also found that the ignored SDD ledger update was absent from the supplied review package. The acceptance document and this report now state those general prerequisites, and the ledger records T8 completion and the `f1ede5a` implementation verification. Hosted acceptance remains BLOCKED/INCOMPLETE; this fix performs no hosted action.
+
+Focused verification: a Python source assertion checked both documents for explicit project/ref, typed confirmation, external run-owned evidence manifest, baseline, reconciliation, cleanup and BLOCKED/INCOMPLETE statuses — passed. `git diff --check` — passed. No hosted action was run.
