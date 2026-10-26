@@ -1,5 +1,13 @@
 # Public Web Intake and Profile Photos
 
+## Superseding user decision — pre-production, 2026-10-26
+
+The user explicitly clarified that the hosted application/database is NOT in production. After preserving the original launch dataset in a verified recoverable external backup, freely change application data for actual online testing: create/edit/delete backed-up application records, use test identities/grants, apply reviewed migrations, deploy/configure the feature function, and reset/reseed application-owned test state when necessary. Keeping original rows unchanged and cleaning every fixture after every individual test are no longer blockers. Final restoration/reimport of the intended launch dataset is authorized before publication. Do not repeatedly request permission for these covered pre-production operations.
+
+This decision supersedes older production-style restrictions in this Spec, plan, handoff and runbook, including the prohibition on final dataset restoration where no legitimate concurrent production writes exist. It does not authorize deletion of the Supabase project, unrelated targets, blind resets of managed Auth/Storage/system schemas, losing the sole backup, exposing personal data/secrets, paid services or public publication. Preserve actual product RLS/auth/bot protections; use privileged operator access for setup and genuine user roles for behavioral assertions. Missing operator privileges or service configuration are technical prerequisites, not permission refusals.
+
+Before launch, restore/reimport preserved application data into the final migrated schema without reverting feature migrations. Reconcile IDs/links/grants/photos, remove test accounts/data, rerun critical checks, take a fresh launch backup and record the production transition. Preserve required Storage bytes separately (database dumps omit them) and account for Auth identities/configuration. From the transition to real use onward, apply the stricter production safeguards. Plan P1–P6 defines execution.
+
 Status: approved by the user on 2026-10-25. Implementation has since been reported complete on `feat/public-web-intake`; runtime/hosted acceptance remains incomplete. Resume from current evidence rather than restarting implementation. This document defines the increment; inherited plans are evidence and contracts, not work to replay.
 
 ## Runtime acceptance clarification — 2026-10-26

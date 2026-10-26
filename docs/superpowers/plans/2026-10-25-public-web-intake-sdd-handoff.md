@@ -1,5 +1,9 @@
 # Public Web Intake — SDD Controller Handoff
 
+## Latest authority — pre-production testing
+
+The user clarified on 2026-10-26 that hosted Supabase is not production and authorized backup-backed application-data changes and actual online tests, followed by restoration of intended launch data. Read the Spec's superseding decision and execute plan P1–P6 before older resume instructions. These replace per-test original-state preservation/run-owned-only restrictions. Do not request permission again for covered pre-production changes. Preserve verified backups, target checks and product security assertions; resolve insufficient operator credentials rather than weakening browser permissions. Public publication, paid services and blind managed-system/project resets remain outside scope. Restore/reconcile launch data before the production transition.
+
 ## Current resume instructions — 2026-10-26
 
 The feature is implemented on `feat/public-web-intake` at `C:\Users\Carlos_Neto\.local\share\opencode\worktree\efb495\public-web-intake`. Do not follow the original new-checkout/import/T1-start instructions below when resuming this branch. Read the Spec's Runtime acceptance clarification and the plan's Resume acceptance first section; complete R1–R7 against current progress/evidence. No Docker or local PostgreSQL server is required; missing client tools and missing hosted readiness are different issues. Preserve existing testing authorization boundaries and do not infer publication authorization.

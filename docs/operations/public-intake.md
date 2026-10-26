@@ -1,5 +1,7 @@
 # Public Web intake operations and release handoff
 
+> Superseding user decision (2026-10-26): the hosted project is pre-production. The Spec's latest decision and plan P1–P6 override this runbook's older per-row-only cleanup/no-data-restore restrictions. Verified recoverable backup first, authorized application-data changes and online tests next, then restore/reconcile intended launch data into the final migrated schema. Operator access/configuration failures remain technical blockers. Public publication is separate; stricter production controls begin at the transition to real use.
+
 Date: 2026-10-25
 
 Source: approved [public Web intake Spec](../superpowers/specs/2026-10-25-public-web-intake-design.md) and [implementation plan](../superpowers/plans/2026-10-25-public-web-intake-plan.md). These govern this increment; this runbook records the current candidate and operator steps. Historical release documents do not establish that any hosting account or production setting exists.
