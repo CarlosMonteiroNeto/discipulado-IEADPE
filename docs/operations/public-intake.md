@@ -6,6 +6,19 @@ Date: 2026-10-25
 
 Source: approved [public Web intake Spec](../superpowers/specs/2026-10-25-public-web-intake-design.md) and [implementation plan](../superpowers/plans/2026-10-25-public-web-intake-plan.md). These govern this increment; this runbook records the current candidate and operator steps. Historical release documents do not establish that any hosting account or production setting exists.
 
+## Current pre-production status (2026-10-26)
+
+This status supersedes the historical `BLOCKED` inventory and candidate statements below where they conflict. The user authorized controlled testing on pre-production project `voqmtnqjrbugpazcimvh`; public publication remains separate and has not occurred.
+
+- Applied migrations `202610250002`–`004` once and deployed the reviewed `public-intake` Edge Function. The anonymous path was exercised with the real Turnstile site configuration; production origin preflight passes. The managed Edge client-address source remains unverified, so only Turnstile plus the global pending-capacity limit are active; per-network hourly/daily protection remains incomplete.
+- Cloudflare account access and the `Public Intake Preproduction` Turnstile widget are verified. Its only allowed hostname is restored to `discipulado-ieadpe.pages.dev`. The Supabase Edge origin/hostname secrets are restored to the protected production-only allowlist after localhost testing.
+- The authenticated local Flutter Web session completed anonymous submission, authorized review/approval, canonical convert listing, and authorized gallery photo crop/save. Anonymous Storage upload/download were denied; anonymous listing revealed no protected fixture. The synthetic rows, receipts, weekly guard and JPEG object were cleaned exactly.
+- Post-cleanup Management API reconciliation matches every application-table row count and link-integrity value in the preserved P1 manifest. Counts include 51 converts, 51 ministry people, 15 convert events, 8 mutation receipts, 1 Auth user, no photo assets or Storage objects, 24 active congregations, and empty public-intake tables. The only intended count delta is the migration ledger (+3). The restored application data therefore needs no wholesale reimport; existing application rows were preserved.
+- The pre-test external full backup remains the verified recovery point. A fresh post-acceptance full dump is still required for P5/P6; `operator-db-url.txt` currently does not contain a valid PostgreSQL URI. Supabase CLI Management API authentication is effective for queries and hosted test operations. Request the full TLS Direct or Session Pooler URI through the protected file only; do not place it in logs or Git.
+- Publication remains **NOT AUTHORIZED**. The Cloudflare Pages project `discipulado-ieadpe` exists but has no deployment. Before asking for publication approval, prepare a source-matched release build/manifest, final independent review, fresh backup, current free-tier usage, rollback checklist, and remaining runtime limitations. No Pages deployment/publication occurred.
+
+The protected external evidence directory contains run receipts, baseline comparisons, and exact cleanup records. No secret or synthetic record identifiers belong in this runbook. Device-native camera testing, fresh OAuth redirect flow, hosted HTTPS Pages checks, and authoritative managed Edge address verification remain incomplete.
+
 ## Readiness decision
 
 **Status: BLOCKED for hosted activation and publication.** Local implementation and T8 acceptance evidence do not prove hosted behavior. No hosted write, migration/function deployment, Turnstile configuration, account change, publication, or paid-service action was performed for this handoff.
