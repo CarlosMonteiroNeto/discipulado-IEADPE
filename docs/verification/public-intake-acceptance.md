@@ -1,5 +1,11 @@
 # Public Intake Acceptance Evidence
 
+## Public-origin mobile submission and approval — 2026-10-26
+
+The user submitted the agreed fictitious `TESTE CELULAR` from a physical phone using the public registration URL. The authenticated browser queue showed exactly one pending submission for Matriz. The operator approved that item through the published review UI; the queue then showed no pending requests. Official name search showed exactly one matching Matriz record, and the same one-result search succeeded after a full browser reload. This verifies the public-origin mobile-submission -> pending -> approval -> persisted official-record journey; the report does not store the submitted phone/address/birth-date values.
+
+The synthetic record is intentionally retained temporarily for the next authorized mobile camera/gallery test; final cleanup/reconciliation remains pending. There was no anonymous photo upload and no camera/gallery test in this step. Earlier baseline of 51 official converts is now expected to be 52 until this specific synthetic record is cleaned up. No other business record was edited.
+
 ## Public OAuth routing fix and successful sign-in — 2026-10-26
 
 The first live Google attempt exposed a Pages routing defect: direct GET/HEAD `/auth/callback?next=%2Fhome` returned HTTP 308 with Location `/?next=%2Fhome`. `/register` also redirected to `/`. Earlier route checks followed redirects, so their HTTP 200 results did not prove path preservation. Root cause: exact proxies targeted `/index.html`, invoking Pages HTML canonicalization. Commit `45535fc` changes only static route targets to `/` with status 200, aligns preflight and adds the regression assertion. Initial RED failed at the expected callback target; final release-operation suite passed 10/10. Stale documentation assertions were updated to the actual configured host/artifact state.
