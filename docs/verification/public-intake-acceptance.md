@@ -1,5 +1,13 @@
 # Public Intake Acceptance Evidence
 
+## First authorized Pages deployment — 2026-10-26
+
+The user explicitly approved first publication to `https://discipulado-ieadpe.pages.dev` and validation there. Wrangler 4.153.0 deployed the reviewed `build/web` to the existing Pages project's production branch `main`, tagged with source `e768261cfdf3bea538a6b9272190c9158bb24ad2`; immutable deployment URL: `https://9b00cc50.discipulado-ieadpe.pages.dev`. This supersedes older NOT AUTHORIZED / NOT PUBLISHED statements for this first deployment only. No paid services or plan changes were enabled.
+
+Fresh HTTPS checks passed for `/`, `/register`, `/login`, `/pending`, `/auth/callback` and `/ministry/students`: HTTP 200 with Flutter bootstrap HTML. Both `/flutter_bootstrap.js` and `/main.dart.js` returned HTTP 200 and JavaScript MIME. This verifies static routing, not authorization for those routes.
+
+Browser check on the canonical public origin rendered anonymous registration and the names-only congregation selector without sign-in; photo controls were absent. Selecting Início showed Google-login requirements. Clicking Google login reached the real Google account chooser with the Supabase callback and canonical Pages redirect. Account selection and successful callback/session establishment are not yet verified; the user must select the intended account. No synthetic registration was submitted in this check and no business data was altered. Public-origin Turnstile submission/approval and actual mobile camera/gallery remain open.
+
 ## Launch follow-up — 2026-10-26
 
 The user explicitly deferred the Free-tier usage snapshot, accepting possible Free-limit interruption and no automatic paid activation. This gate is deferred by the user, not measured or passed.

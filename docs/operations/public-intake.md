@@ -1,5 +1,7 @@
 # Public Web intake operations and release handoff
 
+> Deployment update (2026-10-26): the user explicitly authorized the first public validation deployment. The existing Pages project is now deployed at `https://discipulado-ieadpe.pages.dev` (immutable deployment `https://9b00cc50.discipulado-ieadpe.pages.dev`, reviewed source `e768261`). Older undeployed/not-authorized statements below are historical for this first deployment. HTTPS routes/assets and anonymous form/catalog rendering passed; fresh Google login reached account selection but callback completion, public-origin submission/approval and real mobile photo checks remain open. Free usage was explicitly deferred by the user; no paid plan was enabled. Do not infer final production acceptance from a successful deployment. See the latest acceptance report.
+
 > Superseding user decision (2026-10-26): the hosted project is pre-production. The Spec's latest decision and plan P1–P6 override this runbook's older per-row-only cleanup/no-data-restore restrictions. Verified recoverable backup first, authorized application-data changes and online tests next, then restore/reconcile intended launch data into the final migrated schema. Operator access/configuration failures remain technical blockers. Public publication is separate; stricter production controls begin at the transition to real use.
 
 Date: 2026-10-25
