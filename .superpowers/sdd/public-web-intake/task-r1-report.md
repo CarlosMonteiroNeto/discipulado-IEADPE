@@ -30,7 +30,7 @@ Fresh local commands run on 2026-10-26:
 
 The read-only hosted evidence supplied for R1 records an authenticated CLI inventory with a unique `Discipulado IEADPE` project (`voqmtnqjrbugpazcimvh`), migration `202610250001` applied and `202610250002`–`202610250004` pending, an empty Edge Functions list, and a successful linked safe `SELECT 1 AS safe_probe`. A first safe query omitted `--linked` and failed with `DbQueryMutuallyExclusiveFlagsError`; the corrected invocation succeeded. This is a CLI invocation/configuration error, not a database failure.
 
-No hosted migration, function deployment, or hosted SQL scenario PASS is claimed. Hosted backup/TLS runner prerequisites remain unverified; the presence checks found no `PUBLIC_INTAKE_TRUSTED_PROJECT_REF`, `SUPABASE_URL`, or `PUBLIC_INTAKE_DATABASE_URL`. Migration readiness is blocked by pending migrations and backup-first requirements. Function readiness is blocked by no deployed function and T3's unresolved authoritative managed-gateway address source, for which production remains fail-closed. Hosted journey/readiness is also blocked by absent verified Turnstile configuration, reviewer identities/grants, external full-backup evidence and run-owned fixture/cleanup readiness. Local SQL PASS does not lift any of these hosted blockers.
+No hosted migration, function deployment, or hosted SQL scenario PASS is claimed. The earlier presence check that found no `SUPABASE_URL` is historical; the R1 fix-round presence-only check below found it set, with parsed hostname matching the inventoried project. `PUBLIC_INTAKE_DATABASE_URL` and `PUBLIC_INTAKE_TRUSTED_PROJECT_REF` remain absent. Hosted backup/TLS runner prerequisites remain unverified. Migration readiness is blocked by pending migrations and backup-first requirements. Function readiness is blocked by no deployed function and T3's unresolved authoritative managed-gateway address source, for which production remains fail-closed. Hosted journey/readiness is also blocked by absent verified Turnstile configuration, reviewer identities/grants, external full-backup evidence and run-owned fixture/cleanup readiness. Local SQL PASS does not lift any of these hosted blockers.
 
 R1 required no further Supabase CLI invocation or remote query. The prior `supabase db dump --dry-run` output included a CLI-generated database login credential; this report deliberately does not repeat, store, quote, or use that value. The user plans to rotate/revoke it. No credentials or PII were recorded here.
 
@@ -49,3 +49,17 @@ The full `flutter analyze --no-pub` result remains **INCOMPLETE**. The T8 eviden
 1. Hosted acceptance is not ready: migrations remain pending, no Edge Function is deployed, trusted address resolution and Turnstile settings remain unresolved, and required backup/TLS/runner/reviewer prerequisites are unavailable.
 2. The full Flutter analyzer remains an unresolved tooling/process stall. Existing scoped Dart analysis is clean, but it does not replace the full command.
 3. The prior CLI-generated database login credential must be rotated/revoked by the user as planned; it is excluded from this report and was not used.
+
+## Fix round 1 — configuration evidence (2026-10-26)
+
+Reviewer finding addressed: current configuration evidence was stale. Corrected the report and SDD ledger with the current presence-only result while retaining the earlier `SUPABASE_URL`-absent statement as historical. The current result does not unblock hosted acceptance.
+
+Exact verification command (prints only boolean presence and hostname-match results; it does not print/store URL values):
+
+```powershell
+python -c "import os, urllib.parse; u=os.environ.get('SUPABASE_URL',''); host=urllib.parse.urlparse(u).hostname or ''; print('SUPABASE_URL_PRESENT='+str(bool(u))); print('SUPABASE_URL_HOST_MATCHES_INVENTORIED_PROJECT='+str(host == 'voqmtnqjrbugpazcimvh.supabase.co')); print('PUBLIC_INTAKE_DATABASE_URL_PRESENT='+str(bool(os.environ.get('PUBLIC_INTAKE_DATABASE_URL')))); print('PUBLIC_INTAKE_TRUSTED_PROJECT_REF_PRESENT='+str(bool(os.environ.get('PUBLIC_INTAKE_TRUSTED_PROJECT_REF'))))"
+```
+
+Result: `SUPABASE_URL_PRESENT=True`; `SUPABASE_URL_HOST_MATCHES_INVENTORIED_PROJECT=True`; `PUBLIC_INTAKE_DATABASE_URL_PRESENT=False`; `PUBLIC_INTAKE_TRUSTED_PROJECT_REF_PRESENT=False`. No Supabase CLI or analyzer was run.
+
+Reviewer P3 minor: deferred to R7 evidence close — label the pre-existing PASS table explicitly as T8 historical so readers do not confuse it with the refreshed R1 date/candidate.

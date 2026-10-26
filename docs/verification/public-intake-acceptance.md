@@ -37,6 +37,10 @@ The previous local SQL `INCOMPLETE` assessment described an earlier environment 
 
 These results supersede the earlier local SQL `INCOMPLETE` statements only for the named scenarios and current local candidate. They do not amend historical receipts, establish complete manifest coverage, or establish hosted runtime behavior. The earlier `INCOMPLETE` statements remain historical records of their then-current environment.
 
+### R1 hosted configuration presence update (2026-10-26)
+
+The earlier environment-presence observation that `SUPABASE_URL` was absent is historical. A later presence-only check found `SUPABASE_URL` present and its parsed hostname matched the inventoried project. `PUBLIC_INTAKE_DATABASE_URL` and `PUBLIC_INTAKE_TRUSTED_PROJECT_REF` remain absent. This configuration evidence does not establish backup/TLS runner readiness or hosted SQL acceptance; hosted gates remain BLOCKED/INCOMPLETE. No variable values are included here. Exact safe check and result: `.superpowers/sdd/public-web-intake/task-r1-fix-report.md`.
+
 Local versions were Flutter 3.47.2 / Dart 3.13.2, Python 3.12.10, and Deno 2.9.8, versus the repository CI pin Flutter 3.47.7 / Dart 3.13.5. No shared SDK or CI pin was changed.
 
 ## Amended hosted acceptance status
