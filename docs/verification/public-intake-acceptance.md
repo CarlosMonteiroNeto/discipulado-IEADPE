@@ -1,9 +1,10 @@
 # Public Intake Acceptance Evidence
 
-Date: 2026-10-25
+Date: 2026-10-26 (R1 evidence reconciliation)
 Implementation baseline: `origin/main` at `846a320619d3d8240df391a8b218c713bcceedc3`
 T8 checkout baseline: T7 reviewed commit `d75ee355a5b197fd09485771608ed7864dac04b9`
 Execution checkout: `feat/public-web-intake` in the isolated `public-web-intake` worktree
+Current source candidate: `bed4cbe2887b38db98d13e109b8cd033707ee3ae` (R1 documentation reconciliation is recorded separately).
 
 T9 release handoff and current operator prerequisites: [Public Web intake operations](../operations/public-intake.md). The hosted gates below remain BLOCKED/INCOMPLETE; that runbook is not evidence of deployment or authorization.
 
@@ -23,6 +24,18 @@ T9 release handoff and current operator prerequisites: [Public Web intake operat
 | Catalog archive concurrency | PASS | `python scripts/test_database.py catalog_test.sql --catalog-concurrency`: archive/create and archive/grant wait and revalidate in both commit orders. |
 | Deno test handler | PASS | `deno check scripts/public_intake_test_server.ts` passed; `deno test supabase/functions/public-intake` passed 18/18. Deno 2.9.8. |
 | Original local browser journey | BLOCKED (historical) | The original T8 run of `python scripts/run_unified_journey.py` reported local Supabase unavailable. This was the pre-amendment local path; Docker is not a prerequisite in the amended hosted plan. No journey was run during this offline-only follow-up. |
+
+## R1 current-candidate SQL reconciliation (2026-10-26)
+
+The previous local SQL `INCOMPLETE` assessment described an earlier environment without an available `psql`/server path. For current candidate `bed4cbe2887b38db98d13e109b8cd033707ee3ae`, the three focused database commands below were freshly executed and exited 0 with their reported PASS lines. The runner selected the existing PostgreSQL 17.11 loopback bundle at `~/.codex/tools/ieadpe-postgresql/pgsql/bin`; it constrains targets to loopback and did not start Docker. `psql` is absent from PATH, but this did not prevent the runner from using the bundle. This is local SQL evidence only; hosted SQL remains unverified.
+
+| Local SQL gate | Status | Current-candidate command and outcome |
+|---|---|---|
+| Public intake scenario and concurrency | PASS (local) | `python scripts/test_database.py public_intake_test.sql --public-intake-concurrency` — exit 0; `PASS: public_intake_test.sql` and `PASS: public intake serializes the last global capacity slot`. |
+| Pending review scenario and concurrency | PASS (local) | `python scripts/test_database.py pending_review_test.sql --public-intake-concurrency` — exit 0; `PASS: pending_review_test.sql` and `PASS: public intake serializes the last global capacity slot`. |
+| Registration authority scenario | PASS (local) | `python scripts/test_database.py public_registration_authority_test.sql` — exit 0; focused authority scenario passed. |
+
+These results supersede the earlier local SQL `INCOMPLETE` statements only for the named scenarios and current local candidate. They do not amend historical receipts, establish complete manifest coverage, or establish hosted runtime behavior. The earlier `INCOMPLETE` statements remain historical records of their then-current environment.
 
 Local versions were Flutter 3.47.2 / Dart 3.13.2, Python 3.12.10, and Deno 2.9.8, versus the repository CI pin Flutter 3.47.7 / Dart 3.13.5. No shared SDK or CI pin was changed.
 
