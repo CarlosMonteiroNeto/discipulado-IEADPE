@@ -17,7 +17,7 @@ import shutil
 import subprocess
 import sys
 import uuid
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 SCENARIO_DIR = (ROOT / "supabase/tests/database").resolve()
@@ -309,13 +309,25 @@ def _confirm_target(project_ref: str, env: dict[str, str]) -> str:
         raise SafetyError("project ref does not match trusted local configuration")
     configured_url = urlparse(env.get("SUPABASE_URL", ""))
     database_url = urlparse(env.get("PUBLIC_INTAKE_DATABASE_URL", ""))
+    try:
+        port = database_url.port
+        query = parse_qs(database_url.query, keep_blank_values=True)
+    except ValueError as exc:
+        raise SafetyError("database connection URL is invalid") from exc
+    direct_host = database_url.hostname == f"db.{project_ref}.supabase.co"
+    pooler_host = bool(database_url.hostname and re.fullmatch(
+        r"aws-[0-9]+-[a-z0-9-]+\.pooler\.supabase\.com", database_url.hostname))
+    valid_direct = direct_host and port in (None, 5432)
+    valid_pooler = (
+        pooler_host and port == 5432 and database_url.username in {
+            f"postgres.{project_ref}", f"cli_login_postgres.{project_ref}"
+        }
+    )
     if (configured_url.scheme != "https" or configured_url.hostname != f"{project_ref}.supabase.co"
             or database_url.scheme not in ("postgres", "postgresql")
-            or database_url.hostname != f"db.{project_ref}.supabase.co"
-            or database_url.query == ""):
+            or not (valid_direct or valid_pooler) or database_url.path != "/postgres"
+            or database_url.fragment or query.get("sslmode") != ["require"]):
         raise SafetyError("trusted project URL and SSL database URL must identify the same project")
-    if "sslmode=require" not in database_url.query.lower():
-        raise SafetyError("database connection must require TLS")
     return project_ref
 
 
@@ -560,6 +572,7 @@ def _write_blocked_evidence(args: argparse.Namespace, run_id: str, reason: str) 
         "target_confirmed": False,
         "hosted_subprocesses_invoked": False,
         "hosted_write_attempted": False,
+        "scenario_dispatched": False,
         "reason": reason,
         "cleanup_outcome": "not applicable; no hosted subprocess or write was attempted",
         "started_at": utc_now().isoformat(),
@@ -627,13 +640,6 @@ def main(argv: list[str] | None = None) -> int:
         if target_result.lower() not in ("t", "true"):
             raise SafetyError("connected database identity probe did not confirm the target")
         required_versions = SCENARIOS[args.scenario]
-        version_sql = (
-            "SELECT count(DISTINCT version) = " + str(len(required_versions)) +
-            " FROM supabase_migrations.schema_migrations WHERE version IN (" +
-            ",".join("'" + version + "'" for version in required_versions) + ");"
-        )
-        if _psql(base, process_env, version_sql).lower() not in ("t", "true"):
-            raise SafetyError("required additive migrations are not confirmed as applied")
         counts_sql = _baseline_query(args.scenario)
         try:
             baseline = json.loads(_psql(base, process_env, counts_sql))
@@ -659,6 +665,7 @@ def main(argv: list[str] | None = None) -> int:
             "target_confirmed": True,
             "hosted_subprocesses_invoked": True,
             "hosted_write_attempted": False,
+            "scenario_dispatched": False,
             "transaction_policy": "scenario explicitly ends in ROLLBACK",
             "baseline": baseline,
             "run_ownership": ownership,
@@ -669,6 +676,20 @@ def main(argv: list[str] | None = None) -> int:
             "started_at": utc_now().isoformat(),
         }
         _write_evidence(evidence_path, evidence)
+        missing_migrations = sorted(set(required_versions) - set(baseline["migrations"]))
+        if missing_migrations:
+            evidence["status"] = "BLOCKED"
+            evidence["missing_migrations"] = missing_migrations
+            evidence["reason"] = (
+                "BLOCKED: required migrations are not confirmed as applied: "
+                + ", ".join(missing_migrations)
+            )
+            evidence["cleanup_outcome"] = "not applicable; scenario was not dispatched and no fixture was created"
+            evidence["completed_at"] = utc_now().isoformat()
+            _write_evidence(evidence_path, evidence)
+            print("Hosted scenario BLOCKED by missing migrations; scenario was not dispatched.",
+                  file=sys.stderr)
+            return 2
         if args.scenario == "public_intake_hosted_smoke_test.sql":
             try:
                 preflight = json.loads(_psql(
@@ -690,6 +711,8 @@ def main(argv: list[str] | None = None) -> int:
                 return 2
             evidence["hosted_write_attempted"] = True
             _write_evidence(evidence_path, evidence)
+        evidence["scenario_dispatched"] = True
+        _write_evidence(evidence_path, evidence)
         try:
             scenario_output = _psql(base, process_env, "SELECT 1;", stdin=sql)
         except (SafetyError, OSError, subprocess.TimeoutExpired):
