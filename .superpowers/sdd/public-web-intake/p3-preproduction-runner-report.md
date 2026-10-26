@@ -20,3 +20,11 @@ Status: complete. Implementation commit: `51ce48f088eb855ed683c287ca4442f969fcf2
 - The legacy concurrency helper still truncates shared tables and commits fixed Auth, grant, and official-row fixtures without exact cleanup. It remains blocked pending a separately proven run-owned hosted procedure.
 - Provider documentation reviewed by the acceptance controller does not prove Supabase managed Edge sanitizes or authoritatively supplies `cf-connecting-ip`, `x-real-ip`, or `x-forwarded-for`. Keep the per-network limiter incomplete and retain Turnstile plus global capacity fallback; do not trust those headers.
 - P3 only prepares the runner. This task applied no migrations, deployed no function, and executed no hosted scenario.
+
+## Independent review follow-up
+
+Sol 6.1 low found that the initial TRUNCATE allowlist checked only top-level semicolon fragments, not a nested PL/pgSQL function body. Reproduced the bypass with an unrelated `public.converts` truncate; the new regression failed before the fix. The validator now scans every TRUNCATE occurrence and accepts only the exact canonical private queue reset in the pinned pre-production scenario. The regression rejects a nested unrelated target and accepts the canonical scenario.
+
+Post-fix verification: hosted runner offline suite 32/32 passed; Python compilation and `git diff --check` passed. No hosted database command ran. Awaiting independent re-review.
+
+Sol 6.1 low re-review: no actionable findings. Parent verification after the fix passed 32/32 runner tests, Python compilation, and `git diff --check`. The review agent's duplicate local run stalled and was interrupted; it did not claim a second test result.

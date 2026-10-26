@@ -140,6 +140,22 @@ def validate_scenario_sql(sql: str, scenario_name: str, *, preproduction: bool =
     )
     if forbidden.search(code):
         raise SafetyError("scenario contains a prohibited or non-transactional operation")
+    truncates = re.findall(r"(?is)\bTRUNCATE\b[^;]*;", code)
+    if truncates:
+        normalized_truncates = [
+            re.sub(r",\s+", ",", re.sub(r"\s+", " ", statement).strip()).lower()
+            for statement in truncates
+        ]
+        allowed_capacity_reset = (
+            preproduction
+            and scenario_name == "public_intake_test.sql"
+            and normalized_truncates == [
+                "truncate private.public_intake_decisions,private.public_intake_receipts,"
+                "private.public_intake_accepted_events,private.public_intake_submissions cascade;"
+            ]
+        )
+        if not allowed_capacity_reset:
+            raise SafetyError("TRUNCATE is permitted only for the pinned pre-production capacity fixture")
     if DANGEROUS_FUNCTION.search(code):
         raise SafetyError("scenario calls an unapproved or privileged SQL function")
     calls = {
@@ -192,19 +208,6 @@ def validate_scenario_sql(sql: str, scenario_name: str, *, preproduction: bool =
             raise SafetyError("test clock override is not allowed for this scenario")
     statements = [part.strip() for part in code.split(";") if part.strip()]
     for statement in statements:
-        if re.match(r"(?is)^TRUNCATE\b", statement):
-            normalized = re.sub(r"\s+", " ", statement).strip().lower()
-            normalized = re.sub(r",\s+", ",", normalized)
-            allowed_capacity_reset = (
-                preproduction
-                and scenario_name == "public_intake_test.sql"
-                and normalized == (
-                    "truncate private.public_intake_decisions,private.public_intake_receipts,"
-                    "private.public_intake_accepted_events,private.public_intake_submissions cascade"
-                )
-            )
-            if not allowed_capacity_reset:
-                raise SafetyError("TRUNCATE is permitted only for the pinned pre-production capacity fixture")
         if re.match(r"(?is)^GRANT\b", statement):
             granted = re.search(r"(?is)\bON\s+([a-z_][a-z0-9_,\s]*?)\s+TO\b", statement)
             allowed_grant_targets = {

@@ -559,6 +559,20 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(runner.SafetyError, "prohibited"):
             runner.validate_scenario_sql(sql, "public_intake_test.sql")
         self.assertIn("TRUNCATE private.public_intake_decisions", sql)
+        # The pre-production exception is confined to that exact pinned queue
+        # reset. A nested function body must not hide a different TRUNCATE from
+        # the statement-level safety check.
+        nested_unrelated_truncate = (
+            "BEGIN; CREATE FUNCTION pg_temp.reset_intake() RETURNS void "
+            "LANGUAGE plpgsql AS $$DECLARE fixture uuid := "
+            "'00000000-0000-4000-8000-000000000001'; BEGIN "
+            "TRUNCATE public.converts CASCADE; "
+            "END $$; ROLLBACK;"
+        )
+        with self.assertRaisesRegex(runner.SafetyError, "TRUNCATE"):
+            runner.validate_scenario_sql(
+                nested_unrelated_truncate, "public_intake_test.sql", preproduction=True)
+        runner.validate_scenario_sql(sql, "public_intake_test.sql", preproduction=True)
         sql, _ = runner.load_scenario("pending_review_test.sql", run_id, ROOT)
         self.assertNotIn("'review-a@example.test'", sql)
         self.assertIn("run-0123456789ab4cde8fab0123456789ab-review-a@example.test", sql)
