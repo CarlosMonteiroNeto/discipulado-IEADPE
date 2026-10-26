@@ -13,9 +13,16 @@
 
 - TDD RED observed: before implementation, target confirmation errored on the unsupported `management_api` keyword and the CLI rejected `--management-api`.
 - The new management-mode tests pass, including baseline parsing, scenario result parsing, and after-state reconciliation.
-- `python -m unittest discover -s scripts -p test_public_intake_hosted_runner.py -v`: all 37 tests passed.
+- `python -m unittest discover -s scripts -p test_public_intake_hosted_runner.py -v`: all 38 tests passed, including both follow-up regressions.
 - `python -m py_compile scripts/test_public_intake_hosted.py scripts/test_public_intake_hosted_runner.py`: passed.
 - `git diff --check`: passed (Git emitted only existing LF-to-CRLF working-copy warnings).
+
+## Management API result and reconciliation follow-up
+
+- TDD RED reproduced the void-result bug: the management-mode full preproduction `public_intake_test.sql` run failed when the CLI returned `[{"assert_true": null}]`; direct result tests also failed because the scenario reader did not exist. Scenario-only result parsing now accepts empty rows and one null-valued cell as psql-equivalent empty output. Identity, baseline, and preflight reads still require exactly one scalar result.
+- A fault-injection regression returns malformed CLI output after the full scenario has dispatched. With the old narrow final reconciliation handler restored, the test observed evidence stuck at `STARTED`. The current handler records `FAIL`, blocker code `reconciliation_unavailable`, recovery-required cleanup, and `completed_at`, while keeping raw output out of logs and evidence.
+- This follow-up is offline only; no hosted scenario was dispatched.
+- The full 38-test suite, Python compilation, and `git diff --check` all pass after these fixes.
 
 ## Reviewed scenario pin follow-up
 

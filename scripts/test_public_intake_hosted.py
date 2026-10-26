@@ -540,6 +540,10 @@ def _management_api_rows(command: list[str], project_ref: str, env: dict[str, st
 def _management_api_scalar(command: list[str], project_ref: str,
                            env: dict[str, str], sql: str) -> str:
     rows = _management_api_rows(command, project_ref, env, sql)
+    return _management_api_scalar_value(rows)
+
+
+def _management_api_scalar_value(rows: list) -> str:
     if (len(rows) != 1 or not isinstance(rows[0], dict) or len(rows[0]) != 1
             or not isinstance(next(iter(rows[0].values())), (str, int, float, bool))):
         raise SafetyError("Management API query result was incomplete")
@@ -552,6 +556,33 @@ def _database_query(args: argparse.Namespace, command: list[str], env: dict[str,
     if args.management_api:
         return _management_api_scalar(command, args.project_ref, env, stdin if stdin is not None else sql)
     return _psql(command, env, sql, stdin=stdin)
+
+
+def _management_api_scenario_result(command: list[str], project_ref: str,
+                                    env: dict[str, str], sql: str) -> str:
+    rows = _management_api_rows(command, project_ref, env, sql)
+    if not rows or (len(rows) == 1 and isinstance(rows[0], dict) and len(rows[0]) == 1
+                    and next(iter(rows[0].values())) is None):
+        return ""
+    return _management_api_scalar_value(rows)
+
+
+def _database_scenario_result(args: argparse.Namespace, command: list[str],
+                              env: dict[str, str], sql: str) -> str:
+    if args.management_api:
+        return _management_api_scenario_result(command, args.project_ref, env, sql)
+    return _psql(command, env, "SELECT 1;", stdin=sql)
+
+
+def _record_reconciliation_failure(evidence_path: Path, evidence: dict) -> None:
+    evidence.update({
+        "status": "FAIL",
+        "failure": "after-state response was invalid or unavailable; raw database output withheld",
+        "blocker_code": "reconciliation_unavailable",
+        "cleanup_outcome": "post-run state unavailable; operator recovery required",
+        "completed_at": utc_now().isoformat(),
+    })
+    _write_evidence(evidence_path, evidence)
 
 
 def _evidence_path(value: str, repository: Path) -> Path:
@@ -979,8 +1010,7 @@ def main(argv: list[str] | None = None) -> int:
         evidence["scenario_dispatched"] = True
         _write_evidence(evidence_path, evidence)
         try:
-            scenario_output = _database_query(
-                args, base, process_env, "SELECT 1;", stdin=sql)
+            scenario_output = _database_scenario_result(args, base, process_env, sql)
         except (SafetyError, OSError, subprocess.TimeoutExpired):
             try:
                 failed_after = json.loads(_database_query(args, base, process_env, counts_sql))
@@ -1003,10 +1033,13 @@ def main(argv: list[str] | None = None) -> int:
             try:
                 after = json.loads(_database_query(args, base, process_env, counts_sql))
                 after["migrations"] = applied_migrations
+                if not _validate_snapshot(after):
+                    raise SafetyError("after-state response was incomplete")
                 evidence["after"] = after
-                evidence["reconciled"] = _validate_snapshot(after) and after == baseline
-            except (SafetyError, OSError, ValueError, subprocess.TimeoutExpired):
-                evidence["cleanup_outcome"] = "post-smoke state unavailable; operator recovery required"
+                evidence["reconciled"] = after == baseline
+            except (SafetyError, OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+                _record_reconciliation_failure(evidence_path, evidence)
+                raise SafetyError("after-state response was invalid or unavailable; external evidence was preserved") from None
             if isinstance(scenario_output, str) and scenario_output.startswith("T2_SMOKE_BLOCKED:"):
                 reason_code = scenario_output.removeprefix("T2_SMOKE_BLOCKED:")
                 allowed_block_reasons = {
@@ -1036,15 +1069,13 @@ def main(argv: list[str] | None = None) -> int:
         try:
             after = json.loads(_database_query(args, base, process_env, counts_sql))
             after["migrations"] = applied_migrations
-        except json.JSONDecodeError as exc:
-            evidence["status"] = "FAIL"
-            evidence["failure"] = "after-state response was invalid; raw database output withheld"
-            evidence["cleanup_outcome"] = "post-run state unavailable; operator recovery required"
-            evidence["completed_at"] = utc_now().isoformat()
-            _write_evidence(evidence_path, evidence)
-            raise SafetyError("after-state response was invalid; external evidence was preserved") from exc
+            if not _validate_snapshot(after):
+                raise SafetyError("after-state response was incomplete")
+        except (SafetyError, OSError, ValueError, TypeError, subprocess.TimeoutExpired):
+            _record_reconciliation_failure(evidence_path, evidence)
+            raise SafetyError("after-state response was invalid or unavailable; external evidence was preserved") from None
         evidence["after"] = after
-        evidence["reconciled"] = _validate_snapshot(after) and after == baseline
+        evidence["reconciled"] = after == baseline
         evidence["status"] = "PASS" if evidence["reconciled"] else "FAIL"
         evidence["cleanup_outcome"] = (
             "transaction rollback verified" if evidence["reconciled"]

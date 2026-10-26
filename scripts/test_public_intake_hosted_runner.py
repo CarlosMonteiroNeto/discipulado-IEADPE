@@ -247,6 +247,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             directory = Path(temp)
             capture = directory / "management-calls.jsonl"
+            scenario_marker = directory / "scenario-dispatched"
             fake_cli = directory / "fake_supabase.py"
             snapshot = {
                 "counts": {"public.converts": 0, "public.ministry_people": 0,
@@ -273,12 +274,17 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 " print(json.dumps({'migrations':[{'local':'202610250002','remote':'202610250002','time':'202610250002'},{'local':'202610250003','remote':'202610250003','time':'202610250003'}]}))\n"
                 "elif args[:2] == ['db','query']:\n"
                 " sql=pathlib.Path(args[args.index('--file')+1]).read_text()\n"
+                f" marker=pathlib.Path({str(scenario_marker)!r})\n"
                 f" snapshot=json.loads({json.dumps(snapshot)!r})\n"
-                f" preflight=json.loads({json.dumps(preflight)!r})\n"
                 " if 'current_database() AS current_database' in sql: rows=[{'current_database':'postgres','current_user':'postgres'}]\n"
-                " elif 'two_slot_capacity_headroom' in sql: rows=[{'text':json.dumps(preflight)}]\n"
-                " elif \"'counts'\" in sql: rows=[{'text':json.dumps(snapshot)}]\n"
-                " elif 'SELECT pg_temp.run_smoke();' in sql: rows=[{'?column?':'T2_SMOKE_PASS'}]\n"
+                " elif 'TRUNCATE private.public_intake_decisions' in sql:\n"
+                "  marker.write_text('dispatched')\n"
+                "  rows=[{'assert_true':None}]\n"
+                " elif \"'counts'\" in sql:\n"
+                "  if os.environ.get('FAKE_FAIL_RECONCILIATION') and marker.exists():\n"
+                "   print('sensitive database output must stay hidden')\n"
+                "   sys.exit(0)\n"
+                "  rows=[{'text':json.dumps(snapshot)}]\n"
                 " else: sys.exit(9)\n"
                 " print(json.dumps({'rows':rows,'ignored_metadata':'must not be parsed'}))\n"
                 "else: sys.exit(9)\n", encoding="utf-8",
@@ -296,7 +302,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
                 "--project-ref", "abcdefghijklmnopqrst", "--run-id",
                 "01234567-89ab-4cde-8fab-0123456789ab",
-                "--scenario", "public_intake_hosted_smoke_test.sql", "--preproduction",
+                "--scenario", "public_intake_test.sql", "--preproduction",
                 "--management-api", "--backup-manifest", str(backup),
                 "--evidence-manifest", str(evidence),
                 "--supabase-command-json", json.dumps([sys.executable, str(fake_cli)]),
@@ -310,6 +316,7 @@ class HostedRunnerSafetyTests(unittest.TestCase):
             self.assertTrue(manifest["migration_inventory_verified"])
             self.assertTrue(manifest["scenario_dispatched"])
             self.assertTrue(manifest["reconciled"])
+            self.assertEqual(manifest["scenario"], "public_intake_test.sql")
             calls = [json.loads(line) for line in capture.read_text(encoding="utf-8").splitlines()]
             db_calls = [call for call in calls if call["args"][:2] == ["db", "query"]]
             self.assertGreaterEqual(len(db_calls), 5)
@@ -322,6 +329,30 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                 self.assertFalse(Path(call["args"][call["args"].index("--file") + 1]).exists())
             self.assertNotIn("PUBLIC_INTAKE_DATABASE_URL", env)
             self.assertNotIn("ignored_metadata", evidence.read_text(encoding="utf-8"))
+
+            scenario_marker.unlink(missing_ok=True)
+            env["FAKE_FAIL_RECONCILIATION"] = "1"
+            failed_evidence = directory / "management-reconciliation-failure.json"
+            failed_result = subprocess.run([
+                sys.executable, str(ROOT / "scripts/test_public_intake_hosted.py"),
+                "--project-ref", "abcdefghijklmnopqrst", "--run-id",
+                "11234567-89ab-4cde-8fab-0123456789ab",
+                "--scenario", "public_intake_test.sql", "--preproduction",
+                "--management-api", "--backup-manifest", str(backup),
+                "--evidence-manifest", str(failed_evidence),
+                "--supabase-command-json", json.dumps([sys.executable, str(fake_cli)]),
+            ], input="abcdefghijklmnopqrst\n", text=True, capture_output=True, env=env, cwd=ROOT)
+
+            self.assertEqual(failed_result.returncode, 2)
+            failed_manifest_text = failed_evidence.read_text(encoding="utf-8")
+            failed_manifest = json.loads(failed_manifest_text)
+            self.assertEqual(failed_manifest["status"], "FAIL")
+            self.assertTrue(failed_manifest["scenario_dispatched"])
+            self.assertEqual(failed_manifest["blocker_code"], "reconciliation_unavailable")
+            self.assertIn("operator recovery required", failed_manifest["cleanup_outcome"])
+            self.assertTrue(failed_manifest.get("completed_at"))
+            self.assertNotIn("sensitive database output", failed_manifest_text)
+            self.assertNotIn("sensitive database output", failed_result.stdout + failed_result.stderr)
 
     def test_management_api_wrong_account_target_fails_before_database_query(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -402,6 +433,38 @@ class HostedRunnerSafetyTests(unittest.TestCase):
                     [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", {}, "SELECT 1;")
             self.assertNotIn("secret", str(raised.exception))
             self.assertNotIn("postgresql://", str(raised.exception))
+
+    def test_management_api_scenario_reader_accepts_void_and_empty_rows_only(self):
+        with tempfile.TemporaryDirectory() as temp:
+            fake_cli = Path(temp) / "fake_supabase.py"
+            fake_cli.write_text(
+                "import json, os\nprint(json.dumps({'rows':json.loads(os.environ['FAKE_ROWS'])}))\n",
+                encoding="utf-8",
+            )
+            for rows in ([], [{"assert_true": None}]):
+                with self.subTest(rows=rows):
+                    env = {"FAKE_ROWS": json.dumps(rows)}
+                    self.assertEqual(
+                        runner._management_api_scenario_result(
+                            [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", env, "SELECT 1;"),
+                        "",
+                    )
+            for rows in ([], [{"assert_true": None}]):
+                with self.subTest(strict_scalar_rows=rows):
+                    env = {"FAKE_ROWS": json.dumps(rows)}
+                    with self.assertRaises(runner.SafetyError):
+                        runner._management_api_scalar(
+                            [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", env, "SELECT 1;")
+            env = {"FAKE_ROWS": json.dumps([{"result": "ok"}])}
+            self.assertEqual(
+                runner._management_api_scenario_result(
+                    [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", env, "SELECT 1;"),
+                "ok",
+            )
+            env = {"FAKE_ROWS": json.dumps([{"assert_true": None}, {"assert_true": None}])}
+            with self.assertRaises(runner.SafetyError):
+                runner._management_api_scenario_result(
+                    [sys.executable, str(fake_cli)], "abcdefghijklmnopqrst", env, "SELECT 1;")
 
     def test_target_confirmation_rejects_unsafe_pooler_shapes(self):
         project_ref = "abcdefghijklmnopqrst"
