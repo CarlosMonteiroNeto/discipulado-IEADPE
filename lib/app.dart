@@ -9,14 +9,20 @@ import 'data/convert_repository.dart';
 import 'data/supabase_gateway.dart';
 import 'domain/models.dart';
 import 'routing/router.dart';
+import 'routing/browser_route_history.dart';
 import 'features/auth/login_page.dart';
 import 'features/admin/admin_page.dart';
 import 'features/admin/congregation_repository.dart';
 import 'features/backup/backup_panel.dart';
 import 'features/backup/backup_repository.dart';
-import 'features/converts/convert_form.dart';
+import 'features/converts/congregation_order.dart';
 import 'features/converts/converts_page.dart';
 import 'features/converts/register_page.dart';
+import 'features/intake/public_intake_page.dart';
+import 'features/intake/public_intake_repository.dart';
+import 'features/intake/pending_review_page.dart';
+import 'features/intake/pending_submission_repository.dart';
+import 'features/intake/turnstile_challenge.dart';
 import 'features/feedback/feedback_dialog.dart';
 import 'features/feedback/feedback_manager.dart';
 import 'features/feedback/feedback_repository.dart';
@@ -46,10 +52,22 @@ import 'ui/unified_theme.dart';
 enum _DirectoryNavigation { first, next, previous }
 
 class App extends StatelessWidget {
-  const App({super.key, this.configuration, this.auth});
+  const App({
+    super.key,
+    this.configuration,
+    this.auth,
+    this.publicIntakeRepository,
+    this.turnstileChallengeFactory,
+    this.initialPath,
+    this.browserRouteHistoryFactory,
+  });
 
   final Configuration? configuration;
   final AuthRepository? auth;
+  final PublicIntakeRepository? publicIntakeRepository;
+  final TurnstileChallengeFactory? turnstileChallengeFactory;
+  final String? initialPath;
+  final BrowserRouteHistory Function()? browserRouteHistoryFactory;
 
   @override
   Widget build(BuildContext context) {
@@ -59,35 +77,87 @@ class App extends StatelessWidget {
       supportedLocales: const [Locale('pt', 'BR')],
       localizationsDelegates: GlobalMaterialLocalizations.delegates,
       theme: buildUnifiedTheme(),
-      home: _BootstrapScreen(configuration: configuration, auth: auth),
+      home: _BootstrapScreen(
+        configuration: configuration,
+        auth: auth,
+        publicIntakeRepository: publicIntakeRepository,
+        turnstileChallengeFactory: turnstileChallengeFactory,
+        initialPath: initialPath,
+        browserRouteHistoryFactory: browserRouteHistoryFactory,
+      ),
     );
   }
 }
 
 class _BootstrapScreen extends StatefulWidget {
-  const _BootstrapScreen({this.configuration, this.auth});
+  const _BootstrapScreen({
+    this.configuration,
+    this.auth,
+    this.publicIntakeRepository,
+    this.turnstileChallengeFactory,
+    this.initialPath,
+    this.browserRouteHistoryFactory,
+  });
+
   final Configuration? configuration;
   final AuthRepository? auth;
+  final PublicIntakeRepository? publicIntakeRepository;
+  final TurnstileChallengeFactory? turnstileChallengeFactory;
+  final String? initialPath;
+  final BrowserRouteHistory Function()? browserRouteHistoryFactory;
+
   @override
   State<_BootstrapScreen> createState() => _BootstrapScreenState();
 }
 
 class _BootstrapScreenState extends State<_BootstrapScreen> {
   AuthRepository? _auth;
+  PublicIntakeRepository? _publicIntakeRepository;
+  BrowserRouteHistory? _browserHistory;
+  TurnstileChallenge? _publicChallenge;
+  String? _intendedRoute;
+  bool _ownsPublicRepository = false;
+  bool _publicMode = false;
   bool _loading = false;
+
+  Configuration get _configuration =>
+      widget.configuration ?? Configuration.fromEnvironment();
+
+  TurnstileChallenge _newChallenge() =>
+      (widget.turnstileChallengeFactory ?? createTurnstileChallenge)();
+
   @override
   void initState() {
     super.initState();
-    _initialize();
-  }
-
-  Future<void> _initialize() async {
+    final path = widget.initialPath ?? Uri.base.path;
+    _publicMode = isPublicRegistrationPath(path);
+    _intendedRoute = widget.initialPath == null ? null : safeRoute(path);
+    _browserHistory =
+        (widget.browserRouteHistoryFactory ?? createBrowserRouteHistory)();
+    _browserHistory!.listen(_browserPathChanged);
+    _publicIntakeRepository = widget.publicIntakeRepository;
+    if (_publicIntakeRepository == null && _configuration.isValid) {
+      _publicIntakeRepository = PublicIntakeRepository(
+        supabaseUrl: Uri.parse(_configuration.supabaseUrl),
+        publishableKey: _configuration.supabasePublishableKey,
+      );
+      _ownsPublicRepository = true;
+    }
+    if (_publicMode) {
+      // Public registration does not initialize Supabase or protected owners.
+      _auth = widget.auth;
+      return;
+    }
     if (widget.auth != null) {
       _auth = widget.auth;
       return;
     }
-    final configuration =
-        widget.configuration ?? Configuration.fromEnvironment();
+    unawaited(_initialize());
+  }
+
+  Future<void> _initialize({String? intendedRoute}) async {
+    if (_auth != null || _loading) return;
+    final configuration = _configuration;
     if (!configuration.isValid) return;
     setState(() => _loading = true);
     try {
@@ -99,7 +169,12 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
         configuration,
         AuthRedirectPolicy(Uri.parse(callback)),
       );
-      if (mounted) setState(() => _auth = auth);
+      if (mounted) {
+        setState(() {
+          _auth = auth;
+          _intendedRoute = intendedRoute ?? _intendedRoute;
+        });
+      }
     } catch (_) {
       // Configuration and provider details belong in operator documentation.
     } finally {
@@ -107,9 +182,79 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
     }
   }
 
+  void _showProtectedRoute(String destination, {required bool pushHistory}) {
+    if (pushHistory) _browserHistory?.push(destination);
+    setState(() {
+      _publicMode = false;
+      _publicChallenge = null;
+      _intendedRoute = destination;
+      if (widget.auth != null) _auth = widget.auth;
+    });
+    if (_auth == null) unawaited(_initialize(intendedRoute: destination));
+  }
+
+  void _openProtectedRoute(String route) {
+    final destination = safeRoute(route);
+    if (isPublicRegistrationPath(destination)) return;
+    _showProtectedRoute(destination, pushHistory: true);
+  }
+
+  void _browserPathChanged(String path) {
+    if (!mounted) return;
+    final destination = safeRoute(path);
+    if (destination != path) _browserHistory?.replace(destination);
+    if (isPublicRegistrationPath(destination)) {
+      if (_publicMode) {
+        _intendedRoute = destination;
+        return;
+      }
+      setState(() {
+        _publicMode = true;
+        _publicChallenge = _newChallenge();
+        _intendedRoute = destination;
+        _loading = false;
+      });
+      return;
+    }
+    if (_publicMode) _showProtectedRoute(destination, pushHistory: false);
+  }
+
+  Future<void> _returnToPublicRegistration() async {
+    _browserHistory?.replace('/register');
+    setState(() {
+      _publicMode = true;
+      _intendedRoute = '/register';
+      _loading = false;
+      _publicChallenge = _newChallenge();
+    });
+  }
+
+  @override
+  void dispose() {
+    _browserHistory?.dispose();
+    if (_ownsPublicRepository) _publicIntakeRepository?.close();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_auth != null) return ProtectedApplication(repository: _auth!);
+    if (_publicMode) {
+      _publicChallenge ??= _newChallenge();
+      return PublicRegistrationPage(
+        repository: _publicIntakeRepository,
+        challenge: _publicChallenge!,
+        onNavigateToProtected: _openProtectedRoute,
+      );
+    }
+    if (_auth != null) {
+      return ProtectedApplication(
+        repository: _auth!,
+        intendedRoute: _intendedRoute,
+        publicIntakeRepository: _publicIntakeRepository,
+        turnstileChallengeFactory: widget.turnstileChallengeFactory,
+        onSignedOut: _returnToPublicRegistration,
+      );
+    }
     return Scaffold(
       appBar: AppBar(title: const Text('IEADPE')),
       body: SafeArea(
@@ -138,7 +283,9 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
                   ),
                   const SizedBox(height: 24),
                   FilledButton(
-                    onPressed: _loading ? null : _initialize,
+                    onPressed: _loading
+                        ? null
+                        : () => _initialize(intendedRoute: _intendedRoute),
                     child: const Text('Tentar novamente'),
                   ),
                 ],
@@ -156,10 +303,18 @@ class ProtectedApplication extends StatefulWidget {
   const ProtectedApplication({
     super.key,
     required this.repository,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
+    this.intendedRoute,
+    this.publicIntakeRepository,
+    this.turnstileChallengeFactory,
+    this.onSignedOut,
   });
   final AuthRepository repository;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
+  final String? intendedRoute;
+  final PublicIntakeRepository? publicIntakeRepository;
+  final TurnstileChallengeFactory? turnstileChallengeFactory;
+  final Future<void> Function()? onSignedOut;
   @override
   State<ProtectedApplication> createState() => _ProtectedApplicationState();
 }
@@ -197,9 +352,11 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
     _feedback = FeedbackRepository(_gateway);
     final incoming = Uri.base;
     final policy = widget.repository.redirectPolicy;
-    final intended = policy.accepts(incoming)
-        ? policy.intendedFrom(incoming)
-        : safeRoute(incoming.path);
+    final intended =
+        widget.intendedRoute ??
+        (policy.accepts(incoming)
+            ? policy.intendedFrom(incoming)
+            : safeRoute(incoming.path));
     _router = SessionRouter(
       widget.repository,
       clearProtectedCaches: () {
@@ -225,10 +382,15 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
 
   Future<Uint8List?> _pickPhoto() async {
     final token = _gateway.context;
-    final bytes = await widget.pickPhoto();
+    final bytes = await widget.pickPhoto?.call();
     await _validateExternalReturn();
     _gateway.ensureCurrent(token);
     return bytes;
+  }
+
+  Future<void> _signOut() async {
+    await _router.signOut();
+    if (mounted) await widget.onSignedOut?.call();
   }
 
   @override
@@ -262,10 +424,7 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
                   onPressed: _router.refresh,
                   child: const Text('Tentar novamente'),
                 ),
-                TextButton(
-                  onPressed: _router.signOut,
-                  child: const Text('Sair'),
-                ),
+                TextButton(onPressed: _signOut, child: const Text('Sair')),
               ],
             ),
           ),
@@ -273,7 +432,7 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
       }
       return LoginPage(
         auth: widget.repository,
-        intendedRoute: safeRoute(Uri.base.path),
+        intendedRoute: widget.intendedRoute ?? safeRoute(Uri.base.path),
       );
     }
     return Stack(
@@ -306,7 +465,11 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
                         backup: _backup,
                         feedback: _feedback,
                         exporter: _exporter,
-                        pickPhoto: _pickPhoto,
+                        pickPhoto: widget.pickPhoto == null ? null : _pickPhoto,
+                        publicIntakeRepository: widget.publicIntakeRepository,
+                        turnstileChallengeFactory:
+                            widget.turnstileChallengeFactory,
+                        onSignOut: _signOut,
                         onCongregationChanged: _clearNestedRoutes,
                       ),
                     ),
@@ -346,6 +509,9 @@ class _ProtectedFeatures extends StatefulWidget {
     required this.feedback,
     required this.exporter,
     required this.pickPhoto,
+    required this.publicIntakeRepository,
+    required this.turnstileChallengeFactory,
+    required this.onSignOut,
     required this.onCongregationChanged,
   });
   final AccessScope scope;
@@ -360,7 +526,10 @@ class _ProtectedFeatures extends StatefulWidget {
   final BackupRepository backup;
   final FeedbackRepository feedback;
   final FileExporter exporter;
-  final Future<Uint8List?> Function() pickPhoto;
+  final Future<Uint8List?> Function()? pickPhoto;
+  final PublicIntakeRepository? publicIntakeRepository;
+  final TurnstileChallengeFactory? turnstileChallengeFactory;
+  final Future<void> Function() onSignOut;
   final VoidCallback onCongregationChanged;
   @override
   State<_ProtectedFeatures> createState() => _ProtectedFeaturesState();
@@ -381,6 +550,11 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
   String? _error;
   String? _overlay;
   MinistryRouteContext? _studentRegistrationContext;
+
+  bool get _usesPublicRegistrationCatalog =>
+      widget.router.route == '/register' &&
+      !widget.scope.isGlobalManager &&
+      widget.scope.congregationIds.isEmpty;
   @override
   void initState() {
     super.initState();
@@ -489,7 +663,19 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     final token = widget.gateway.context;
     if (mounted) setState(() => _error = null);
     try {
-      final rows = await CongregationRepository(widget.gateway).list();
+      late final List<Congregation> rows;
+      if (_usesPublicRegistrationCatalog) {
+        final publicRepository = widget.publicIntakeRepository;
+        if (publicRepository == null) {
+          throw StateError('Public registration catalog unavailable');
+        }
+        rows = await orderCongregations([
+          for (final item in await publicRepository.listAllCongregations())
+            Congregation(id: item.id, name: item.name),
+        ]);
+      } else {
+        rows = await CongregationRepository(widget.gateway).list();
+      }
       widget.gateway.ensureCurrent(token);
       if (mounted) setState(() => _catalog = rows);
     } catch (error) {
@@ -568,6 +754,11 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           congregations: _catalog!,
           onScopeRefresh: widget.router.refresh,
           pickPhoto: widget.pickPhoto,
+          revalidatePhotoAuthority: (congregationId) async {
+            await widget.router.revalidate();
+            await widget.router.ensureValidated();
+            return widget.router.scope?.canAccess(congregationId) ?? false;
+          },
         ),
         '/admin' => AdminPage(
           scope: widget.scope,
@@ -591,11 +782,40 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           ),
           onFeedback: () => setState(() => _overlay = 'manage'),
         ),
+        '/pending' => PendingReviewPage(
+          key: ValueKey('pending-review:${widget.scope.hashCode}'),
+          repository: PendingSubmissionRepository(widget.gateway),
+          scope: widget.scope,
+          congregations: _catalog!
+              .where(
+                (congregation) =>
+                    congregation.archivedAt == null &&
+                    (widget.scope.isGlobalManager ||
+                        widget.scope.congregationIds.contains(congregation.id)),
+              )
+              .toList(growable: false),
+          onScopeRefresh: widget.router.refresh,
+          acquireNavigationLock: widget.router.acquireNavigationLock,
+          releaseNavigationLock: widget.router.releaseNavigationLock,
+        ),
         _ => RegisterPage(
           converts: widget.converts,
           photos: widget.photos,
           congregations: _catalog!.where((c) => c.archivedAt == null).toList(),
           pickPhoto: widget.pickPhoto,
+          scope: widget.scope,
+          publicIntakeRepository: widget.publicIntakeRepository,
+          turnstileChallengeFactory: widget.turnstileChallengeFactory,
+          revalidateScope: (congregationId) async {
+            await widget.router.revalidate();
+            await widget.router.ensureValidated();
+            return widget.router.scope?.canAccess(congregationId) ?? false;
+          },
+          revalidatePhotoAuthority: (congregationId) async {
+            await widget.router.revalidate();
+            await widget.router.ensureValidated();
+            return widget.router.scope?.canAccess(congregationId) ?? false;
+          },
           onCancel: () => widget.router.go('/home'),
         ),
       };
@@ -603,12 +823,14 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
     return AppShell(
       scope: widget.scope,
       currentRoute: widget.router.route,
+      navigationLocked: widget.router.navigationLocked,
       onNavigate: (route) {
+        if (widget.router.navigationLocked) return;
         setState(() => _overlay = null);
         if (!route.startsWith('/ministry') && _catalog == null) _load();
         widget.router.go(route);
       },
-      onSignOut: widget.router.signOut,
+      onSignOut: () => unawaited(widget.onSignOut()),
       onFeedback: () => setState(() => _overlay = 'submit'),
       child: page,
     );

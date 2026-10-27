@@ -83,6 +83,9 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write(f"SUPABASE_URL={api_url}\nSUPABASE_ANON_KEY={anon_key}\n")
           '
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.9.8
       - name: Run the unified gate
         env:
           CHROME_EXECUTABLE: ${{ steps.pinned-chrome.outputs.chrome-path }}

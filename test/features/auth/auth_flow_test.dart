@@ -93,11 +93,13 @@ void main() {
       '/register',
       '/home',
       '/converts',
+      '/pending',
     ]);
     expect(routesFor(AccessScope(isSupervision: true)), [
       '/register',
       '/home',
       '/converts',
+      '/pending',
       '/admin',
     ]);
   });
@@ -253,6 +255,32 @@ void main() {
       await auth.events.close();
     },
   );
+  test(
+    'unauthenticated router leaves public pop paths for bootstrap',
+    () async {
+      final auth = FakeAuth()..currentSession = null;
+      final history = _FakeBrowserHistory()..initialPath = '/home';
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        browserHistory: history,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      history.onPop?.call('/');
+      expect(
+        history.entries,
+        isEmpty,
+        reason:
+            'bootstrap owns the public root path during unauthenticated login',
+      );
+      history.onPop?.call('/register');
+      expect(history.entries, isEmpty);
+
+      router.dispose();
+      await auth.events.close();
+    },
+  );
   test('browser refresh restores only a server authorized path', () async {
     final auth = FakeAuth()
       ..access = AccessScope(ministryCongregationIds: ['ministry-id']);
@@ -302,6 +330,56 @@ void main() {
       expect(clears, greaterThan(before));
       expect(router.allowedRoutes, isNot(contains('/ministry')));
       expect(router.route, '/register');
+      router.dispose();
+      await auth.events.close();
+    },
+  );
+  test(
+    'navigation lock blocks routes but clears on scope revocation and sign-out',
+    () async {
+      final auth = FakeAuth()
+        ..access = AccessScope(congregationIds: ['campaign']);
+      final router = SessionRouter(
+        auth,
+        clearProtectedCaches: () {},
+        intendedRoute: '/pending',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(router.route, '/pending');
+
+      final revokedLock = router.acquireNavigationLock();
+      router.go('/home');
+      expect(router.route, '/pending');
+      expect(router.navigationLocked, isTrue);
+
+      auth.access = AccessScope();
+      await router.revalidate();
+      expect(router.navigationLocked, isFalse);
+      expect(router.route, '/register');
+
+      auth.access = AccessScope(isAdmin: true);
+      await router.revalidate();
+      router.go('/pending');
+      final currentLock = router.acquireNavigationLock();
+      router.releaseNavigationLock(revokedLock);
+      expect(
+        router.navigationLocked,
+        isTrue,
+        reason: 'a stale page cannot release a newer navigation lock',
+      );
+      router.releaseNavigationLock(currentLock);
+      expect(router.navigationLocked, isFalse);
+
+      auth.signingOut = Completer<void>();
+      router.acquireNavigationLock();
+      final logout = router.signOut();
+      expect(router.navigationLocked, isFalse);
+      await router.refresh();
+      expect(router.route, '/login');
+      expect(router.navigationLocked, isFalse);
+      auth.signingOut!.complete();
+      await logout;
+
       router.dispose();
       await auth.events.close();
     },

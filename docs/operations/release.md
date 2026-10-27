@@ -7,7 +7,7 @@ This prepares local artifacts only. Production provisioning, deployment, grants,
 
 ## Static web artifact
 
-Supabase does not host the Flutter website. Proposed host: Cloudflare Pages Free static hosting only, without Workers, Functions or R2. Official [Pages limits](https://developers.cloudflare.com/pages/platform/limits/) checked **2026-10-16**: 25 MiB per file, 20,000 files/site, 500 builds/month, one concurrent build and 20-minute build timeout. Recheck at release.
+Supabase does not host the Flutter website. Proposed host: Cloudflare Pages Free static files only, without Cloudflare Workers, Pages Functions or R2; the approved public intake uses a separate Supabase Edge Function. This repository does not prove a deployed host, account, site, domain or URL; inspect existing provider configuration before deciding whether setup is needed. Official [Pages limits](https://developers.cloudflare.com/pages/platform/limits/) checked **2026-10-16**: 25 MiB per file, 20,000 files/site, 500 builds/month, one concurrent build and 20-minute build timeout. Recheck at release. For the later public Web intake's exact four public build defines, Turnstile hostname, Supabase function secrets, hosted blockers and release authorization gates, follow [public intake operations](public-intake.md).
 
 After Task 19 root wiring, build with **public** values from a private local build-settings file outside the repository:
 

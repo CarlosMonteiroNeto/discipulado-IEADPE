@@ -12,6 +12,65 @@ from web_preflight import inspect
 
 
 class ReleaseTest(unittest.TestCase):
+    def test_callback_proxy_avoids_index_html_canonical_redirect(self):
+        rules = [line.split() for line in Path('web/_redirects').read_text().splitlines()
+                 if line.strip() and not line.startswith('#')]
+        callback = next(rule for rule in rules if rule[0] == '/auth/callback')
+        self.assertEqual(callback, ['/auth/callback', '/', '200'])
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / 'index.html').write_text('synthetic shell')
+            (root / '_redirects').write_text(Path('web/_redirects').read_text())
+            self.assertEqual(inspect(root), [])
+            (root / '_redirects').write_text(
+                Path('web/_redirects').read_text().replace(' / 200', ' /index.html 200'))
+            self.assertTrue(inspect(root))
+
+    def test_public_intake_runbook_pins_config_and_release_boundaries(self):
+        runbook_path = Path('docs/operations/public-intake.md')
+        runbook = runbook_path.read_text() if runbook_path.exists() else ''
+        for public_define in (
+            'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY',
+            'AUTH_CALLBACK_URL', 'TURNSTILE_SITE_KEY',
+        ):
+            with self.subTest(public_define=public_define):
+                self.assertIn(public_define, runbook)
+        for server_value in (
+            'SUPABASE_SERVICE_ROLE_KEY', 'TURNSTILE_SECRET_KEY',
+            'INTAKE_NETWORK_HASH_SECRET', 'INTAKE_ALLOWED_ORIGINS',
+            'INTAKE_ALLOWED_HOSTNAMES',
+        ):
+            with self.subTest(server_value=server_value):
+                self.assertIn(server_value, runbook)
+        self.assertIn('verify_jwt = false', runbook)
+        self.assertIn('private.public_intake_cleanup()', runbook)
+        self.assertIn('BLOCKED', runbook)
+        self.assertIn('https://discipulado-ieadpe.pages.dev', runbook)
+        self.assertIn('public-intake-release-candidate-20261026.json', runbook)
+        self.assertIn('https://discipulado-ieadpe.pages.dev', runbook)
+
+    def test_public_intake_runbook_names_current_hosted_release_blockers(self):
+        runbook_path = Path('docs/operations/public-intake.md')
+        runbook = runbook_path.read_text() if runbook_path.exists() else ''
+        for evidence in (
+            '202610250002', '202610250003', '202610250004',
+            'client-address', 'Turnstile', 'fresh post-acceptance full database archive',
+            'TLS Session Pooler', 'mobile',
+        ):
+            with self.subTest(evidence=evidence):
+                self.assertIn(evidence, runbook)
+
+    def test_public_intake_retention_is_fixed_and_limits_are_configurable(self):
+        runbook = Path('docs/operations/public-intake.md').read_text()
+        self.assertIn('pending drafts expire after exactly 30 days', runbook)
+        self.assertIn('decision metadata is retained for exactly 90 days', runbook)
+        self.assertIn('only abuse and capacity limits are operator-configurable', runbook)
+
+    def test_ministry_contract_marks_no_grant_creation_as_superseded(self):
+        contract = Path('docs/integration/ministry-contracts.md').read_text()
+        self.assertIn('without a matching campaign grant, registration follows public pending intake', contract)
+        self.assertIn('superseded by the public-intake authority migration', contract)
+
     def test_preflight_rejects_proxy_that_shadows_assets(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
@@ -69,7 +128,7 @@ class ReleaseTest(unittest.TestCase):
             Thread(target=server.serve_forever, daemon=True).start()
             try:
                 for route in (
-                    '/login', '/register', '/home', '/converts', '/admin',
+                    '/login', '/register', '/home', '/converts', '/pending', '/admin',
                     '/auth/callback?code=synthetic&next=%2Fregister',
                     '/ministry', '/ministry/team', '/ministry/students',
                     '/ministry/students/register', '/ministry/classes',
@@ -90,3 +149,7 @@ class ReleaseTest(unittest.TestCase):
             finally:
                 server.shutdown()
                 server.server_close()
+
+
+if __name__ == '__main__':
+    unittest.main()

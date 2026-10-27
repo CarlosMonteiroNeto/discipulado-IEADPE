@@ -121,6 +121,22 @@ else
   run_gate 'Browser file export smoke' python3 test/platform/run_export_browser.py
 fi
 run_gate 'Local routes and asset rewrite fixture' python3 -m unittest discover -s scripts -p test_release_operations.py
+run_gate 'Unified journey runner guards' python3 -m unittest discover -s scripts -p test_unified_journey_runner.py
+
+deno_tool="$(command -v deno || true)"
+if [[ -z "$deno_tool" && -x "$HOME/.codex/tools/deno-local/bin/deno" ]]; then
+  deno_tool="$HOME/.codex/tools/deno-local/bin/deno"
+fi
+if [[ -z "$deno_tool" && -x "$HOME/.codex/tools/deno-local/bin/deno.exe" ]]; then
+  deno_tool="$HOME/.codex/tools/deno-local/bin/deno.exe"
+fi
+if [[ -n "$deno_tool" ]]; then
+  run_gate 'Public intake test handler check' "$deno_tool" check scripts/public_intake_test_server.ts
+  run_gate 'Public intake Edge handler tests' "$deno_tool" test supabase/functions/public-intake
+else
+  RESULTS+=('Public intake test handler check|INCOMPLETE|n/a|deno check scripts/public_intake_test_server.ts|Deno executable unavailable')
+  RESULTS+=('Public intake Edge handler tests|INCOMPLETE|n/a|deno test supabase/functions/public-intake|Deno executable unavailable')
+fi
 run_journey
 
 failed=0; blocked=0

@@ -10,6 +10,9 @@ import '../../data/supabase_gateway.dart';
 import '../../ui/br_input.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/unified_theme.dart';
+import '../photos/photo_crop.dart';
+import '../photos/photo_crop_page.dart';
+import '../photos/photo_picker.dart';
 
 /// Only user-editable fields. Never serialize a read DTO into a command.
 class ConvertDraft {
@@ -27,6 +30,7 @@ class ConvertDraft {
     this.congregationId,
     this.age,
     this.photoBytes,
+    this.photoCrop,
     this.removePhoto = false,
   });
   final String name, landmark;
@@ -39,6 +43,7 @@ class ConvertDraft {
   final bool preserveNullAddress;
   final int? age;
   final Uint8List? photoBytes;
+  final NormalizedPhotoCrop? photoCrop;
   final bool removePhoto;
   Map<String, Object?> payload() => {
     'congregation_id': congregationId,
@@ -69,12 +74,7 @@ class ConvertDraft {
 }
 
 Future<Uint8List?> pickConvertPhoto() async {
-  final file = await ImagePicker().pickImage(source: ImageSource.gallery);
-  if (file == null) return null;
-  if (await file.length() > 20 * 1024 * 1024) {
-    throw const DataFailure('invalid');
-  }
-  return file.readAsBytes();
+  return pickProfilePhoto(ImageSource.gallery);
 }
 
 class ConvertForm extends StatefulWidget {
@@ -85,24 +85,64 @@ class ConvertForm extends StatefulWidget {
     this.congregations = const [],
     this.onCancel,
     this.gateway,
-    this.pickPhoto = pickConvertPhoto,
+    this.pickPhoto,
+    this.acquirePhoto = pickProfilePhoto,
+    this.choosePhotoSource = chooseProfilePhotoSource,
+    this.cropPhoto = showPhotoCrop,
     this.existingPhoto,
     this.now = DateTime.now,
+    this.allowPhotos = false,
+    this.allowCongregationChange = true,
+    this.requireCongregation = true,
+    this.submitLabel,
+    this.photoAuthority,
+    this.submissionLocked = false,
+    this.submitEnabled = true,
+    this.onPhotoAuthorityRevoked,
+    this.revalidatePhotoAuthority,
+    this.onCongregationChanged,
   });
   final ConvertRecord? initial;
   final Future<void> Function(ConvertDraft) onSubmit;
   final List<Congregation> congregations;
   final VoidCallback? onCancel;
   final Gateway? gateway;
-  final Future<Uint8List?> Function() pickPhoto;
+
+  /// Legacy injectable hook retained for existing form tests/callers.
+  final Future<Uint8List?> Function()? pickPhoto;
+  final Future<Uint8List?> Function(ImageSource source) acquirePhoto;
+  final Future<ImageSource?> Function(BuildContext context) choosePhotoSource;
+  final Future<NormalizedPhotoCrop?> Function(
+    BuildContext context,
+    Uint8List source,
+  )
+  cropPhoto;
   final Uint8List? existingPhoto;
   final DateTime Function() now;
+  final bool allowPhotos;
+  final bool allowCongregationChange;
+  final bool requireCongregation;
+  final String? submitLabel;
+  final bool Function(String? congregationId)? photoAuthority;
+  final bool submissionLocked;
+  final bool submitEnabled;
+  final VoidCallback? onPhotoAuthorityRevoked;
+  final Future<bool> Function(String? congregationId)? revalidatePhotoAuthority;
+  final ValueChanged<String?>? onCongregationChanged;
   @override
   State<ConvertForm> createState() => _ConvertFormState();
 }
 
 class _ConvertFormState extends State<ConvertForm> {
   final _form = GlobalKey<FormState>();
+  final _congregationFocus = FocusNode(debugLabel: 'convert-congregation');
+  final _nameFocus = FocusNode(debugLabel: 'convert-name');
+  final _phoneFocus = FocusNode(debugLabel: 'convert-phone');
+  final _landmarkFocus = FocusNode(debugLabel: 'convert-landmark');
+  final _ageFocus = FocusNode(debugLabel: 'convert-age');
+  final _genderFocus = FocusNode(debugLabel: 'convert-gender');
+  final _dateFocus = FocusNode(debugLabel: 'convert-date');
+  final _worshipFocus = FocusNode(debugLabel: 'convert-worship');
   late final TextEditingController _name,
       _address,
       _landmark,
@@ -112,6 +152,7 @@ class _ConvertFormState extends State<ConvertForm> {
   String? _congregation, _worship;
   Gender? _gender;
   Uint8List? _photo;
+  NormalizedPhotoCrop? _photoCrop;
   bool _removePhoto = false, _busy = false, _picking = false;
   String? _error;
   @override
@@ -144,13 +185,73 @@ class _ConvertFormState extends State<ConvertForm> {
     _gender = i?.gender;
   }
 
+  bool _photoAllowedFor(String? congregationId) =>
+      widget.allowPhotos &&
+      congregationId != null &&
+      (widget.photoAuthority?.call(congregationId) ?? true);
+
+  void _clearSelectedPhoto() {
+    _photo?.fillRange(0, _photo!.length, 0);
+    _photo = null;
+    _photoCrop = null;
+  }
+
+  void _selectCongregation(String? congregationId) {
+    final wasAllowed = _photoAllowedFor(_congregation);
+    final willBeAllowed = _photoAllowedFor(congregationId);
+    setState(() {
+      _congregation = congregationId;
+      if (!willBeAllowed) {
+        _clearSelectedPhoto();
+        _removePhoto = false;
+      }
+    });
+    if (wasAllowed && !willBeAllowed) {
+      widget.onPhotoAuthorityRevoked?.call();
+    }
+    widget.onCongregationChanged?.call(congregationId);
+  }
+
+  @override
+  void didUpdateWidget(covariant ConvertForm oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final wasAllowed =
+        oldWidget.allowPhotos &&
+        _congregation != null &&
+        (oldWidget.photoAuthority?.call(_congregation) ?? true);
+    if (wasAllowed && !_photoAllowedFor(_congregation)) {
+      _clearSelectedPhoto();
+      _removePhoto = false;
+      widget.onPhotoAuthorityRevoked?.call();
+    }
+  }
+
   @override
   void dispose() {
-    for (final c in [_name, _address, _landmark, _phone, _age, _date]) {
+    for (final focus in [
+      _congregationFocus,
+      _nameFocus,
+      _phoneFocus,
+      _landmarkFocus,
+      _ageFocus,
+      _genderFocus,
+      _dateFocus,
+      _worshipFocus,
+    ]) {
+      focus.dispose();
+    }
+    for (final c in [
+      _name,
+      _address,
+      _landmark,
+      _phone,
+      _age,
+      _date,
+    ]) {
       c.clear();
       c.dispose();
     }
-    _photo = null;
+    _clearSelectedPhoto();
     super.dispose();
   }
 
@@ -164,25 +265,91 @@ class _ConvertFormState extends State<ConvertForm> {
     }
   }
 
+  Future<bool> _revalidatePhotoScope(
+    String? congregationId,
+    String? token,
+  ) async {
+    if (!_current(token) ||
+        congregationId != _congregation ||
+        !_photoAllowedFor(_congregation)) {
+      return false;
+    }
+    final authorized = await widget.revalidatePhotoAuthority?.call(
+      congregationId,
+    );
+    if (!_current(token)) return false;
+    if (authorized == false) {
+      if (mounted) {
+        setState(() {
+          _clearSelectedPhoto();
+          _removePhoto = false;
+          _error = 'Seu acesso mudou. Atualize a página antes de enviar fotos.';
+        });
+        widget.onPhotoAuthorityRevoked?.call();
+      }
+      return false;
+    }
+    return congregationId == _congregation && _photoAllowedFor(_congregation);
+  }
+
   Future<void> _pick() async {
-    if (_picking || _busy) return;
+    final congregationId = _congregation;
+    if (_picking ||
+        _busy ||
+        widget.submissionLocked ||
+        !_photoAllowedFor(congregationId)) {
+      return;
+    }
     final token = widget.gateway?.context;
     setState(() {
       _picking = true;
       _error = null;
     });
+    Uint8List? source;
     try {
-      final bytes = await widget.pickPhoto();
-      if (!_current(token)) return;
-      if (bytes != null) {
-        if (bytes.isEmpty || bytes.length > 20 * 1024 * 1024) {
-          throw const DataFailure('invalid');
+      if (!await _revalidatePhotoScope(congregationId, token)) return;
+      NormalizedPhotoCrop? crop;
+      if (widget.pickPhoto != null) {
+        source = await widget.pickPhoto!();
+      } else {
+        if (!mounted) return;
+        final imageSource = await widget.choosePhotoSource(context);
+        if (!_current(token) ||
+            congregationId != _congregation ||
+            !_photoAllowedFor(_congregation) ||
+            imageSource == null) {
+          return;
         }
-        setState(() {
-          _photo = Uint8List.fromList(bytes);
-          _removePhoto = false;
-        });
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
+        source = await widget.acquirePhoto(imageSource);
+        if (source == null) return;
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
+        if (!mounted) return;
+        crop = await widget.cropPhoto(context, source);
+        if (!_current(token) ||
+            congregationId != _congregation ||
+            !_photoAllowedFor(_congregation) ||
+            crop == null) {
+          return;
+        }
+        if (!await _revalidatePhotoScope(congregationId, token)) return;
       }
+      if (source == null) return;
+      if (!_current(token) ||
+          congregationId != _congregation ||
+          !_photoAllowedFor(_congregation)) {
+        return;
+      }
+      if (source.isEmpty || source.length > 20 * 1024 * 1024) {
+        throw const DataFailure('invalid');
+      }
+      final selected = Uint8List.fromList(source);
+      setState(() {
+        _clearSelectedPhoto();
+        _photo = selected;
+        _photoCrop = crop;
+        _removePhoto = false;
+      });
     } catch (_) {
       if (_current(token)) {
         setState(
@@ -191,6 +358,7 @@ class _ConvertFormState extends State<ConvertForm> {
       }
     } finally {
       if (_current(token)) setState(() => _picking = false);
+      source?.fillRange(0, source.length, 0);
     }
   }
 
@@ -199,8 +367,45 @@ class _ConvertFormState extends State<ConvertForm> {
     return date == null ? null : DateOnly(date.year, date.month, date.day);
   }
 
+  bool _validateAndFocusFirstInvalid() {
+    if (_form.currentState!.validate()) return true;
+    final inheritedName = widget.initial?.personIdentity?.name;
+    final name = _name.text.trim();
+    if (widget.requireCongregation && _congregation == null) {
+      _congregationFocus.requestFocus();
+    } else if (name.isEmpty ||
+        (_name.text != inheritedName && name.length > 200)) {
+      _nameFocus.requestFocus();
+    } else if (brPhoneValidationError(_phone.text) != null) {
+      _phoneFocus.requestFocus();
+    } else if (_landmark.text.trim().isEmpty) {
+      _landmarkFocus.requestFocus();
+    } else if (_age.text.isNotEmpty &&
+        (int.tryParse(_age.text) == null ||
+            int.parse(_age.text) < 0 ||
+            int.parse(_age.text) > 150)) {
+      _ageFocus.requestFocus();
+    } else if (_gender == null) {
+      _genderFocus.requestFocus();
+    } else {
+      final dateError = brDateValidationError(_date.text, required: true);
+      final date = _parsedDate();
+      if (dateError != null ||
+          date == null ||
+          date.compareTo(BusinessCalendar().today(widget.now())) > 0) {
+        _dateFocus.requestFocus();
+      }
+    }
+    return false;
+  }
+
   Future<void> _submit() async {
-    if (_busy || _picking || !_form.currentState!.validate()) return;
+    if (_busy ||
+        _picking ||
+        widget.submissionLocked ||
+        !_validateAndFocusFirstInvalid()) {
+      return;
+    }
     final token = widget.gateway?.context;
     final i = widget.initial;
     String? optional(TextEditingController c, String? old) =>
@@ -239,8 +444,13 @@ class _ConvertFormState extends State<ConvertForm> {
       preserveNullAddress: preserveNullAddress,
       congregationId: _congregation,
       age: _age.text.isEmpty ? null : int.parse(_age.text),
-      photoBytes: _photo == null ? null : Uint8List.fromList(_photo!),
-      removePhoto: _removePhoto,
+      photoBytes: !_photoAllowedFor(_congregation) || _photo == null
+          ? null
+          : Uint8List.fromList(_photo!),
+      photoCrop: !_photoAllowedFor(_congregation) || _photo == null
+          ? null
+          : _photoCrop,
+      removePhoto: _photoAllowedFor(_congregation) && _removePhoto,
     );
     setState(() {
       _busy = true;
@@ -269,21 +479,24 @@ class _ConvertFormState extends State<ConvertForm> {
     TextEditingController c, {
     String? Function(String?)? validator,
     TextInputType? keyboard,
+    FocusNode? focusNode,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: AppTextFormField(
       fieldKey: ValueKey(key),
       controller: c,
-      readOnly: _busy,
+      readOnly: _busy || widget.submissionLocked,
       keyboardType: keyboard,
       validator: validator,
+      focusNode: focusNode,
       onChanged: (_) => setState(() {}),
       label: label,
     ),
   );
   @override
   Widget build(BuildContext context) {
-    final old = widget.existingPhoto;
+    final photoAllowed = _photoAllowedFor(_congregation);
+    final old = photoAllowed ? widget.existingPhoto : null;
     // Keep the attached photo visible during replacement, until the page publishes success.
     final displayed = old ?? (_removePhoto ? null : _photo);
     final worships = {...worshipTypes, ?_worship};
@@ -302,87 +515,96 @@ class _ConvertFormState extends State<ConvertForm> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Semantics(
-                  label: displayed == null
-                      ? 'Sem foto do convertido'
-                      : 'Foto do convertido',
-                  child: Center(
-                    child: Container(
-                      width: 104,
-                      height: 104,
-                      padding: const EdgeInsets.all(4),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: UnifiedColors.border,
-                          width: 2,
-                        ),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x140f172a),
-                            blurRadius: 8,
-                            offset: Offset(0, 3),
+                if (photoAllowed) ...[
+                  Semantics(
+                    label: displayed == null
+                        ? 'Sem foto do convertido'
+                        : 'Foto do convertido',
+                    child: Center(
+                      child: Container(
+                        width: 104,
+                        height: 104,
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: UnifiedColors.border,
+                            width: 2,
                           ),
-                        ],
-                      ),
-                      child: ClipOval(
-                        child: displayed == null
-                            ? const ColoredBox(
-                                color: UnifiedColors.pageTint,
-                                child: Icon(
-                                  Icons.person_outline,
-                                  size: 52,
-                                  color: UnifiedColors.muted,
-                                ),
-                              )
-                            : Image.memory(
-                                displayed,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, e, s) => const ColoredBox(
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x140f172a),
+                              blurRadius: 8,
+                              offset: Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: displayed == null
+                              ? const ColoredBox(
                                   color: UnifiedColors.pageTint,
                                   child: Icon(
                                     Icons.person_outline,
                                     size: 52,
                                     color: UnifiedColors.muted,
                                   ),
+                                )
+                              : Image.memory(
+                                  displayed,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, e, s) => const ColoredBox(
+                                    color: UnifiedColors.pageTint,
+                                    child: Icon(
+                                      Icons.person_outline,
+                                      size: 52,
+                                      color: UnifiedColors.muted,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 8,
-                  runSpacing: 4,
-                  children: [
-                    TextButton.icon(
-                      onPressed: _busy || _picking ? null : _pick,
-                      icon: const Icon(Icons.add_a_photo_outlined),
-                      label: Text(_picking ? 'Abrindo foto…' : 'Escolher foto'),
-                    ),
-                    if (_photo != null ||
-                        old != null ||
-                        widget.initial?.photoAssetId != null)
-                      TextButton(
-                        onPressed: _busy
+                  const SizedBox(height: 8),
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      TextButton.icon(
+                        onPressed: _busy || _picking || widget.submissionLocked
                             ? null
-                            : () => setState(() {
-                                _photo = null;
-                                _removePhoto = true;
-                              }),
-                        child: const Text('Remover foto'),
+                            : _pick,
+                        icon: const Icon(Icons.add_a_photo_outlined),
+                        label: Text(
+                          _picking ? 'Abrindo foto…' : 'Escolher foto',
+                        ),
                       ),
-                  ],
-                ),
-                if (_photo != null && old != null)
-                  const Text(
-                    'Nova foto selecionada. A foto atual será mantida até salvar.',
+                      if (_photo != null ||
+                          old != null ||
+                          widget.initial?.photoAssetId != null)
+                        TextButton(
+                          onPressed: _busy || widget.submissionLocked
+                              ? null
+                              : () => setState(() {
+                                  _clearSelectedPhoto();
+                                  _removePhoto = true;
+                                }),
+                          child: const Text('Remover foto'),
+                        ),
+                    ],
                   ),
-                if (_removePhoto) const Text('A foto será removida ao salvar.'),
+                  if (_photo != null && old != null)
+                    const Text(
+                      'Nova foto selecionada. A foto atual será mantida até salvar.',
+                    ),
+                  if (_removePhoto)
+                    const Text('A foto será removida ao salvar.'),
+                ],
                 DropdownButtonFormField<String>(
+                  key: const ValueKey('convert-congregation'),
+                  focusNode: _congregationFocus,
                   initialValue: _congregation,
                   isExpanded: true,
                   decoration: const InputDecoration(
@@ -394,17 +616,23 @@ class _ConvertFormState extends State<ConvertForm> {
                     for (final c in congregations.entries)
                       DropdownMenuItem(value: c.key, child: Text(c.value)),
                   ],
-                  onChanged: _busy
+                  onChanged:
+                      !widget.allowCongregationChange ||
+                          _busy ||
+                          _picking ||
+                          widget.submissionLocked
                       ? null
-                      : (v) => setState(() => _congregation = v),
-                  validator: (v) =>
-                      v == null ? 'Selecione uma congregação' : null,
+                      : _selectCongregation,
+                  validator: (v) => widget.requireCongregation && v == null
+                      ? 'Selecione uma congregação'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 AppTextFormField(
                   fieldKey: const ValueKey('person-name'),
                   controller: _name,
-                  readOnly: _busy,
+                  readOnly: _busy || widget.submissionLocked,
+                  focusNode: _nameFocus,
                   label: 'Nome *',
                   validator: (value) {
                     final name = value?.trim() ?? '';
@@ -420,7 +648,8 @@ class _ConvertFormState extends State<ConvertForm> {
                 BrPhoneField(
                   fieldKey: const ValueKey('person-phone'),
                   controller: _phone,
-                  enabled: !_busy,
+                  enabled: !_busy && !widget.submissionLocked,
+                  focusNode: _phoneFocus,
                 ),
                 _field('person-address-street', 'Endereço', _address),
                 _field(
@@ -430,12 +659,14 @@ class _ConvertFormState extends State<ConvertForm> {
                   validator: (v) => v!.trim().isEmpty
                       ? 'Ponto de referência é obrigatório'
                       : null,
+                  focusNode: _landmarkFocus,
                 ),
                 _field(
                   'age',
                   'Idade',
                   _age,
                   keyboard: TextInputType.number,
+                  focusNode: _ageFocus,
                   validator: (v) => v!.isEmpty
                       ? null
                       : (int.tryParse(v) == null ||
@@ -445,6 +676,8 @@ class _ConvertFormState extends State<ConvertForm> {
                             : null),
                 ),
                 DropdownButtonFormField<Gender>(
+                  key: const ValueKey('convert-gender'),
+                  focusNode: _genderFocus,
                   initialValue: _gender,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Gênero *'),
@@ -458,7 +691,9 @@ class _ConvertFormState extends State<ConvertForm> {
                       child: Text('Feminino'),
                     ),
                   ],
-                  onChanged: _busy ? null : (v) => setState(() => _gender = v),
+                  onChanged: _busy || widget.submissionLocked
+                      ? null
+                      : (v) => setState(() => _gender = v),
                   validator: (v) => v == null ? 'Gênero é obrigatório' : null,
                 ),
                 const SizedBox(height: 16),
@@ -466,7 +701,8 @@ class _ConvertFormState extends State<ConvertForm> {
                   fieldKey: const ValueKey('conversion_date'),
                   controller: _date,
                   label: 'Data de conversão *',
-                  enabled: !_busy,
+                  enabled: !_busy && !widget.submissionLocked,
+                  focusNode: _dateFocus,
                   validator: (value) {
                     final invalid = brDateValidationError(
                       value,
@@ -484,6 +720,8 @@ class _ConvertFormState extends State<ConvertForm> {
                   },
                 ),
                 DropdownButtonFormField<String>(
+                  key: const ValueKey('convert-worship'),
+                  focusNode: _worshipFocus,
                   initialValue: _worship,
                   isExpanded: true,
                   decoration: const InputDecoration(labelText: 'Tipo de culto'),
@@ -495,7 +733,9 @@ class _ConvertFormState extends State<ConvertForm> {
                     for (final w in worships)
                       DropdownMenuItem(value: w, child: Text(w)),
                   ],
-                  onChanged: _busy ? null : (v) => setState(() => _worship = v),
+                  onChanged: _busy || widget.submissionLocked
+                      ? null
+                      : (v) => setState(() => _worship = v),
                 ),
                 if (_error != null)
                   Padding(
@@ -509,21 +749,30 @@ class _ConvertFormState extends State<ConvertForm> {
                   runSpacing: 8,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: _busy ? null : widget.onCancel,
+                      onPressed: _busy || widget.submissionLocked
+                          ? null
+                          : widget.onCancel,
                       icon: const Icon(Icons.close),
                       label: const Text('Cancelar'),
                     ),
                     FilledButton.icon(
-                      onPressed: _busy || _picking ? null : _submit,
+                      onPressed:
+                          _busy ||
+                              _picking ||
+                              widget.submissionLocked ||
+                              !widget.submitEnabled
+                          ? null
+                          : _submit,
                       icon: Icon(
                         _busy ? Icons.hourglass_top : Icons.save_outlined,
                       ),
                       label: Text(
                         _busy
                             ? 'Salvando…'
-                            : widget.initial == null
-                            ? 'Cadastrar'
-                            : 'Atualizar',
+                            : widget.submitLabel ??
+                                  (widget.initial == null
+                                      ? 'Cadastrar'
+                                      : 'Atualizar'),
                       ),
                     ),
                   ],

@@ -104,7 +104,7 @@ raise SystemExit(0)
     def _write_stubs(self) -> None:
         python = self._bash_path(sys.executable)
         dispatcher = self._bash_path(self.dispatcher)
-        names = ("python", "python3", "flutter", "dart", "psql", "supabase", "git")
+        names = ("python", "python3", "flutter", "dart", "psql", "supabase", "git", "deno")
         for name in names:
             posix = self.bin / name
             posix.write_text(
@@ -245,6 +245,7 @@ class UnifiedGateContractTests(unittest.TestCase):
                         "--import-concurrency", "--lifecycle-concurrency",
                         "--ministry-registry-concurrency", "--ministry-academic-concurrency",
                         "--convert-student-concurrency", "--ministry-follow-up-concurrency",
+                        "--public-intake-concurrency",
                     }, "verification gate omitted or added a concurrency suite")
                     canonical = next(argv for argv in database_calls
                                      if argv and argv[0] == "canonical_person_link_test.sql")
@@ -372,6 +373,15 @@ class UnifiedGateContractTests(unittest.TestCase):
         self.assertIn('status.get("ANON_KEY")', status_step)
         self.assertNotIn("SERVICE_ROLE_KEY", status_step)
         self.assertNotIn("DB_URL", status_step)
+
+    def test_workflow_pins_deno_before_running_unified_gate(self) -> None:
+        workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")
+        deno_step = workflow.find("      - uses: denoland/setup-deno@v2")
+        gate_step = workflow.index("      - name: Run the unified gate")
+
+        self.assertNotEqual(deno_step, -1, "workflow must install Deno with denoland/setup-deno@v2")
+        self.assertLess(deno_step, gate_step, "Deno must be installed before the unified gate")
+        self.assertIn("          deno-version: v2.9.8", workflow[deno_step:gate_step])
 
     def test_workflow_pins_flutter_font_hashes_and_compatible_browser_pair(self) -> None:
         workflow = (REPOSITORY / ".github" / "workflows" / "verify-unified.yml").read_text(encoding="utf-8")

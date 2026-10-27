@@ -28,6 +28,7 @@ REQUIRED_RACES = {
     "--import-concurrency", "--lifecycle-concurrency",
     "--ministry-registry-concurrency", "--ministry-academic-concurrency",
     "--convert-student-concurrency", "--ministry-follow-up-concurrency",
+    "--public-intake-concurrency",
 }
 
 

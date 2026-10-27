@@ -48,7 +48,14 @@ class VerificationManifestTests(unittest.TestCase):
             "seed_scenario": "ministry_session_management_test.sql",
         })
 
-    def test_generated_argv_preserves_seed_order_and_all_nine_races(self) -> None:
+    def test_public_intake_hosted_smoke_is_covered_by_guarded_sql_gate(self) -> None:
+        result = validate()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        data = json.loads(MANIFEST.read_text(encoding="utf-8"))
+        scenarios = {entry["scenario"] for entry in data["sql"]}
+        self.assertIn("public_intake_hosted_smoke_test.sql", scenarios)
+
+    def test_generated_argv_preserves_seed_order_and_all_ten_races(self) -> None:
         result = subprocess.run(
             [sys.executable, str(TOOL), "--cases-json"], cwd=ROOT,
             text=True, capture_output=True, check=False,
@@ -72,6 +79,7 @@ class VerificationManifestTests(unittest.TestCase):
             "--import-concurrency", "--lifecycle-concurrency",
             "--ministry-registry-concurrency", "--ministry-academic-concurrency",
             "--convert-student-concurrency", "--ministry-follow-up-concurrency",
+            "--public-intake-concurrency",
         })
 
     def test_generated_case_lines_use_lf_without_carriage_returns(self) -> None:
@@ -82,7 +90,7 @@ class VerificationManifestTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr.decode("utf-8"))
         self.assertNotIn(b"\r", result.stdout)
         lines = result.stdout.decode("utf-8").splitlines()
-        expected_count = len(json.loads(MANIFEST.read_text(encoding="utf-8"))["sql"]) + 9
+        expected_count = len(json.loads(MANIFEST.read_text(encoding="utf-8"))["sql"]) + 10
         self.assertEqual(len(lines), expected_count)
         canonical = next(line for line in lines if line.startswith("sql\tcanonical_person_link_test.sql\t"))
         self.assertEqual(canonical.split("\t")[2:], [

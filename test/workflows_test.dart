@@ -137,7 +137,7 @@ class RootFixture {
           value = {
             'is_admin': admin,
             'is_supervision': false,
-            'congregation_ids': <String>[],
+            'congregation_ids': admin ? <String>[] : [scopeId],
             'ministry_supervision': false,
             'ministry_congregation_ids': [scopeId],
           };
@@ -417,6 +417,15 @@ Future<void> drain(WidgetTester tester) async {
     );
     await tester.pump();
   }
+}
+
+Future<void> selectSyntheticCongregation(WidgetTester tester) async {
+  final field = find.byKey(const ValueKey('convert-congregation'));
+  await tester.ensureVisible(field);
+  await tester.tap(field);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text('Congregação Sintética').last);
+  await tester.pumpAndSettle();
 }
 
 Future<void> settleLoopback(WidgetTester tester) async {
@@ -854,6 +863,7 @@ void main() {
       await drain(tester);
       expect(find.byType(RegisterPage), findsOneWidget);
       final owner = tester.state(find.byType(RegisterPage));
+      await selectSyntheticCongregation(tester);
       final rootContext = tester.element(find.byType(RegisterPage));
       final router = (rootContext
           .findAncestorWidgetOfExactType<ProtectedApplication>()!);
@@ -910,6 +920,7 @@ void main() {
       );
       await drain(tester);
       final owner = tester.state(find.byType(RegisterPage));
+      await selectSyntheticCongregation(tester);
       await tester.enterText(
         find.byKey(const ValueKey('person-name')),
         'Synthetic private draft',
@@ -948,6 +959,7 @@ void main() {
         );
         await drain(tester);
         final owner = tester.state(find.byType(RegisterPage));
+        await selectSyntheticCongregation(tester);
         await tester.enterText(
           find.byKey(const ValueKey('person-name')),
           'Synthetic private draft',

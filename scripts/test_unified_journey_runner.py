@@ -2,6 +2,7 @@ import importlib
 import http.client
 import json
 import os
+from dataclasses import replace
 from pathlib import Path
 import tempfile
 import threading
@@ -211,6 +212,183 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertNotIn("service_role", serialized.lower())
         self.assertEqual(settings["JOURNEY_CONVERT_NAME"], "Journey Convert test")
 
+    def test_local_intake_endpoint_is_the_only_test_server_value_in_flutter_settings(self):
+        self.require_runner()
+        endpoint = "http://127.0.0.1:7358/functions/v1/public-intake"
+        settings = runner.flutter_settings(
+            api_url="http://127.0.0.1:54321",
+            anon_key="public-anon-key",
+            service_role_key="service-role-never-in-browser",
+            fixture={"JOURNEY_INTAKE_TEST_ENDPOINT": endpoint},
+        )
+        self.assertEqual(settings["JOURNEY_INTAKE_TEST_ENDPOINT"], endpoint)
+        self.assertNotIn("service-role-never-in-browser", json.dumps(settings))
+
+        for unsafe in (
+            "https://hosted.example/functions/v1/public-intake",
+            "http://127.0.0.1:7358/unrelated",
+            "http://127.0.0.1:7358/functions/v1/public-intake?target=hosted",
+        ):
+            with self.subTest(endpoint=unsafe):
+                with self.assertRaises(runner.UnsafeSupabaseTarget):
+                    runner.flutter_settings(
+                        api_url="http://127.0.0.1:54321",
+                        anon_key="public-anon-key",
+                        service_role_key="service-role-never-in-browser",
+                        fixture={"JOURNEY_INTAKE_TEST_ENDPOINT": unsafe},
+                    )
+
+    def test_local_intake_server_keeps_service_role_host_side_and_limits_network(self):
+        self.require_runner()
+        fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
+        config = runner.LocalSupabase(
+            "http://127.0.0.1:54321",
+            "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+            "local-anon",
+            "host-only-service-role-secret",
+        )
+        server = runner.LocalPublicIntakeTestFunction(
+            config,
+            fixture,
+            allowed_origin="http://127.0.0.1:7357",
+        )
+        process = mock.Mock()
+        process.poll.return_value = None
+        captured = {}
+
+        def start_process(command, **kwargs):
+            captured.update(command=command, **kwargs)
+            return process
+
+        with (
+            mock.patch.object(runner, "_deno_executable", return_value="deno"),
+            mock.patch.object(runner, "_free_loopback_port", return_value=7358),
+            mock.patch.object(runner.subprocess, "Popen", side_effect=start_process),
+            mock.patch.object(runner, "request_json", return_value={"ready": True}),
+        ):
+            server.start()
+            server.close()
+
+        self.assertEqual(
+            server.endpoint,
+            f"http://127.0.0.1:{server.port}/functions/v1/public-intake",
+        )
+        self.assertIn(
+            f"--allow-net=127.0.0.1:{server.port},127.0.0.1:54321",
+            captured["command"],
+        )
+        self.assertNotIn("host-only-service-role-secret", captured["command"])
+        self.assertEqual(
+            captured["env"]["JOURNEY_LOCAL_SERVICE_ROLE_KEY"],
+            "host-only-service-role-secret",
+        )
+        self.assertEqual(captured["stdout"], runner.subprocess.DEVNULL)
+        self.assertEqual(captured["stderr"], runner.subprocess.DEVNULL)
+
+    def test_local_intake_server_rejects_remote_api_before_process_start(self):
+        self.require_runner()
+        fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
+        config = runner.LocalSupabase(
+            "https://remote.example",
+            "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+            "local-anon",
+            "service-secret",
+        )
+        server = runner.LocalPublicIntakeTestFunction(
+            config,
+            fixture,
+            allowed_origin="http://127.0.0.1:7357",
+        )
+        with (
+            mock.patch.object(runner, "_deno_executable", return_value="deno"),
+            mock.patch.object(runner.subprocess, "Popen") as popen,
+            self.assertRaises(runner.UnsafeSupabaseTarget),
+        ):
+            server.start()
+        popen.assert_not_called()
+
+    def test_cleanup_targets_run_owned_pending_intake_and_approved_convert(self):
+        self.require_runner()
+        fixture = runner.make_fixture(
+            "17b98af0-dfd2-4ae0-94cc-c44eb7258f9a",
+            password_factory=lambda: "synthetic-only-password",
+        )
+        sql = runner.cleanup_sql(fixture)
+        self.assertIn(fixture.public_convert_name, sql)
+        self.assertRegex(sql, r"(?is)journey_owned_public_submissions")
+        self.assertIn("private.public_intake_submissions", sql)
+        self.assertIn("private.public_intake_receipts", sql)
+        self.assertIn("private.public_intake_decisions", sql)
+        self.assertIn("private.public_intake_accepted_events", sql)
+        self.assertNotRegex(sql, r"(?is)DELETE\s+FROM\s+private\.public_intake_submissions\s*;")
+        self.assertNotRegex(sql, r"(?is)TRUNCATE")
+        self.assertNotIn("synthetic-only-password", sql)
+
+    def test_cleanup_pins_public_submission_id_and_acceptance_sql_checks_erasure(self):
+        self.require_runner()
+        fixture = replace(
+            runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a"),
+            public_submission_id="22222222-2222-4222-8222-222222222222",
+        )
+        cleanup = runner.cleanup_sql(fixture)
+        self.assertIn(fixture.public_submission_id, cleanup)
+        self.assertIn(
+            f"s.congregation_id={runner._sql_uuid(fixture.congregation_a_id)}",
+            cleanup,
+        )
+
+        acceptance = runner.public_intake_acceptance_sql(fixture)
+        self.assertIn("status='approved' AND draft IS NULL", acceptance)
+        self.assertIn("payload_erased_at IS NOT NULL", acceptance)
+        self.assertIn("private.public_intake_decisions", acceptance)
+        self.assertIn("private.public_intake_accepted_events", acceptance)
+        self.assertIn(f"c.created_by={runner._sql_uuid(fixture.supervisor_id)}", acceptance)
+        with self.assertRaises(ValueError):
+            runner.public_intake_acceptance_sql(runner.make_fixture(fixture.run_id))
+
+    def test_partial_anonymous_upload_cleanup_is_exact_and_loopback_only(self):
+        self.require_runner()
+        fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
+        config = runner.LocalSupabase(
+            "http://127.0.0.1:54321",
+            "postgresql://postgres:pw@127.0.0.1:54329/postgres",
+            "local-anon",
+            "host-only-service-role",
+        )
+        with mock.patch.object(runner, "request_json") as request:
+            runner.cleanup_public_intake_photo(config, fixture)
+        request.assert_called_once_with(
+            "http://127.0.0.1:54321/storage/v1/object/convert-photos/"
+            f"journey-test/{fixture.run_id}/unsigned.jpg",
+            method="DELETE",
+            headers={
+                "apikey": "host-only-service-role",
+                "Authorization": "Bearer host-only-service-role",
+            },
+            timeout=10,
+        )
+
+        remote = replace(config, api_url="https://hosted.example")
+        with mock.patch.object(runner, "request_json") as request:
+            with self.assertRaises(runner.UnsafeSupabaseTarget):
+                runner.cleanup_public_intake_photo(remote, fixture)
+        request.assert_not_called()
+
+    def test_public_submission_cleanup_marker_accepts_one_uuid_only(self):
+        self.require_runner()
+        submission_id = "22222222-2222-4222-8222-222222222222"
+        self.assertEqual(
+            runner._public_submission_id_from_output(
+                f"PUBLIC_INTAKE_CLEANUP_ID={submission_id}"
+            ),
+            submission_id,
+        )
+        with self.assertRaises(runner.JourneyFailure):
+            runner._public_submission_id_from_output(
+                f"PUBLIC_INTAKE_CLEANUP_ID={submission_id}\n"
+                "PUBLIC_INTAKE_CLEANUP_ID=33333333-3333-4333-8333-333333333333"
+            )
+
     def test_cleanup_sql_is_scoped_to_generated_run_fixture_ids(self):
         self.require_runner()
         fixture = runner.make_fixture(
@@ -236,8 +414,15 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertIn(
             f"c.name={runner._sql_text(fixture.convert_name)}", convert_selector
         )
+        self.assertIn(
+            f"c.name={runner._sql_text(fixture.public_convert_name)}",
+            convert_selector,
+        )
         self.assertIn("c.internal_id=c.id::text", convert_selector)
-        self.assertNotIn("c.congregation_id", convert_selector)
+        self.assertIn(
+            f"c.congregation_id={runner._sql_uuid(fixture.congregation_a_id)}",
+            convert_selector,
+        )
         self.assertNotIn("synthetic-only-password", sql)
         self.assertNotRegex(sql, r"(?is)DELETE\s+FROM\s+(?:public\.)?congregations\s*;")
         with self.assertRaises(ValueError):
@@ -313,6 +498,7 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
                 create=True,
             ),
             mock.patch.object(runner, "run_sql", side_effect=lambda sql, _url: cleanup_calls.append(sql) or ""),
+            mock.patch.object(runner, "cleanup_public_intake_photo"),
         ):
             result = runner.run_journey()
         self.assertEqual(result, runner.FAIL)
@@ -334,12 +520,16 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         fixture = runner.make_fixture("17b98af0-dfd2-4ae0-94cc-c44eb7258f9a")
         actual_student_id = "22222222-2222-4222-8222-222222222222"
         actual_person_id = "77777777-7777-4777-8777-777777777777"
+        actual_submission_id = "33333333-3333-4333-8333-333333333333"
         cleanup_calls = []
 
         def report_then_fail(_config, _fixture, _driver, _chrome, **kwargs):
             callback = kwargs.get("on_owned_identity")
             if callback is not None:
                 callback(actual_student_id, actual_person_id)
+            submission_callback = kwargs.get("on_public_submission")
+            if submission_callback is not None:
+                submission_callback(actual_submission_id)
             raise runner.JourneyFailure("synthetic post-registration browser failure")
 
         stderr = StringIO()
@@ -367,6 +557,7 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
                 side_effect=lambda sql, _url: cleanup_calls.append(sql) or "",
             ),
             mock.patch.object(runner, "_run_browser_journey", side_effect=report_then_fail),
+            mock.patch.object(runner, "cleanup_public_intake_photo"),
         ):
             result = runner.run_journey()
 
@@ -374,6 +565,7 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         self.assertEqual(len(cleanup_calls), 2)
         self.assertIn(actual_student_id, cleanup_calls[-1])
         self.assertIn(actual_person_id, cleanup_calls[-1])
+        self.assertIn(actual_submission_id, cleanup_calls[-1])
         self.assertNotIn("synthetic post-registration browser failure", stderr.getvalue())
 
     def test_browser_failure_releases_the_run_control(self):
@@ -397,8 +589,22 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
             def close(self):
                 closed.append(True)
 
+        class FakeIntakeTestServer:
+            endpoint = "http://127.0.0.1:43212/functions/v1/public-intake"
+
+            def start(self):
+                return None
+
+            def close(self):
+                closed.append(True)
+
         with (
             mock.patch.object(runner, "RevocationControl", return_value=FakeControl()),
+            mock.patch.object(
+                runner,
+                "LocalPublicIntakeTestFunction",
+                return_value=FakeIntakeTestServer(),
+            ),
             mock.patch.object(
                 runner,
                 "_start_chromedriver",
@@ -408,7 +614,7 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         ):
             with self.assertRaises(runner.PrerequisiteBlocked):
                 runner._run_browser_journey(config, fixture, "driver", "chrome")
-        self.assertEqual(closed, [True])
+        self.assertEqual(closed, [True, True])
         run_sql.assert_not_called()
 
     def test_browser_timeout_after_launch_is_journey_failure_and_releases_control(self):
@@ -433,6 +639,15 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
             def close(self):
                 closed.append(True)
 
+        class FakeIntakeTestServer:
+            endpoint = "http://127.0.0.1:43212/functions/v1/public-intake"
+
+            def start(self):
+                return None
+
+            def close(self):
+                closed.append(True)
+
         class FakeProcess:
             def poll(self):
                 return None
@@ -446,6 +661,11 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         with (
             mock.patch.object(runner, "_free_loopback_port", return_value=43211),
             mock.patch.object(runner, "RevocationControl", return_value=FakeControl()),
+            mock.patch.object(
+                runner,
+                "LocalPublicIntakeTestFunction",
+                return_value=FakeIntakeTestServer(),
+            ),
             mock.patch.object(runner, "_start_chromedriver", return_value=FakeProcess()),
             mock.patch.object(runner, "_safe_environment", return_value={}),
             mock.patch.object(runner, "_drive_command", return_value=["flutter", "drive"]),
@@ -457,7 +677,7 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         ):
             with self.assertRaises(runner.JourneyFailure):
                 runner._run_browser_journey(config, fixture, "driver", "chrome")
-        self.assertEqual(closed, [True])
+        self.assertEqual(closed, [True, True])
         self.assertEqual(terminated, [True])
 
     def test_cleanup_failure_cannot_report_pass_and_retains_sanitized_cause(self):
@@ -472,7 +692,14 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
         def run_sql(sql, _url):
             if "-- run_id:" in sql:
                 raise runner.JourneyFailure("synthetic cleanup failure")
+            if "WITH target AS" in sql:
+                return "PASS"
             return ""
+
+        def report_submission(_config, _fixture, _driver, _chrome, **kwargs):
+            callback = kwargs.get("on_public_submission")
+            if callback is not None:
+                callback("33333333-3333-4333-8333-333333333333")
 
         stderr = StringIO()
         with (
@@ -494,7 +721,8 @@ class UnifiedJourneyRunnerTests(unittest.TestCase):
             mock.patch.object(runner, "_admin_create_user", side_effect=create_user),
             mock.patch.object(runner, "_admin_delete_user"),
             mock.patch.object(runner, "run_sql", side_effect=run_sql),
-            mock.patch.object(runner, "_run_browser_journey"),
+            mock.patch.object(runner, "_run_browser_journey", side_effect=report_submission),
+            mock.patch.object(runner, "cleanup_public_intake_photo"),
         ):
             result = runner.run_journey()
         self.assertEqual(user_count, 4)

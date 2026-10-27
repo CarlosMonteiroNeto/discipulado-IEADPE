@@ -69,7 +69,11 @@ def check_catalog_concurrency(psql, connection):
         ('{manager}','catalog-race-manager@example.test',now());
         INSERT INTO private.admin_allowlist VALUES('{manager}');
         INSERT INTO public.congregations(id,name) VALUES('{scope}','Synthetic catalog race');
+        INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+        ('catalog-race-registrar@example.test','{registrar}',
+         'Membro da direção da campanha','{scope}');
     """)
+    assert query(f"SELECT count(*) FROM public.user_access WHERE user_id='{registrar}' AND role='Membro da direção da campanha' AND congregation_id='{scope}'") == "1"
 
     def authenticated(actor):
         return ("BEGIN; SET LOCAL ROLE authenticated; "
@@ -106,7 +110,11 @@ def check_catalog_concurrency(psql, connection):
             wait_until("selection revalidates after archive", lambda: attempted.state().get("state") == "idle in transaction")
             attempted.finish()
             assert query("SELECT count(*) FROM public.converts") == "0"
-            assert query("SELECT count(*) FROM public.user_access") == "0"
+            if index == 0:
+                assert query(f"SELECT count(*) FROM public.user_access WHERE user_id='{registrar}' AND role='Membro da direção da campanha' AND congregation_id='{scope}'") == "1"
+            else:
+                assert query("SELECT count(*) FROM public.user_access") == "0"
+            assert query(f"SELECT count(*) FROM public.user_access WHERE user_id='{manager}'") == "0"
             query(f"UPDATE public.congregations SET archived_at=NULL WHERE id='{scope}'")
 
             selected = Session(f"ieadpe_selection_first_{index}", authenticated(registrar if index == 0 else manager) +

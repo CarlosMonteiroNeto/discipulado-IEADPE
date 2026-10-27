@@ -78,7 +78,19 @@
       "scenario": "optional_worship_test.sql"
     },
     {
+      "scenario": "pending_review_test.sql"
+    },
+    {
       "scenario": "photos_test.sql"
+    },
+    {
+      "scenario": "public_intake_hosted_smoke_test.sql"
+    },
+    {
+      "scenario": "public_intake_test.sql"
+    },
+    {
+      "scenario": "public_registration_authority_test.sql"
     },
     {
       "scenario": "student_academic_link_test.sql"
@@ -126,6 +138,9 @@
     },
     {
       "flag": "--ministry-follow-up-concurrency"
+    },
+    {
+      "flag": "--public-intake-concurrency"
     }
   ]
 }

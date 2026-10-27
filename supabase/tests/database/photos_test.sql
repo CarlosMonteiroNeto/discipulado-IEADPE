@@ -9,6 +9,10 @@ INSERT INTO auth.users(id,email,email_confirmed_at) VALUES
  ('80000000-0000-0000-0000-000000000003','other@example.test',now());
 INSERT INTO private.admin_allowlist VALUES('80000000-0000-0000-0000-000000000002');
 INSERT INTO public.congregations(id,name) VALUES('81000000-0000-0000-0000-810000000001','Photo fixture');
+-- Approved policy: photo draft/upload requires an active scoped or global grant.
+INSERT INTO public.user_access(user_email,user_id,role,congregation_id) VALUES
+ ('uploader@example.test','80000000-0000-0000-0000-000000000001',
+  'Membro da direção da campanha','81000000-0000-0000-0000-810000000001');
 CREATE TEMP TABLE photos(label text PRIMARY KEY,id uuid,path text);
 CREATE TEMP TABLE target(id uuid);
 GRANT ALL ON photos,target TO authenticated;
@@ -79,8 +83,11 @@ INSERT INTO target SELECT (public.ieadpe_create_convert(gen_random_uuid(),jsonb_
  'person',jsonb_build_object('name','Synthetic','phone',NULL,'birth_date',NULL,'address',NULL),
  'convert',jsonb_build_object('landmark','Square','gender','male','conversion_date','2020-01-01','worship_type','01',
   'photo_asset_id',(SELECT id FROM photos WHERE label='old'))))->>'id')::uuid;
-SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects), 'registrar loses photo ownership read after attach');
-SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.photo_assets), 'registrar cannot read attached metadata');
+SELECT pg_temp.assert_true((SELECT count(*)=1 FROM storage.objects), 'active scope reads its newly attached photo');
+SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.photo_assets), 'active scope reads its attached metadata');
+SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000003',true);
+SELECT pg_temp.assert_true((SELECT count(*)=0 FROM storage.objects), 'no-grant actor cannot read an attached object');
+SELECT pg_temp.assert_true((SELECT count(*)=0 FROM public.photo_assets), 'no-grant actor cannot read attached metadata');
 SELECT set_config('request.jwt.claim.sub','80000000-0000-0000-0000-000000000002',true);
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM storage.objects), 'current scope reads attached photo from another uploader');
 RESET ROLE;

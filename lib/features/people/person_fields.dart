@@ -21,6 +21,9 @@ class PersonFields extends StatelessWidget {
     this.enabled = true,
     this.nameValidator,
     this.birthDateValidator,
+    this.nameFocusNode,
+    this.phoneFocusNode,
+    this.birthDateFocusNode,
   });
 
   final TextEditingController name;
@@ -34,6 +37,9 @@ class PersonFields extends StatelessWidget {
   final bool enabled;
   final String? Function(String?)? nameValidator;
   final String? Function(String?)? birthDateValidator;
+  final FocusNode? nameFocusNode;
+  final FocusNode? phoneFocusNode;
+  final FocusNode? birthDateFocusNode;
 
   Widget _field(
     String key,
@@ -42,6 +48,7 @@ class PersonFields extends StatelessWidget {
     TextInputType? keyboard,
     String? Function(String?)? validator,
     int? maxLength,
+    FocusNode? focusNode,
   }) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: AppTextFormField(
@@ -51,6 +58,7 @@ class PersonFields extends StatelessWidget {
       enabled: enabled,
       keyboardType: keyboard,
       validator: validator,
+      focusNode: focusNode,
       maxLength: maxLength,
     ),
   );
@@ -60,13 +68,20 @@ class PersonFields extends StatelessWidget {
     crossAxisAlignment: CrossAxisAlignment.stretch,
     mainAxisSize: MainAxisSize.min,
     children: [
-      _field('person-name', 'Nome *', name, validator: nameValidator),
+      _field(
+        'person-name',
+        'Nome *',
+        name,
+        validator: nameValidator,
+        focusNode: nameFocusNode,
+      ),
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: BrPhoneField(
           fieldKey: const ValueKey('person-phone'),
           controller: phone,
           enabled: enabled,
+          focusNode: phoneFocusNode,
         ),
       ),
       Padding(
@@ -79,6 +94,7 @@ class PersonFields extends StatelessWidget {
           allowClear: true,
           validator:
               birthDateValidator ?? (value) => brDateValidationError(value),
+          focusNode: birthDateFocusNode,
         ),
       ),
       _field('person-address-street', 'Logradouro', street),

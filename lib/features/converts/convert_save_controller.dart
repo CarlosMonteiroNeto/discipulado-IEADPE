@@ -57,6 +57,13 @@ class ConvertSaveController {
         fields,
         draft.removePhoto,
         draft.photoBytes == null ? null : base64Encode(draft.photoBytes!),
+        draft.photoCrop == null
+            ? null
+            : [
+                draft.photoCrop!.left,
+                draft.photoCrop!.top,
+                draft.photoCrop!.size,
+              ],
       ]);
       if (_signature != signature) {
         _signature = signature;
@@ -74,7 +81,10 @@ class ConvertSaveController {
         };
         final convert = Map<String, Object?>.from(payload['convert'] as Map);
         if (draft.photoBytes != null) {
-          final asset = await photos.upload(draft.photoBytes!);
+          final asset = await photos.upload(
+            draft.photoBytes!,
+            crop: draft.photoCrop,
+          );
           check();
           convert['photo_asset_id'] = asset.id;
         } else if (draft.removePhoto) {

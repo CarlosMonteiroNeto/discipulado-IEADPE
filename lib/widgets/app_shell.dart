@@ -18,6 +18,8 @@ class AppShell extends StatelessWidget {
     required this.onSignOut,
     this.currentRoute = '/home',
     this.onFeedback,
+    this.publicMode = false,
+    this.navigationLocked = false,
   });
 
   final Widget child;
@@ -26,11 +28,14 @@ class AppShell extends StatelessWidget {
   final ValueChanged<String> onNavigate;
   final VoidCallback onSignOut;
   final VoidCallback? onFeedback;
+  final bool publicMode;
+  final bool navigationLocked;
 
   static const labels = {
     '/home': 'Início',
     '/register': 'Cadastrar',
     '/converts': 'Convertidos',
+    '/pending': 'Pendentes',
     '/admin': 'Admin',
     '/ministry': 'Discipulado',
     '/ministry/team': 'Equipe',
@@ -45,6 +50,7 @@ class AppShell extends StatelessWidget {
     '/home': Icons.home_outlined,
     '/register': Icons.person_add_alt_1_outlined,
     '/converts': Icons.people_outline,
+    '/pending': Icons.inbox_outlined,
     '/admin': Icons.settings_outlined,
     '/ministry': Icons.menu_book_outlined,
     '/ministry/team': Icons.groups_outlined,
@@ -73,6 +79,7 @@ class AppShell extends StatelessWidget {
       '/home',
       '/register',
       '/converts',
+      '/pending',
       '/admin',
       '/ministry',
     ])
@@ -80,6 +87,7 @@ class AppShell extends StatelessWidget {
   ];
 
   void _feedback(BuildContext context) {
+    if (navigationLocked) return;
     if (onFeedback != null) {
       onFeedback!.call();
     } else {
@@ -93,9 +101,11 @@ class AppShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final routes = routesFor(scope)
-        .where((route) => !hiddenFromMenu.contains(route))
-        .toList(growable: false);
+    final routes = publicMode
+        ? const ['/register', '/home']
+        : routesFor(scope)
+              .where((route) => !hiddenFromMenu.contains(route))
+              .toList(growable: false);
     final mobile = MediaQuery.sizeOf(context).width < 768;
     final hasOverflow = routes.length > 5;
     final primaryRoutes = mobile
@@ -151,30 +161,36 @@ class AppShell extends StatelessWidget {
                       selected: _active(route),
                       selectedColor: UnifiedColors.brandNavy,
                       selectedTileColor: UnifiedColors.selected,
+                      onTap: navigationLocked
+                          ? null
+                          : () {
+                              Navigator.of(drawerContext).pop();
+                              onNavigate(route);
+                            },
+                    ),
+                  if (!publicMode) ...[
+                    const Divider(),
+                    ListTile(
+                      key: const ValueKey('app-shell-drawer-feedback'),
+                      leading: const Icon(Icons.feedback_outlined),
+                      title: const Text('Enviar sugestão'),
+                      onTap: navigationLocked
+                          ? null
+                          : () {
+                              Navigator.of(drawerContext).pop();
+                              _feedback(drawerContext);
+                            },
+                    ),
+                    ListTile(
+                      key: const ValueKey('app-shell-drawer-sign-out'),
+                      leading: const Icon(Icons.logout),
+                      title: const Text('Sair'),
                       onTap: () {
                         Navigator.of(drawerContext).pop();
-                        onNavigate(route);
+                        onSignOut();
                       },
                     ),
-                  const Divider(),
-                  ListTile(
-                    key: const ValueKey('app-shell-drawer-feedback'),
-                    leading: const Icon(Icons.feedback_outlined),
-                    title: const Text('Enviar sugestão'),
-                    onTap: () {
-                      Navigator.of(drawerContext).pop();
-                      _feedback(drawerContext);
-                    },
-                  ),
-                  ListTile(
-                    key: const ValueKey('app-shell-drawer-sign-out'),
-                    leading: const Icon(Icons.logout),
-                    title: const Text('Sair'),
-                    onTap: () {
-                      Navigator.of(drawerContext).pop();
-                      onSignOut();
-                    },
-                  ),
+                  ],
                 ],
               ),
             ),
@@ -194,7 +210,7 @@ class AppShell extends StatelessWidget {
           backgroundColor: selected ? Colors.white : Colors.transparent,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
-        onPressed: () => onNavigate(route),
+        onPressed: navigationLocked ? null : () => onNavigate(route),
         icon: Icon(icons[route], size: 18),
         label: Text(
           labels[route]!,
@@ -219,6 +235,7 @@ class AppShell extends StatelessWidget {
         for (final route in routes)
           PopupMenuItem<String>(
             value: route,
+            enabled: !navigationLocked,
             child: Row(
               children: [
                 Icon(icons[route], size: 20),
@@ -228,8 +245,9 @@ class AppShell extends StatelessWidget {
             ),
           ),
         const PopupMenuDivider(),
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: _feedbackAction,
+          enabled: !navigationLocked,
           child: Row(
             children: [
               Icon(Icons.feedback_outlined, size: 20),
@@ -286,9 +304,11 @@ class AppShell extends StatelessWidget {
                       child: Text(labels[route]!, maxLines: 2),
                     ),
                 ],
-                onChanged: (route) {
-                  if (route != null) onNavigate(route);
-                },
+                onChanged: navigationLocked
+                    ? null
+                    : (route) {
+                        if (route != null) onNavigate(route);
+                      },
               ),
             ),
           ),
@@ -354,7 +374,7 @@ class AppShell extends StatelessWidget {
                                     icon: const Icon(Icons.menu),
                                   ),
                                 )
-                              else ...[
+                              else if (!publicMode) ...[
                                 IconButton(
                                   tooltip: 'Sair',
                                   color: Colors.white,
@@ -409,10 +429,12 @@ class AppShell extends StatelessWidget {
                           child: Semantics(
                             key: ValueKey('app-shell-nav-$route'),
                             selected: _active(route),
-                            button: true,
+                            button: !navigationLocked,
                             label: labels[route],
                             child: InkWell(
-                              onTap: () => onNavigate(route),
+                              onTap: navigationLocked
+                                  ? null
+                                  : () => onNavigate(route),
                               child: Stack(
                                 fit: StackFit.expand,
                                 children: [
@@ -510,11 +532,13 @@ class AppShell extends StatelessWidget {
               ),
             )
           : null,
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Enviar sugestão',
-        onPressed: () => _feedback(context),
-        child: const Icon(Icons.feedback_outlined),
-      ),
+      floatingActionButton: publicMode
+          ? null
+          : FloatingActionButton(
+              tooltip: 'Enviar sugestão',
+              onPressed: navigationLocked ? null : () => _feedback(context),
+              child: const Icon(Icons.feedback_outlined),
+            ),
     );
   }
 }

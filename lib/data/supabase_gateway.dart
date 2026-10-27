@@ -50,6 +50,15 @@ abstract interface class ReadRpcGateway implements Gateway {
   });
 }
 
+/// Authenticated review RPC transport. Pending-review writes have a typed
+/// result distinct from the older ID-only [Gateway.command] contract.
+abstract interface class PendingReviewGateway implements ReadRpcGateway {
+  Future<Map<String, dynamic>> reviewPendingIntake(
+    String operationId,
+    Map<String, Object?> payload,
+  );
+}
+
 /// Additive ministry command transport. Rich ministry results include revisions
 /// and status values, while the older convert command contract returns an ID.
 abstract interface class MinistryCommandGateway implements Gateway {
@@ -96,7 +105,7 @@ abstract interface class ImportRpcGateway implements Gateway {
 
 class SupabaseGateway
     implements
-        ReadRpcGateway,
+        PendingReviewGateway,
         ImportRpcGateway,
         MinistryCommandGateway,
         StudentRegistrationCommandGateway,
@@ -500,6 +509,10 @@ class SupabaseGateway
     required String context,
     Map<String, Object?> parameters = const {},
   }) async {
+    const pendingReadParameters = <String, Set<String>>{
+      'list_pending_intake': {'congregation_id', 'limit', 'cursor'},
+      'get_pending_intake': {'id'},
+    };
     const ministryReadParameters = <String, Set<String>>{
       'ministry_list_congregations': {'limit', 'cursor'},
       'ministry_list_people': {
@@ -572,9 +585,11 @@ class SupabaseGateway
       'ministry_list_classes': {'congregation_id', 'status', 'limit', 'cursor'},
     };
     final ministryKeys = ministryReadParameters[rpc];
+    final pendingKeys = pendingReadParameters[rpc];
     final ministryRead = ministryKeys != null;
     final Set<String>? allowed =
         ministryKeys ??
+        pendingKeys ??
         (rpc == 'weekly_overview'
             ? <String>{'after_id', 'expected_week'}
             : null);
@@ -583,6 +598,8 @@ class SupabaseGateway
       throw const DataFailure('invalid');
     }
     const requiredReadKeys = <String, Set<String>>{
+      'list_pending_intake': {'congregation_id', 'limit', 'cursor'},
+      'get_pending_intake': {'id'},
       'ministry_list_people': {'congregation_id', 'limit'},
       'ministry_list_converts': {'limit'},
       'ministry_get_convert': {'congregation_id', 'convert_id'},
@@ -622,7 +639,47 @@ class SupabaseGateway
       () => client
           .rpc(
             'ieadpe_$rpc',
-            params: ministryRead ? {'request': frozen} : frozen,
+            params: ministryRead || pendingKeys != null
+                ? {'request': frozen}
+                : frozen,
+          )
+          .retry(enabled: false, requestTimeout: requestTimeout),
+    );
+    if (result is! Map<String, dynamic>) {
+      throw const DataFailure('invalid_response');
+    }
+    return result;
+  }
+
+  @override
+  Future<Map<String, dynamic>> reviewPendingIntake(
+    String operationId,
+    Map<String, Object?> payload,
+  ) async {
+    validateUuid(operationId);
+    if (!_hasExactKeys(payload, {
+          'id',
+          'expected_revision',
+          'decision',
+          if (payload['decision'] == 'approve') 'draft',
+        }) ||
+        !{'approve', 'reject'}.contains(payload['decision'])) {
+      throw const DataFailure('invalid');
+    }
+    validateUuid(payload['id']);
+    final revision = payload['expected_revision'];
+    if (revision is! int || revision < 1) throw const DataFailure('invalid');
+    if (payload['decision'] == 'approve' && payload['draft'] is! Map ||
+        payload['decision'] == 'reject' && payload.containsKey('draft')) {
+      throw const DataFailure('invalid');
+    }
+    final frozen = Map<String, Object?>.unmodifiable(payload);
+    final result = await _run(
+      context,
+      () => client
+          .rpc(
+            'ieadpe_review_pending_intake',
+            params: {'operation_id': operationId, 'payload': frozen},
           )
           .retry(enabled: false, requestTimeout: requestTimeout),
     );

@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart';
 import 'photo_processor.dart';
+import 'photo_crop.dart';
 
 class PhotoAsset {
   const PhotoAsset({required this.id, required this.path});
@@ -24,9 +25,18 @@ class PhotoAsset {
 
 /// No byte or URL cache. The UI must clear memory images on boundary invalidation.
 class PhotoRepository {
-  PhotoRepository(this.gateway, {this.processor = processPhoto});
+  PhotoRepository(
+    this.gateway, {
+    Future<Uint8List> Function(Uint8List)? processor,
+  }) : processor = processor ?? processPhoto,
+       _cropProcessor = processor == null
+           ? processPhoto
+           : ((Uint8List bytes, {NormalizedPhotoCrop? crop}) =>
+                 processor(bytes));
   final SupabaseGateway gateway;
   final Future<Uint8List> Function(Uint8List) processor;
+  final Future<Uint8List> Function(Uint8List, {NormalizedPhotoCrop? crop})
+  _cropProcessor;
 
   Future<T> _network<T>(String token, Future<T> Function() request) async {
     gateway.ensureCurrent(token);
@@ -53,13 +63,16 @@ class PhotoRepository {
     }
   }
 
-  Future<PhotoAsset> upload(Uint8List bytes) async {
+  Future<PhotoAsset> upload(
+    Uint8List bytes, {
+    NormalizedPhotoCrop? crop,
+  }) async {
     final token = gateway.context;
     final owner = gateway.client.auth.currentUser?.id;
     if (owner == null) throw const DataFailure('permission');
     final Uint8List encoded;
     try {
-      encoded = await processor(Uint8List.fromList(bytes));
+      encoded = await _cropProcessor(Uint8List.fromList(bytes), crop: crop);
     } catch (_) {
       gateway.ensureCurrent(token);
       rethrow;
