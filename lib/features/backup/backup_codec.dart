@@ -58,7 +58,7 @@ final class BackupCodec {
         r.age?.toString() ?? '',
         r.gender == Gender.male ? 'Masculino' : 'Feminino',
         r.conversionDate.toString(),
-        r.worshipType,
+        r.worshipType ?? '',
         r.visitCount.toString(),
         yes(r.isInDiscipleship),
         yes(r.isDiscipleshipCompleted),
@@ -379,6 +379,9 @@ final class BackupCodec {
         error(0, 'duplicate_id');
       }
       if (v[1].trim().isEmpty) error(1, 'required');
+      if (v[9].isNotEmpty && (v[9].trim().isEmpty || v[9] != v[9].trim())) {
+        error(9, 'invalid_worship_type');
+      }
       final age = integer(6, optional: true), visits = integer(10);
       if (v[7] != 'Masculino' && v[7] != 'Feminino') error(7, 'invalid_gender');
       final conversion = date(8),
@@ -403,7 +406,7 @@ final class BackupCodec {
             age: age,
             gender: v[7] == 'Masculino' ? Gender.male : Gender.female,
             conversionDate: conversion!,
-            worshipType: v[9],
+            worshipType: v[9].isEmpty ? null : v[9],
             visitCount: visits!,
             lastVisitDate: last,
             discipleshipStartDate: start,

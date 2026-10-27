@@ -102,7 +102,7 @@ final class ConvertRecord {
   final String landmark;
   final Gender gender;
   final DateOnly conversionDate;
-  final String worshipType;
+  final String? worshipType;
   final String? congregationId;
   final String? photoUrl;
   final String? photoAssetId;
@@ -141,7 +141,7 @@ final class ConvertRecord {
     landmark: json['landmark'] as String,
     gender: Gender.fromWire(json['gender'] as String),
     conversionDate: DateOnly.parse(json['conversion_date'] as String),
-    worshipType: json['worship_type'] as String,
+    worshipType: json['worship_type'] as String?,
     congregationId: json['congregation_id'] as String?,
     photoUrl: json['photo_url'] as String?,
     photoAssetId: json['photo_asset_id'] as String?,

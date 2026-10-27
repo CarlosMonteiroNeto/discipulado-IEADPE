@@ -295,6 +295,42 @@ void main() {
       expect(() => BackupCodec().encode([r]), throwsFormatException);
     },
   );
+  test(
+    'empty worship cells decode as null and null exports as an empty cell',
+    () {
+    final imported = BackupCodec().decode(
+      fixture([headers, row()..[9] = '']),
+    );
+      expect(imported.rows.single.record.worshipType, isNull);
+
+      final record = imported.rows.single.record;
+    final exported = BackupCodec().encode([record]);
+      expect(
+        BackupCodec().decode(exported).rows.single.record.worshipType,
+        isNull,
+      );
+    },
+  );
+  test(
+    'rejects whitespace-only worship values while preserving legacy values',
+    () {
+      final invalid = row()..[9] = '   ';
+      final rejected = BackupCodec().decode(fixture([headers, invalid]));
+      expect(rejected.rows, isEmpty);
+      expect(rejected.diagnostics.single.column, 'tipo_culto');
+
+      final legacy = row()..[9] = 'Culto legado';
+      expect(
+        BackupCodec()
+            .decode(fixture([headers, legacy]))
+            .rows
+            .single
+            .record
+            .worshipType,
+        'Culto legado',
+      );
+    },
+  );
   test('does not silently overwrite duplicate coordinates', () {
     expect(
       () => BackupCodec().decode(

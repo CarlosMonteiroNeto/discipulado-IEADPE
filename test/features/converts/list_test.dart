@@ -28,6 +28,7 @@ ConvertRecord row(
   DateOnly? effectiveFollowUpDate,
   DateOnly? date,
   DateTime? created,
+  String? worshipType = 'Culto legado',
 }) => ConvertRecord(
   id: id,
   internalId: 'legacy-$id',
@@ -35,7 +36,7 @@ ConvertRecord row(
   landmark: 'Praça',
   gender: Gender.male,
   conversionDate: date ?? DateOnly(2026, 1, 1),
-  worshipType: 'Culto legado',
+  worshipType: worshipType,
   congregationId: congregationId,
   isDeviated: terminal,
   photoAssetId: photo,
@@ -95,6 +96,43 @@ class OrderedGateway extends TestGateway {
 }
 
 void main() {
+  test('convert decoding accepts null worship but rejects blank text', () {
+    final json =
+        row('d0000000-0000-4000-8000-000000000001', worshipType: null).toJson()
+          ..['created_at'] = '2026-01-02T00:00:00Z'
+          ..['updated_at'] = '2026-01-02T00:00:00Z'
+          ..['legacy_identity'] = {
+            'name': 'Pessoa',
+            'phone': null,
+            'address': null,
+          };
+
+    expect(decodeConvert(json).worshipType, isNull);
+    expect(
+      () => decodeConvert({...json, 'worship_type': '  '}),
+      throwsA(isA<DataFailure>()),
+    );
+  });
+
+  testWidgets('card presents a missing worship type as not informed', (
+    t,
+  ) async {
+    await t.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: SingleChildScrollView(
+            child: ConvertCard(
+              record: row('no-worship', worshipType: null),
+              today: DateOnly(2026, 10, 15),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('Não informado'), findsOneWidget);
+  });
+
   testWidgets('removing a photo asset clears pending and failed photo state', (
     t,
   ) async {

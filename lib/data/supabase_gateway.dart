@@ -311,9 +311,10 @@ class SupabaseGateway
         (gender != 'male' && gender != 'female') ||
         conversionDate is! String ||
         !_isIsoDate(conversionDate) ||
-        worshipType is! String ||
-        worshipType.trim().isEmpty ||
-        worshipType != worshipType.trim() ||
+        (worshipType != null &&
+            (worshipType is! String ||
+                worshipType.trim().isEmpty ||
+                worshipType != worshipType.trim())) ||
         (age != null && (age is! int || age < 0 || age > 150))) {
       throw const DataFailure('invalid');
     }
@@ -1280,6 +1281,13 @@ class SupabaseGateway
       'is_deviated',
     };
     if (payload.keys.any((key) => !allowed.contains(key))) {
+      throw const DataFailure('invalid');
+    }
+    final worshipType = payload['worship_type'];
+    if (worshipType != null &&
+        (worshipType is! String ||
+            worshipType.trim().isEmpty ||
+            worshipType != worshipType.trim())) {
       throw const DataFailure('invalid');
     }
     final frozen = jsonDecode(jsonEncode(payload)) as Map<String, dynamic>;

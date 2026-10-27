@@ -98,7 +98,7 @@ void main() {
     },
   );
 
-  testWidgets('convert form uses the shared canonical person field keys', (
+  testWidgets('convert form shows only the shared editable person fields', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -109,11 +109,22 @@ void main() {
 
     expect(find.byKey(const ValueKey('person-name')), findsOneWidget);
     expect(find.byKey(const ValueKey('person-phone')), findsOneWidget);
-    expect(find.byKey(const ValueKey('person-birth-date')), findsOneWidget);
+    expect(find.byKey(const ValueKey('person-birth-date')), findsNothing);
     expect(find.byKey(const ValueKey('person-address-street')), findsOneWidget);
+    expect(find.text('Endereço'), findsOneWidget);
+    expect(find.byKey(const ValueKey('person-address-district')), findsNothing);
+    expect(find.byKey(const ValueKey('person-address-city')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('person-address-postal-code')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('person-address-state-code')),
+      findsNothing,
+    );
   });
 
-  testWidgets('convert form scrolls canonical fields above the keyboard', (
+  testWidgets('convert form scrolls the address field above the keyboard', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -126,12 +137,12 @@ void main() {
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();
-    final lastField = find.byKey(const ValueKey('person-address-state-code'));
+    final addressField = find.byKey(const ValueKey('person-address-street'));
     await tester.drag(
       find.byType(SingleChildScrollView),
       const Offset(0, -500),
     );
-    await tester.showKeyboard(lastField);
+    await tester.showKeyboard(addressField);
     await tester.pumpAndSettle();
 
     final devicePixelRatio = tester.view.devicePixelRatio;
@@ -139,7 +150,7 @@ void main() {
         tester.view.physicalSize.height / devicePixelRatio -
         tester.view.viewInsets.bottom / devicePixelRatio;
     expect(
-      tester.getBottomRight(lastField).dy,
+      tester.getBottomRight(addressField).dy,
       lessThanOrEqualTo(usableBottom),
     );
     expect(tester.takeException(), isNull);

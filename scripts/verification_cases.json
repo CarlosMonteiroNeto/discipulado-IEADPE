@@ -75,6 +75,9 @@
       "scenario": "ministry_ui_reads_test.sql"
     },
     {
+      "scenario": "optional_worship_test.sql"
+    },
+    {
       "scenario": "photos_test.sql"
     },
     {

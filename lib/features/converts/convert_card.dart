@@ -421,7 +421,10 @@ class _ConvertCardState extends State<ConvertCard> {
                   },
                 ),
                 const SizedBox(height: 8),
-                _detail(Icons.menu_book_outlined, record.worshipType),
+                _detail(
+                  Icons.menu_book_outlined,
+                  record.worshipType ?? 'Não informado',
+                ),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,

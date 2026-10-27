@@ -7,13 +7,14 @@ import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/domain/worship_types.dart';
 import 'package:ieadpe_converts/features/converts/convert_form.dart';
+import 'package:ieadpe_converts/ui/br_input.dart';
 
 import '../../support/date_picker.dart';
 
 const _congregationId = 'b0000000-0000-4000-8000-000000000001';
 
 ConvertRecord record({
-  String worship = '01 - Oração',
+  String? worship = '01 - Oração',
   String name = 'Pessoa',
   String? congregationId = _congregationId,
   String? personId,
@@ -36,6 +37,7 @@ ConvertRecord record({
   address: address,
 );
 Widget host(Widget child, {double scale = 1}) => MaterialApp(
+  theme: ThemeData(splashFactory: NoSplash.splashFactory),
   home: MediaQuery(
     data: MediaQueryData(
       textScaler: TextScaler.linear(scale),
@@ -51,6 +53,142 @@ Future<void> tapSave(WidgetTester t, String text) async {
 }
 
 void main() {
+  testWidgets('convert form hides birth date and structured address parts', (
+    t,
+  ) async {
+    await t.pumpWidget(host(ConvertForm(onSubmit: (_) async {})));
+
+    expect(find.byKey(const ValueKey('person-birth-date')), findsNothing);
+    expect(find.byKey(const ValueKey('person-address-district')), findsNothing);
+    expect(find.byKey(const ValueKey('person-address-city')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('person-address-postal-code')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('person-address-state-code')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('person-address-street')), findsOneWidget);
+    expect(find.text('Endereço'), findsOneWidget);
+  });
+
+  testWidgets(
+    'new convert has no birth date or worship and only street address',
+    (t) async {
+      ConvertDraft? saved;
+      await t.pumpWidget(
+        host(
+          ConvertForm(
+            now: () => DateTime.utc(2026, 10, 28, 1, 30),
+            congregations: const [
+              Congregation(id: _congregationId, name: 'Central'),
+            ],
+            onSubmit: (draft) async => saved = draft,
+          ),
+        ),
+      );
+      await t.enterText(find.byKey(const ValueKey('person-name')), 'Pessoa');
+      await t.enterText(
+        find.byKey(const ValueKey('person-address-street')),
+        'Rua Nova',
+      );
+      await t.enterText(find.byKey(const ValueKey('landmark')), 'Praça');
+      await t.ensureVisible(find.text('Congregação *'));
+      await t.tap(find.text('Congregação *'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Central').last);
+      await t.pumpAndSettle();
+      await t.ensureVisible(find.text('Gênero *'));
+      await t.tap(find.text('Gênero *'));
+      await t.pumpAndSettle();
+      await t.tap(find.text('Masculino').last);
+      await t.pumpAndSettle();
+      await tapSave(t, 'Cadastrar');
+
+      expect(saved, isNotNull);
+      expect(saved!.birthDate, isNull);
+      expect(saved!.worshipType, isNull);
+      expect((saved!.payload()['person'] as Map)['address'], {
+        'street': 'Rua Nova',
+        'district': null,
+        'city': null,
+        'postal_code': null,
+        'state_code': null,
+      });
+    },
+  );
+
+  testWidgets('new form suggests Sao Paulo business date at each mount', (
+    t,
+  ) async {
+    Future<DateTime?> displayedDate(DateTime now) async {
+      await t.pumpWidget(
+        host(
+          ConvertForm(
+            key: ValueKey(now.toIso8601String()),
+            onSubmit: (_) async {},
+            now: () => now,
+          ),
+        ),
+      );
+      final field = find.descendant(
+        of: find.byKey(const ValueKey('conversion_date')),
+        matching: find.byType(TextFormField),
+      );
+      return parseDateInput(t.widget<TextFormField>(field).controller!.text);
+    }
+
+    expect(
+      await displayedDate(DateTime.utc(2026, 10, 28, 1, 30)),
+      DateTime(2026, 10, 27),
+    );
+    expect(
+      await displayedDate(DateTime.utc(2026, 10, 28, 3, 30)),
+      DateTime(2026, 10, 28),
+    );
+  });
+
+  testWidgets('editing street preserves birth date and hidden address parts', (
+    t,
+  ) async {
+    const name = 'Pessoa vinculada';
+    const address = <String, Object?>{
+      'street': 'Rua Antiga',
+      'district': 'Boa Vista',
+      'city': 'Recife',
+      'postal_code': '50000-000',
+      'state_code': 'PE',
+    };
+    final initial = record(
+      name: name,
+      personId: 'person',
+      personRevision: 3,
+      personIdentity: CanonicalPersonIdentity(
+        name: name,
+        birthDate: DateOnly(1990, 2, 3),
+        address: address,
+      ),
+    );
+    ConvertDraft? saved;
+    await t.pumpWidget(
+      host(
+        ConvertForm(initial: initial, onSubmit: (draft) async => saved = draft),
+      ),
+    );
+    await t.enterText(
+      find.byKey(const ValueKey('person-address-street')),
+      'Rua Nova',
+    );
+    await tapSave(t, 'Atualizar');
+
+    expect(saved!.birthDate, DateOnly(1990, 2, 3));
+    expect((saved!.payload()['person'] as Map)['address'], {
+      ...address,
+      'street': 'Rua Nova',
+    });
+  });
+
   testWidgets('blank required fields explain validation in Portuguese', (
     t,
   ) async {
@@ -134,10 +272,17 @@ void main() {
     },
   );
   testWidgets(
-    'edited canonical address fields remain a complete address object',
+    'editing canonical street preserves existing address components',
     (t) async {
       ConvertDraft? saved;
       const name = 'Pessoa';
+      const address = <String, Object?>{
+        'street': 'Rua Antiga',
+        'district': 'Boa Vista',
+        'city': 'Olinda',
+        'postal_code': '50000-000',
+        'state_code': 'PE',
+      };
       await t.pumpWidget(
         host(
           ConvertForm(
@@ -146,7 +291,10 @@ void main() {
               congregationId: _congregationId,
               personId: 'person',
               personRevision: 1,
-              personIdentity: const CanonicalPersonIdentity(name: name),
+              personIdentity: CanonicalPersonIdentity(
+                name: name,
+                address: address,
+              ),
             ),
             onSubmit: (draft) async => saved = draft,
           ),
@@ -156,19 +304,12 @@ void main() {
         find.byKey(const ValueKey('person-address-street')),
         'Rua Nova',
       );
-      await t.enterText(
-        find.byKey(const ValueKey('person-address-city')),
-        'Recife',
-      );
 
       await tapSave(t, 'Atualizar');
 
       expect((saved!.payload()['person'] as Map)['address'], {
+        ...address,
         'street': 'Rua Nova',
-        'district': null,
-        'city': 'Recife',
-        'postal_code': null,
-        'state_code': null,
       });
     },
   );

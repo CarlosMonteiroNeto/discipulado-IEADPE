@@ -5,6 +5,23 @@ import 'package:ieadpe_converts/features/reports/reports_repository.dart';
 import '../../data/repositories_test.dart' show fixture, respond, row;
 
 void main() {
+  test('conversions retain records with a missing worship type', () async {
+    final g = await fixture((r) async {
+      await respond(r, [
+        {
+          ...row(1),
+          'conversion_date': '2026-10-15',
+          'worship_type': null,
+        },
+      ]);
+    });
+
+    final data = await ReportsRepository(g).conversions(const DateRange());
+
+    expect(data.single.name, 'Não informado');
+    expect(data.single.count, 1);
+  });
+
   test('conversion grouping traverses all rows includes endpoints and sorts descending', () async {
     final g = await fixture((r) async {
       final after = r.uri.queryParameters['id'];

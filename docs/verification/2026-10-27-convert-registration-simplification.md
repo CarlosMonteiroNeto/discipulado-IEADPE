@@ -1,0 +1,11 @@
+# Convert registration simplification — verification
+
+- Worktree branch: `codex/convert-registration-simplification`, base `12d4b8c`.
+- `optional_worship_test.sql`: passed on a fresh, disposable loopback PostgreSQL database after applying the fixture and every migration in order. The test runner's 90-second subprocess limit was increased in memory to 600 seconds to accommodate slow database creation; tracked runner code was not modified. The runner removed the database. Earlier focused `convert_commands_test.sql` and `import_test.sql` passed on a separate disposable database, subsequently removed.
+- Scenario coverage includes null and absent worship, preserved old values, invalid blank, tab and nonbreaking-space input, receipt replay, and the initial revision of legacy inserts.
+- `python scripts/test_verification_cases.py`: 9 tests passed after adding the new scenario to the existing manifest.
+- `flutter test --no-pub test/features/converts/form_test.dart`: 13 passed. The list suite passed 16 cases, and gateway contract suite passed 3 cases. An independent rerun of team and operational tests passed 22 cases.
+- `dart analyze` of the changed Dart files and initial related tests returned `No issues found!`.
+- The broader serial suite encountered two obsolete convert form expectations in `student_registration_entry_points_test.dart` and two 30-second operational timeouts; the latter tests passed when run in isolation. After updating the obsolete tests, `flutter test --no-pub --concurrency=1 test/features/ministry/ui/student_registration_entry_points_test.dart test/features/converts/form_test.dart` passed all 21 tests. The full suite was interrupted after these failures while an unrelated five-minute operational gate was running. No clean full-suite result is claimed.
+- Initial RED evidence for the new Dart tests was not captured because Flutter dependency setup and its shared startup lock prevented completion before implementation. SQL was verified against actual PostgreSQL, but its initial RED was blocked by slow database creation.
+- Independent review identified and verified corrections to Dart nullability and legacy Unicode whitespace validation. No hosted database operation, deployment, APK build or device check was performed.

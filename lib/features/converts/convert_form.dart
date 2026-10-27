@@ -10,7 +10,6 @@ import '../../data/supabase_gateway.dart';
 import '../../ui/br_input.dart';
 import '../../ui/form_fields.dart';
 import '../../ui/unified_theme.dart';
-import '../people/person_fields.dart';
 
 /// Only user-editable fields. Never serialize a read DTO into a command.
 class ConvertDraft {
@@ -30,7 +29,8 @@ class ConvertDraft {
     this.photoBytes,
     this.removePhoto = false,
   });
-  final String name, landmark, worshipType;
+  final String name, landmark;
+  final String? worshipType;
   final Gender gender;
   final DateOnly conversionDate;
   final String? address, phone, congregationId;
@@ -105,13 +105,8 @@ class _ConvertFormState extends State<ConvertForm> {
   final _form = GlobalKey<FormState>();
   late final TextEditingController _name,
       _address,
-      _district,
-      _city,
-      _postalCode,
-      _stateCode,
       _landmark,
       _phone,
-      _birthDate,
       _age,
       _date;
   String? _congregation, _worship;
@@ -131,28 +126,18 @@ class _ConvertFormState extends State<ConvertForm> {
           ? (i?.legacyIdentity?.address ?? i?.address)
           : identityAddress?['street'] as String?,
     );
-    _district = TextEditingController(
-      text: identityAddress?['district'] as String?,
-    );
-    _city = TextEditingController(text: identityAddress?['city'] as String?);
-    _postalCode = TextEditingController(
-      text: identityAddress?['postal_code'] as String?,
-    );
-    _stateCode = TextEditingController(
-      text: identityAddress?['state_code'] as String?,
-    );
     _landmark = TextEditingController(text: i?.landmark);
     _phone = TextEditingController(
       text: brPhoneDisplay(
         identity?.phone ?? i?.legacyIdentity?.phone ?? i?.phone,
       ),
     );
-    _birthDate = TextEditingController(
-      text: brDateDisplay(identity?.birthDate?.toString()),
-    );
     _age = TextEditingController(text: i?.age?.toString());
     _date = TextEditingController(
-      text: brDateDisplay(i?.conversionDate.toString()),
+      text: brDateDisplay(
+        (i?.conversionDate ?? BusinessCalendar().today(widget.now()))
+            .toString(),
+      ),
     );
     _congregation = i?.congregationId;
     _worship = i?.worshipType;
@@ -161,19 +146,7 @@ class _ConvertFormState extends State<ConvertForm> {
 
   @override
   void dispose() {
-    for (final c in [
-      _name,
-      _address,
-      _district,
-      _city,
-      _postalCode,
-      _stateCode,
-      _landmark,
-      _phone,
-      _birthDate,
-      _age,
-      _date,
-    ]) {
+    for (final c in [_name, _address, _landmark, _phone, _age, _date]) {
       c.clear();
       c.dispose();
     }
@@ -226,11 +199,6 @@ class _ConvertFormState extends State<ConvertForm> {
     return date == null ? null : DateOnly(date.year, date.month, date.day);
   }
 
-  DateOnly? _parsedBirthDate() {
-    final date = parseDateInput(_birthDate.text);
-    return date == null ? null : DateOnly(date.year, date.month, date.day);
-  }
-
   Future<void> _submit() async {
     if (_busy || _picking || !_form.currentState!.validate()) return;
     final token = widget.gateway?.context;
@@ -246,38 +214,28 @@ class _ConvertFormState extends State<ConvertForm> {
         ? i?.legacyIdentity?.address ?? i?.address
         : oldAddress?['street'] as String?;
     final preserveNullAddress =
-        oldPerson != null &&
-        oldAddress == null &&
-        [
-          _address,
-          _district,
-          _city,
-          _postalCode,
-          _stateCode,
-        ].every((controller) => controller.text.trim().isEmpty);
+        oldPerson != null && oldAddress == null && _address.text.trim().isEmpty;
+    final street = optional(_address, oldAddressStreet);
+    final personAddress = oldAddress == null
+        ? {
+            'street': street,
+            'district': null,
+            'city': null,
+            'postal_code': null,
+            'state_code': null,
+          }
+        : {...oldAddress, 'street': street};
     final name = _name.text == oldName ? oldName! : _name.text.trim();
     final draft = ConvertDraft(
       name: name,
       landmark: _landmark.text.trim(),
       gender: _gender!,
       conversionDate: _parsedDate()!,
-      worshipType: _worship!,
+      worshipType: _worship,
       address: optional(_address, oldAddressStreet),
       phone: resolveBrPhone(_phone.text),
-      birthDate: _parsedBirthDate(),
-      personAddress: {
-        'street': optional(_address, oldAddressStreet),
-        'district': optional(_district, oldAddress?['district'] as String?),
-        'city': optional(_city, oldAddress?['city'] as String?),
-        'postal_code': optional(
-          _postalCode,
-          oldAddress?['postal_code'] as String?,
-        ),
-        'state_code': optional(
-          _stateCode,
-          oldAddress?['state_code'] as String?,
-        ),
-      },
+      birthDate: oldPerson?.birthDate,
+      personAddress: personAddress,
       preserveNullAddress: preserveNullAddress,
       congregationId: _congregation,
       age: _age.text.isEmpty ? null : int.parse(_age.text),
@@ -443,17 +401,12 @@ class _ConvertFormState extends State<ConvertForm> {
                       v == null ? 'Selecione uma congregação' : null,
                 ),
                 const SizedBox(height: 16),
-                PersonFields(
-                  name: _name,
-                  phone: _phone,
-                  birthDate: _birthDate,
-                  street: _address,
-                  district: _district,
-                  city: _city,
-                  postalCode: _postalCode,
-                  stateCode: _stateCode,
-                  enabled: !_busy,
-                  nameValidator: (value) {
+                AppTextFormField(
+                  fieldKey: const ValueKey('person-name'),
+                  controller: _name,
+                  readOnly: _busy,
+                  label: 'Nome *',
+                  validator: (value) {
                     final name = value?.trim() ?? '';
                     if (name.isEmpty) return 'Nome é obrigatório';
                     final inherited = widget.initial?.personIdentity?.name;
@@ -462,8 +415,14 @@ class _ConvertFormState extends State<ConvertForm> {
                     }
                     return null;
                   },
-                  birthDateValidator: brDateValidationError,
                 ),
+                const SizedBox(height: 16),
+                BrPhoneField(
+                  fieldKey: const ValueKey('person-phone'),
+                  controller: _phone,
+                  enabled: !_busy,
+                ),
+                _field('person-address-street', 'Endereço', _address),
                 _field(
                   'landmark',
                   'Ponto de referência *',
@@ -527,17 +486,16 @@ class _ConvertFormState extends State<ConvertForm> {
                 DropdownButtonFormField<String>(
                   initialValue: _worship,
                   isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de culto *',
-                  ),
+                  decoration: const InputDecoration(labelText: 'Tipo de culto'),
                   items: [
+                    const DropdownMenuItem<String>(
+                      value: null,
+                      child: Text('Não informado'),
+                    ),
                     for (final w in worships)
                       DropdownMenuItem(value: w, child: Text(w)),
                   ],
                   onChanged: _busy ? null : (v) => setState(() => _worship = v),
-                  validator: (v) => v == null || v.trim().isEmpty
-                      ? 'Tipo de culto é obrigatório'
-                      : null,
                 ),
                 if (_error != null)
                   Padding(

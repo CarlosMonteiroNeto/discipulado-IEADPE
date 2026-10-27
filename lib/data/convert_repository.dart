@@ -235,10 +235,17 @@ bool _hasOnly(Map<String, dynamic> json, Set<String> allowed) =>
 ConvertRecord decodeConvert(Map<String, dynamic> row) {
   try {
     validateUuid(row['id']);
-    for (final key in ['internal_id', 'name', 'landmark', 'worship_type']) {
+    for (final key in ['internal_id', 'name', 'landmark']) {
       if (row[key] is! String || (row[key] as String).trim().isEmpty) {
         throw const FormatException();
       }
+    }
+    final worshipType = row['worship_type'];
+    if (worshipType != null &&
+        (worshipType is! String ||
+            worshipType.trim().isEmpty ||
+            worshipType != worshipType.trim())) {
+      throw const FormatException();
     }
     for (final key in [
       'was_visited_once',
