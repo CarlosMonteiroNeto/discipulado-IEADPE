@@ -10,6 +10,12 @@ Date: 2026-10-25
 
 Source: approved [public Web intake Spec](../superpowers/specs/2026-10-25-public-web-intake-design.md) and [implementation plan](../superpowers/plans/2026-10-25-public-web-intake-plan.md). These govern this increment; this runbook records the current candidate and operator steps. Historical release documents do not establish that any hosting account or production setting exists.
 
+## Current publication status (2026-10-27)
+
+The user authorized pushing the integrated work and publishing it. Wrangler 4.153.0 deployed the merged `build/web` (source `602d583`, which merges the approved convert-registration simplification into `feat/public-web-intake`) to project `discipulado-ieadpe`, branch `main`. Immutable deployment: `https://2164db51.discipulado-ieadpe.pages.dev`; canonical: `https://discipulado-ieadpe.pages.dev`. Canonical and immutable `/`, `/register` and `/auth/callback?next=%2Fhome` returned HTTP 200 with zero redirects, `/main.dart.js` returned HTTP 200 with `application/javascript`, and its SHA-256 matched the local artifact. No database or Supabase setting changed during this deployment.
+
+Statements below that say publication is unauthorized or that the project has no deployment are historical for the 2026-10-26 state. Still open: Free-tier usage snapshot (deferred by the user), provider invocation-body retention decision, managed Edge client-address trust and per-network limits, a fresh OAuth round trip, and browser/mobile acceptance of this merged build. See the [acceptance evidence](../verification/public-intake-acceptance.md).
+
 ## Current pre-production status (2026-10-26)
 
 This status supersedes the historical `BLOCKED` inventory and candidate statements below where they conflict. The user authorized controlled testing on pre-production project `voqmtnqjrbugpazcimvh`; public publication remains separate and has not occurred.
