@@ -270,7 +270,7 @@ TextFormField _personNameField(WidgetTester tester) =>
     );
 
 void main() {
-  testWidgets('only review-authorized scope receives Pendentes navigation', (
+  testWidgets('pending queue is reached from converts, not shell navigation', (
     t,
   ) async {
     final opened = <String>[];
@@ -284,9 +284,9 @@ void main() {
         ),
       ),
     );
-    expect(find.text('Pendentes'), findsOneWidget);
-    await t.tap(find.text('Pendentes'));
-    expect(opened, ['/pending']);
+    expect(find.text('Pendentes'), findsNothing);
+    expect(find.byKey(const ValueKey('app-shell-nav-/pending')), findsNothing);
+    expect(opened, isEmpty);
 
     await t.pumpWidget(
       MaterialApp(
@@ -299,6 +299,7 @@ void main() {
       ),
     );
     expect(find.text('Pendentes'), findsNothing);
+    expect(find.byKey(const ValueKey('app-shell-nav-/pending')), findsNothing);
   });
 
   testWidgets(
@@ -479,8 +480,9 @@ void main() {
     );
     expect(
       t
-          .widgetList<IconButton>(find.byType(IconButton))
-          .singleWhere((button) => button.tooltip == 'Sair')
+          .widget<TextButton>(
+            find.byKey(const ValueKey('app-shell-sign-out')),
+          )
           .onPressed,
       isNotNull,
       reason: 'sign-out remains available to invalidate protected state',

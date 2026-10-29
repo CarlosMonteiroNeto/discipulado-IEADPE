@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../weekly/weekly_repository.dart';
 import 'home_repository.dart';
 import '../../data/supabase_gateway.dart';
+import '../../domain/models.dart';
 import '../../widgets/brand_header.dart';
 import '../../ui/base44_widgets.dart';
 import '../../ui/unified_theme.dart';
@@ -18,12 +19,14 @@ class HomePage extends StatefulWidget {
     this.isAdmin = false,
     this.onScopeRefresh,
     this.refreshRevision = 0,
+    this.scope,
   });
   final HomeRepository repository;
   final WeeklyRepository weekly;
   final ValueChanged<String> onNavigate;
   final String? name;
   final bool isAdmin;
+  final AccessScope? scope;
   final Future<void> Function()? onScopeRefresh;
 
   /// Refreshes summaries and the existing weekly owner, preserving write retries.
@@ -65,7 +68,8 @@ class _HomePageState extends State<HomePage> {
       _denied = false;
       _weeklyRevision++;
       _load();
-    } else if (oldWidget.refreshRevision != widget.refreshRevision) {
+    } else if (oldWidget.scope != widget.scope ||
+        oldWidget.refreshRevision != widget.refreshRevision) {
       _weeklyRevision++;
       _load();
     }
@@ -90,7 +94,7 @@ class _HomePageState extends State<HomePage> {
       _error = null;
     });
     try {
-      final summary = await widget.repository.summary();
+      final summary = await widget.repository.summary(scope: widget.scope);
       if (_current && request == _request) setState(() => _summary = summary);
     } catch (error) {
       if (!_current || request != _request) return;

@@ -5,9 +5,15 @@ import '../../ui/unified_theme.dart';
 import 'auth_repository.dart';
 
 class LoginPage extends StatefulWidget {
-  const LoginPage({super.key, required this.auth, this.intendedRoute});
+  const LoginPage({
+    super.key,
+    required this.auth,
+    this.intendedRoute,
+    this.onBackToRegistration,
+  });
   final AuthGateway auth;
   final String? intendedRoute;
+  final VoidCallback? onBackToRegistration;
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
@@ -140,6 +146,17 @@ class _LoginPageState extends State<LoginPage> {
                                       color: UnifiedColors.red,
                                     ),
                                   ),
+                                ),
+                              ),
+                            if (widget.onBackToRegistration != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 8),
+                                child: TextButton.icon(
+                                  onPressed: _busy
+                                      ? null
+                                      : widget.onBackToRegistration,
+                                  icon: const Icon(Icons.arrow_back),
+                                  label: const Text('Voltar ao cadastro'),
                                 ),
                               ),
                           ],

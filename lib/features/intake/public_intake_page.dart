@@ -26,13 +26,13 @@ class PublicRegistrationPage extends StatefulWidget {
     required this.repository,
     required this.challenge,
     this.sortNames,
-    this.onNavigateToProtected,
+    this.onSignIn,
   });
 
   final PublicIntakeRepository? repository;
   final TurnstileChallenge challenge;
   final Future<List<String>> Function(List<String>)? sortNames;
-  final ValueChanged<String>? onNavigateToProtected;
+  final VoidCallback? onSignIn;
 
   @override
   State<PublicRegistrationPage> createState() => _PublicRegistrationPageState();
@@ -225,8 +225,9 @@ class _PublicRegistrationPageState extends State<PublicRegistrationPage> {
     scope: AccessScope(),
     currentRoute: '/register',
     publicMode: true,
-    onNavigate: (route) => widget.onNavigateToProtected?.call(route),
+    onNavigate: (_) {},
     onSignOut: () {},
+    onSignIn: () => widget.onSignIn?.call(),
     child: SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Center(

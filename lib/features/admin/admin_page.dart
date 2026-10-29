@@ -457,6 +457,8 @@ class _AdminPageState extends State<AdminPage> {
                 )
               else if (_selected == 1)
                 AccessPanel(
+                  gateway: widget.gateway,
+                  congregations: _catalog!,
                   canOpenTeam: widget.scope.hasMinistryAccess,
                   onOpenTeam: widget.onOpenTeam,
                   onScopeRefresh: widget.onScopeRefresh,

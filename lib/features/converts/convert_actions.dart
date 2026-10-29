@@ -4,6 +4,7 @@ import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
 import '../../domain/convert_policy.dart';
+import '../../platform/portuguese_sort.dart';
 
 Uri? brazilWhatsApp(String? phone) {
   if (phone == null || RegExp(r'[A-Za-z]').hasMatch(phone)) return null;
@@ -24,6 +25,20 @@ String statusCode(ConvertRecord record, DateOnly today) =>
       VisitState.current => 'green',
       VisitState.attention => 'yellow',
     };
+Future<Map<String, int>> convertNameRanks(
+  List<ConvertRecord> rows, {
+  Future<List<String>> Function(List<String>) sortNames = sortPortugueseNames,
+}) async {
+  final names = rows.map((row) => row.name).toSet().toList();
+  final sorted = names.length < 2 ? names : await sortNames(names);
+  if (sorted.length != names.length ||
+      sorted.toSet().length != names.length ||
+      !sorted.toSet().containsAll(names)) {
+    throw StateError('Invalid locale ordering');
+  }
+  return {for (final entry in sorted.indexed) entry.$2: entry.$1};
+}
+
 List<ConvertRecord> visibleConverts(
   List<ConvertRecord> rows,
   List<Congregation> congregations,
@@ -32,12 +47,12 @@ List<ConvertRecord> visibleConverts(
   String name = '',
   String? congregationId,
   String? status,
+  Map<String, int>? nameRanks,
 }) {
   final congregationsById = {
     for (final congregation in congregations) congregation.id: congregation,
   };
-  // Congregations arrive in prepared platform locale order. IDs, including
-  // equal-name congregations, form separate groups before recency sorting.
+  // Keep equal-name congregations as distinct groups in prepared locale order.
   final groupRanks = {
     for (final entry in congregations.indexed) entry.$2.id: entry.$1,
   };
@@ -50,18 +65,24 @@ List<ConvertRecord> visibleConverts(
         (status == null || statusCode(row, today) == status);
   }).toList();
   indexed.sort((a, b) {
-    final ca = congregationsById[a.$2.congregationId],
-        cb = congregationsById[b.$2.congregationId];
-    var order = ca == null
+    int severity(ConvertRecord row) => switch (visitState(row, today)) {
+      VisitState.urgent => 0,
+      VisitState.attention => 1,
+      VisitState.current => 2,
+    };
+    var order = severity(a.$2).compareTo(severity(b.$2));
+    if (order != 0) return order;
+    final ca = congregationsById[a.$2.congregationId];
+    final cb = congregationsById[b.$2.congregationId];
+    order = ca == null
         ? (cb == null ? 0 : 1)
         : (cb == null ? -1 : groupRanks[ca.id]!.compareTo(groupRanks[cb.id]!));
     if (order != 0) return order;
-    final da = a.$2.createdAt, db = b.$2.createdAt;
-    if (da != null && db != null) {
-      order = db.compareTo(da);
-    } else if (da != db) {
-      order = da == null ? 1 : -1;
-    }
+    final rankA = nameRanks?[a.$2.name];
+    final rankB = nameRanks?[b.$2.name];
+    order = rankA != null && rankB != null
+        ? rankA.compareTo(rankB)
+        : a.$2.name.toLowerCase().compareTo(b.$2.name.toLowerCase());
     return order != 0 ? order : a.$1.compareTo(b.$1);
   });
   return indexed.map((entry) => entry.$2).toList(growable: false);
@@ -98,7 +119,14 @@ class ConvertActions {
   final Map<String, String> _operations = {};
   final Set<String> _pending = {};
   bool _disposed = false;
-  Future<void> execute(ConvertAction action, ConvertRecord record) async {
+  Future<void> execute(
+    ConvertAction action,
+    ConvertRecord record, {
+    String? classId,
+  }) async {
+    if (action == ConvertAction.start && classId == null) {
+      throw const DataFailure('invalid');
+    }
     gateway.ensureCurrent(_context);
     if (_disposed) throw const DataFailure('stale');
     final key = '${record.id}:${action.name}';
@@ -113,6 +141,7 @@ class ConvertActions {
         {
           'id': record.id,
           if (action != ConvertAction.delete) 'action': action.name,
+          if (action == ConvertAction.start) 'class_id': classId,
         },
       );
       gateway.ensureCurrent(_context);
@@ -121,6 +150,13 @@ class ConvertActions {
         throw DataFailure(result.errorCode ?? 'backend');
       }
       _operations.remove(key);
+    } on DataFailure catch (error) {
+      if (error.code == 'invalid' ||
+          error.code == 'academic_invalid' ||
+          error.code == 'permission') {
+        _operations.remove(key);
+      }
+      rethrow;
     } finally {
       _pending.remove(record.id);
     }

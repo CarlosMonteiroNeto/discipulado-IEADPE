@@ -514,6 +514,15 @@ class SupabaseGateway
       'get_pending_intake': {'id'},
     };
     const ministryReadParameters = <String, Set<String>>{
+      'convert_dashboard_page': {
+        'congregation_id',
+        'congregation_ids',
+        'search',
+        'status',
+        'limit',
+        'cursor',
+      },
+      'convert_dashboard_counts': {'congregation_ids', 'search'},
       'ministry_list_congregations': {'limit', 'cursor'},
       'ministry_list_people': {
         'congregation_id',
@@ -1394,7 +1403,7 @@ class SupabaseGateway
       'save_congregation' => {'id', 'name'},
       'submit_feedback' => {'message'},
       'update_feedback' => {'id', 'status'},
-      'transition_convert' => {'id', 'action'},
+      'transition_convert' => {'id', 'action', 'class_id'},
       'confirm_zero' => {'congregation_id'},
       'create_photo_draft' => <String>{},
       'detach_photo' => {'id'},

@@ -18,6 +18,7 @@ class ClassForm extends StatefulWidget {
     super.key,
     required this.repository,
     required this.congregationId,
+    this.congregationName,
     required this.onSaved,
     required this.onCancel,
     this.initialClass,
@@ -25,6 +26,7 @@ class ClassForm extends StatefulWidget {
 
   final MinistryRepository repository;
   final String congregationId;
+  final String? congregationName;
   final MinistryClassSummary? initialClass;
   final ValueChanged<MinistryClassSummary> onSaved;
   final VoidCallback onCancel;
@@ -275,7 +277,9 @@ class _ClassFormState extends State<ClassForm> {
                 Base44PageHeading(
                   title: _editing ? 'Editar turma' : 'Nova turma',
                   icon: Icons.groups_outlined,
-                  subtitle: 'As alterações ficam registradas na congregação selecionada.',
+                  subtitle: widget.congregationName == null
+                      ? 'As alterações ficam registradas na congregação selecionada.'
+                      : 'Congregação: ${widget.congregationName}',
                 ),
                 const SizedBox(height: UnifiedSpace.x4),
                 Base44Panel(

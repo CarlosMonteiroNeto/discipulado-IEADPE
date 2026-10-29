@@ -1,18 +1,33 @@
+import 'dart:async';
 import 'dart:typed_data';
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Page;
 
 import '../../domain/models.dart';
 import '../../domain/business_calendar.dart';
 import '../../data/convert_repository.dart';
 import '../../data/supabase_gateway.dart';
 import '../photos/photo_repository.dart';
+import '../ministry/data/ministry_browser_repository.dart';
 import '../../ui/base44_widgets.dart';
 import '../../ui/unified_theme.dart';
 import 'convert_actions.dart';
 import 'congregation_order.dart';
 import 'convert_card.dart';
 import 'edit_page.dart';
+import '../intake/pending_banner.dart';
+import '../intake/pending_count.dart';
+
+List<ConvertRecord> _appendUnique(
+  Iterable<ConvertRecord> existing,
+  Iterable<ConvertRecord> incoming,
+) {
+  final seen = <String>{};
+  return [
+    for (final record in [...existing, ...incoming])
+      if (seen.add(record.id)) record,
+  ];
+}
 
 /// Root must unmount this complete subtree on protected generation changes.
 class ConvertsPage extends StatefulWidget {
@@ -25,6 +40,8 @@ class ConvertsPage extends StatefulWidget {
     this.onScopeRefresh,
     this.pickPhoto,
     this.revalidatePhotoAuthority,
+    this.loadPending,
+    this.onOpenPending,
   });
   final Future<Uint8List?> Function()? pickPhoto;
   final AccessScope scope;
@@ -33,6 +50,8 @@ class ConvertsPage extends StatefulWidget {
   final List<Congregation> congregations;
   final Future<void> Function()? onScopeRefresh;
   final Future<bool> Function(String? congregationId)? revalidatePhotoAuthority;
+  final Future<PendingCount> Function()? loadPending;
+  final VoidCallback? onOpenPending;
   @override
   State<ConvertsPage> createState() => _ConvertsPageState();
 }
@@ -44,17 +63,52 @@ class _ConvertsPageState extends State<ConvertsPage> {
   List<ConvertRecord> _rows = [];
   final _pending = <String>{};
   final _errors = <String, String>{};
+  final _pendingStartClass = <String, String>{};
   bool _loading = true, _accessDenied = false;
   List<Congregation> _orderedCongregations = [];
-  String? _error, _status, _congregation;
+  String? _error, _status;
   ConvertRecord? _editing;
+  PendingCount? _pendingCount;
   int _request = 0;
+  final _drawerRows = <String, List<ConvertRecord>>{};
+  final _drawerCursors = <String, String?>{};
+  final _openDrawers = <String>{};
+  final _drawerLoading = <String>{};
+  Map<String, int> _urgentCounts = {};
+  String? _nextCursor;
+  bool _urgentView = false;
+  bool _loadingMore = false;
+  Timer? _searchTimer;
+  bool get _drawers =>
+      widget.congregations.isNotEmpty &&
+      (widget.scope.isGlobalManager || widget.scope.congregationIds.length > 1);
+  List<Congregation> get _availableCongregations => _orderedCongregations
+      .where((c) => c.archivedAt == null && widget.scope.canAccess(c.id))
+      .toList();
   @override
   void initState() {
     super.initState();
     _context = widget.converts.gateway.context;
     _actions = ConvertActions(widget.converts.gateway);
     _load();
+    _loadPending();
+  }
+
+  Future<void> _loadPending() async {
+    final load = widget.loadPending;
+    if (load == null) return;
+    try {
+      final count = await load();
+      if (_current()) setState(() => _pendingCount = count);
+    } catch (_) {
+      // A failed count must not hide the converts list or claim zero pending.
+      if (_current()) setState(() => _pendingCount = null);
+    }
+  }
+
+  void _refresh() {
+    _load();
+    _loadPending();
   }
 
   bool _current() {
@@ -76,40 +130,51 @@ class _ConvertsPageState extends State<ConvertsPage> {
     final request = ++_request;
     setState(() {
       _loading = true;
+      _loadingMore = false;
       _error = null;
       _rows = [];
+      _drawerLoading.clear();
     });
     try {
       final ordered = await orderCongregations(widget.congregations);
       if (!_current() || request != _request) return;
-      final rows = <ConvertRecord>[];
-      final scopes = widget.scope.isGlobalManager
-          ? <String?>[null]
-          : ordered
-                .where(
-                  (congregation) =>
-                      congregation.archivedAt == null &&
-                      widget.scope.congregationIds.contains(congregation.id),
-                )
-                .map((congregation) => congregation.id)
-                .toList(growable: false);
-      for (final scopeId in scopes) {
-        String? cursor;
-        do {
-          final page = await widget.converts.list(
-            ConvertQuery(congregationId: scopeId),
-            cursor,
-          );
-          if (!_current() || request != _request) return;
-          rows.addAll(page.items);
-          cursor = page.nextCursor;
-        } while (cursor != null);
+      final scopes = ordered
+          .where((c) => c.archivedAt == null && widget.scope.canAccess(c.id))
+          .map((c) => c.id)
+          .toList();
+      final counts = _drawers
+          ? await widget.converts.dashboardCounts(
+              scopes,
+              search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+            )
+          : <String, int>{};
+      Page<ConvertRecord>? page;
+      if (!_drawers || _urgentView || _search.text.trim().isNotEmpty) {
+        page = await widget.converts.dashboardPage(
+          congregationId: !_drawers && !widget.scope.isGlobalManager
+              ? widget.scope.congregationIds.first
+              : null,
+          congregationIds: widget.scope.isGlobalManager || _drawers
+              ? scopes
+              : null,
+          search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+          status: _urgentView ? 'red' : _status,
+        );
       }
       if (_current() && request == _request) {
         setState(() {
-          _rows = rows;
+          _rows = page?.items ?? [];
+          _nextCursor = page?.nextCursor;
+          _urgentCounts = counts;
           _orderedCongregations = ordered;
+          _drawerRows.clear();
+          _drawerCursors.clear();
         });
+        if (!_urgentView && _search.text.trim().isEmpty) {
+          for (final id in _openDrawers.toList()) {
+            unawaited(_loadDrawer(id));
+          }
+        }
       }
     } catch (error) {
       if (_current() && request == _request) {
@@ -128,6 +193,88 @@ class _ConvertsPageState extends State<ConvertsPage> {
     }
   }
 
+  Future<void> _loadDrawer(String id, {bool more = false}) async {
+    if (!_current() || _drawerLoading.contains(id)) return;
+    final request = _request;
+    setState(() => _drawerLoading.add(id));
+    try {
+      final page = await widget.converts.dashboardPage(
+        congregationId: id,
+        search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+        status: _status,
+        cursor: more ? _drawerCursors[id] : null,
+      );
+      if (!_current() || request != _request || !_openDrawers.contains(id)) {
+        return;
+      }
+      setState(() {
+        _drawerRows[id] = _appendUnique(
+          more ? _drawerRows[id] ?? [] : [],
+          page.items,
+        );
+        _drawerCursors[id] = page.nextCursor;
+      });
+    } catch (error) {
+      if (_current() &&
+          request == _request &&
+          error is DataFailure &&
+          error.code == 'permission') {
+        _denyAccess();
+        await widget.onScopeRefresh?.call();
+      } else if (_current() && request == _request) {
+        setState(
+          () => _error =
+              'Não foi possível carregar os convertidos. Tente novamente.',
+        );
+      }
+    } finally {
+      if (_current() && request == _request) {
+        setState(() => _drawerLoading.remove(id));
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final cursor = _nextCursor;
+    if (cursor == null || _loading || _loadingMore) return;
+    final request = _request;
+    setState(() => _loadingMore = true);
+    try {
+      final scopes = _availableCongregations.map((c) => c.id).toList();
+      final page = await widget.converts.dashboardPage(
+        congregationId: !_drawers && !widget.scope.isGlobalManager
+            ? widget.scope.congregationIds.first
+            : null,
+        congregationIds: widget.scope.isGlobalManager || _drawers
+            ? scopes
+            : null,
+        search: _search.text.trim().isEmpty ? null : _search.text.trim(),
+        status: _urgentView ? 'red' : _status,
+        cursor: cursor,
+      );
+      if (_current() && request == _request) {
+        setState(() {
+          _rows = _appendUnique(_rows, page.items);
+          _nextCursor = page.nextCursor;
+        });
+      }
+    } catch (error) {
+      if (_current() &&
+          request == _request &&
+          error is DataFailure &&
+          error.code == 'permission') {
+        _denyAccess();
+        await widget.onScopeRefresh?.call();
+      } else if (_current() && request == _request) {
+        setState(() => _error = 'Não foi possível carregar mais convertidos.');
+      }
+    } finally {
+      if (_current() && request == _request) {
+        setState(() => _loadingMore = false);
+      }
+    }
+  }
+
   void _denyAccess() {
     _request++;
     setState(() {
@@ -136,8 +283,98 @@ class _ConvertsPageState extends State<ConvertsPage> {
       _rows = [];
       _editing = null;
       _errors.clear();
+      _drawerRows.clear();
+      _drawerCursors.clear();
+      _openDrawers.clear();
+      _urgentCounts.clear();
       _error = 'Seu acesso mudou. Atualize seu acesso para continuar.';
     });
+  }
+
+  Future<List<MinistryClassSummary>> _availableClasses(
+    String congregationId,
+  ) async {
+    final gateway = widget.converts.gateway;
+    if (gateway is! ReadRpcGateway) throw const DataFailure('unavailable');
+    final repository = MinistryBrowserRepository(gateway);
+    final classes = <MinistryClassSummary>[];
+    String? cursor;
+    do {
+      final page = await repository.listClasses(
+        congregationId: congregationId,
+        status: 'active',
+        limit: 100,
+        cursor: cursor,
+      );
+      classes.addAll(page.items);
+      cursor = page.nextCursor;
+    } while (cursor != null);
+    return classes;
+  }
+
+  Future<String?> _chooseClass(ConvertRecord record) async {
+    if (record.personId == null || record.congregationId == null) {
+      setState(
+        () => _errors[record.id] = 'Este cadastro precisa de uma identidade vinculada antes da matrícula.',
+      );
+      return null;
+    }
+    final previous = _pendingStartClass[record.id];
+    if (previous != null) return previous;
+    final future = _availableClasses(record.congregationId!);
+    String? selected;
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('Selecionar turma'),
+          content: FutureBuilder<List<MinistryClassSummary>>(
+            future: future,
+            builder: (context, snapshot) {
+              if (snapshot.hasError) {
+                return const Text(
+                  'Não foi possível carregar as turmas desta congregação. Tente novamente.',
+                );
+              }
+              if (!snapshot.hasData) return const CircularProgressIndicator();
+              final classes = snapshot.data!;
+              if (classes.isEmpty) {
+                return const Text(
+                  'Nenhuma turma ativa nesta congregação. Cadastre uma turma antes de iniciar o discipulado.',
+                );
+              }
+              return DropdownButtonFormField<String>(
+                isExpanded: true,
+                initialValue: selected,
+                decoration: const InputDecoration(
+                  labelText: 'Turma da congregação',
+                ),
+                items: [
+                  for (final item in classes)
+                    DropdownMenuItem(
+                      value: item.id,
+                      child: Text(item.name, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (value) => update(() => selected = value),
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancelar'),
+            ),
+            FilledButton(
+              onPressed: selected == null
+                  ? null
+                  : () => Navigator.pop(dialogContext, selected),
+              child: const Text('Matricular e iniciar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _execute(ConvertAction action, ConvertRecord record) async {
@@ -147,12 +384,20 @@ class _ConvertsPageState extends State<ConvertsPage> {
         !actionAllowed(action, record, today)) {
       return;
     }
+    final classId = action == ConvertAction.start
+        ? await _chooseClass(record)
+        : null;
+    if (!_current() || (action == ConvertAction.start && classId == null)) {
+      return;
+    }
+    if (classId != null) _pendingStartClass[record.id] = classId;
     setState(() {
       _pending.add(record.id);
       _errors.remove(record.id);
     });
     try {
-      await _actions.execute(action, record);
+      await _actions.execute(action, record, classId: classId);
+      _pendingStartClass.remove(record.id);
       if (_current()) await _load();
     } catch (error) {
       if (!_current()) return;
@@ -162,10 +407,14 @@ class _ConvertsPageState extends State<ConvertsPage> {
         _denyAccess();
         await widget.onScopeRefresh?.call();
       } else {
-        if (code == 'invalid') await _load();
+        if (code == 'invalid' || code == 'academic_invalid') {
+          _pendingStartClass.remove(record.id);
+          await _load();
+        }
         if (_current()) {
           setState(
-            () => _errors[record.id] = code == 'invalid'
+            () => _errors[record.id] =
+                code == 'invalid' || code == 'academic_invalid'
                 ? 'O cadastro mudou. Confira os dados atualizados antes de tentar novamente.'
                 : 'Não foi possível salvar. Tente novamente a mesma ação.',
           );
@@ -178,13 +427,20 @@ class _ConvertsPageState extends State<ConvertsPage> {
 
   @override
   void dispose() {
+    _searchTimer?.cancel();
     _request++;
     _rows = [];
     _orderedCongregations = [];
     _editing = null;
     _errors.clear();
     _pending.clear();
+    _pendingStartClass.clear();
+    _drawerRows.clear();
+    _drawerCursors.clear();
+    _openDrawers.clear();
+    _urgentCounts.clear();
     _actions.clear();
+    _pendingCount = null;
     _search.clear();
     _search.dispose();
     super.dispose();
@@ -215,18 +471,9 @@ class _ConvertsPageState extends State<ConvertsPage> {
       );
     }
     final today = BusinessCalendar().today(DateTime.now());
-    final rows = visibleConverts(
-      _rows,
-      _orderedCongregations,
-      widget.scope,
-      today,
-      name: _search.text,
-      congregationId: _congregation,
-      status: _status,
-    );
-    final congregations = _orderedCongregations
-        .where((c) => widget.scope.canAccess(c.id))
-        .toList();
+    final rows = _rows;
+    final showDrawers = _drawers && !_urgentView && _search.text.trim().isEmpty;
+    final congregations = _availableCongregations;
     final allowed =
         widget.scope.isGlobalManager || widget.scope.congregationIds.isNotEmpty;
     final statusFilters =
@@ -256,6 +503,16 @@ class _ConvertsPageState extends State<ConvertsPage> {
     final header = Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_pendingCount != null &&
+            _pendingCount!.count > 0 &&
+            widget.onOpenPending != null) ...[
+          PendingBanner(
+            count: _pendingCount!.count,
+            capped: _pendingCount!.capped,
+            onReview: widget.onOpenPending!,
+          ),
+          const SizedBox(height: 16),
+        ],
         Base44PageHeading(
           title: 'Convertidos',
           icon: Icons.people_outline,
@@ -263,10 +520,12 @@ class _ConvertsPageState extends State<ConvertsPage> {
               ? 'Carregando convertidos…'
               : _error != null
               ? 'Consulta indisponível'
-              : '${rows.length} convertidos encontrados',
+              : showDrawers
+              ? 'Selecione uma congregação'
+              : '${rows.length} convertidos carregados',
           trailing: IconButton(
             tooltip: 'Atualizar',
-            onPressed: _loading || _pending.isNotEmpty ? null : _load,
+            onPressed: _loading || _pending.isNotEmpty ? null : _refresh,
             icon: const Icon(Icons.refresh),
           ),
         ),
@@ -284,11 +543,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
                     for (final item in statusFilters)
                       FilterChip(
                         avatar: Icon(item.icon, size: 18, color: item.color),
-                        label: Text(
-                          _loading || _error != null
-                              ? item.label
-                              : '${item.label} (${rows.where((r) => statusCode(r, today) == item.code).length})',
-                        ),
+                        label: Text(item.label),
                         labelStyle: TextStyle(color: item.color),
                         selected: _status == item.code,
                         backgroundColor: item.tint,
@@ -298,51 +553,64 @@ class _ConvertsPageState extends State<ConvertsPage> {
                               ? item.color
                               : item.color.withValues(alpha: .25),
                         ),
-                        onSelected: (selected) => setState(
-                          () => _status = selected ? item.code : null,
-                        ),
+                        onSelected: (selected) {
+                          setState(() {
+                            _status = selected ? item.code : null;
+                            _urgentView = false;
+                          });
+                          _load();
+                        },
                       ),
                   ],
                 ),
                 const SizedBox(height: 12),
                 TextField(
                   controller: _search,
+                  maxLength: 200,
                   decoration: const InputDecoration(
                     labelText: 'Buscar por nome',
                     prefixIcon: Icon(Icons.search),
                   ),
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) {
+                    _searchTimer?.cancel();
+                    _request++;
+                    setState(() {
+                      _loading = true;
+                      _rows = [];
+                      _drawerRows.clear();
+                    });
+                    _searchTimer = Timer(
+                      const Duration(milliseconds: 300),
+                      _load,
+                    );
+                  },
                 ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  key: ValueKey(_congregation),
-                  initialValue: _congregation ?? '',
-                  isExpanded: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Congregação',
-                    prefixIcon: Icon(Icons.church_outlined),
-                  ),
-                  items: [
-                    const DropdownMenuItem(
-                      value: '',
-                      child: Text('Todas as congregações'),
+                if (_drawers)
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _urgentView = !_urgentView;
+                        _status = null;
+                      });
+                      _load();
+                    },
+                    icon: const Icon(Icons.warning_amber_outlined),
+                    label: Text(
+                      _urgentView
+                          ? 'Ver congregações'
+                          : 'Ver todas as visitas urgentes',
                     ),
-                    ...congregations.map(
-                      (c) => DropdownMenuItem(value: c.id, child: Text(c.name)),
-                    ),
-                  ],
-                  onChanged: (value) => setState(
-                    () => _congregation = value == '' ? null : value,
                   ),
-                ),
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton.icon(
                     onPressed: () {
                       setState(() {
                         _status = null;
-                        _congregation = null;
+                        _urgentView = false;
+                        _search.clear();
                       });
+                      _load();
                     },
                     icon: const Icon(Icons.filter_alt_off_outlined),
                     label: const Text('Limpar filtros'),
@@ -369,7 +637,7 @@ class _ConvertsPageState extends State<ConvertsPage> {
             padding: EdgeInsets.only(top: 16),
             child: Base44Panel(child: Text('Carregando…')),
           )
-        else if (rows.isEmpty && allowed)
+        else if (rows.isEmpty && allowed && !showDrawers)
           const Padding(
             padding: EdgeInsets.only(top: 16),
             child: Base44Panel(child: Text('Nenhum convertido encontrado')),
@@ -386,49 +654,94 @@ class _ConvertsPageState extends State<ConvertsPage> {
               padding: const EdgeInsets.all(16),
               itemCount:
                   1 +
-                  (_loading || _error != null || !allowed ? 0 : rows.length),
+                  (_loading || _error != null || !allowed
+                      ? 0
+                      : showDrawers
+                      ? congregations.length
+                      : rows.length + (_nextCursor == null ? 0 : 1)),
               itemBuilder: (context, index) {
                 if (index == 0) return header;
-                final record = rows[index - 1];
-                Congregation? congregation;
-                for (final candidate in widget.congregations) {
-                  if (candidate.id == record.congregationId) {
-                    congregation = candidate;
-                    break;
-                  }
-                }
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (record.legacyIdentity != null)
-                      const Padding(
-                        padding: EdgeInsets.fromLTRB(4, 12, 4, 0),
-                        child: Text(
-                          'Identidade legada original · somente leitura',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                      ),
-                    ConvertCard(
-                      key: ValueKey('${record.id}:$_context'),
-                      record: record,
-                      today: today,
-                      congregation: congregation,
-                      gateway: widget.converts.gateway,
-                      photos: widget.photos,
-                      busy: _pending.contains(record.id),
-                      error: _errors[record.id],
-                      onAction: (action) => _execute(action, record),
-                      onEdit: _pending.isNotEmpty || record.personId == null
-                          ? null
-                          : () => setState(() => _editing = record),
+                if (showDrawers) {
+                  final congregation = congregations[index - 1];
+                  final id = congregation.id;
+                  return ExpansionTile(
+                    key: ValueKey('drawer:$id'),
+                    title: Text(congregation.name),
+                    subtitle: Text(
+                      '${_urgentCounts[id] ?? 0} visitas urgentes',
                     ),
-                  ],
-                );
+                    initiallyExpanded: _openDrawers.contains(id),
+                    onExpansionChanged: (open) {
+                      if (open) {
+                        _openDrawers.add(id);
+                        if (!_drawerRows.containsKey(id)) _loadDrawer(id);
+                      } else {
+                        _openDrawers.remove(id);
+                      }
+                    },
+                    children: [
+                      if (_drawerLoading.contains(id))
+                        const CircularProgressIndicator(),
+                      for (final record in _drawerRows[id] ?? <ConvertRecord>[])
+                        _recordCard(record, today),
+                      if (_drawerCursors[id] != null)
+                        TextButton(
+                          onPressed: () => _loadDrawer(id, more: true),
+                          child: const Text('Carregar mais'),
+                        ),
+                    ],
+                  );
+                }
+                if (index > rows.length) {
+                  return TextButton(
+                    onPressed: _loadingMore ? null : _loadMore,
+                    child: const Text('Carregar mais'),
+                  );
+                }
+                final record = rows[index - 1];
+                return _recordCard(record, today);
               },
             ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _recordCard(ConvertRecord record, DateOnly today) {
+    Congregation? congregation;
+    for (final candidate in widget.congregations) {
+      if (candidate.id == record.congregationId) {
+        congregation = candidate;
+        break;
+      }
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (record.legacyIdentity != null)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(4, 12, 4, 0),
+            child: Text(
+              'Identidade legada original · somente leitura',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ConvertCard(
+          key: ValueKey('${record.id}:$_context'),
+          record: record,
+          today: today,
+          congregation: congregation,
+          gateway: widget.converts.gateway,
+          photos: widget.photos,
+          busy: _pending.contains(record.id),
+          error: _errors[record.id],
+          onAction: (action) => _execute(action, record),
+          onEdit: _pending.isNotEmpty || record.personId == null
+              ? null
+              : () => setState(() => _editing = record),
+        ),
+      ],
     );
   }
 }

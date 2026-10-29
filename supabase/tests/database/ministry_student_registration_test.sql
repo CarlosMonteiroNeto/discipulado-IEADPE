@@ -342,4 +342,22 @@ BEGIN
   WHERE c.id=long_convert_id),
   'archived edit retry and new edit leave convert and canonical person unchanged');
 END $$;
+-- Supervisors can register students in an active congregation without a local grant.
+SELECT set_config('request.jwt.claim.sub','99100000-0000-4000-8000-000000000002',true);
+DO $$
+DECLARE result jsonb;
+BEGIN
+ result:=public.ieadpe_ministry_register_student(
+  '99500000-0000-4000-8000-000000000090', jsonb_build_object(
+   'id','99300000-0000-4000-8000-000000000090',
+   'person_id','99400000-0000-4000-8000-000000000090',
+   'congregation_id','99200000-0000-4000-8000-000000000002',
+   'person',jsonb_build_object('name','Aluno Supervisor Sintetico','phone',NULL,'birth_date',NULL,
+    'address',jsonb_build_object('street',NULL,'district',NULL,'city',NULL,'postal_code',NULL,'state_code',NULL)),
+   'academic',jsonb_build_object('education',NULL,'marital_status',NULL,'new_convert',false,'water_baptized',NULL,'wants_baptism',NULL)));
+ PERFORM pg_temp.assert_true(result->>'id'='99300000-0000-4000-8000-000000000090' AND
+  EXISTS(SELECT FROM public.ministry_students WHERE id='99300000-0000-4000-8000-000000000090'
+   AND congregation_id='99200000-0000-4000-8000-000000000002'),
+  'supervisor registers student in chosen active congregation');
+END $$;
 ROLLBACK;

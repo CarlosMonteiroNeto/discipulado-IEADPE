@@ -1,5 +1,8 @@
 import '../../../data/supabase_gateway.dart';
 import '../../../domain/uuid_shape.dart';
+import '../../../domain/models.dart' show Congregation;
+import '../../converts/congregation_order.dart';
+import '../../../platform/portuguese_sort.dart';
 import '../domain/ministry_models.dart';
 import 'ministry_codec.dart';
 
@@ -169,52 +172,91 @@ class MinistryBrowserRepository {
   }
 }
 
-/// Holds one directory page at a time and fetches adjacent pages on demand.
+/// Reads bounded server pages, then displays the authorized directory in locale order.
 class MinistryCongregationDirectoryPager {
   static const pageSize = 99;
-  MinistryCongregationDirectoryPager(this.repository);
+  MinistryCongregationDirectoryPager(
+    this.repository, {
+    this.sortNames = sortPortugueseNames,
+  });
   final MinistryBrowserRepository repository;
+  final Future<List<String>> Function(List<String>) sortNames;
 
   MinistryPage<MinistryCongregationChoice>? page;
-  String? _currentCursor;
-  final List<String?> _previousCursors = [];
+  List<MinistryCongregationChoice> _ordered = const [];
+  int _pageIndex = 0;
+  String? _loadedContext;
 
-  bool get hasPrevious => _previousCursors.isNotEmpty;
-  bool get hasNext => page?.nextCursor != null;
-  int get pageNumber => _previousCursors.length + 1;
+  int compareChoices(
+    MinistryCongregationChoice a,
+    MinistryCongregationChoice b,
+  ) {
+    final aIndex = _ordered.indexWhere((item) => item.id == a.id);
+    final bIndex = _ordered.indexWhere((item) => item.id == b.id);
+    return (aIndex < 0 ? _ordered.length : aIndex).compareTo(
+      bIndex < 0 ? _ordered.length : bIndex,
+    );
+  }
+
+  bool get hasPrevious => _pageIndex > 0;
+  bool get hasNext => (_pageIndex + 1) * pageSize < _ordered.length;
+  int get pageNumber => _pageIndex + 1;
+
+  MinistryPage<MinistryCongregationChoice> _displayPage() {
+    final start = _pageIndex * pageSize;
+    final end = (start + pageSize).clamp(0, _ordered.length);
+    return page = MinistryPage(
+      items: List.unmodifiable(_ordered.sublist(start, end)),
+      nextCursor: hasNext ? _ordered[end - 1].id : null,
+    );
+  }
 
   Future<MinistryPage<MinistryCongregationChoice>> loadFirst() async {
-    final nextPage = await repository.listCongregations(limit: pageSize);
-    page = nextPage;
-    _currentCursor = null;
-    _previousCursors.clear();
-    return nextPage;
+    final token = repository.gateway.context;
+    final rows = <MinistryCongregationChoice>[];
+    final seenIds = <String>{};
+    final seenCursors = <String>{};
+    String? cursor;
+    do {
+      final nextPage = await repository.listCongregations(
+        limit: pageSize,
+        cursor: cursor,
+      );
+      repository.gateway.ensureCurrent(token);
+      for (final item in nextPage.items) {
+        if (!seenIds.add(item.id)) throw const DataFailure('invalid_response');
+        rows.add(item);
+      }
+      cursor = nextPage.nextCursor;
+      if (cursor != null && !seenCursors.add(cursor)) {
+        throw const DataFailure('invalid_response');
+      }
+    } while (cursor != null);
+    final ordered = await orderCongregations([
+      for (final item in rows) Congregation(id: item.id, name: item.name),
+    ], sortNames: sortNames);
+    repository.gateway.ensureCurrent(token);
+    _ordered = [
+      for (final item in ordered)
+        MinistryCongregationChoice(id: item.id, name: item.name),
+    ];
+    _pageIndex = 0;
+    _loadedContext = token;
+    return _displayPage();
   }
 
   Future<MinistryPage<MinistryCongregationChoice>?> next() async {
-    final cursor = page?.nextCursor;
-    if (cursor == null) return null;
-    final nextPage = await repository.listCongregations(
-      limit: pageSize,
-      cursor: cursor,
-    );
-    _previousCursors.add(_currentCursor);
-    _currentCursor = cursor;
-    page = nextPage;
-    return nextPage;
+    if (!hasNext) return null;
+    repository.gateway.ensureCurrent(_loadedContext!);
+    _pageIndex++;
+    return _displayPage();
   }
 
   Future<MinistryPage<MinistryCongregationChoice>?> previous() async {
-    if (_previousCursors.isEmpty) return null;
-    final cursor = _previousCursors.last;
-    final previousPage = await repository.listCongregations(
-      limit: pageSize,
-      cursor: cursor,
-    );
-    _previousCursors.removeLast();
-    _currentCursor = cursor;
-    page = previousPage;
-    return previousPage;
+    if (!hasPrevious) return null;
+    repository.gateway.ensureCurrent(_loadedContext!);
+    _pageIndex--;
+    return _displayPage();
   }
 }
 

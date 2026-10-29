@@ -16,9 +16,9 @@ Future<List<Congregation>> orderCongregations(
   final ranks = {for (final entry in sorted.indexed) entry.$2: entry.$1};
   final indexed = congregations.indexed.toList();
   indexed.sort((a, b) {
-    final sedeA = a.$2.name.toLowerCase().contains('sede');
-    final sedeB = b.$2.name.toLowerCase().contains('sede');
-    if (sedeA != sedeB) return sedeA ? -1 : 1;
+    final matrizA = a.$2.name.trim().toLowerCase() == 'matriz';
+    final matrizB = b.$2.name.trim().toLowerCase() == 'matriz';
+    if (matrizA != matrizB) return matrizA ? -1 : 1;
     final order = ranks[a.$2.name]!.compareTo(ranks[b.$2.name]!);
     return order == 0 ? a.$1.compareTo(b.$1) : order;
   });

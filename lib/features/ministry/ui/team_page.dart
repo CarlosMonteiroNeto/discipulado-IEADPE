@@ -17,6 +17,7 @@ class TeamPage extends StatefulWidget {
     super.key,
     required this.repository,
     this.congregationId,
+    this.congregationName,
     this.supervision = false,
     this.canManageAccess = false,
     this.onScopeRefresh,
@@ -24,6 +25,7 @@ class TeamPage extends StatefulWidget {
 
   final MinistryRepository repository;
   final String? congregationId;
+  final String? congregationName;
   final bool supervision;
   final bool canManageAccess;
   final Future<void> Function()? onScopeRefresh;
@@ -181,6 +183,7 @@ class _TeamPageState extends State<TeamPage> {
           accessRepository: AccessRepository(widget.repository.gateway),
           scope: scope,
           congregationId: congregationId,
+          congregationName: widget.congregationName,
           current: detail,
           directory: _page?.items ?? const <MinistryDirectoryEntry>[],
           canManageAccess: widget.canManageAccess,

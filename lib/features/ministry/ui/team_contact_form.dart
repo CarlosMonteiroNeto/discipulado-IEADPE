@@ -21,6 +21,7 @@ class TeamContactForm extends StatefulWidget {
     required this.accessRepository,
     required this.scope,
     required this.congregationId,
+    this.congregationName,
     required this.current,
     required this.directory,
     required this.canManageAccess,
@@ -34,6 +35,7 @@ class TeamContactForm extends StatefulWidget {
   final AccessRepository accessRepository;
   final ContactScope scope;
   final String? congregationId;
+  final String? congregationName;
   final MinistryContactDetail? current;
   final List<MinistryDirectoryEntry> directory;
   final bool canManageAccess;
@@ -547,6 +549,10 @@ class _TeamContactFormState extends State<TeamContactForm> {
                   subtitle:
                       'Função na equipe e acesso ao app são campos separados.',
                 ),
+                if (widget.congregationName != null) ...[
+                  const SizedBox(height: UnifiedSpace.x2),
+                  Text('Congregação: ${widget.congregationName}'),
+                ],
                 const SizedBox(height: UnifiedSpace.x3),
                 TextFormField(
                   key: const ValueKey('team-contact-name'),
@@ -654,12 +660,12 @@ class _TeamContactFormState extends State<TeamContactForm> {
                   Base44SectionHeading(
                     title: 'Acesso ao aplicativo',
                     subtitle: current?.email == null
-                        ? 'Este contato não tem login vinculado.'
+                        ? 'Ao informar um email, o acesso será concedido automaticamente ao perfil desta equipe.'
                         : linkedAccess?.boundUserId == null && _hasLinkedAccess
                         ? 'Aguardando confirmação do email para ativar o acesso.'
                         : _hasLinkedAccess
                         ? 'Acesso ativo para ${linkedAccess!.userEmail}.'
-                        : 'O email do contato não concede acesso por si só.',
+                        : 'Um email novo concede acesso automaticamente; vínculos revogados permanecem revogados.',
                   ),
                   if (!archived)
                     CheckboxListTile(
@@ -685,7 +691,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                       title: Text(
                         _hasLinkedAccess
                             ? 'Atualizar vínculo de acesso'
-                            : 'Conceder acesso ao aplicativo',
+                            : 'Selecionar vínculo manualmente',
                       ),
                       subtitle: const Text(
                         'O acesso só fica ativo quando o email corresponde a uma conta verificada.',
@@ -886,7 +892,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
                         : 'Email (opcional)',
                     helperText: _hasLinkedAccess
                         ? 'O email muda somente com o vínculo selecionado.'
-                        : null,
+                        : 'Email verificado concede acesso.',
                   ),
                   validator: (value) {
                     final email = value?.trim() ?? '';

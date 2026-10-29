@@ -6,21 +6,29 @@ import 'package:ieadpe_converts/routing/router.dart';
 
 import '../features/auth/auth_flow_test.dart' show FakeAuth;
 
+Future<void> _pumpShell(
+  WidgetTester tester, {
+  required double width,
+  required Widget shell,
+}) async {
+  tester.view.physicalSize = Size(width, 900);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(MaterialApp(home: shell));
+}
+
 void main() {
   testWidgets('mobile current route exposes selected semantics', (t) async {
-    t.view.physicalSize = const Size(360, 800);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.resetPhysicalSize);
-    addTearDown(t.view.resetDevicePixelRatio);
-    await t.pumpWidget(
-      MaterialApp(
-        home: AppShell(
-          scope: AccessScope(isAdmin: true),
-          currentRoute: '/converts',
-          onNavigate: (_) {},
-          onSignOut: () {},
-          child: const Text('Conteúdo'),
-        ),
+    await _pumpShell(
+      t,
+      width: 360,
+      shell: AppShell(
+        scope: AccessScope(isAdmin: true),
+        currentRoute: '/converts',
+        onNavigate: (_) {},
+        onSignOut: () {},
+        child: const Text('Conteúdo'),
       ),
     );
     final selected = find.byWidgetPredicate(
@@ -31,147 +39,138 @@ void main() {
       findsOneWidget,
     );
   });
-  testWidgets(
-    'student registration is reached through Alunos, not a context-free Menu route',
-    (t) async {
-      t.view.physicalSize = const Size(360, 800);
-      t.view.devicePixelRatio = 1;
-      addTearDown(t.view.resetPhysicalSize);
-      addTearDown(t.view.resetDevicePixelRatio);
-      final opened = <String>[];
-      await t.pumpWidget(
-        MaterialApp(
-          home: AppShell(
-            scope: AccessScope(isAdmin: true, isMinistrySupervision: true),
-            onNavigate: opened.add,
-            onSignOut: () {},
-            child: const Text('Conteúdo'),
-          ),
-        ),
-      );
 
-      expect(find.text('Menu').hitTestable(), findsOneWidget);
-      await t.tap(find.byKey(const ValueKey('app-shell-bottom-menu')));
-      await t.pumpAndSettle();
-      for (final label in ['Equipe', 'Alunos', 'Turmas', 'Frequência']) {
-        expect(find.text(label).hitTestable(), findsOneWidget);
-      }
-      expect(find.text('Cadastrar aluno').hitTestable(), findsNothing);
-      expect(find.text('Novos convertidos').hitTestable(), findsNothing);
-      expect(
-        find.descendant(
-          of: find.byKey(
-            const ValueKey('app-shell-drawer-/ministry/students/register'),
-          ),
-          matching: find.byIcon(Icons.person_add_alt_1_outlined),
-        ),
-        findsNothing,
-      );
-      await t.tap(find.text('Alunos').last);
-      await t.pumpAndSettle();
-      expect(opened, ['/ministry/students']);
-      expect(find.text('Sair').hitTestable(), findsNothing);
-      expect(t.takeException(), isNull);
-    },
-  );
-
-  testWidgets('selected ministry child highlights its parent navigation', (
+  testWidgets('mobile navigation has no Menu tab and no side drawer', (
     t,
   ) async {
-    t.view.physicalSize = const Size(360, 800);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.resetPhysicalSize);
-    addTearDown(t.view.resetDevicePixelRatio);
-    await t.pumpWidget(
-      MaterialApp(
-        home: AppShell(
-          scope: AccessScope(isAdmin: true, isMinistrySupervision: true),
-          currentRoute: '/ministry/attendance',
-          onNavigate: (_) {},
-          onSignOut: () {},
-          child: const Text('Conteúdo'),
-        ),
+    final opened = <String>[];
+    await _pumpShell(
+      t,
+      width: 360,
+      shell: AppShell(
+        scope: AccessScope(isAdmin: true, isMinistrySupervision: true),
+        currentRoute: '/home',
+        onNavigate: opened.add,
+        onSignOut: () {},
+        child: const Text('Conteúdo'),
       ),
     );
 
+    expect(find.text('Menu'), findsNothing);
+    expect(find.byTooltip('Abrir menu'), findsNothing);
+    expect(t.widget<Scaffold>(find.byType(Scaffold)).endDrawer, isNull);
+    expect(find.text('Pendentes'), findsNothing);
     expect(
-      find.descendant(
-        of: find.byWidgetPredicate(
-          (widget) => widget is Semantics && widget.properties.selected == true,
-        ),
-        matching: find.text('Discipulado'),
-      ),
-      findsOneWidget,
+      find.byKey(const ValueKey('app-shell-nav-/ministry/students/register')),
+      findsNothing,
     );
-    expect(find.text('Frequência'), findsOneWidget);
+    expect(find.text('Cadastrar aluno'), findsNothing);
+
+    await t.tap(find.byKey(const ValueKey('app-shell-nav-/ministry')));
+    expect(opened, ['/ministry']);
   });
 
-  testWidgets('register-only scope keeps protected destinations out of Menu', (
+  testWidgets('signed-in shell offers Sair in the header', (t) async {
+    var signedOut = 0;
+    await _pumpShell(
+      t,
+      width: 360,
+      shell: AppShell(
+        scope: AccessScope(isAdmin: true),
+        onNavigate: (_) {},
+        onSignOut: () => signedOut++,
+        child: const Text('Conteúdo'),
+      ),
+    );
+
+    await t.tap(find.byKey(const ValueKey('app-shell-sign-out')));
+    expect(signedOut, 1);
+    expect(find.text('Sair'), findsOneWidget);
+  });
+
+  testWidgets('public shell offers Entrar and no bottom destinations', (
     t,
   ) async {
-    t.view.physicalSize = const Size(320, 800);
-    t.view.devicePixelRatio = 1;
-    addTearDown(t.view.resetPhysicalSize);
-    addTearDown(t.view.resetDevicePixelRatio);
-    await t.pumpWidget(
-      MaterialApp(
-        home: AppShell(
-          scope: AccessScope(),
-          onNavigate: (_) {},
-          onSignOut: () {},
-          child: const Text('Cadastro'),
-        ),
+    var signIns = 0;
+    await _pumpShell(
+      t,
+      width: 360,
+      shell: AppShell(
+        scope: AccessScope(),
+        publicMode: true,
+        onNavigate: (_) {},
+        onSignOut: () {},
+        onSignIn: () => signIns++,
+        child: const Text('Cadastro'),
       ),
     );
 
-    await t.tap(find.byTooltip('Abrir menu'));
-    await t.pumpAndSettle();
-    expect(find.text('Início').hitTestable(), findsNothing);
-    expect(find.text('Admin').hitTestable(), findsNothing);
-    expect(find.text('Discipulado').hitTestable(), findsNothing);
-    expect(find.text('Sair').hitTestable(), findsOneWidget);
+    expect(find.text('Entrar'), findsOneWidget);
+    expect(
+      t.widget<Scaffold>(find.byType(Scaffold)).bottomNavigationBar,
+      isNull,
+    );
+    expect(find.byKey(const ValueKey('app-shell-nav-/register')), findsNothing);
+    expect(find.text('Sair'), findsNothing);
+
+    await t.tap(find.byKey(const ValueKey('app-shell-sign-in')));
+    expect(signIns, 1);
   });
+
+  testWidgets('register-only scope keeps protected destinations out', (
+    t,
+  ) async {
+    await _pumpShell(
+      t,
+      width: 320,
+      shell: AppShell(
+        scope: AccessScope(),
+        onNavigate: (_) {},
+        onSignOut: () {},
+        child: const Text('Cadastro'),
+      ),
+    );
+
+    expect(find.text('Início'), findsNothing);
+    expect(find.text('Admin'), findsNothing);
+    expect(find.text('Discipulado'), findsNothing);
+    expect(find.text('Menu'), findsNothing);
+    expect(find.text('Sair'), findsOneWidget);
+  });
+
   for (final width in [360.0, 768.0, 1280.0]) {
     testWidgets('navigation at $width with 200% text and reduced motion', (
       t,
     ) async {
-      t.view.resetPhysicalSize();
-      t.view.physicalSize = Size(width, 1000);
-      t.view.devicePixelRatio = 1;
-      addTearDown(t.view.resetPhysicalSize);
-      addTearDown(t.view.resetDevicePixelRatio);
-      String? route;
+      String? tapped;
       var feedback = 0;
-      await t.pumpWidget(
-        MaterialApp(
-          home: MediaQuery(
-            data: MediaQueryData(
-              size: Size(width, 1000),
-              textScaler: TextScaler.linear(2),
-              disableAnimations: true,
-            ),
-            child: AppShell(
-              scope: AccessScope(isAdmin: true),
-              onNavigate: (r) => route = r,
-              onSignOut: () {},
-              onFeedback: () => feedback++,
-              child: const Text('Conteúdo'),
-            ),
+      await _pumpShell(
+        t,
+        width: width,
+        shell: MediaQuery(
+          data: MediaQueryData(
+            size: Size(width, 900),
+            textScaler: const TextScaler.linear(2),
+            disableAnimations: true,
+          ),
+          child: AppShell(
+            scope: AccessScope(isAdmin: true),
+            onNavigate: (route) => tapped = route,
+            onSignOut: () {},
+            onFeedback: () => feedback++,
+            child: const Text('Conteúdo'),
           ),
         ),
       );
-      await t.tap(find.text('Convertidos'));
-      expect(route, '/converts');
+      await t.tap(find.text('Convertidos').first);
+      expect(tapped, '/converts');
       await t.tap(find.byTooltip('Enviar sugestão'));
       expect(feedback, 1);
-      if (width < 768) {
-        await t.tap(find.byTooltip('Abrir menu'));
-        await t.pumpAndSettle();
-        expect(find.text('Menu'), findsOneWidget);
-      }
+      expect(find.text('Menu'), findsNothing);
       expect(t.takeException(), isNull);
     });
   }
+
   test('real SessionRouter redirects registrar private deep link', () async {
     final auth = FakeAuth()..access = AccessScope();
     final router = SessionRouter(

@@ -17,6 +17,7 @@ Future<void> main() async {
       'sao',
       'Sede',
       'Sede Nova',
+      'Matriz',
       'área',
       'Área',
       'Area',
@@ -36,6 +37,7 @@ Future<void> main() async {
       'Area',
       'área',
       'Área',
+      'Matriz',
       'sao',
       'Sao',
       'são',
@@ -52,26 +54,13 @@ Future<void> main() async {
       for (final entry in input.indexed)
         Congregation(id: '${entry.$1}', name: entry.$2),
     ]);
-    const expectedWithSede = [
-      'Sede',
-      'Sede Nova',
-      'Acao',
-      'ação',
-      'Ação',
-      'Água',
-      'area',
-      'Area',
-      'área',
-      'Área',
-      'sao',
-      'Sao',
-      'são',
-      'São',
-      'Zebra',
+    final expectedWithMatriz = [
+      'Matriz',
+      ...expected.where((name) => name != 'Matriz'),
     ];
     if (jsonEncode(ordered.map((c) => c.name).toList()) !=
-        jsonEncode(expectedWithSede)) {
-      throw StateError('Sede order');
+        jsonEncode(expectedWithMatriz)) {
+      throw StateError('Matriz order');
     }
     if (jsonEncode(await sortPortugueseNames(['Sa\u0303o', 'São'])) !=
         jsonEncode(['Sa\u0303o', 'São'])) {
@@ -80,7 +69,7 @@ Future<void> main() async {
     if ('Sa\u0303o'.runes.length != 4 || 'São'.runes.length != 3) {
       throw StateError('Canonical fixture encoding');
     }
-    resultText = 'PASS: production browser pt-BR collation, sede priority and canonical equivalence'
+    resultText = 'PASS: production browser pt-BR collation, Matriz priority and canonical equivalence'
         .toJS;
   } catch (error) {
     resultText = 'FAIL: $error'.toJS;

@@ -19,18 +19,26 @@ class HomeRepository {
     : now = now ?? DateTime.now;
   final ConvertRepository converts;
   final DateTime Function() now;
-  Future<HomeSummary> summary() async {
+  Future<HomeSummary> summary({AccessScope? scope}) async {
     final token = converts.gateway.context;
     final today = BusinessCalendar().today(now());
     final rows = <ConvertRecord>[];
-    String? cursor;
-    do {
-      converts.gateway.ensureCurrent(token);
-      final page = await converts.list(const ConvertQuery(), cursor);
-      converts.gateway.ensureCurrent(token);
-      rows.addAll(page.items.where((r) => r.deletedAt == null));
-      cursor = page.nextCursor;
-    } while (cursor != null);
+    final scopes = scope == null || scope.isGlobalManager
+        ? <String?>[null]
+        : (scope.congregationIds.toList()..sort()).cast<String?>();
+    for (final congregationId in scopes) {
+      String? cursor;
+      do {
+        converts.gateway.ensureCurrent(token);
+        final page = await converts.list(
+          ConvertQuery(congregationId: congregationId),
+          cursor,
+        );
+        converts.gateway.ensureCurrent(token);
+        rows.addAll(page.items.where((r) => r.deletedAt == null));
+        cursor = page.nextCursor;
+      } while (cursor != null);
+    }
     final recent =
         rows.where((r) {
           final age = today.differenceInDays(r.conversionDate);

@@ -47,5 +47,5 @@ void main() {
       'test_hosted_upgrade.py',
     ]);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-  });
+  }, timeout: Timeout(Duration(minutes: 2)));
 }

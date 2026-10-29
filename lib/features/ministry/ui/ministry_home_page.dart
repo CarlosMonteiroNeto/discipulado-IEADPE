@@ -311,18 +311,18 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                     runSpacing: 12,
                     children: [
                       _CountTile(
-                        label: 'Alunos',
-                        value: data['students'],
-                        icon: Icons.school_outlined,
-                        iconColor: UnifiedColors.brandNavy,
-                        onTap: widget.onOpenStudents,
-                      ),
-                      _CountTile(
                         label: 'Turmas',
                         value: data['classes'],
                         icon: Icons.groups_outlined,
                         iconColor: UnifiedColors.brandBlue,
                         onTap: widget.onOpenClasses,
+                      ),
+                      _CountTile(
+                        label: 'Alunos',
+                        value: data['students'],
+                        icon: Icons.school_outlined,
+                        iconColor: UnifiedColors.brandNavy,
+                        onTap: widget.onOpenStudents,
                       ),
                       _CountTile(
                         label: 'Chamadas abertas',
@@ -342,17 +342,17 @@ class _MinistryHomePageState extends State<MinistryHomePage> {
                 children: [
                   FilledButton.icon(
                     onPressed: widget.scopedActionsEnabled
-                        ? widget.onOpenStudents
-                        : null,
-                    icon: const Icon(Icons.school_outlined),
-                    label: const Text('Alunos'),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.scopedActionsEnabled
                         ? widget.onOpenClasses
                         : null,
                     icon: const Icon(Icons.groups_outlined),
                     label: const Text('Turmas'),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: widget.scopedActionsEnabled
+                        ? widget.onOpenStudents
+                        : null,
+                    icon: const Icon(Icons.school_outlined),
+                    label: const Text('Alunos'),
                   ),
                   OutlinedButton.icon(
                     onPressed: widget.onOpenAttendance,

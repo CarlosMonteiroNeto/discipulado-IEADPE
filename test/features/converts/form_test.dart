@@ -649,9 +649,10 @@ void main() {
       expect(t.takeException(), null);
     },
   );
-  test('source worship choices preserve all 64 exact wire labels', () {
-    expect(worshipTypes.length, 64);
-    expect(worshipTypes.first, '01 - Oração');
+  test('worship choices include evangelism and preserve source labels', () {
+    expect(worshipTypes.length, 65);
+    expect(worshipTypes.first, '00 -  Evangelismo / Ar livre');
+    expect(worshipTypes[1], '01 - Oração');
     expect(worshipTypes.last, '64 - Inauguração de Templo');
   });
 }

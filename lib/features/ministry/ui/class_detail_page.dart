@@ -20,12 +20,14 @@ class ClassDetailPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.congregationId,
+    this.congregationName,
     required this.classSummary,
     required this.onChanged,
   });
 
   final MinistryRepository repository;
   final String congregationId;
+  final String? congregationName;
   final MinistryClassSummary classSummary;
   final VoidCallback onChanged;
 
@@ -99,6 +101,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
         builder: (_) => ClassForm(
           repository: widget.repository,
           congregationId: widget.congregationId,
+          congregationName: widget.congregationName,
           initialClass: _classSummary,
           onCancel: () => Navigator.of(context).pop(),
           onSaved: (summary) => Navigator.of(context).pop(summary),

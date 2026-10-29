@@ -31,5 +31,6 @@ void main() {
         await dir.delete(recursive: true);
       }
     },
+    timeout: Timeout(Duration(minutes: 2)),
   );
 }

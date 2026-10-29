@@ -90,7 +90,7 @@ class RootFixture {
   late SupabaseClient client;
   late HttpClient http;
   late AuthRepository auth;
-  bool admin = true, failScope = false;
+  bool admin = true, failScope = false, ministrySupervision = false;
   String? displayName;
   Completer<void>? scopeGate;
   Zone? _transportZone;
@@ -99,6 +99,7 @@ class RootFixture {
   final requestHandlerErrors = <AsyncError>[];
   final requestStages = <HttpRequest, String>{};
   final paths = <String>[];
+  final convertListScopes = <Object?>[];
   String? convertId;
   String? studentId;
   String? enrollmentId;
@@ -138,7 +139,7 @@ class RootFixture {
             'is_admin': admin,
             'is_supervision': false,
             'congregation_ids': admin ? <String>[] : [scopeId],
-            'ministry_supervision': false,
+            'ministry_supervision': ministrySupervision,
             'ministry_congregation_ids': [scopeId],
           };
         }
@@ -147,6 +148,36 @@ class RootFixture {
         value = [
           {'id': scopeId, 'name': 'Congregação Sintética', 'archived_at': null},
         ];
+      }
+      if (rpc == 'ieadpe_ministry_list_converts') {
+        final requestValue = params['request'] as Map?;
+        final scope = requestValue?['congregation_id'];
+        convertListScopes.add(scope);
+        if (!admin && scope == null) {
+          request.response.statusCode = 403;
+          value = {'code': '42501', 'message': 'forbidden'};
+        } else {
+          value = {'items': <Object>[], 'next_cursor': null};
+        }
+      }
+      if (rpc == 'ieadpe_convert_dashboard_page') {
+        final requestValue = params['request'] as Map?;
+        final scope = requestValue?['congregation_id'];
+        convertListScopes.add(scope);
+        if (!admin && scope != scopeId) {
+          request.response.statusCode = 403;
+          value = {'code': '42501', 'message': 'forbidden'};
+        } else {
+          value = {'items': <Object>[], 'next_cursor': null};
+        }
+      }
+      if (rpc == 'ieadpe_convert_dashboard_counts') {
+        final ids = (params['request'] as Map)['congregation_ids'] as List;
+        value = {
+          'counts': [
+            for (final id in ids) {'congregation_id': id, 'red_count': 0},
+          ],
+        };
       }
       if (rpc == 'ieadpe_ministry_list_congregations') {
         value = {
@@ -633,7 +664,7 @@ void main() {
   });
 
   testWidgets(
-    'production root mounts Google login for configured SDK without a session',
+    'production root opens public registration for a session-less SDK',
     (tester) async {
       final client = (await tester.runAsync(
         () async => SupabaseClient(
@@ -648,7 +679,9 @@ void main() {
       );
       await tester.pumpWidget(App(auth: auth));
       await tester.pumpAndSettle();
-      expect(find.text('Entrar com Google'), findsOneWidget);
+      expect(find.text('Cadastro público'), findsOneWidget);
+      expect(find.text('Entrar'), findsOneWidget);
+      expect(find.text('Entrar com Google'), findsNothing);
       expect(find.text('Aplicativo em preparação'), findsNothing);
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(client.dispose);
@@ -842,6 +875,88 @@ void main() {
       expect(registration.containsKey('conversion_date'), isFalse);
 
       expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      await tester.runAsync(fixture.close);
+    },
+  );
+  testWidgets('local home loads without repeated access refresh', (
+    tester,
+  ) async {
+    final fixture = RootFixture()..admin = false;
+    await tester.runAsync(fixture.initialize);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProtectedApplication(
+          repository: fixture.auth,
+          intendedRoute: '/home',
+        ),
+      ),
+    );
+    await drain(tester);
+    tester.widget<AppShell>(find.byType(AppShell)).onNavigate('/home');
+    await drain(tester);
+    await settleLoopback(tester);
+    await drain(tester);
+    expect(fixture.convertListScopes, [RootFixture.scopeId]);
+    expect(find.text('Atualizando acesso…'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(fixture.close);
+  });
+  testWidgets(
+    'supervision chooses a congregation from team and uses it across ministry',
+    (tester) async {
+      final fixture = RootFixture()..ministrySupervision = true;
+      await tester.runAsync(fixture.initialize);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ProtectedApplication(
+            repository: fixture.auth,
+            intendedRoute: '/ministry/team',
+          ),
+        ),
+      );
+      await drain(tester);
+      expect(
+        find.byKey(const ValueKey('ministry-workspace-congregation')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('ministry-workspace-congregation')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Congregação Sintética').last);
+      await drain(tester);
+      expect(find.text('Diretório da congregação'), findsOneWidget);
+      await tester.tap(find.text('Adicionar contato'));
+      await tester.pumpAndSettle();
+      expect(find.text('Congregação: Congregação Sintética'), findsOneWidget);
+      await tester.tap(find.text('Cancelar'));
+      await tester.pumpAndSettle();
+      for (final section in ['Alunos', 'Turmas']) {
+        await tester.tap(
+          find.byKey(const ValueKey('app-shell-ministry-selector')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text(section).last);
+        await drain(tester);
+        expect(
+          find.byKey(const ValueKey('ministry-workspace-congregation')),
+          findsOneWidget,
+        );
+        expect(find.text('Congregação Sintética'), findsOneWidget);
+        await tester.tap(
+          find
+              .text(section == 'Alunos' ? 'Registrar aluno' : 'Nova turma')
+              .last,
+        );
+        await drain(tester);
+        expect(find.text('Congregação: Congregação Sintética'), findsOneWidget);
+        await tester.ensureVisible(find.text('Cancelar').last);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Cancelar').last);
+        await drain(tester);
+      }
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(fixture.close);
     },

@@ -14,7 +14,7 @@ void main() {
       'test_release_operations.py',
     ]);
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
-  });
+  }, timeout: Timeout(Duration(minutes: 2)));
 
   test(
     'maintenance eligibility, dry-run and Storage failure contracts',

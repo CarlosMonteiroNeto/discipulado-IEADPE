@@ -437,7 +437,7 @@ void main() {
       );
       await _pumpAppFrames(tester);
       expect(auth.sessionWatches, 0);
-      await tester.tap(find.byKey(const ValueKey('app-shell-nav-/home')));
+      await tester.tap(find.byKey(const ValueKey('app-shell-sign-in')));
       await _pumpAppFrames(tester);
       expect(find.text('Entrar com Google'), findsOneWidget);
       expect(auth.sessionWatches, 1);
@@ -465,6 +465,37 @@ void main() {
       await disposal;
     },
   );
+
+  testWidgets('browser deep link survives anonymous sign in', (tester) async {
+    final auth = _AuthProbe(<http.Request>[]);
+    final history = _FakeBootstrapHistory('/converts');
+    await tester.pumpWidget(
+      App(
+        auth: auth,
+        publicIntakeRepository: _FakePublicIntakeRepository(),
+        turnstileChallengeFactory: _FakeTurnstileChallenge.new,
+        browserRouteHistoryFactory: () => history,
+      ),
+    );
+    await _pumpAppFrames(tester);
+    await tester.tap(find.byKey(const ValueKey('app-shell-sign-in')));
+    await _pumpAppFrames(tester);
+    await tester.tap(find.text('Entrar com Google'));
+    await _pumpAppFrames(tester);
+    expect(auth.intendedRoutes, ['/converts']);
+    await tester.pumpWidget(const SizedBox());
+    await auth.events.close();
+    var disposed = false;
+    final disposal = auth.client.dispose().then((_) => disposed = true);
+    for (var attempt = 0; attempt < 30 && !disposed; attempt++) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 20)),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(disposed, isTrue);
+    await disposal;
+  });
 
   testWidgets('browser Back from login restores public registration', (
     tester,
@@ -510,9 +541,10 @@ void main() {
     await _pumpAppFrames(tester);
     expect(find.text('Cadastro público'), findsOneWidget);
 
-    await tester.tap(find.byKey(const ValueKey('app-shell-nav-/home')));
+    await tester.tap(find.byKey(const ValueKey('app-shell-sign-in')));
     await _pumpAppFrames(tester);
     expect(find.text('Entrar com Google'), findsOneWidget);
+    expect(find.text('Voltar ao cadastro'), findsOneWidget);
     expect(history.currentPath, '/home');
 
     history.back();
@@ -598,8 +630,8 @@ void main() {
         congregationField.items!
             .map((item) => (item.child as Text).data)
             .toList(),
-        ['Sede Alfa', 'Congregação Central', 'Zeta'],
-        reason: 'public catalog rows use existing locale and Sede ordering',
+        ['Congregação Central', 'Sede Alfa', 'Zeta'],
+        reason: 'public catalog rows use locale ordering',
       );
 
       await _fillPublicForm(tester);
@@ -616,7 +648,7 @@ void main() {
         reason: 'submission scope must be revalidated',
       );
 
-      await tester.tap(find.byTooltip('Sair'));
+      await tester.tap(find.byKey(const ValueKey('app-shell-sign-out')));
       await _pumpAppFrames(tester);
       expect(find.text('Cadastro público'), findsOneWidget);
       expect(repository.catalogReads, 2);

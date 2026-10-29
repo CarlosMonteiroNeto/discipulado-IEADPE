@@ -92,7 +92,8 @@ void main() {
     expect(Supabase.instance.isInitialized, isTrue);
     expect(Supabase.instance.client.auth.currentSession, isNull);
     expect(find.text('Aplicativo em preparação'), findsNothing);
-    expect(find.text('Entrar com Google'), findsOneWidget);
+    expect(find.text('Cadastro público'), findsOneWidget);
+    expect(find.text('Entrar com Google'), findsNothing);
     await tester.pumpWidget(const SizedBox());
     var disposed = false;
     final disposal = Supabase.instance.dispose().then((_) => disposed = true);

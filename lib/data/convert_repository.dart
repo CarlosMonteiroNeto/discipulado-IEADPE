@@ -15,6 +15,104 @@ class ConvertRepository {
   ConvertRepository(this.gateway);
   final Gateway gateway;
 
+  Future<Page<ConvertRecord>> dashboardPage({
+    String? congregationId,
+    List<String>? congregationIds,
+    String? search,
+    String? status,
+    String? cursor,
+  }) async {
+    final token = gateway.context;
+    if (congregationId != null) validateUuid(congregationId);
+    for (final id in congregationIds ?? <String>[]) {
+      validateUuid(id);
+    }
+    if (search != null && (search.trim().isEmpty || search.length > 200) ||
+        status != null && !{'red', 'yellow', 'green'}.contains(status)) {
+      throw const DataFailure('invalid');
+    }
+    final transport = gateway;
+    if (transport is! ReadRpcGateway) throw const DataFailure('unavailable');
+    final result = await transport.readRpc(
+      'convert_dashboard_page',
+      context: token,
+      parameters: {
+        'congregation_id': congregationId,
+        'congregation_ids': congregationIds,
+        'search': search,
+        'status': status,
+        'limit': 50,
+        'cursor': cursor,
+      },
+    );
+    gateway.ensureCurrent(token);
+    try {
+      final items = result['items'];
+      final next = result['next_cursor'];
+      if (!_hasOnly(result, {'items', 'next_cursor'}) ||
+          items is! List ||
+          items.length > 50 ||
+          (next != null && (next is! String || next.length > 4096))) {
+        throw const FormatException();
+      }
+      return Page(
+        items: items
+            .map(
+              (e) =>
+                  decodeConvertProjection(Map<String, dynamic>.from(e as Map)),
+            )
+            .toList(),
+        nextCursor: next as String?,
+      );
+    } catch (_) {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
+  Future<Map<String, int>> dashboardCounts(
+    List<String> congregationIds, {
+    String? search,
+  }) async {
+    for (final id in congregationIds) {
+      validateUuid(id);
+    }
+    final token = gateway.context;
+    final transport = gateway;
+    if (transport is! ReadRpcGateway) throw const DataFailure('unavailable');
+    final result = await transport.readRpc(
+      'convert_dashboard_counts',
+      context: token,
+      parameters: {'congregation_ids': congregationIds, 'search': search},
+    );
+    gateway.ensureCurrent(token);
+    try {
+      if (!_hasOnly(result, {'counts'}) || result['counts'] is! List) {
+        throw const FormatException();
+      }
+      final counts = <String, int>{};
+      for (final row in result['counts'] as List) {
+        final data = Map<String, dynamic>.from(row as Map);
+        final id = data['congregation_id'];
+        final count = data['red_count'];
+        if (!_hasOnly(data, {'congregation_id', 'red_count'}) ||
+            id is! String ||
+            !congregationIds.contains(id) ||
+            counts.containsKey(id) ||
+            count is! int ||
+            count < 0) {
+          throw const FormatException();
+        }
+        counts[id] = count;
+      }
+      if (counts.length != congregationIds.toSet().length) {
+        throw const FormatException();
+      }
+      return counts;
+    } catch (_) {
+      throw const DataFailure('invalid_response');
+    }
+  }
+
   Future<Page<ConvertRecord>> list(ConvertQuery query, String? cursor) async {
     final token = gateway.context;
     if (query.congregationId != null) validateUuid(query.congregationId);

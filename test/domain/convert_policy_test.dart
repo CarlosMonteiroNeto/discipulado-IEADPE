@@ -192,15 +192,16 @@ void main() {
       expect(canStopDiscipleship(record(active: true)), true);
     },
   );
-  test('all sixty-four worship labels exactly match captured values', () {
+  test('new worship label precedes all sixty-four captured values', () {
     final source = File('reference/base44/src/utils/worshipTypes.js')
         .readAsStringSync();
     final expected = RegExp('"([^"]+)"')
         .allMatches(source)
         .map((match) => match.group(1))
         .toList();
-    expect(worshipTypes, expected);
-    expect(worshipTypes.toSet(), hasLength(64));
+    expect(worshipTypes.first, '00 -  Evangelismo / Ar livre');
+    expect(worshipTypes.skip(1).toList(), expected);
+    expect(worshipTypes.toSet(), hasLength(65));
   });
   test('Sunday 19:59 and 20:00 use Sao Paulo and Monday periods', () {
     final calendar = BusinessCalendar();

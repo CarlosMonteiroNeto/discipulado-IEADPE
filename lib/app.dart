@@ -21,6 +21,7 @@ import 'features/converts/register_page.dart';
 import 'features/intake/public_intake_page.dart';
 import 'features/intake/public_intake_repository.dart';
 import 'features/intake/pending_review_page.dart';
+import 'features/intake/pending_count.dart';
 import 'features/intake/pending_submission_repository.dart';
 import 'features/intake/turnstile_challenge.dart';
 import 'features/feedback/feedback_dialog.dart';
@@ -129,11 +130,12 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
   @override
   void initState() {
     super.initState();
-    final path = widget.initialPath ?? Uri.base.path;
-    _publicMode = isPublicRegistrationPath(path);
-    _intendedRoute = widget.initialPath == null ? null : safeRoute(path);
     _browserHistory =
         (widget.browserRouteHistoryFactory ?? createBrowserRouteHistory)();
+    final path =
+        widget.initialPath ?? _browserHistory!.currentPath ?? Uri.base.path;
+    final authCallback = widget.initialPath == null && path == '/auth/callback';
+    _intendedRoute = authCallback ? null : safeRoute(path);
     _browserHistory!.listen(_browserPathChanged);
     _publicIntakeRepository = widget.publicIntakeRepository;
     if (_publicIntakeRepository == null && _configuration.isValid) {
@@ -143,15 +145,26 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
       );
       _ownsPublicRepository = true;
     }
-    if (_publicMode) {
-      // Public registration does not initialize Supabase or protected owners.
-      _auth = widget.auth;
+    if (authCallback) {
+      // The OAuth provider returns here; the SDK must exchange the code first.
+      unawaited(_initialize());
       return;
     }
     if (widget.auth != null) {
       _auth = widget.auth;
+      // Registration is the entry screen; a live session opens the app directly.
+      _publicMode = widget.auth!.currentSession == null;
       return;
     }
+    if (_configuration.isValid) {
+      // Registration is the entry point. The SDK still initializes in the
+      // background so OAuth callbacks and stored sessions are not lost.
+      _publicMode = true;
+      unawaited(_initialize());
+      return;
+    }
+    _publicMode = isPublicRegistrationPath(path);
+    if (_publicMode) return;
     unawaited(_initialize());
   }
 
@@ -172,6 +185,9 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
       if (mounted) {
         setState(() {
           _auth = auth;
+          if (_publicMode && auth.currentSession != null) {
+            _publicMode = false;
+          }
           _intendedRoute = intendedRoute ?? _intendedRoute;
         });
       }
@@ -193,9 +209,13 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
     if (_auth == null) unawaited(_initialize(intendedRoute: destination));
   }
 
-  void _openProtectedRoute(String route) {
-    final destination = safeRoute(route);
-    if (isPublicRegistrationPath(destination)) return;
+  /// Sign-in from the registration screen keeps a private deep link when the
+  /// visitor arrived on one, otherwise it opens the dashboard.
+  void _signIn() {
+    final intended = _intendedRoute;
+    final destination = intended != null && !isPublicRegistrationPath(intended)
+        ? intended
+        : '/home';
     _showProtectedRoute(destination, pushHistory: true);
   }
 
@@ -243,7 +263,7 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
       return PublicRegistrationPage(
         repository: _publicIntakeRepository,
         challenge: _publicChallenge!,
-        onNavigateToProtected: _openProtectedRoute,
+        onSignIn: _signIn,
       );
     }
     if (_auth != null) {
@@ -253,6 +273,7 @@ class _BootstrapScreenState extends State<_BootstrapScreen> {
         publicIntakeRepository: _publicIntakeRepository,
         turnstileChallengeFactory: widget.turnstileChallengeFactory,
         onSignedOut: _returnToPublicRegistration,
+        onBackToRegistration: _returnToPublicRegistration,
       );
     }
     return Scaffold(
@@ -308,6 +329,7 @@ class ProtectedApplication extends StatefulWidget {
     this.publicIntakeRepository,
     this.turnstileChallengeFactory,
     this.onSignedOut,
+    this.onBackToRegistration,
   });
   final AuthRepository repository;
   final Future<Uint8List?> Function()? pickPhoto;
@@ -315,6 +337,7 @@ class ProtectedApplication extends StatefulWidget {
   final PublicIntakeRepository? publicIntakeRepository;
   final TurnstileChallengeFactory? turnstileChallengeFactory;
   final Future<void> Function()? onSignedOut;
+  final VoidCallback? onBackToRegistration;
   @override
   State<ProtectedApplication> createState() => _ProtectedApplicationState();
 }
@@ -433,6 +456,7 @@ class _ProtectedApplicationState extends State<ProtectedApplication> {
       return LoginPage(
         auth: widget.repository,
         intendedRoute: widget.intendedRoute ?? safeRoute(Uri.base.path),
+        onBackToRegistration: widget.onBackToRegistration,
       );
     }
     return Stack(
@@ -744,6 +768,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           onNavigate: widget.router.go,
           name: widget.displayName,
           isAdmin: widget.scope.isGlobalManager,
+          scope: widget.scope,
           onScopeRefresh: widget.router.refresh,
           refreshRevision: widget.router.refreshRevision,
         ),
@@ -759,6 +784,19 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
             await widget.router.ensureValidated();
             return widget.router.scope?.canAccess(congregationId) ?? false;
           },
+          loadPending: () =>
+              PendingCountLoader(
+                PendingSubmissionRepository(widget.gateway),
+              ).load(
+                global: widget.scope.isGlobalManager,
+                congregationIds: [
+                  for (final congregation in _catalog!)
+                    if (congregation.archivedAt == null &&
+                        widget.scope.congregationIds.contains(congregation.id))
+                      congregation.id,
+                ],
+              ),
+          onOpenPending: () => widget.router.go('/pending'),
         ),
         '/admin' => AdminPage(
           scope: widget.scope,
@@ -848,7 +886,9 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
       page: _ministryCongregations ?? const <MinistryCongregationChoice>[],
       selectedId: _selectedMinistryCongregationId,
       selectedName: _selectedMinistryCongregationName,
-    );
+    ).toList();
+    final directoryPager = _ministryDirectoryPager;
+    if (directoryPager != null) available.sort(directoryPager.compareChoices);
     final selectedId = _selectedMinistryCongregationId;
     final selectedOnPage = selectedId == null
         ? null
@@ -896,7 +936,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         ),
       );
     }
-    return switch (widget.router.route) {
+    final page = switch (widget.router.route) {
       '/ministry' => MinistryHomePage(
         key: ValueKey('ministry-home:$congregationId'),
         loadOverview: () =>
@@ -948,6 +988,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         key: ValueKey('ministry-team:$congregationId'),
         repository: ministry,
         congregationId: congregationId,
+        congregationName: _selectedMinistryCongregationName,
         supervision:
             widget.scope.isMinistrySupervision && congregationId == null,
         canManageAccess:
@@ -969,6 +1010,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
           ),
           repository: ministry,
           congregationId: registrationContext.congregationId,
+          congregationName: _selectedMinistryCongregationName,
           onCancel: _returnFromStudentRegistration,
           onSaved: (_) => _returnFromStudentRegistration(),
         ),
@@ -976,6 +1018,7 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         key: ValueKey('ministry-classes:$congregationId'),
         repository: browser,
         congregationId: congregationId,
+        congregationName: _selectedMinistryCongregationName,
       ),
       '/ministry/attendance' when scopedActionsEnabled => AttendancePage(
         key: ValueKey('ministry-attendance:$congregationId'),
@@ -996,6 +1039,98 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
         child: Text('Selecione uma congregação autorizada antes de continuar.'),
       ),
     };
+    if (!widget.scope.isMinistrySupervision ||
+        widget.router.route == '/ministry' ||
+        widget.router.route == '/ministry/students/register' ||
+        widget.router.route == '/ministry/handoff') {
+      return page;
+    }
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: DropdownButton<String>(
+                      key: const ValueKey('ministry-workspace-congregation'),
+                      value: selectedOnPage?.id,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        const DropdownMenuItem<String>(
+                          value: null,
+                          child: Text('Supervisão — sem congregação'),
+                        ),
+                        for (final item in available)
+                          DropdownMenuItem<String>(
+                            value: item.id,
+                            child: Text(
+                              item.name,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                      ],
+                      onChanged:
+                          widget.router.navigationLocked ||
+                              _ministryCatalogLoading
+                          ? null
+                          : (value) {
+                              setState(() {
+                                _selectedMinistryCongregationId = value;
+                                _selectedMinistryCongregationName =
+                                    value == null
+                                    ? null
+                                    : available
+                                          .where((item) => item.id == value)
+                                          .firstOrNull
+                                          ?.name;
+                              });
+                              widget.onCongregationChanged();
+                            },
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Congregações anteriores',
+                    onPressed:
+                        !widget.router.navigationLocked &&
+                            !_ministryCatalogLoading &&
+                            (_ministryDirectoryPager?.hasPrevious ?? false)
+                        ? () => _navigateMinistryCatalog(
+                            _DirectoryNavigation.previous,
+                          )
+                        : null,
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  IconButton(
+                    tooltip: 'Próximas congregações',
+                    onPressed:
+                        !widget.router.navigationLocked &&
+                            !_ministryCatalogLoading &&
+                            (_ministryDirectoryPager?.hasNext ?? false)
+                        ? () => _navigateMinistryCatalog(
+                            _DirectoryNavigation.next,
+                          )
+                        : null,
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (_ministryCatalogError != null)
+          TextButton(
+            onPressed: () =>
+                _navigateMinistryCatalog(_ministryCatalogRetryNavigation),
+            child: const Text('Tentar carregar congregações novamente'),
+          ),
+        Expanded(child: page),
+      ],
+    );
   }
 
   void _openStudentRegistration(String? congregationId) {

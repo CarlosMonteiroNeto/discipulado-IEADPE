@@ -2,12 +2,26 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ieadpe_converts/data/supabase_gateway.dart';
+import 'package:ieadpe_converts/data/convert_repository.dart';
 import 'package:ieadpe_converts/domain/models.dart';
 import 'package:ieadpe_converts/domain/business_calendar.dart';
 import 'package:ieadpe_converts/features/home/home_repository.dart';
 
 import '../converts/list_test.dart' show RowsRepository, row;
 import '../converts/save_test.dart' show TestGateway;
+
+class ScopedRowsRepository extends RowsRepository {
+  ScopedRowsRepository(super.gateway, super.rows);
+  final queries = <String?>[];
+  @override
+  Future<Page<ConvertRecord>> list(ConvertQuery query, String? cursor) async {
+    queries.add(query.congregationId);
+    if (query.congregationId == null) throw const DataFailure('permission');
+    return Page(
+      items: rows.where((r) => r.congregationId == query.congregationId),
+    );
+  }
+}
 
 void main() {
   test('Home traverses beyond 1000 and includes terminal totals with latest five business dates', () async {
@@ -67,6 +81,17 @@ void main() {
       'disciple',
       'six',
     });
+  });
+  test('local dashboard queries each authorized congregation', () async {
+    final repository = ScopedRowsRepository(TestGateway(), [
+      row('a', congregationId: 'a'),
+      row('b', congregationId: 'b'),
+      row('foreign', congregationId: 'c'),
+    ]);
+    final result = await HomeRepository(repository)
+        .summary(scope: AccessScope(congregationIds: ['a', 'b']));
+    expect(result.total, 2);
+    expect(repository.queries.toSet(), {'a', 'b'});
   });
   test('dashboard counts server-derived enrollment state', () async {
     final today = DateOnly(2026, 10, 15);

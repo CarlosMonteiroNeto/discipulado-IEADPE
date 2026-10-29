@@ -296,12 +296,14 @@ class StudentRegistrationPage extends StatefulWidget {
     super.key,
     required this.repository,
     required this.congregationId,
+    this.congregationName,
     this.onCancel,
     required this.onSaved,
   });
 
   final MinistryRepository repository;
   final String congregationId;
+  final String? congregationName;
   final VoidCallback? onCancel;
   final ValueChanged<app_models.PersonRegistrationResult> onSaved;
 
@@ -583,6 +585,8 @@ class _StudentRegistrationPageState extends State<StudentRegistrationPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         const Text('Registrar aluno'),
+                        if (widget.congregationName != null)
+                          Text('Congregação: ${widget.congregationName}'),
                         const SizedBox(height: 8),
                         const Text(
                           'Este cadastro cria a identidade e os dados acadêmicos do aluno. Ele não registra uma conversão.',

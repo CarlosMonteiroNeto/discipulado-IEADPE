@@ -33,7 +33,7 @@ try:
         (output / "browser-dom.html").write_text(run.stdout, encoding="utf-8")
         if run.returncode or "<body>PASS: production browser pt-BR collation" not in run.stdout:
             raise AssertionError("Browser locale check failed; inspect build/task10-collation artifacts")
-        print("PASS: actual Chrome runs production pt-BR adapter, sede priority and canonical-equivalence fixtures")
+        print("PASS: actual Chrome runs production pt-BR adapter, Matriz priority and canonical-equivalence fixtures")
 finally:
     server.shutdown()
     server.server_close()

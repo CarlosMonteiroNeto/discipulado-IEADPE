@@ -30,7 +30,8 @@ INSERT INTO public.ministry_students(id,congregation_id,person_id,name,normalize
  ('94800000-0000-4000-8000-000000000007','94800000-0000-4000-8000-000000000002',
   '94800000-0000-4000-8000-000000000003','Enrolled Person','enrolled person');
 INSERT INTO public.ministry_classes(id,congregation_id,name,normalized_name,start_date) VALUES
- ('94800000-0000-4000-8000-000000000008','94800000-0000-4000-8000-000000000002','Class','class',private.business_today()-120);
+ ('94800000-0000-4000-8000-000000000008','94800000-0000-4000-8000-000000000002','Class','class',private.business_today()-120),
+ ('94800000-0000-4000-8000-000000000096','94800000-0000-4000-8000-000000000014','Foreign Class','foreign class',private.business_today()-120);
 INSERT INTO public.ministry_enrollments(id,congregation_id,student_id,class_id,start_date) VALUES
  ('94800000-0000-4000-8000-000000000009','94800000-0000-4000-8000-000000000002',
   '94800000-0000-4000-8000-000000000007','94800000-0000-4000-8000-000000000008',private.business_today()-90);
@@ -63,6 +64,14 @@ INSERT INTO public.ministry_attendance(congregation_id,session_id,enrollment_id,
  ('94800000-0000-4000-8000-000000000002','94800000-0000-4000-8000-000000000017','94800000-0000-4000-8000-000000000009','94800000-0000-4000-8000-000000000007','absent'),
  ('94800000-0000-4000-8000-000000000002','94800000-0000-4000-8000-000000000018','94800000-0000-4000-8000-000000000009','94800000-0000-4000-8000-000000000007','excused'),
  ('94800000-0000-4000-8000-000000000002','94800000-0000-4000-8000-000000000019','94800000-0000-4000-8000-000000000009','94800000-0000-4000-8000-000000000007','unmarked');
+
+DO $$ BEGIN
+ BEGIN
+  PERFORM public.ieadpe_transition_convert('94800000-0000-4000-8000-000000000099',
+   '{"id":"94800000-0000-4000-8000-000000000006","action":"start"}'::jsonb);
+  RAISE EXCEPTION 'ASSERTION: starting without a class was allowed';
+ EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+END $$;
 
 DO $$ DECLARE detail jsonb; item jsonb; page jsonb; closed jsonb; canceled jsonb; BEGIN
  detail:=public.ieadpe_ministry_get_convert(jsonb_build_object('congregation_id','94800000-0000-4000-8000-000000000002','convert_id','94800000-0000-4000-8000-000000000005'));
@@ -141,4 +150,40 @@ DO $$ DECLARE detail jsonb; item jsonb; page jsonb; closed jsonb; canceled jsonb
   detail->'convert'->>'latest_qualifying_lesson_date'=(private.business_today()-40)::text,
   'closure removes only active contribution and retains historical contact');
 END $$;
+DO $$ DECLARE result jsonb; detail jsonb; BEGIN
+ BEGIN
+  PERFORM public.ieadpe_transition_convert('94800000-0000-4000-8000-000000000098',
+   jsonb_build_object('id','94800000-0000-4000-8000-000000000006','action','start',
+    'class_id','94800000-0000-4000-8000-000000000096'));
+  RAISE EXCEPTION 'ASSERTION: non-local class accepted';
+ EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ PERFORM pg_temp.assert_true(NOT EXISTS(SELECT FROM public.ministry_students WHERE person_id='94800000-0000-4000-8000-000000000004'), 'failed enrollment is atomic');
+ result:=public.ieadpe_transition_convert('94800000-0000-4000-8000-000000000097',
+  jsonb_build_object('id','94800000-0000-4000-8000-000000000006','action','start',
+   'class_id','94800000-0000-4000-8000-000000000008'));
+ PERFORM pg_temp.assert_true(EXISTS(SELECT FROM public.ministry_students s JOIN public.ministry_enrollments e ON e.student_id=s.id
+  WHERE s.person_id='94800000-0000-4000-8000-000000000004' AND e.class_id='94800000-0000-4000-8000-000000000008'
+   AND e.status='active' AND e.start_date=private.business_today()), 'start enrolls the convert in the local class today');
+ detail:=public.ieadpe_ministry_get_convert(jsonb_build_object('congregation_id','94800000-0000-4000-8000-000000000002','convert_id','94800000-0000-4000-8000-000000000006'));
+ PERFORM pg_temp.assert_true(detail->'convert'->>'effective_is_in_discipleship'='true', 'enrollment displays started status');
+ PERFORM pg_temp.assert_true(result=public.ieadpe_transition_convert('94800000-0000-4000-8000-000000000097',
+  jsonb_build_object('id','94800000-0000-4000-8000-000000000006','action','start',
+   'class_id','94800000-0000-4000-8000-000000000008')), 'start retry replays receipt');
+END $$;
+
+INSERT INTO public.ministry_people(id,congregation_id,name,normalized_name) VALUES
+ ('94800000-0000-4000-8000-000000000091','94800000-0000-4000-8000-000000000002','Ministry Enrollment','ministry enrollment');
+INSERT INTO public.converts(id,internal_id,name,landmark,gender,conversion_date,worship_type,congregation_id,person_id)
+ VALUES ('94800000-0000-4000-8000-000000000092','reverse-enrollment','Ministry Enrollment','Square','male',private.business_today()-5,'Culto regular','94800000-0000-4000-8000-000000000002','94800000-0000-4000-8000-000000000091');
+DO $$ DECLARE detail jsonb; BEGIN
+ PERFORM public.ieadpe_ministry_enroll_student('94800000-0000-4000-8000-000000000093',jsonb_build_object(
+  'id','94800000-0000-4000-8000-000000000094','congregation_id','94800000-0000-4000-8000-000000000002',
+  'class_id','94800000-0000-4000-8000-000000000008','person_id','94800000-0000-4000-8000-000000000091',
+  'start_date',private.business_today()));
+ detail:=public.ieadpe_ministry_get_convert(jsonb_build_object('congregation_id','94800000-0000-4000-8000-000000000002','convert_id','94800000-0000-4000-8000-000000000092'));
+ PERFORM pg_temp.assert_true(detail->'convert'->>'effective_is_in_discipleship'='true' AND
+ detail->'convert'->>'effective_discipleship_start_date'=private.business_today()::text,
+ 'ministry class enrollment updates the convert status through canonical identity');
+END $$;
+
 ROLLBACK;

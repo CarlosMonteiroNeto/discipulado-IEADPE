@@ -81,51 +81,74 @@ void main() {
       expect(gateway.reads, 1);
     },
   );
-  test('directory pager loads its next page only when requested', () async {
-    const nextCursor = '55555555-5555-4555-8555-555555555555';
-    const secondScope = '66666666-6666-4666-8666-666666666666';
+  test(
+    'ministry congregation picker sorts all pages with Matriz first',
+    () async {
+      const next = '55555555-5555-4555-8555-555555555555';
+      const secondId = '66666666-6666-4666-8666-666666666666';
+      final gateway = _BrowserGateway(
+        (rpc, parameters) => parameters['cursor'] == null
+            ? {
+                'items': [
+                  {'id': _scope, 'name': 'Zeta'},
+                ],
+                'next_cursor': next,
+              }
+            : {
+                'items': [
+                  {'id': secondId, 'name': 'Matriz'},
+                ],
+                'next_cursor': null,
+              },
+      );
+      final pager = MinistryCongregationDirectoryPager(
+        MinistryBrowserRepository(gateway),
+        sortNames: (names) async => [...names]..sort(),
+      );
+      final page = await pager.loadFirst();
+      expect(page.items.map((item) => item.name), ['Matriz', 'Zeta']);
+      expect(gateway.reads, 2);
+    },
+  );
+  test('ordered directory pages stay bounded and can be revisited', () async {
+    String id(int number) =>
+        '00000000-0000-4000-8000-${number.toString().padLeft(12, '0')}';
     final cursors = <Object?>[];
     final gateway = _BrowserGateway((rpc, parameters) {
-      expect(rpc, 'ministry_list_congregations');
-      expect(parameters['limit'], MinistryCongregationDirectoryPager.pageSize);
       cursors.add(parameters['cursor']);
       if (parameters['cursor'] == null) {
         return {
           'items': [
-            {'id': _scope, 'name': 'Central'},
+            for (var i = 1; i <= 99; i++)
+              {'id': id(i), 'name': 'Local ${i.toString().padLeft(3, '0')}'},
           ],
-          'next_cursor': nextCursor,
+          'next_cursor': id(99),
         };
       }
       return {
         'items': [
-          {'id': secondScope, 'name': 'Norte'},
+          {'id': id(100), 'name': 'Matriz'},
         ],
         'next_cursor': null,
       };
     });
     final pager = MinistryCongregationDirectoryPager(
       MinistryBrowserRepository(gateway),
+      sortNames: (names) async => [...names]..sort(),
     );
-
-    final firstPage = await pager.loadFirst();
-    expect(firstPage.items.single.id, _scope);
-    expect(gateway.reads, 1);
-    expect(cursors, [null]);
+    final first = await pager.loadFirst();
+    expect(first.items.length, 99);
+    expect(first.items.first.name, 'Matriz');
+    expect(cursors, [null, id(99)]);
     expect(pager.hasNext, isTrue);
-
-    final secondPage = await pager.next();
-    expect(secondPage!.items.single.id, secondScope);
-    expect(gateway.reads, 2);
-    expect(cursors, [null, nextCursor]);
+    final second = await pager.next();
+    expect(second!.items.single.name, 'Local 099');
     expect(pager.hasPrevious, isTrue);
-
-    final firstAgain = await pager.previous();
-    expect(firstAgain!.items.single.id, _scope);
-    expect(gateway.reads, 3);
-    expect(cursors, [null, nextCursor, null]);
-    expect(pager.hasPrevious, isFalse);
-    expect(pager.hasNext, isTrue);
+    final previous = await pager.previous();
+    expect(previous!.items.first.name, 'Matriz');
+    expect(gateway.reads, 2);
+    gateway.boundary.invalidate();
+    await expectLater(pager.next(), throwsA(isA<DataFailure>()));
   });
   test('active congregation remains visible beside a bounded next page', () {
     final page = [

@@ -101,6 +101,43 @@ Future<SupabaseGateway> fixture(
 }
 
 void main() {
+  test(
+    'dashboard counts reject missing scope instead of reporting zero',
+    () async {
+      final gateway = await fixture((r) async {
+        expect(r.uri.path, '/rest/v1/rpc/ieadpe_convert_dashboard_counts');
+        await respond(r, {'counts': <Object>[]});
+      });
+      await expectLater(
+        ConvertRepository(gateway).dashboardCounts([scopeId]),
+        throwsA(
+          isA<DataFailure>().having((e) => e.code, 'code', 'invalid_response'),
+        ),
+      );
+    },
+  );
+  test('dashboard pages preserve server ordering and scope filters', () async {
+    final gateway = await fixture((r) async {
+      expect(r.uri.path, '/rest/v1/rpc/ieadpe_convert_dashboard_page');
+      final body = jsonDecode(await utf8.decoder.bind(r).join());
+      expect(body['request'], {
+        'congregation_id': scopeId,
+        'congregation_ids': null,
+        'search': 'soa',
+        'status': 'red',
+        'limit': 50,
+        'cursor': null,
+      });
+      await respond(r, {
+        'items': [convertProjection(2), convertProjection(1)],
+        'next_cursor': 'opaque',
+      });
+    });
+    final page = await ConvertRepository(gateway)
+        .dashboardPage(congregationId: scopeId, search: 'soa', status: 'red');
+    expect(page.items.map((e) => e.id), [id(2), id(1)]);
+    expect(page.nextCursor, 'opaque');
+  });
   test('literal search sends asterisk and regex metacharacters without wildcard aliases', () async {
     final gateway = await fixture((r) async {
       expect(r.uri.queryParameters['name'], r'imatch.A\*%_\\\.\[\]');
@@ -156,6 +193,25 @@ void main() {
       expect(requestBodies, hasLength(13));
     },
   );
+  test('transport sends selected class when starting discipleship', () async {
+    Map<String, dynamic>? body;
+    final gateway = await fixture((r) async {
+      body =
+          jsonDecode(await utf8.decoder.bind(r).join()) as Map<String, dynamic>;
+      await respond(r, {'id': id(1)});
+    });
+    final result = await gateway.command('transition_convert', operationId, {
+      'id': id(1),
+      'action': 'start',
+      'class_id': id(2),
+    });
+    expect(result.status, MutationStatus.applied);
+    expect(body?['payload'], {
+      'id': id(1),
+      'action': 'start',
+      'class_id': id(2),
+    });
+  });
   test(
     'transient SQL errors retry exactly three times with unchanged envelope',
     () async {

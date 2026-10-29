@@ -242,6 +242,7 @@ void main() {
             classId: _classId,
             classStartDate: '2026-10-01',
             classEndDate: null,
+            now: () => DateTime.utc(2026, 10, 20, 15),
             onChanged: () {},
           ),
         ),
@@ -266,6 +267,10 @@ void main() {
 
     expect(gateway.calls.single.name, 'enroll_student');
     expect(gateway.calls.single.payload, containsPair('person_id', _personId));
+    expect(
+      gateway.calls.single.payload,
+      containsPair('start_date', '2026-10-20'),
+    );
     expect(gateway.calls.single.payload, isNot(contains('student_id')));
     expect(find.text('Pessoa Exemplo'), findsOneWidget);
   });

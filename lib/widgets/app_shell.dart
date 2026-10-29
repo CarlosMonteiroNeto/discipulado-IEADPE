@@ -16,6 +16,7 @@ class AppShell extends StatelessWidget {
     required this.scope,
     required this.onNavigate,
     required this.onSignOut,
+    this.onSignIn,
     this.currentRoute = '/home',
     this.onFeedback,
     this.publicMode = false,
@@ -27,6 +28,7 @@ class AppShell extends StatelessWidget {
   final String currentRoute;
   final ValueChanged<String> onNavigate;
   final VoidCallback onSignOut;
+  final VoidCallback? onSignIn;
   final VoidCallback? onFeedback;
   final bool publicMode;
   final bool navigationLocked;
@@ -61,14 +63,12 @@ class AppShell extends StatelessWidget {
     '/ministry/handoff': Icons.move_to_inbox_outlined,
   };
 
-  /// Registration depends on transient context and is reopened from Alunos.
+  /// Registration and handoff depend on transient context and are reopened
+  /// from their owning page instead of the shell.
   static const hiddenFromMenu = {
     '/ministry/handoff',
     '/ministry/students/register',
   };
-
-  static const _feedbackAction = '__base44_feedback__';
-  static const _signOutAction = '__base44_sign_out__';
 
   bool _active(String route) =>
       route == currentRoute ||
@@ -79,7 +79,6 @@ class AppShell extends StatelessWidget {
       '/home',
       '/register',
       '/converts',
-      '/pending',
       '/admin',
       '/ministry',
     ])
@@ -102,102 +101,16 @@ class AppShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final routes = publicMode
-        ? const ['/register', '/home']
+        ? const ['/register']
         : routesFor(scope)
               .where((route) => !hiddenFromMenu.contains(route))
               .toList(growable: false);
     final mobile = MediaQuery.sizeOf(context).width < 768;
-    final hasOverflow = routes.length > 5;
-    final primaryRoutes = mobile
-        ? (hasOverflow
-              ? [
-                  for (final route in const [
-                    '/home',
-                    '/register',
-                    '/converts',
-                    '/ministry',
-                  ])
-                    if (routes.contains(route)) route,
-                ]
-              : routes)
-        : _topLevelRoutes(routes);
+    final primaryRoutes = _topLevelRoutes(routes);
     final ministryRoutes = [
       for (final route in routes)
         if (route.startsWith('/ministry')) route,
     ];
-
-    Widget menuDrawer(BuildContext drawerContext) => Drawer(
-      child: SafeArea(
-        child: Column(
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(gradient: brandGradient),
-              child: Row(
-                children: [
-                  const ExcludeSemantics(
-                    child: Icon(Icons.church, color: Colors.white),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Menu',
-                    style: Theme.of(drawerContext).textTheme.titleLarge
-                        ?.copyWith(color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  for (final route in routes)
-                    ListTile(
-                      key: ValueKey('app-shell-drawer-$route'),
-                      minVerticalPadding: 8,
-                      leading: ExcludeSemantics(child: Icon(icons[route])),
-                      title: Text(labels[route]!),
-                      selected: _active(route),
-                      selectedColor: UnifiedColors.brandNavy,
-                      selectedTileColor: UnifiedColors.selected,
-                      onTap: navigationLocked
-                          ? null
-                          : () {
-                              Navigator.of(drawerContext).pop();
-                              onNavigate(route);
-                            },
-                    ),
-                  if (!publicMode) ...[
-                    const Divider(),
-                    ListTile(
-                      key: const ValueKey('app-shell-drawer-feedback'),
-                      leading: const Icon(Icons.feedback_outlined),
-                      title: const Text('Enviar sugestão'),
-                      onTap: navigationLocked
-                          ? null
-                          : () {
-                              Navigator.of(drawerContext).pop();
-                              _feedback(drawerContext);
-                            },
-                    ),
-                    ListTile(
-                      key: const ValueKey('app-shell-drawer-sign-out'),
-                      leading: const Icon(Icons.logout),
-                      title: const Text('Sair'),
-                      onTap: () {
-                        Navigator.of(drawerContext).pop();
-                        onSignOut();
-                      },
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
 
     Widget desktopRoute(String route) {
       final selected = _active(route);
@@ -220,58 +133,31 @@ class AppShell extends StatelessWidget {
       );
     }
 
-    Widget desktopMenu() => PopupMenuButton<String>(
-      tooltip: 'Abrir menu',
-      onSelected: (value) {
-        if (value == _feedbackAction) {
-          _feedback(context);
-        } else if (value == _signOutAction) {
-          onSignOut();
-        } else {
-          onNavigate(value);
-        }
-      },
-      itemBuilder: (context) => [
-        for (final route in routes)
-          PopupMenuItem<String>(
-            value: route,
-            enabled: !navigationLocked,
-            child: Row(
-              children: [
-                Icon(icons[route], size: 20),
-                const SizedBox(width: 12),
-                Flexible(child: Text(labels[route]!)),
-              ],
-            ),
-          ),
-        const PopupMenuDivider(),
-        PopupMenuItem<String>(
-          value: _feedbackAction,
-          enabled: !navigationLocked,
-          child: Row(
-            children: [
-              Icon(Icons.feedback_outlined, size: 20),
-              SizedBox(width: 12),
-              Text('Enviar sugestão'),
-            ],
-          ),
-        ),
-        const PopupMenuItem<String>(
-          value: _signOutAction,
-          child: Row(
-            children: [
-              Icon(Icons.logout, size: 20),
-              SizedBox(width: 12),
-              Text('Sair'),
-            ],
-          ),
-        ),
-      ],
-      child: const Padding(
-        padding: EdgeInsets.all(12),
-        child: Icon(Icons.more_horiz, color: Colors.white),
-      ),
+    final sessionButtonStyle = TextButton.styleFrom(
+      minimumSize: const Size(48, 48),
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      foregroundColor: Colors.white,
+      textStyle: const TextStyle(fontWeight: FontWeight.w600),
     );
+
+    Widget sessionAction() {
+      if (publicMode) {
+        return TextButton.icon(
+          key: const ValueKey('app-shell-sign-in'),
+          style: sessionButtonStyle,
+          onPressed: navigationLocked ? null : onSignIn,
+          icon: const Icon(Icons.login_outlined, size: 18),
+          label: const Text('Entrar'),
+        );
+      }
+      return TextButton.icon(
+        key: const ValueKey('app-shell-sign-out'),
+        style: sessionButtonStyle,
+        onPressed: onSignOut,
+        icon: const Icon(Icons.logout, size: 18),
+        label: const Text('Sair'),
+      );
+    }
 
     Widget ministrySelector() {
       if (ministryRoutes.length < 2) return const SizedBox.shrink();
@@ -320,7 +206,6 @@ class AppShell extends StatelessWidget {
     final bottomHeight = math.max(68.0, 44 + textScale * 2);
     return Scaffold(
       backgroundColor: Colors.transparent,
-      endDrawer: mobile ? menuDrawer(context) : null,
       body: Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
@@ -359,39 +244,16 @@ class AppShell extends StatelessWidget {
                           Row(
                             children: [
                               const Expanded(child: BrandHeader()),
-                              if (mobile)
-                                Builder(
-                                  builder: (context) => IconButton(
-                                    key: const ValueKey('app-shell-open-menu'),
-                                    tooltip: 'Abrir menu',
-                                    color: Colors.white,
-                                    style: IconButton.styleFrom(
-                                      foregroundColor: Colors.white,
-                                      minimumSize: const Size(48, 48),
-                                    ),
-                                    onPressed: () =>
-                                        Scaffold.of(context).openEndDrawer(),
-                                    icon: const Icon(Icons.menu),
-                                  ),
-                                )
-                              else if (!publicMode) ...[
-                                IconButton(
-                                  tooltip: 'Sair',
-                                  color: Colors.white,
-                                  onPressed: onSignOut,
-                                  icon: const Icon(Icons.logout),
-                                ),
-                              ],
+                              sessionAction(),
                             ],
                           ),
-                          if (!mobile)
+                          if (!mobile && !publicMode)
                             SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
                               child: Row(
                                 children: [
                                   for (final route in primaryRoutes)
                                     desktopRoute(route),
-                                  if (hasOverflow) desktopMenu(),
                                 ],
                               ),
                             ),
@@ -414,7 +276,7 @@ class AppShell extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: mobile
+      bottomNavigationBar: mobile && !publicMode
           ? SafeArea(
               top: false,
               child: Material(
@@ -489,39 +351,6 @@ class AppShell extends StatelessWidget {
                                       ),
                                     ),
                                 ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      if (hasOverflow)
-                        Expanded(
-                          child: Builder(
-                            builder: (context) => Semantics(
-                              button: true,
-                              label: 'Menu',
-                              child: InkWell(
-                                key: const ValueKey('app-shell-bottom-menu'),
-                                onTap: () =>
-                                    Scaffold.of(context).openEndDrawer(),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(
-                                      Icons.menu,
-                                      size: 22,
-                                      color: UnifiedColors.muted,
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      'Menu',
-                                      style: const TextStyle(
-                                        fontSize: 11,
-                                        color: UnifiedColors.muted,
-                                      ),
-                                    ),
-                                  ],
-                                ),
                               ),
                             ),
                           ),

@@ -1,5 +1,6 @@
 // Exact source values; persisted labels are stable wire values.
 const worshipTypes = <String>[
+  '00 -  Evangelismo / Ar livre',
   '01 - Oração',
   '02 - Pregação',
   '03 - Santa Ceia',

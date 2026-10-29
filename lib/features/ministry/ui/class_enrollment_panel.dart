@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
+import '../../../domain/business_calendar.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
@@ -169,7 +170,8 @@ class _ClassEnrollmentPanelState extends State<ClassEnrollmentPanel> {
       setState(() => _error = 'Confirme primeiro o encerramento pendente.');
       return;
     }
-    final startDate = CalendarDate.parse(widget.classStartDate);
+    final date = BusinessCalendar().today(widget.now?.call() ?? DateTime.now());
+    final startDate = CalendarDate(date.year, date.month, date.day);
     final signature = _PendingEnrollment.signatureFor(
       widget.congregationId,
       widget.classId,

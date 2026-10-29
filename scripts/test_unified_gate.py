@@ -11,16 +11,74 @@ import os
 from pathlib import Path
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 GUARD = REPOSITORY / "scripts" / "local_supabase_guard.py"
 REDACTOR = REPOSITORY / "scripts" / "redact_supabase_start.py"
+
+def run_bounded(command, *, cwd, env, timeout):
+    job = None
+    if os.name == 'nt':
+        import ctypes
+        from ctypes import wintypes
+        kernel = ctypes.WinDLL('kernel32', use_last_error=True)
+        kernel.CreateJobObjectW.argtypes = [wintypes.LPVOID, wintypes.LPCWSTR]
+        kernel.CreateJobObjectW.restype = wintypes.HANDLE
+        kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        kernel.AssignProcessToJobObject.restype = wintypes.BOOL
+        kernel.TerminateJobObject.argtypes = [wintypes.HANDLE, wintypes.UINT]
+        kernel.TerminateJobObject.restype = wintypes.BOOL
+        kernel.CloseHandle.argtypes = [wintypes.HANDLE]
+        kernel.CloseHandle.restype = wintypes.BOOL
+        job = kernel.CreateJobObjectW(None, None)
+        if not job:
+            raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        process = subprocess.Popen(command, cwd=cwd, env=env, text=True,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                   start_new_session=os.name != 'nt',
+                                   creationflags=0x4 if os.name == 'nt' else 0)
+        if job:
+            if not kernel.AssignProcessToJobObject(job, int(process._handle)):
+                process.kill()
+                process.communicate(timeout=10)
+                raise ctypes.WinError(ctypes.get_last_error())
+            ntdll = ctypes.WinDLL('ntdll')
+            ntdll.NtResumeProcess.argtypes = [wintypes.HANDLE]
+            ntdll.NtResumeProcess.restype = ctypes.c_long
+            if ntdll.NtResumeProcess(int(process._handle)) != 0:
+                kernel.TerminateJobObject(job, 1)
+                process.communicate(timeout=10)
+                raise OSError('could not resume bounded gate process')
+    except BaseException:
+        if job:
+            kernel.CloseHandle(job)
+        raise
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if job:
+            if not kernel.TerminateJobObject(job, 1):
+                raise ctypes.WinError(ctypes.get_last_error())
+        else:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+        process.communicate(timeout=10)
+        raise
+    finally:
+        if job:
+            kernel.CloseHandle(job)
+    return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
 
 
 class GateHarness:
@@ -193,7 +251,7 @@ raise SystemExit(0)
                 "-File",
                 str(self.root / "scripts" / "verify_unified.ps1"),
             ]
-        return subprocess.run(command, cwd=self.root, env=env, text=True, capture_output=True, timeout=90)
+        return run_bounded(command, cwd=self.root, env=env, timeout=180)
 
     @property
     def report(self) -> str:
@@ -215,6 +273,27 @@ raise SystemExit(0)
 
 
 class UnifiedGateContractTests(unittest.TestCase):
+    def test_timed_out_gate_terminates_descendants(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "late-child.txt"
+            child = "import time, pathlib, sys; time.sleep(2); pathlib.Path(sys.argv[1]).write_text('still running')"
+            parent = "import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]]); time.sleep(20)"
+            with self.assertRaises(subprocess.TimeoutExpired):
+                run_bounded([sys.executable, '-c', parent, child, str(marker)],
+                            cwd=REPOSITORY, env=os.environ.copy(), timeout=0.5)
+            time.sleep(2.5)
+            self.assertFalse(marker.exists(), "gate timeout left a child process running")
+
+    def test_timed_out_gate_terminates_child_after_parent_exits(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "late-child.txt"
+            child = "import time, pathlib, sys; time.sleep(2); pathlib.Path(sys.argv[1]).write_text('still running')"
+            parent = "import subprocess, sys; subprocess.Popen([sys.executable, '-c', sys.argv[1], sys.argv[2]])"
+            with self.assertRaises(subprocess.TimeoutExpired):
+                run_bounded([sys.executable, '-c', parent, child, str(marker)],
+                            cwd=REPOSITORY, env=os.environ.copy(), timeout=0.5)
+            time.sleep(2.5)
+            self.assertFalse(marker.exists(), "gate timeout left a child after its parent exited")
     def test_gate_executes_every_standalone_sql_case_and_all_manifest_races(self) -> None:
         for shell in self.available_shells():
             with self.subTest(shell=shell):

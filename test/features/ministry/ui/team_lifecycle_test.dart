@@ -531,7 +531,7 @@ void main() {
       'marcos@example.test',
     );
     expect(gateway.writes, isEmpty);
-    await _tapAndSettle(tester, find.text('Conceder acesso ao aplicativo'));
+    await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
     await _tapAndSettle(
       tester,
       find.byKey(const ValueKey('team-create-new-access')),
@@ -546,6 +546,41 @@ void main() {
       AccessRole.supervision.wireValue,
     );
   });
+
+  testWidgets(
+    'supervisor grants congregation access within the selected congregation',
+    (tester) async {
+      final gateway = _TeamGateway(globalManager: true);
+      await _pumpTeam(
+        tester,
+        gateway,
+        congregationId: _congregationId,
+        canManageAccess: true,
+      );
+      await _tapAndSettle(tester, find.text('Adicionar contato'));
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-name')),
+        'Maria Local',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('team-contact-email')),
+        'maria@example.test',
+      );
+      await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
+      expect(find.text('Direção da congregação'), findsOneWidget);
+      await _tapAndSettle(
+        tester,
+        find.byKey(const ValueKey('team-create-new-access')),
+      );
+      await _tapAndSettle(tester, find.text('Salvar contato'));
+      final payload = gateway.writes.single.$2;
+      final access = payload['access']! as Map<String, Object?>;
+      expect(payload['scope'], 'congregation');
+      expect(payload['congregation_id'], _congregationId);
+      expect(access['role'], AccessRole.direction.wireValue);
+      expect(access['congregation_id'], _congregationId);
+    },
+  );
 
   testWidgets(
     'existing unlinked assignment requires explicit exact ID choice',
@@ -579,7 +614,7 @@ void main() {
         find.byKey(const ValueKey('team-contact-email')),
         'marcos@example.test',
       );
-      await _tapAndSettle(tester, find.text('Conceder acesso ao aplicativo'));
+      await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
 
       final candidateDropdown = find.byKey(
         const ValueKey('team-access-candidate'),
@@ -918,7 +953,7 @@ void main() {
     await _pumpTeam(tester, gateway);
 
     await _tapAndSettle(tester, find.text('Adicionar contato'));
-    expect(find.text('Conceder acesso ao aplicativo'), findsNothing);
+    expect(find.text('Selecionar vínculo manualmente'), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('team-contact-name')),
       'Joana Nunes',

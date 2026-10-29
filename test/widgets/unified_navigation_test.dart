@@ -156,7 +156,7 @@ void main() {
     expect(find.textContaining('Escolha uma congregação'), findsOneWidget);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+          .widget<OutlinedButton>(find.widgetWithText(OutlinedButton, 'Alunos'))
           .onPressed,
       isNull,
     );
@@ -215,15 +215,15 @@ void main() {
 
       expect(
         tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+            .widget<OutlinedButton>(
+              find.widgetWithText(OutlinedButton, 'Alunos'),
+            )
             .onPressed,
         isNull,
       );
       expect(
         tester
-            .widget<OutlinedButton>(
-              find.widgetWithText(OutlinedButton, 'Turmas'),
-            )
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Turmas'))
             .onPressed,
         isNull,
       );
@@ -238,32 +238,32 @@ void main() {
       await tester.pumpAndSettle();
       expect(selectedId, centralId);
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, 'Alunos'),
+        find.widgetWithText(FilledButton, 'Turmas'),
         160,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.scrollUntilVisible(
-        find.widgetWithText(OutlinedButton, 'Turmas'),
+        find.widgetWithText(OutlinedButton, 'Alunos'),
         160,
         scrollable: find.byType(Scrollable).first,
       );
       expect(
         tester
-            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Alunos'))
+            .widget<FilledButton>(find.widgetWithText(FilledButton, 'Turmas'))
             .onPressed,
         isNotNull,
       );
       expect(
         tester
             .widget<OutlinedButton>(
-              find.widgetWithText(OutlinedButton, 'Turmas'),
+              find.widgetWithText(OutlinedButton, 'Alunos'),
             )
             .onPressed,
         isNotNull,
       );
 
-      await tester.tap(find.widgetWithText(FilledButton, 'Alunos'));
-      await tester.tap(find.widgetWithText(OutlinedButton, 'Turmas'));
+      await tester.tap(find.widgetWithText(FilledButton, 'Turmas'));
+      await tester.tap(find.widgetWithText(OutlinedButton, 'Alunos'));
       expect(openedStudents, isTrue);
       expect(openedClasses, isTrue);
     },
@@ -371,5 +371,36 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Congregação Central'), findsAtLeastNWidgets(1));
+  });
+
+  testWidgets('Discipulado lists Turmas before Alunos', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MinistryHomePage(
+            loadOverview: () async => const {
+              'students': 3,
+              'classes': 2,
+              'open_sessions': 0,
+            },
+            scopeName: 'Congregação Central',
+            scopedActionsEnabled: true,
+            onOpenStudents: () {},
+            onOpenClasses: () {},
+            onOpenAttendance: () {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final labels = tester
+        .widgetList<Text>(find.byType(Text))
+        .map((text) => text.data)
+        .whereType<String>()
+        .toList();
+    expect(labels.where((label) => label == 'Turmas'), hasLength(2));
+    expect(labels.where((label) => label == 'Alunos'), hasLength(2));
+    expect(labels.indexOf('Turmas'), lessThan(labels.indexOf('Alunos')));
   });
 }

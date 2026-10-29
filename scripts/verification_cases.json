@@ -31,6 +31,9 @@
       "scenario": "convert_commands_test.sql"
     },
     {
+      "scenario": "convert_dashboard_test.sql"
+    },
+    {
       "scenario": "convert_student_link_test.sql"
     },
     {
@@ -100,6 +103,9 @@
     },
     {
       "scenario": "teacher_contact_detail_test.sql"
+    },
+    {
+      "scenario": "team_automatic_access_test.sql"
     },
     {
       "scenario": "unified_scope_test.sql"

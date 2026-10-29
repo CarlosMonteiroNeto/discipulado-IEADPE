@@ -30,13 +30,8 @@ DO $$ DECLARE field text; BEGIN
   PERFORM pg_temp.reject_transition(jsonb_build_object('id','60000000-0000-0000-0000-000000000002','action','visit',field,'spoof'),'invalid_payload');
  END LOOP;
 END $$;
-SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"start"}','operation_conflict','60000000-0000-0000-0000-000000000003');
-SELECT public.ieadpe_transition_convert(gen_random_uuid(),'{"id":"60000000-0000-0000-0000-000000000002","action":"start"}');
-SELECT pg_temp.assert_true((SELECT is_in_discipleship AND discipleship_start_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date FROM public.converts),'start uses server business date');
-SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"start"}','discipleship_active');
-SELECT public.ieadpe_transition_convert(gen_random_uuid(),'{"id":"60000000-0000-0000-0000-000000000002","action":"stop"}');
-SELECT pg_temp.assert_true((SELECT count(*)=2 FROM public.convert_events),'stop creates no event');
-SELECT public.ieadpe_transition_convert(gen_random_uuid(),'{"id":"60000000-0000-0000-0000-000000000002","action":"start"}');
+SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"start"}','invalid_payload');
+-- Historical manual status remains testable; new starts require class enrollment.
 RESET ROLE;
 -- Exercise exact policy boundaries on synthetic historical data.
 DO $$ DECLARE active boolean; visited boolean; days integer; threshold integer; start_date date; BEGIN
@@ -92,7 +87,7 @@ SELECT public.ieadpe_transition_convert('60000000-0000-0000-0000-000000000004','
 SELECT pg_temp.assert_true((SELECT is_discipleship_completed AND NOT is_in_discipleship AND NOT is_deviated FROM public.converts),'completion at 90 calendar dates is terminal');
 DO $$ DECLARE action text; BEGIN
  FOREACH action IN ARRAY ARRAY['visit','start','stop','complete','deviate'] LOOP
-  PERFORM pg_temp.reject_transition(jsonb_build_object('id','60000000-0000-0000-0000-000000000002','action',action),'convert_terminal');
+  PERFORM pg_temp.reject_transition(jsonb_build_object('id','60000000-0000-0000-0000-000000000002','action',action) || CASE WHEN action='start' THEN jsonb_build_object('class_id','60000000-0000-4000-8000-000000000099') ELSE '{}'::jsonb END,'convert_terminal');
  END LOOP;
  BEGIN UPDATE public.convert_events SET convert_name='Tampered';
   RAISE EXCEPTION 'ASSERTION: event snapshot mutable'; EXCEPTION WHEN insufficient_privilege THEN NULL; END;
@@ -106,12 +101,12 @@ SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.convert_events WHERE e
 SELECT pg_temp.assert_true((SELECT bool_and(created_by='60000000-0000-0000-0000-000000000001' AND done_by_email='lifecycle@example.test' AND event_date=(now() AT TIME ZONE 'America/Sao_Paulo')::date AND created_at=now()) FROM public.convert_events),'event metadata derives from server actor and clock');
 RESET ROLE;
 UPDATE public.converts SET is_deviated=false,deleted_at=now();
-SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"start"}','convert_terminal');
+SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"start","class_id":"60000000-0000-4000-8000-000000000099"}','convert_terminal');
 DELETE FROM private.admin_allowlist;
 SET LOCAL ROLE authenticated;
 SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"visit"}','forbidden','60000000-0000-0000-0000-000000000003');
 RESET ROLE;
-SELECT pg_temp.assert_true((SELECT count(*)=11 FROM private.mutation_receipts),'only successful mutations leave receipts');
+SELECT pg_temp.assert_true((SELECT count(*)=8 FROM private.mutation_receipts),'only successful mutations leave receipts');
 SELECT set_config('request.jwt.claim.sub','',true);
 SELECT pg_temp.reject_transition('{"id":"60000000-0000-0000-0000-000000000002","action":"visit"}','unauthorized');
 ROLLBACK;

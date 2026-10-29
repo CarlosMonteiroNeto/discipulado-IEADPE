@@ -9,7 +9,7 @@ import '../../data/repositories_test.dart' show fixture, respond, id;
 
 void main() {
   test(
-    'server overview crosses 1205 bounded pages and orders Sede first',
+    'server overview crosses 1205 bounded pages and orders Matriz first',
     () async {
       var requests = 0;
       final gateway = await fixture((r) async {
@@ -28,7 +28,7 @@ void main() {
               {
                 'id': id(i),
                 'name': i == 1205
-                    ? 'Sede'
+                    ? 'Matriz'
                     : 'Congregação ${i.toString().padLeft(4, '0')}',
                 'confirmed': i.isEven,
               },
@@ -40,7 +40,7 @@ void main() {
         sortNames: (names) async => names..sort(),
       ).overview();
       expect(overview.entries, hasLength(1205));
-      expect(overview.entries.first.name, 'Sede');
+      expect(overview.entries.first.name, 'Matriz');
       expect(overview.isGlobal, isTrue);
       expect(requests, 13);
     },

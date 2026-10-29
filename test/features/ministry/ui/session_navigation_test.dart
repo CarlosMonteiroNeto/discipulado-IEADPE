@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:http/io_client.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:ieadpe_converts/app.dart';
@@ -615,6 +616,14 @@ void main() {
   testWidgets('congregation switch clears a pending session create route', (
     tester,
   ) async {
+    const locale = MethodChannel('br.org.ieadpe/locale');
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      locale,
+      (call) async => List<String>.from(call.arguments as List)..sort(),
+    );
+    addTearDown(() => messenger.setMockMethodCallHandler(locale, null));
     final fixture = _RootNavigationFixture()
       ..twoCongregations = true
       ..createGate = Completer<void>();

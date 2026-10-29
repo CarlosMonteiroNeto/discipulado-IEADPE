@@ -474,4 +474,18 @@ void main() {
     );
     await auth.events.close();
   });
+
+  testWidgets('login offers a way back to public registration', (tester) async {
+    final auth = FakeAuth();
+    var back = 0;
+    await tester.pumpWidget(
+      MaterialApp(home: LoginPage(auth: auth, onBackToRegistration: () => back++)),
+    );
+
+    expect(find.text('Voltar ao cadastro'), findsOneWidget);
+    await tester.tap(find.text('Voltar ao cadastro'));
+    expect(back, 1);
+
+    await auth.events.close();
+  });
 }
