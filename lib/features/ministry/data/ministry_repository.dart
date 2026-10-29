@@ -17,21 +17,26 @@ class MinistryRepository {
     required String congregationId,
   }) async {
     _uuid(congregationId);
-    final page = await listDirectory(
-      scope: 'congregation',
-      congregationId: congregationId,
-      roleCode: 'teacher',
-      limit: 100,
-    );
-    return List.unmodifiable(
-      page.items.where(
-        (entry) =>
-            entry.scope == 'congregation' &&
-            entry.congregationId == congregationId &&
-            entry.roleCode == 'teacher' &&
-            entry.archivedAt == null,
-      ),
-    );
+    final entries = <MinistryDirectoryEntry>[];
+    String? cursor;
+    do {
+      final page = await listDirectory(
+        scope: 'congregation',
+        congregationId: congregationId,
+        limit: 100,
+        cursor: cursor,
+      );
+      entries.addAll(
+        page.items.where(
+          (entry) =>
+              entry.scope == 'congregation' &&
+              entry.congregationId == congregationId &&
+              entry.archivedAt == null,
+        ),
+      );
+      cursor = page.nextCursor;
+    } while (cursor != null);
+    return List.unmodifiable(entries);
   }
 
   Future<MinistryCommandResult> saveClass({

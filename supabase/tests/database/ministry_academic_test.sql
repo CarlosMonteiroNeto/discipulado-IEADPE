@@ -106,9 +106,7 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; 
  BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000136',
   '{"id":"94000000-0000-0000-0000-000000000040","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Other Class","teacher_contact_id":"94000000-0000-0000-0000-000000000104","start_date":"2026-01-01","end_date":null,"expected_revision":1}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: archived teacher assigned to a class'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
- BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000137',
-  '{"id":"94000000-0000-0000-0000-000000000040","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Other Class","teacher_contact_id":"94000000-0000-0000-0000-000000000105","start_date":"2026-01-01","end_date":null,"expected_revision":1}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: non-teacher contact assigned to a class'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+
 
  class_result:=public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000138',
   '{"id":"94000000-0000-0000-0000-000000000138","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Archive Retry Class","teacher_contact_id":"94000000-0000-0000-0000-000000000106","start_date":"2026-01-01","end_date":null}'::jsonb);
@@ -143,9 +141,9 @@ DO $$ DECLARE result jsonb; replay jsonb; class_result jsonb; class_list jsonb; 
  PERFORM pg_temp.assert_true(class_row=jsonb_build_object('id','94000000-0000-0000-0000-000000000090','name','Teacher Class','status','active',
   'start_date','2026-01-01','end_date',NULL,'revision',1,'teacher_contact_id','94000000-0000-0000-0000-000000000100'),
   'class list returns the assigned teacher UUID in its bounded summary only');
- BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000091',
+ class_result:= public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000091',
   '{"id":"94000000-0000-0000-0000-000000000091","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Nonteacher Class","teacher_contact_id":"94000000-0000-0000-0000-000000000101","start_date":"2026-01-01","end_date":null}'::jsonb);
-  RAISE EXCEPTION 'ASSERTION: non-teacher contact accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+  PERFORM pg_temp.assert_true(class_result->>'revision'='1','active local non-teacher can be assigned');
  BEGIN PERFORM public.ieadpe_ministry_save_class('94000000-0000-0000-0000-000000000092',
   '{"id":"94000000-0000-0000-0000-000000000092","congregation_id":"94000000-0000-0000-0000-000000000002","name":"Foreign Teacher Class","teacher_contact_id":"94000000-0000-0000-0000-000000000102","start_date":"2026-01-01","end_date":null}'::jsonb);
   RAISE EXCEPTION 'ASSERTION: foreign teacher contact accepted'; EXCEPTION WHEN invalid_parameter_value THEN NULL; END;

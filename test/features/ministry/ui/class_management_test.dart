@@ -356,7 +356,7 @@ void main() {
   });
 
   testWidgets(
-    'class form offers only active local teachers and validates dates',
+    'class form offers active local team members and validates dates',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 900);
@@ -376,17 +376,23 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.byKey(const Key('class-add-team-member')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('class-add-team-member')));
+      await tester.pumpAndSettle();
+      expect(find.text('Novo contato'), findsOneWidget);
+      await tester.tap(find.text('Cancelar').last);
+      await tester.pumpAndSettle();
       final helperText = tester.renderObject<RenderParagraph>(
-        find.text('Apenas professores ativos desta congregação.'),
+        find.text('Apenas membros ativos da equipe desta congregação.'),
       );
       expect(helperText.maxLines, isNull);
       expect(helperText.softWrap, isTrue);
 
-      expect(gateway.readRequests.single.rpc, 'ministry_list_directory');
-      expect(gateway.readRequests.single.parameters, {
+      expect(gateway.readRequests.first.rpc, 'ministry_list_directory');
+      expect(gateway.readRequests.first.parameters, {
         'scope': 'congregation',
         'congregation_id': _scope,
-        'role_code': 'teacher',
+        'role_code': null,
         'name_prefix': null,
         'limit': 100,
         'cursor': null,
@@ -395,12 +401,12 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Ana Professora'), findsOneWidget);
       expect(find.text('Professora Arquivada'), findsNothing);
-      expect(find.text('Contato sem função de professor'), findsNothing);
+      expect(find.text('Contato sem função de professor'), findsOneWidget);
       expect(find.text('Professor de outra congregação'), findsNothing);
       await tester.tap(find.text('Ana Professora'));
       await tester.pumpAndSettle();
       expect(
-        find.text('Professor selecionado: Ana Professora'),
+        find.text('Responsável principal selecionado: Ana Professora'),
         findsOneWidget,
       );
 
@@ -561,7 +567,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    const selectedState = 'Professor selecionado: Sem professor definido';
+    const selectedState =
+        'Responsável principal selecionado: Sem responsável definido';
     final stateFinder = find.text(selectedState);
     expect(stateFinder, findsOneWidget);
     final paragraph = tester.renderObject<RenderParagraph>(stateFinder);

@@ -114,6 +114,20 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Adicionar contato'), findsOneWidget);
+    expect(find.byTooltip('Abrir WhatsApp'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(
+            find
+                .ancestor(
+                  of: find.byTooltip('Abrir WhatsApp'),
+                  matching: find.byType(IconButton),
+                )
+                .first,
+          )
+          .onPressed,
+      isNotNull,
+    );
   });
 
   testWidgets(

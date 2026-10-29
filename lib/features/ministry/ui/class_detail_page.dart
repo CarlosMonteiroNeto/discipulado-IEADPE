@@ -89,7 +89,7 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
     } catch (_) {
       if (!mounted || teacherId != _classSummary.teacherContactId) return;
       setState(() {
-        _teacherName = 'Professor indisponível';
+        _teacherName = 'Responsável indisponível';
         _loadingTeacher = false;
       });
     }
@@ -250,12 +250,12 @@ class _ClassDetailPageState extends State<ClassDetailPage> {
                     _DetailRow(label: 'Situação', value: _statusLabel),
                     const Divider(height: UnifiedSpace.x6),
                     _DetailRow(
-                      label: 'Professor',
+                      label: 'Responsável principal',
                       value: _classSummary.teacherContactId == null
-                          ? 'Sem professor definido'
+                          ? 'Sem responsável definido'
                           : _loadingTeacher
                           ? 'Carregando…'
-                          : _teacherName ?? 'Professor indisponível',
+                          : _teacherName ?? 'Responsável indisponível',
                     ),
                     const Divider(height: UnifiedSpace.x6),
                     _DetailRow(

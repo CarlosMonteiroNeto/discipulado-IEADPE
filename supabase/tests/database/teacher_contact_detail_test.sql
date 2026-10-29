@@ -47,7 +47,7 @@ UPDATE public.ministry_contacts SET archived_at=now()
 
 SELECT set_config('request.jwt.claim.sub','ab100000-0000-4000-8000-000000000001',true);
 DO $$
-DECLARE detail jsonb; saved jsonb;
+DECLARE detail jsonb; other_detail jsonb; saved jsonb;
 BEGIN
  detail:=public.ieadpe_ministry_get_teacher_contact(jsonb_build_object(
   'congregation_id','ab200000-0000-4000-8000-000000000001',
@@ -65,12 +65,11 @@ BEGIN
    'contact_id','ab300000-0000-4000-8000-000000000001','extra','no'));
   RAISE EXCEPTION 'ASSERTION: teacher detail accepted an unknown key';
  EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
- BEGIN
-  PERFORM public.ieadpe_ministry_get_teacher_contact(jsonb_build_object(
+ other_detail:=public.ieadpe_ministry_get_teacher_contact(jsonb_build_object(
    'congregation_id','ab200000-0000-4000-8000-000000000001',
    'contact_id','ab300000-0000-4000-8000-000000000002'));
-  RAISE EXCEPTION 'ASSERTION: non-teacher contact detail was returned';
- EXCEPTION WHEN invalid_parameter_value THEN NULL; END;
+ PERFORM pg_temp.assert_true(other_detail->'contact'->>'id'='ab300000-0000-4000-8000-000000000002',
+  'active local non-teacher contact detail is available');
  BEGIN
   PERFORM public.ieadpe_ministry_get_teacher_contact(jsonb_build_object(
    'congregation_id','ab200000-0000-4000-8000-000000000001',

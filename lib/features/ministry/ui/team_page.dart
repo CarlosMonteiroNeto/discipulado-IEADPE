@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../../converts/convert_actions.dart';
 
 import '../../../data/access_repository.dart';
 import '../../../data/supabase_gateway.dart';
@@ -128,6 +131,24 @@ class _TeamPageState extends State<TeamPage> {
               ? 'Você não tem acesso a este diretório.'
               : 'Não foi possível carregar a equipe. Tente novamente.';
         });
+      }
+    }
+  }
+
+  Future<void> _openWhatsApp(Uri uri) async {
+    try {
+      if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+        throw StateError('unavailable');
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Não foi possível abrir o WhatsApp. Tente novamente.',
+            ),
+          ),
+        );
       }
     }
   }
@@ -316,10 +337,26 @@ class _TeamPageState extends State<TeamPage> {
                     foregroundColor: UnifiedColors.brandNavy,
                     child: Icon(Icons.person_outline),
                   ),
-                  trailing: IconButton(
-                    tooltip: 'Editar contato',
-                    onPressed: _detailLoading ? null : () => _openContact(item),
-                    icon: const Icon(Icons.edit_outlined),
+                  trailing: Wrap(
+                    children: [
+                      IconButton(
+                        tooltip: 'Abrir WhatsApp',
+                        onPressed: brazilWhatsApp(item.phoneE164) == null
+                            ? null
+                            : () => _openWhatsApp(
+                                brazilWhatsApp(item.phoneE164)!,
+                              ),
+                        icon: const Icon(Icons.chat_outlined),
+                        color: UnifiedColors.whatsapp,
+                      ),
+                      IconButton(
+                        tooltip: 'Editar contato',
+                        onPressed: _detailLoading
+                            ? null
+                            : () => _openContact(item),
+                        icon: const Icon(Icons.edit_outlined),
+                      ),
+                    ],
                   ),
                   minVerticalPadding: UnifiedSize.minTouchTarget / 4,
                   onTap: _detailLoading ? null : () => _openContact(item),

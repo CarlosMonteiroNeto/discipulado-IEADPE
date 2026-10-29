@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
+import '../../../data/access_repository.dart';
+import 'team_contact_form.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/br_input.dart';
 import '../../../ui/form_fields.dart';
@@ -126,7 +128,7 @@ class _ClassFormState extends State<ClassForm> {
             ),
           );
         } on DataFailure {
-          _teacherError = 'O professor atual não está disponível. Escolha outro professor ou deixe a turma sem designação.';
+          _teacherError = 'O responsável atual não está disponível. Escolha outro membro ou deixe a turma sem designação.';
           _teacherChoice = _noTeacher;
         }
       }
@@ -139,8 +141,33 @@ class _ClassFormState extends State<ClassForm> {
       if (!mounted) return;
       setState(() {
         _loadingTeachers = false;
-        _teacherError = 'Não foi possível carregar os professores.';
+        _teacherError = 'Não foi possível carregar a equipe.';
       });
+    }
+  }
+
+  Future<void> _addTeamMember() async {
+    final congregationId = widget.congregationId;
+    await showDialog<void>(
+      context: context,
+      builder: (dialogContext) => TeamContactForm(
+        repository: widget.repository,
+        accessRepository: AccessRepository(widget.repository.gateway),
+        scope: ContactScope.congregation,
+        congregationId: congregationId,
+        congregationName: widget.congregationName,
+        current: null,
+        directory: _teachers,
+        canManageAccess: false,
+        createId: _uuid.v4,
+        isScopeCurrent: () =>
+            mounted && widget.congregationId == congregationId,
+        onScopeRefresh: null,
+        onSaved: () => Navigator.of(dialogContext).pop(),
+      ),
+    );
+    if (mounted && widget.congregationId == congregationId) {
+      await _loadTeachers();
     }
   }
 
@@ -318,7 +345,7 @@ class _ClassFormState extends State<ClassForm> {
                           initialValue: _teacherChoice,
                           isExpanded: true,
                           decoration: InputDecoration(
-                            labelText: 'Professor',
+                            labelText: 'Responsável principal',
                             floatingLabelBehavior: FloatingLabelBehavior.always,
                             prefixIcon: const Icon(Icons.person_outline),
                             contentPadding: const EdgeInsets.symmetric(
@@ -329,7 +356,7 @@ class _ClassFormState extends State<ClassForm> {
                           items: [
                             const DropdownMenuItem(
                               value: _noTeacher,
-                              child: Text('Sem professor definido'),
+                              child: Text('Sem responsável definido'),
                             ),
                             if (widget.initialClass?.teacherContactId != null &&
                                 !_teachers.any(
@@ -341,8 +368,8 @@ class _ClassFormState extends State<ClassForm> {
                                 value: widget.initialClass!.teacherContactId!,
                                 child: Text(
                                   _loadingTeachers
-                                      ? 'Carregando professor atual…'
-                                      : 'Professor atual indisponível',
+                                      ? 'Carregando responsável atual…'
+                                      : 'Responsável atual indisponível',
                                 ),
                               ),
                             for (final teacher in _teachers)
@@ -363,6 +390,15 @@ class _ClassFormState extends State<ClassForm> {
                                   }
                                 },
                         ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            key: const Key('class-add-team-member'),
+                            onPressed: _fieldsEnabled ? _addTeamMember : null,
+                            icon: const Icon(Icons.person_add_alt_1),
+                            label: const Text('Adicionar membro da equipe'),
+                          ),
+                        ),
                         Padding(
                           key: const Key('class-teacher-selection-summary'),
                           padding: const EdgeInsets.only(
@@ -370,7 +406,7 @@ class _ClassFormState extends State<ClassForm> {
                             top: UnifiedSpace.x2,
                           ),
                           child: Text(
-                            'Professor selecionado: $_selectedTeacherLabel',
+                            'Responsável principal selecionado: $_selectedTeacherLabel',
                           ),
                         ),
                         Padding(
@@ -379,7 +415,7 @@ class _ClassFormState extends State<ClassForm> {
                             top: UnifiedSpace.x2,
                           ),
                           child: Text(
-                            _loadingTeachers ? 'Carregando professores…' : 'Apenas professores ativos desta congregação.',
+                            _loadingTeachers ? 'Carregando equipe…' : 'Apenas membros ativos da equipe desta congregação.',
                           ),
                         ),
                         if (_teacherError != null) ...[
@@ -472,13 +508,13 @@ class _ClassFormState extends State<ClassForm> {
   );
 
   String get _selectedTeacherLabel {
-    if (_teacherChoice == _noTeacher) return 'Sem professor definido';
+    if (_teacherChoice == _noTeacher) return 'Sem responsável definido';
     for (final teacher in _teachers) {
       if (teacher.id == _teacherChoice) return teacher.name;
     }
     return _loadingTeachers
-        ? 'Carregando professor atual…'
-        : 'Professor atual indisponível';
+        ? 'Carregando responsável atual…'
+        : 'Responsável atual indisponível';
   }
 }
 
