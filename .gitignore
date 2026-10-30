@@ -18,3 +18,10 @@ pub-sync-report.txt
 
 __pycache__/
 *.pyc
+
+# Tool caches and local run artifacts
+.wrangler/
+supabase/.temp/
+*.log
+!docs/verification/**/*.log
+test/**/failures/
