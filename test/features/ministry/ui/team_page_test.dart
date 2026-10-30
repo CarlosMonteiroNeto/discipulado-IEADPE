@@ -107,13 +107,13 @@ void main() {
       MaterialApp(
         home: TeamPage(
           repository: MinistryRepository(_TeamGateway()),
-          congregationId: _scope,
+          congregations: const [Congregation(id: _scope, name: 'Central')],
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Adicionar contato'), findsOneWidget);
+    expect(find.text('Adicionar membro'), findsOneWidget);
     expect(find.byTooltip('Abrir WhatsApp'), findsOneWidget);
     expect(
       tester
@@ -138,13 +138,13 @@ void main() {
         MaterialApp(
           home: TeamPage(
             repository: MinistryRepository(gateway),
-            congregationId: _scope,
+            congregations: const [Congregation(id: _scope, name: 'Central')],
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('Editar contato'));
+      await tester.tap(find.byTooltip('Editar membro'));
       await tester.pumpAndSettle();
 
       expect(
@@ -178,11 +178,13 @@ void main() {
     final gateway = _TeamGateway()..delayContactDetail = Completer<void>();
     final repository = MinistryRepository(gateway);
     await tester.pumpWidget(
-      MaterialApp(home: TeamPage(repository: repository, supervision: true)),
+      MaterialApp(
+        home: TeamPage(repository: repository, canSelectSupervision: true),
+      ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byTooltip('Editar contato'));
+    await tester.tap(find.byTooltip('Editar membro'));
     await tester.pump();
     await tester.pumpWidget(
       MaterialApp(home: TeamPage(repository: repository)),

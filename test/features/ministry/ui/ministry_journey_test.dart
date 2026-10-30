@@ -886,7 +886,10 @@ void main() {
           onOpenClasses: () {},
           onOpenAttendance: () {},
         ),
-        () => TeamPage(repository: ministry, congregationId: _scope),
+        () => TeamPage(
+          repository: ministry,
+          congregations: const [Congregation(id: _scope, name: 'Central')],
+        ),
         () => StudentsPage(
           repository: browser,
           congregationId: _scope,

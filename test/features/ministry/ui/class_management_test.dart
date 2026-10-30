@@ -379,7 +379,7 @@ void main() {
       expect(find.byKey(const Key('class-add-team-member')), findsOneWidget);
       await tester.tap(find.byKey(const Key('class-add-team-member')));
       await tester.pumpAndSettle();
-      expect(find.text('Novo contato'), findsOneWidget);
+      expect(find.text('Novo membro da equipe'), findsOneWidget);
       await tester.tap(find.text('Cancelar').last);
       await tester.pumpAndSettle();
       final helperText = tester.renderObject<RenderParagraph>(

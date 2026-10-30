@@ -3,7 +3,7 @@ from pathlib import Path
 import argparse
 
 APPLICATION_ROUTES = {
-    '/login', '/register', '/home', '/converts', '/pending', '/admin', '/auth/callback',
+    '/login', '/register', '/home', '/converts', '/pending', '/team', '/admin', '/auth/callback',
     '/ministry', '/ministry/team', '/ministry/students',
     '/ministry/students/register', '/ministry/classes', '/ministry/attendance',
     '/ministry/handoff',

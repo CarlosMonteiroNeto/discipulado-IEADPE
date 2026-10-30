@@ -798,11 +798,25 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
               ),
           onOpenPending: () => widget.router.go('/pending'),
         ),
+        '/team' => TeamPage(
+          key: ValueKey('team:${widget.scope.hashCode}'),
+          repository: MinistryRepository(widget.gateway),
+          congregations: [
+            for (final congregation in _catalog!)
+              if (congregation.archivedAt == null &&
+                  (widget.scope.isMinistrySupervision ||
+                      widget.scope.ministryCongregationIds.contains(
+                        congregation.id,
+                      )))
+                congregation,
+          ],
+          canSelectSupervision: widget.scope.isMinistrySupervision,
+          onScopeRefresh: widget.router.refresh,
+        ),
         '/admin' => AdminPage(
           scope: widget.scope,
           gateway: widget.gateway,
           onScopeRefresh: widget.router.refresh,
-          onOpenTeam: () => widget.router.go('/ministry/team'),
           reportBuilder: (_) => ConversionPanel(
             repository: widget.reports,
             exporter: widget.exporter,
@@ -983,17 +997,6 @@ class _ProtectedFeaturesState extends State<_ProtectedFeatures> {
             scopedActionsEnabled || widget.scope.isMinistrySupervision
             ? () => widget.router.go('/ministry/attendance')
             : null,
-      ),
-      '/ministry/team' => TeamPage(
-        key: ValueKey('ministry-team:$congregationId'),
-        repository: ministry,
-        congregationId: congregationId,
-        congregationName: _selectedMinistryCongregationName,
-        supervision:
-            widget.scope.isMinistrySupervision && congregationId == null,
-        canManageAccess:
-            widget.scope.isGlobalManager || widget.scope.isMinistrySupervision,
-        onScopeRefresh: widget.router.refresh,
       ),
       '/ministry/students' when scopedActionsEnabled => StudentsPage(
         key: ValueKey('ministry-students:$congregationId'),

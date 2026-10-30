@@ -903,64 +903,36 @@ void main() {
     await tester.pumpWidget(const SizedBox());
     await tester.runAsync(fixture.close);
   });
-  testWidgets(
-    'supervision chooses a congregation from team and uses it across ministry',
-    (tester) async {
-      final fixture = RootFixture()..ministrySupervision = true;
-      await tester.runAsync(fixture.initialize);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: ProtectedApplication(
-            repository: fixture.auth,
-            intendedRoute: '/ministry/team',
-          ),
+  testWidgets('supervision opens a local team from the Equipe route', (
+    tester,
+  ) async {
+    final fixture = RootFixture()..ministrySupervision = true;
+    await tester.runAsync(fixture.initialize);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ProtectedApplication(
+          repository: fixture.auth,
+          intendedRoute: '/team',
         ),
-      );
-      await drain(tester);
-      expect(
-        find.byKey(const ValueKey('ministry-workspace-congregation')),
-        findsOneWidget,
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('ministry-workspace-congregation')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Congregação Sintética').last);
-      await drain(tester);
-      expect(find.text('Diretório da congregação'), findsOneWidget);
-      await tester.tap(find.text('Adicionar contato'));
-      await tester.pumpAndSettle();
-      expect(find.text('Congregação: Congregação Sintética'), findsOneWidget);
-      await tester.tap(find.text('Cancelar'));
-      await tester.pumpAndSettle();
-      for (final section in ['Alunos', 'Turmas']) {
-        await tester.tap(
-          find.byKey(const ValueKey('app-shell-ministry-selector')),
-        );
-        await tester.pumpAndSettle();
-        await tester.tap(find.text(section).last);
-        await drain(tester);
-        expect(
-          find.byKey(const ValueKey('ministry-workspace-congregation')),
-          findsOneWidget,
-        );
-        expect(find.text('Congregação Sintética'), findsOneWidget);
-        await tester.tap(
-          find
-              .text(section == 'Alunos' ? 'Registrar aluno' : 'Nova turma')
-              .last,
-        );
-        await drain(tester);
-        expect(find.text('Congregação: Congregação Sintética'), findsOneWidget);
-        await tester.ensureVisible(find.text('Cancelar').last);
-        await tester.pumpAndSettle();
-        await tester.tap(find.text('Cancelar').last);
-        await drain(tester);
-      }
-      await tester.pumpWidget(const SizedBox());
-      await tester.runAsync(fixture.close);
-    },
-  );
+      ),
+    );
+    await drain(tester);
+    await settleLoopback(tester);
+    await drain(tester);
+    expect(find.text('Equipe da supervisão'), findsAtLeastNWidgets(1));
+    await tester.tap(find.byKey(const ValueKey('team-scope-selector')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('Congregação Sintética').last);
+    await drain(tester);
+    expect(find.text('Equipe local'), findsOneWidget);
+    await tester.tap(find.text('Adicionar membro'));
+    await tester.pumpAndSettle();
+    expect(find.text('Congregação: Congregação Sintética'), findsOneWidget);
+    await tester.tap(find.text('Cancelar'));
+    await tester.pumpAndSettle();
+    await tester.pumpWidget(const SizedBox());
+    await tester.runAsync(fixture.close);
+  });
   testWidgets(
     'real SDK root retains picker through resume and destroys explicit equal-scope owners',
     (tester) async {
@@ -1107,7 +1079,7 @@ void main() {
     );
   }
   testWidgets(
-    'actual SDK root connects all five Admin tabs and both feedback owners',
+    'actual SDK root connects all four Admin tabs and both feedback owners',
     (tester) async {
       final fixture = RootFixture();
       await tester.runAsync(fixture.initialize);
@@ -1117,13 +1089,7 @@ void main() {
       await drain(tester);
       tester.widget<AppShell>(find.byType(AppShell)).onNavigate('/admin');
       await drain(tester);
-      for (final label in [
-        'Congregações',
-        'Acessos',
-        'Relatório',
-        'Eventos',
-        'Backup',
-      ]) {
+      for (final label in ['Congregações', 'Relatório', 'Eventos', 'Backup']) {
         final choice = find.widgetWithText(ChoiceChip, label);
         await tester.ensureVisible(choice);
         await tester.tap(choice);
@@ -1131,6 +1097,7 @@ void main() {
         expect(find.textContaining('ainda não está disponível'), findsNothing);
         expect(tester.takeException(), isNull);
       }
+      expect(find.widgetWithText(ChoiceChip, 'Acessos'), findsNothing);
       expect(fixture.paths, contains('/rest/v1/congregations'));
       await tester.pumpWidget(const SizedBox());
       await tester.runAsync(fixture.close);

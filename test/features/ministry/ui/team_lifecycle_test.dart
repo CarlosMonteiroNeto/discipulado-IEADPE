@@ -23,7 +23,6 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   _TeamGateway({
     this.globalManager = false,
     List<Map<String, Object?>> contacts = const [],
-    this.accessCandidates = const [],
   }) {
     for (final contact in contacts) {
       _contacts[contact['id']! as String] = Map.of(contact);
@@ -31,7 +30,6 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
   }
 
   final bool globalManager;
-  final List<Map<String, Object?>> accessCandidates;
   @override
   final boundary = ProtectedDataBoundary();
   final _contacts = <String, Map<String, Object?>>{};
@@ -103,21 +101,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
       };
     }
     if (rpc == 'ministry_list_access_candidates') {
-      if (!globalManager) throw const DataFailure('permission');
-      final scope = parameters['scope'];
-      final congregationId = parameters['congregation_id'];
-      final role = parameters['role'];
-      return {
-        'items': accessCandidates
-            .where(
-              (candidate) =>
-                  candidate['scope'] == scope &&
-                  candidate['congregation_id'] == congregationId &&
-                  candidate['role'] == role,
-            )
-            .toList(growable: false),
-        'next_cursor': null,
-      };
+      throw StateError('manual access candidates are no longer used');
     }
     final scope = parameters['scope']! as String;
     final congregationId = parameters['congregation_id'];
@@ -190,6 +174,7 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
     switch (command) {
       case 'save_contact':
         final revision = old == null ? 1 : (old['revision']! as int) + 1;
+        final email = payload['email'];
         _contacts[id] = {
           'id': id,
           'scope': payload['scope'],
@@ -199,52 +184,23 @@ class _TeamGateway implements ReadRpcGateway, MinistryCommandGateway {
           'role_code': payload['role_code'],
           'phone_e164': payload['phone_e164'],
           'birth_date': payload['birth_date'],
-          'email': payload['email'],
+          'email': email,
           'archived_at': old?['archived_at'],
+          // Access follows the e-mail, exactly like the server-side command.
+          'user_access_id': email == null ? null : _assignmentId,
           'revision': revision,
-          'user_access_id': old?['user_access_id'],
         };
         return _commit(operationId, command, frozen, {
           'id': id,
           'revision': revision,
-        });
-      case 'save_contact_with_access':
-        final access = payload['access']! as Map<String, Object?>;
-        final accessId = access['id'] as String? ?? _assignmentId;
-        final revision = old == null ? 1 : (old['revision']! as int) + 1;
-        _contacts[id] = {
-          'id': id,
-          'scope': payload['scope'],
-          'congregation_id': payload['congregation_id'],
-          'name': payload['name'],
-          'normalized_name': (payload['name']! as String).toLowerCase(),
-          'role_code': payload['role_code'],
-          'phone_e164': payload['phone_e164'],
-          'birth_date': payload['birth_date'],
-          'email': payload['email'],
-          'archived_at': old?['archived_at'],
-          'revision': revision,
-          'user_access_id': accessId,
-        };
-        return _commit(operationId, command, frozen, {
-          'id': id,
-          'revision': revision,
-          'access_id': accessId,
-        });
-      case 'revoke_contact_access':
-        final revision = (old!['revision']! as int) + 1;
-        old['user_access_id'] = null;
-        old['revision'] = revision;
-        return _commit(operationId, command, frozen, {
-          'id': id,
-          'revision': revision,
-          'revoked_access_id': _assignmentId,
         });
       case 'set_contact_archived':
         final revision = (old!['revision']! as int) + 1;
-        old['archived_at'] = payload['archived'] == true
-            ? '2026-10-19T00:00:00Z'
-            : null;
+        final archived = payload['archived'] == true;
+        old['archived_at'] = archived ? '2026-10-19T00:00:00Z' : null;
+        old['user_access_id'] = archived || old['email'] == null
+            ? null
+            : _assignmentId;
         old['revision'] = revision;
         return _commit(operationId, command, frozen, {
           'id': id,
@@ -332,17 +288,17 @@ Map<String, Object?> _contact({
 Future<void> _pumpTeam(
   WidgetTester tester,
   _TeamGateway gateway, {
-  String? congregationId = _congregationId,
-  bool supervision = false,
-  bool canManageAccess = false,
+  List<Congregation> congregations = const [
+    Congregation(id: _congregationId, name: 'Congregação Central'),
+  ],
+  bool canSelectSupervision = false,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
       home: TeamPage(
         repository: MinistryRepository(gateway),
-        congregationId: congregationId,
-        supervision: supervision,
-        canManageAccess: canManageAccess,
+        congregations: congregations,
+        canSelectSupervision: canSelectSupervision,
       ),
     ),
   );
@@ -374,7 +330,9 @@ Future<void> _pumpTeamViewport(
       ),
       home: TeamPage(
         repository: MinistryRepository(gateway),
-        congregationId: _congregationId,
+        congregations: const [
+          Congregation(id: _congregationId, name: 'Congregação Central'),
+        ],
       ),
     ),
   );
@@ -404,8 +362,8 @@ void main() {
     final gateway = _TeamGateway(contacts: [_contact(email: null)]);
     await _pumpTeam(tester, gateway);
 
-    expect(find.text('Sem acesso ao aplicativo'), findsOneWidget);
-    await _tapAndSettle(tester, find.text('Adicionar contato'));
+    expect(find.text('Sem acesso ao app'), findsOneWidget);
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
     await tester.enterText(
       find.byKey(const ValueKey('team-contact-name')),
       'Joana Nunes',
@@ -423,7 +381,7 @@ void main() {
     final gateway = _TeamGateway(contacts: [_contact()]);
     await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
     expect(
       gateway.reads.map((read) => read.$1),
       contains('ministry_get_contact'),
@@ -447,7 +405,7 @@ void main() {
     gateway.detailGate = Completer<void>();
     await _pumpTeam(tester, gateway);
 
-    await tester.tap(find.byTooltip('Editar contato'));
+    await tester.tap(find.byTooltip('Editar membro'));
     await tester.pump();
     expect(
       gateway.reads.map((read) => read.$1),
@@ -462,7 +420,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('global manager explicitly selects the returned assignment ID', (
+  testWidgets('editing a linked member exposes no manual access controls', (
     tester,
   ) async {
     final gateway = _TeamGateway(
@@ -477,51 +435,52 @@ void main() {
         ),
       ],
     );
-    await _pumpTeam(
-      tester,
-      gateway,
-      congregationId: null,
-      supervision: true,
-      canManageAccess: true,
+    await _pumpTeam(tester, gateway, canSelectSupervision: true);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    expect(find.text('Acesso ao aplicativo'), findsNothing);
+    expect(find.text('Selecionar vínculo manualmente'), findsNothing);
+    expect(find.byKey(const ValueKey('team-access-role')), findsNothing);
+    expect(
+      tester
+          .widget<TextFormField>(
+            find.byKey(const ValueKey('team-contact-email')),
+          )
+          .enabled,
+      isTrue,
     );
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    expect(find.text('Acesso ao aplicativo'), findsOneWidget);
-    await _tapAndSettle(tester, find.text('Atualizar vínculo de acesso'));
-    expect(
-      find.byKey(const ValueKey('team-access-assignment')),
-      findsOneWidget,
+    await tester.enterText(
+      find.byKey(const ValueKey('team-contact-email')),
+      'ana.nova@example.test',
     );
     await _tapAndSettle(tester, find.text('Salvar contato'));
-    expect(gateway.writes, isEmpty);
 
-    await _tapAndSettle(
-      tester,
-      find.byKey(const ValueKey('team-access-assignment')),
-    );
-    await _tapAndSettle(tester, find.textContaining(_assignmentId));
-    await _tapAndSettle(tester, find.text('Salvar contato'));
-
-    expect(gateway.writes.single.$1, 'save_contact_with_access');
-    expect(
-      (gateway.writes.single.$2['access']! as Map<String, Object?>)['id'],
-      _assignmentId,
-    );
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['email'], 'ana.nova@example.test');
+    expect(gateway.writes.single.$2, isNot(contains('access')));
   });
 
-  testWidgets('verified access is granted only after an explicit choice', (
+  testWidgets('saving an unchanged member synchronizes access', (tester) async {
+    final gateway = _TeamGateway(
+      contacts: [_contact(email: 'ana@example.test')],
+    );
+    await _pumpTeam(tester, gateway);
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    await _tapAndSettle(tester, find.text('Salvar contato'));
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['email'], 'ana@example.test');
+  });
+
+  testWidgets('adding a member with an e-mail grants access in the same save', (
     tester,
   ) async {
     final gateway = _TeamGateway(globalManager: true);
-    await _pumpTeam(
-      tester,
-      gateway,
-      congregationId: null,
-      supervision: true,
-      canManageAccess: true,
-    );
+    await _pumpTeam(tester, gateway, canSelectSupervision: true);
 
-    await _tapAndSettle(tester, find.text('Adicionar contato'));
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
+    expect(find.text('Selecionar vínculo manualmente'), findsNothing);
+    expect(find.byKey(const ValueKey('team-create-new-access')), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('team-contact-name')),
       'Marcos Lima',
@@ -531,130 +490,61 @@ void main() {
       'marcos@example.test',
     );
     expect(gateway.writes, isEmpty);
-    await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
-    await _tapAndSettle(
-      tester,
-      find.byKey(const ValueKey('team-create-new-access')),
-    );
     await _tapAndSettle(tester, find.text('Salvar contato'));
 
-    expect(gateway.writes.single.$1, 'save_contact_with_access');
-    expect(gateway.writes.single.$2, isNot(contains('access_id')));
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['scope'], 'supervision');
     expect(gateway.writes.single.$2['email'], 'marcos@example.test');
+    expect(gateway.writes.single.$2, isNot(contains('access')));
     expect(
-      (gateway.writes.single.$2['access']! as Map<String, Object?>)['role'],
-      AccessRole.supervision.wireValue,
+      gateway.contact(
+        gateway.writes.single.$2['id'] as String,
+      )['user_access_id'],
+      _assignmentId,
     );
   });
 
-  testWidgets(
-    'supervisor grants congregation access within the selected congregation',
-    (tester) async {
-      final gateway = _TeamGateway(globalManager: true);
-      await _pumpTeam(
-        tester,
-        gateway,
-        congregationId: _congregationId,
-        canManageAccess: true,
-      );
-      await _tapAndSettle(tester, find.text('Adicionar contato'));
-      await tester.enterText(
-        find.byKey(const ValueKey('team-contact-name')),
-        'Maria Local',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('team-contact-email')),
-        'maria@example.test',
-      );
-      await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
-      expect(find.text('Direção da congregação'), findsOneWidget);
-      await _tapAndSettle(
-        tester,
-        find.byKey(const ValueKey('team-create-new-access')),
-      );
-      await _tapAndSettle(tester, find.text('Salvar contato'));
-      final payload = gateway.writes.single.$2;
-      final access = payload['access']! as Map<String, Object?>;
-      expect(payload['scope'], 'congregation');
-      expect(payload['congregation_id'], _congregationId);
-      expect(access['role'], AccessRole.direction.wireValue);
-      expect(access['congregation_id'], _congregationId);
-    },
-  );
+  testWidgets('team scope selector switches between supervision and local', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(globalManager: true);
+    await _pumpTeam(
+      tester,
+      gateway,
+      canSelectSupervision: true,
+      congregations: const [
+        Congregation(id: _congregationId, name: 'Congregação Central'),
+      ],
+    );
 
-  testWidgets(
-    'existing unlinked assignment requires explicit exact ID choice',
-    (tester) async {
-      final gateway = _TeamGateway(
-        globalManager: true,
-        accessCandidates: [
-          {
-            'id': _assignmentId,
-            'email': 'marcos@example.test',
-            'role': AccessRole.supervision.wireValue,
-            'scope': 'supervision',
-            'congregation_id': null,
-          },
-        ],
-      );
-      await _pumpTeam(
-        tester,
-        gateway,
-        congregationId: null,
-        supervision: true,
-        canManageAccess: true,
-      );
+    expect(find.text('Equipe da supervisão'), findsAtLeastNWidgets(1));
+    expect(find.byKey(const ValueKey('team-scope-selector')), findsOneWidget);
 
-      await _tapAndSettle(tester, find.text('Adicionar contato'));
-      await tester.enterText(
-        find.byKey(const ValueKey('team-contact-name')),
-        'Marcos Lima',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('team-contact-email')),
-        'marcos@example.test',
-      );
-      await _tapAndSettle(tester, find.text('Selecionar vínculo manualmente'));
+    await _tapAndSettle(
+      tester,
+      find.byKey(const ValueKey('team-scope-selector')),
+    );
+    await _tapAndSettle(
+      tester,
+      find.textContaining('Congregação Central').last,
+    );
 
-      final candidateDropdown = find.byKey(
-        const ValueKey('team-access-candidate'),
-      );
-      expect(candidateDropdown, findsOneWidget);
-      expect(
-        tester
-            .widget<DropdownButtonFormField<String>>(candidateDropdown)
-            .initialValue,
-        isNull,
-      );
-      expect(
-        gateway.reads.map((read) => read.$1),
-        contains('ministry_list_access_candidates'),
-      );
-      final candidateRead = gateway.reads.singleWhere(
-        (read) => read.$1 == 'ministry_list_access_candidates',
-      );
-      expect(candidateRead.$2['role'], AccessRole.supervision.wireValue);
-      expect(candidateRead.$2['scope'], 'supervision');
-      expect(candidateRead.$2['congregation_id'], isNull);
+    expect(find.text('Equipe local'), findsOneWidget);
+    final listing = gateway.reads.last;
+    expect(listing.$2['scope'], 'congregation');
+    expect(listing.$2['congregation_id'], _congregationId);
 
-      await _tapAndSettle(
-        tester,
-        find.byKey(const ValueKey('team-contact-save')),
-      );
-      expect(gateway.writes, isEmpty);
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
+    expect(find.text('Congregação: Congregação Central'), findsOneWidget);
+  });
 
-      await _tapAndSettle(tester, candidateDropdown);
-      expect(find.textContaining(_assignmentId), findsOneWidget);
-      await _tapAndSettle(tester, find.textContaining(_assignmentId));
-      await _tapAndSettle(tester, find.text('Salvar contato'));
-
-      expect(gateway.writes.single.$1, 'save_contact_with_access');
-      expect(
-        (gateway.writes.single.$2['access']! as Map<String, Object?>)['id'],
-        _assignmentId,
-      );
-    },
-  );
+  testWidgets('single-congregation leader goes straight to the local team', (
+    tester,
+  ) async {
+    await _pumpTeam(tester, _TeamGateway());
+    expect(find.text('Equipe local'), findsOneWidget);
+    expect(find.byKey(const ValueKey('team-scope-selector')), findsNothing);
+  });
 
   testWidgets('role replacement keeps the previous contact in the directory', (
     tester,
@@ -742,7 +632,7 @@ void main() {
       ..dropResponseAfterCommitOnce = 'save_contact';
     await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
     final phoneField = find.byKey(const ValueKey('team-contact-phone'));
     await tester.enterText(phoneField, '(11) 9 9999-0002');
     await _tapAndSettle(
@@ -835,25 +725,7 @@ void main() {
     },
   );
 
-  testWidgets('local user can edit email only for an unlinked contact', (
-    tester,
-  ) async {
-    final gateway = _TeamGateway(
-      contacts: [_contact(email: 'old@example.test')],
-    );
-    await _pumpTeam(tester, gateway);
-
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    final emailField = find.byKey(const ValueKey('team-contact-email'));
-    expect(tester.widget<TextFormField>(emailField).enabled, isTrue);
-    await tester.enterText(emailField, 'new@example.test');
-    await _tapAndSettle(tester, find.text('Salvar contato'));
-
-    expect(gateway.writes.single.$1, 'save_contact');
-    expect(gateway.writes.single.$2['email'], 'new@example.test');
-  });
-
-  testWidgets('local user cannot edit email for a linked contact', (
+  testWidgets('leader can move a linked member to a new e-mail', (
     tester,
   ) async {
     final gateway = _TeamGateway(
@@ -863,18 +735,40 @@ void main() {
     );
     await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    expect(
-      tester
-          .widget<TextFormField>(
-            find.byKey(const ValueKey('team-contact-email')),
-          )
-          .enabled,
-      isFalse,
-    );
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    final emailField = find.byKey(const ValueKey('team-contact-email'));
+    expect(tester.widget<TextFormField>(emailField).enabled, isTrue);
+    await tester.enterText(emailField, 'novo@example.test');
+    await _tapAndSettle(tester, find.text('Salvar contato'));
+
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['email'], 'novo@example.test');
   });
 
-  testWidgets('archive and access revoke are distinct lifecycle actions', (
+  testWidgets('clearing the e-mail removes access and keeps the member', (
+    tester,
+  ) async {
+    final gateway = _TeamGateway(
+      contacts: [
+        _contact(email: 'linked@example.test', userAccessId: _assignmentId),
+      ],
+    );
+    await _pumpTeam(tester, gateway);
+
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    await tester.enterText(
+      find.byKey(const ValueKey('team-contact-email')),
+      '',
+    );
+    await _tapAndSettle(tester, find.text('Salvar contato'));
+
+    expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['email'], isNull);
+    expect(gateway.contact(_contactId)['user_access_id'], isNull);
+    expect(gateway.contact(_contactId)['archived_at'], isNull);
+  });
+
+  testWidgets('inactive member loses access and reactivation restores it', (
     tester,
   ) async {
     final gateway = _TeamGateway(
@@ -883,48 +777,56 @@ void main() {
         _contact(email: 'ana@example.test', userAccessId: _assignmentId),
       ],
     );
-    await _pumpTeam(tester, gateway, canManageAccess: true);
+    await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    await _tapAndSettle(tester, find.text('Arquivar contato'));
-    expect(find.textContaining('não revoga o acesso'), findsOneWidget);
-    await _tapAndSettle(tester, find.text('Confirmar arquivamento'));
-    expect(gateway.writes.single.$1, 'set_contact_archived');
-    expect(gateway.contact(_contactId)['user_access_id'], _assignmentId);
-
-    final revokeGateway = _TeamGateway(
-      globalManager: true,
-      contacts: [
-        _contact(email: 'ana@example.test', userAccessId: _assignmentId),
-      ],
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    await _tapAndSettle(tester, find.text('Marcar como inativo'));
+    expect(find.textContaining('perde o acesso ao aplicativo'), findsOneWidget);
+    await _tapAndSettle(
+      tester,
+      find.widgetWithText(FilledButton, 'Marcar como inativo'),
     );
-    await _pumpTeam(tester, revokeGateway, canManageAccess: true);
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    await _tapAndSettle(tester, find.text('Revogar acesso'));
-    await _tapAndSettle(tester, find.text('Confirmar revogação'));
+    expect(gateway.writes.single.$1, 'set_contact_archived');
+    expect(gateway.writes.single.$2['archived'], isTrue);
+    expect(gateway.contact(_contactId)['user_access_id'], isNull);
+    expect(find.text('Membro inativo'), findsOneWidget);
 
-    expect(revokeGateway.writes.single.$1, 'revoke_contact_access');
-    expect(revokeGateway.contact(_contactId)['archived_at'], isNull);
-    expect(revokeGateway.contact(_contactId)['user_access_id'], isNull);
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    await _tapAndSettle(
+      tester,
+      find.widgetWithText(TextButton, 'Reativar membro'),
+    );
+    await _tapAndSettle(
+      tester,
+      find.widgetWithText(FilledButton, 'Reativar membro'),
+    );
+
+    expect(gateway.writes, hasLength(2));
+    expect(gateway.writes.last.$2['archived'], isFalse);
+    expect(gateway.contact(_contactId)['user_access_id'], _assignmentId);
+    expect(find.text('Membro inativo'), findsNothing);
   });
 
-  testWidgets('archived contact can be restored from its detail form', (
+  testWidgets('inactive member can be reactivated from its detail form', (
     tester,
   ) async {
     final gateway = _TeamGateway(contacts: [_contact()]);
     await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
-    await _tapAndSettle(tester, find.text('Arquivar contato'));
-    await _tapAndSettle(tester, find.text('Confirmar arquivamento'));
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
+    await _tapAndSettle(tester, find.text('Marcar como inativo'));
+    await _tapAndSettle(
+      tester,
+      find.widgetWithText(FilledButton, 'Marcar como inativo'),
+    );
 
     expect(gateway.writes.single.$1, 'set_contact_archived');
     expect(gateway.writes.single.$2['archived'], isTrue);
     expect(gateway.contact(_contactId)['revision'], 5);
     expect(gateway.contact(_contactId)['archived_at'], isNotNull);
-    expect(find.text('Contato arquivado'), findsOneWidget);
+    expect(find.text('Membro inativo'), findsOneWidget);
 
-    await _tapAndSettle(tester, find.byTooltip('Editar contato'));
+    await _tapAndSettle(tester, find.byTooltip('Editar membro'));
     expect(
       tester
           .widget<TextFormField>(
@@ -933,11 +835,18 @@ void main() {
           .enabled,
       isFalse,
     );
-    final restoreButton = find.widgetWithText(TextButton, 'Restaurar contato');
+    expect(
+      find.text('Membro inativo · sem acesso ao aplicativo'),
+      findsOneWidget,
+    );
+    final restoreButton = find.widgetWithText(TextButton, 'Reativar membro');
     expect(restoreButton, findsOneWidget);
     expect(tester.widget<TextButton>(restoreButton).onPressed, isNotNull);
     await _tapAndSettle(tester, restoreButton);
-    await _tapAndSettle(tester, find.text('Restaurar contato').last);
+    await _tapAndSettle(
+      tester,
+      find.widgetWithText(FilledButton, 'Reativar membro'),
+    );
 
     expect(gateway.writes, hasLength(2));
     expect(gateway.writes.last.$1, 'set_contact_archived');
@@ -945,14 +854,14 @@ void main() {
     expect(gateway.writes.last.$2['expected_revision'], 5);
     expect(gateway.contact(_contactId)['revision'], 6);
     expect(gateway.contact(_contactId)['archived_at'], isNull);
-    expect(find.text('Contato arquivado'), findsNothing);
+    expect(find.text('Membro inativo'), findsNothing);
   });
 
-  testWidgets('local user cannot create global access', (tester) async {
+  testWidgets('local team uses the same automatic access save', (tester) async {
     final gateway = _TeamGateway();
     await _pumpTeam(tester, gateway);
 
-    await _tapAndSettle(tester, find.text('Adicionar contato'));
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
     expect(find.text('Selecionar vínculo manualmente'), findsNothing);
     await tester.enterText(
       find.byKey(const ValueKey('team-contact-name')),
@@ -961,6 +870,8 @@ void main() {
     await _tapAndSettle(tester, find.text('Salvar contato'));
 
     expect(gateway.writes.single.$1, 'save_contact');
+    expect(gateway.writes.single.$2['scope'], 'congregation');
+    expect(gateway.writes.single.$2['congregation_id'], _congregationId);
     expect(gateway.writes.single.$2, isNot(contains('access')));
   });
 
@@ -985,7 +896,7 @@ void main() {
         size: size,
         textScale: textScale,
       );
-      await _tapAndSettle(tester, find.text('Adicionar contato'));
+      await _tapAndSettle(tester, find.text('Adicionar membro'));
       expect(find.byType(TeamContactForm), findsOneWidget);
       final saveButton = find.byKey(const ValueKey('team-contact-save'));
       expect(saveButton.hitTestable(), findsOneWidget);
@@ -998,11 +909,41 @@ void main() {
       }
       expect(tester.takeException(), isNull);
       await expectLater(
-        find.byType(AlertDialog),
+        find.byType(Dialog),
         matchesGoldenFile(_teamGoldenPath(golden)),
       );
       await _tapAndSettle(tester, find.text('Cancelar'));
     }
+  });
+
+  testWidgets('Team contact form keeps focused email above the keyboard', (
+    tester,
+  ) async {
+    await _pumpTeamViewport(
+      tester,
+      _TeamGateway(),
+      size: const Size(360, 900),
+      textScale: 2,
+    );
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
+
+    final email = find.byKey(const ValueKey('team-contact-email'));
+    await tester.ensureVisible(email);
+    await tester.pumpAndSettle();
+    await tester.tap(email);
+    await tester.pump();
+
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    addTearDown(tester.view.resetViewInsets);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 16));
+    await tester.pumpAndSettle();
+
+    final usableBottom =
+        tester.view.physicalSize.height / tester.view.devicePixelRatio -
+        tester.view.viewInsets.bottom / tester.view.devicePixelRatio;
+    expect(tester.getBottomRight(email).dy, lessThanOrEqualTo(usableBottom));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Team contact form scrolls email above the keyboard', (
@@ -1014,7 +955,7 @@ void main() {
       size: const Size(360, 900),
       textScale: 2,
     );
-    await _tapAndSettle(tester, find.text('Adicionar contato'));
+    await _tapAndSettle(tester, find.text('Adicionar membro'));
     tester.view.viewInsets = const FakeViewPadding(bottom: 280);
     addTearDown(tester.view.resetViewInsets);
     await tester.pumpAndSettle();

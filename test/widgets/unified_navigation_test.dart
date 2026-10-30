@@ -53,6 +53,8 @@ void main() {
       );
       expect(find.text('Discipulado'), findsNWidgets(2));
       expect(routesFor(scope), contains('/ministry/students'));
+      expect(routesFor(scope), contains('/team'));
+      expect(routesFor(scope), isNot(contains('/ministry/team')));
       expect(routesFor(scope), isNot(contains('/admin')));
       expect(
         find.byKey(const ValueKey('app-shell-ministry-selector')),
@@ -92,6 +94,67 @@ void main() {
     );
     expect(routesFor(scope), contains('/admin'));
     expect(routesFor(scope), contains('/ministry/students'));
+  });
+
+  testWidgets('mobile bar keeps five slots and moves Admin to the header', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final opened = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildUnifiedTheme(),
+        home: AppShell(
+          scope: AccessScope(isAdmin: true, isMinistrySupervision: true),
+          currentRoute: '/home',
+          onNavigate: opened.add,
+          onSignOut: () {},
+          child: const Text('Conteúdo'),
+        ),
+      ),
+    );
+
+    const slots = ['/home', '/converts', '/register', '/team', '/ministry'];
+    final xs = [
+      for (final route in slots)
+        tester.getCenter(find.byKey(ValueKey('app-shell-nav-$route'))).dx,
+    ];
+    final sorted = [...xs]..sort();
+    expect(
+      xs,
+      sorted,
+      reason: 'bar order must be Início, Convertidos, Cadastrar, Equipe, Discipulado',
+    );
+    expect(find.byKey(const ValueKey('app-shell-nav-/admin')), findsNothing);
+    expect(find.text('Admin'), findsNothing);
+
+    await tester.tap(find.byKey(const ValueKey('app-shell-admin')));
+    expect(opened, ['/admin']);
+  });
+
+  testWidgets('single accessible page hides the bottom bar', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(400, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildUnifiedTheme(),
+        home: MediaQuery(
+          data: const MediaQueryData(size: Size(400, 800)),
+          child: AppShell(
+            scope: AccessScope(),
+            currentRoute: '/register',
+            onNavigate: (_) {},
+            onSignOut: () {},
+            child: const Text('Cadastro'),
+          ),
+        ),
+      ),
+    );
+    expect(find.byKey(const ValueKey('app-shell-nav-/register')), findsNothing);
+    expect(find.byKey(const ValueKey('app-shell-admin')), findsNothing);
   });
 
   test(

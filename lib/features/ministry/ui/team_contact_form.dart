@@ -1,10 +1,9 @@
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../data/access_repository.dart';
 import '../../../data/supabase_gateway.dart';
-import '../../../domain/models.dart' show AccessRole;
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/br_input.dart';
 import '../../../ui/form_fields.dart';
@@ -14,17 +13,17 @@ import '../data/ministry_repository.dart';
 import '../domain/ministry_models.dart';
 import 'team_role_labels.dart';
 
+/// Directory record for a team member. Team membership carries application
+/// access: the e-mail is the only access input, and it is optional.
 class TeamContactForm extends StatefulWidget {
   const TeamContactForm({
     super.key,
     required this.repository,
-    required this.accessRepository,
     required this.scope,
     required this.congregationId,
     this.congregationName,
     required this.current,
     required this.directory,
-    required this.canManageAccess,
     required this.createId,
     required this.isScopeCurrent,
     required this.onScopeRefresh,
@@ -32,13 +31,11 @@ class TeamContactForm extends StatefulWidget {
   });
 
   final MinistryRepository repository;
-  final AccessRepository accessRepository;
   final ContactScope scope;
   final String? congregationId;
   final String? congregationName;
   final MinistryContactDetail? current;
   final List<MinistryDirectoryEntry> directory;
-  final bool canManageAccess;
   final String Function() createId;
   final bool Function() isScopeCurrent;
   final Future<void> Function()? onScopeRefresh;
@@ -56,42 +53,28 @@ class _TeamContactFormState extends State<TeamContactForm> {
   late final TextEditingController _email;
   late final String _contactId;
   RoleCode? _roleCode;
-  late AccessRole _accessRole;
-  bool _manageAccess = false;
   bool _replaceHolder = false;
   bool _loadingPrevious = false;
   bool _busy = false;
   bool _mutationAttempted = false;
   String? _previousContactId;
   MinistryContactDetail? _previousContact;
-  String? _selectedAccessId;
-  bool _createNewAccess = false;
-  MinistryPage<TeamAccessCandidate>? _accessCandidatePage;
-  bool _loadingAccessCandidates = false;
-  String? _accessCandidateError;
-  int _accessCandidateLoadGeneration = 0;
   String? _error;
   String? _saveSignature;
   String? _saveOperationId;
   String? _completedStageSignature;
   int? _completedStageRevision;
-  bool _completedStageChangedAccess = false;
   String? _replaceSignature;
   String? _replaceOperationId;
   String? _lifecycleSignature;
   String? _lifecycleOperationId;
 
   MinistryContact? get _contact => widget.current?.contact;
-  bool get _hasLinkedAccess => _contact?.accessLinked ?? false;
 
   bool get _canEditFields =>
       !_busy && !_mutationAttempted && !(_contact?.archived ?? false);
 
   bool get _canChangeArchiveState => !_busy && !_mutationAttempted;
-
-  bool get _canEditEmail =>
-      _canEditFields &&
-      (!_hasLinkedAccess || (widget.canManageAccess && _manageAccess));
 
   @override
   void initState() {
@@ -104,9 +87,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
     );
     _email = TextEditingController(text: _contact?.email ?? '');
     _roleCode = _contact?.roleCode;
-    _accessRole = widget.scope == ContactScope.congregation
-        ? AccessRole.direction
-        : AccessRole.supervision;
   }
 
   @override
@@ -165,47 +145,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
     }
   }
 
-  Future<void> _loadAccessCandidates({String? cursor}) async {
-    if (!widget.canManageAccess || !_manageAccess || _hasLinkedAccess) return;
-    final generation = ++_accessCandidateLoadGeneration;
-    if (cursor != null) {
-      _selectedAccessId = null;
-      _createNewAccess = false;
-    }
-    final token = widget.repository.gateway.context;
-    setState(() {
-      _loadingAccessCandidates = true;
-      _accessCandidateError = null;
-    });
-    try {
-      final page = await widget.accessRepository.listCandidates(
-        scope: widget.scope,
-        congregationId: widget.congregationId,
-        role: _accessRole,
-        limit: 50,
-        cursor: cursor,
-      );
-      widget.repository.gateway.ensureCurrent(token);
-      if (!mounted ||
-          generation != _accessCandidateLoadGeneration ||
-          !widget.isScopeCurrent() ||
-          !_manageAccess) {
-        return;
-      }
-      setState(() {
-        _accessCandidatePage = page;
-        _loadingAccessCandidates = false;
-      });
-    } catch (_) {
-      if (!mounted || generation != _accessCandidateLoadGeneration) return;
-      setState(() {
-        _loadingAccessCandidates = false;
-        _accessCandidateError =
-            'Não foi possível carregar os vínculos disponíveis.';
-      });
-    }
-  }
-
   Future<void> _save() async {
     if (_busy || !(_form.currentState?.validate() ?? false)) return;
     if (!widget.isScopeCurrent()) {
@@ -225,22 +164,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
       setState(() => _error = 'Selecione o ocupante atual da função.');
       return;
     }
-    if (_manageAccess && _hasLinkedAccess && _selectedAccessId == null) {
-      setState(
-        () => _error = 'Selecione o vínculo de acesso que será atualizado.',
-      );
-      return;
-    }
-    if (_manageAccess &&
-        !_hasLinkedAccess &&
-        _selectedAccessId == null &&
-        !_createNewAccess) {
-      setState(
-        () =>
-            _error = 'Selecione um vínculo existente ou escolha criar um novo.',
-      );
-      return;
-    }
 
     final name = _name.text.trim();
     final phone = resolveBrPhone(_phone.text);
@@ -258,9 +181,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
       phone,
       birthDate?.toString(),
       email,
-      _manageAccess,
-      _selectedAccessId,
-      _accessRole.wireValue,
       _replaceHolder,
       _previousContactId,
       _previousContact?.contact.revision,
@@ -278,7 +198,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
       _replaceOperationId = null;
       _completedStageSignature = null;
       _completedStageRevision = null;
-      _completedStageChangedAccess = false;
     }
     final token = widget.repository.gateway.context;
     setState(() {
@@ -289,39 +208,9 @@ class _TeamContactFormState extends State<TeamContactForm> {
 
     try {
       var targetRevision = _completedStageRevision;
-      var accessChanged = _completedStageChangedAccess;
       if (_completedStageSignature != signature) {
-        final hasDirectoryChanges =
-            current == null ||
-            current.name != name ||
-            current.roleCode != _roleCode ||
-            current.phoneE164 != phone ||
-            current.birthDate != birthDate ||
-            (!_hasLinkedAccess && current.email != email);
         targetRevision = current?.revision;
-        accessChanged = false;
-        if (_manageAccess) {
-          final accessResult = await widget.accessRepository
-              .saveContactWithAccess(
-                operationId: _saveOperationId!,
-                id: _contactId,
-                expectedRevision: current?.revision,
-                scope: widget.scope,
-                congregationId: widget.congregationId,
-                name: name,
-                roleCode: _roleCode,
-                phoneE164: phone,
-                birthDate: birthDate,
-                email: email!,
-                accessId: _selectedAccessId,
-                accessRole: _accessRole,
-                accessCongregationId: widget.scope == ContactScope.congregation
-                    ? widget.congregationId
-                    : null,
-              );
-          targetRevision = accessResult.revision;
-          accessChanged = true;
-        } else if (hasDirectoryChanges) {
+        {
           final result = await widget.repository.saveContact(
             operationId: _saveOperationId!,
             id: _contactId,
@@ -338,7 +227,6 @@ class _TeamContactFormState extends State<TeamContactForm> {
         }
         _completedStageSignature = signature;
         _completedStageRevision = targetRevision;
-        _completedStageChangedAccess = accessChanged;
       }
 
       if (_replaceHolder) {
@@ -368,7 +256,8 @@ class _TeamContactFormState extends State<TeamContactForm> {
         );
       }
 
-      if (accessChanged) {
+      if (current?.email != email) {
+        // Access follows the e-mail, so the session scope may have changed.
         widget.repository.gateway.boundary.invalidate();
         await widget.onScopeRefresh?.call();
       } else {
@@ -399,11 +288,13 @@ class _TeamContactFormState extends State<TeamContactForm> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(archived ? 'Arquivar contato?' : 'Restaurar contato?'),
+        title: Text(
+          archived ? 'Marcar membro como inativo?' : 'Reativar membro?',
+        ),
         content: Text(
           archived
-              ? 'O contato ficará no histórico. Esta ação não revoga o acesso ao aplicativo${_hasLinkedAccess ? '; ele continuará ativo até ser revogado separadamente' : ''}.'
-              : 'O contato voltará a aparecer como ativo no diretório.',
+              ? 'A pessoa sai da equipe ativa e perde o acesso ao aplicativo. O histórico é mantido e a reativação devolve o acesso.'
+              : 'A pessoa volta a aparecer na equipe ativa e recupera o acesso ao aplicativo quando houver e-mail cadastrado.',
         ),
         actions: [
           TextButton(
@@ -412,9 +303,7 @@ class _TeamContactFormState extends State<TeamContactForm> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: Text(
-              archived ? 'Confirmar arquivamento' : 'Restaurar contato',
-            ),
+            child: Text(archived ? 'Marcar como inativo' : 'Reativar membro'),
           ),
         ],
       ),
@@ -444,78 +333,17 @@ class _TeamContactFormState extends State<TeamContactForm> {
         archived: archived,
         expectedRevision: contact.revision,
       );
-      if (!mounted || !widget.isScopeCurrent()) return;
-      widget.onSaved();
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _error =
-              'Não foi possível alterar o estado do contato. Tente novamente.',
-        );
+      if (contact.email != null) {
+        widget.repository.gateway.boundary.invalidate();
+        await widget.onScopeRefresh?.call();
       }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _revokeAccess() async {
-    final contact = _contact;
-    final access = widget.current?.access;
-    if (contact == null || access == null || _busy || !widget.canManageAccess) {
-      return;
-    }
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Revogar acesso?'),
-        content: Text(
-          'Revogar o acesso de ${access.userEmail} mantém este contato no diretório e preserva o histórico de professor.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Confirmar revogação'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !mounted || !widget.isScopeCurrent()) return;
-    final signature = jsonEncode([
-      contact.id,
-      contact.revision,
-      access.id,
-      widget.scope.wire,
-      widget.congregationId,
-    ]);
-    if (_lifecycleSignature != signature) {
-      _lifecycleSignature = signature;
-      _lifecycleOperationId = widget.createId();
-    }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await widget.accessRepository.revokeContactAccess(
-        operationId: _lifecycleOperationId!,
-        id: contact.id,
-        scope: widget.scope,
-        congregationId: widget.congregationId,
-        expectedRevision: contact.revision,
-      );
-      widget.repository.gateway.boundary.invalidate();
-      await widget.onScopeRefresh?.call();
       if (!mounted || !widget.isScopeCurrent()) return;
       widget.onSaved();
     } catch (_) {
       if (mounted) {
         setState(
           () => _error =
-              'Não foi possível confirmar a revogação. Tente novamente.',
+              'Não foi possível alterar o estado do membro. Tente novamente.',
         );
       }
     } finally {
@@ -530,434 +358,259 @@ class _TeamContactFormState extends State<TeamContactForm> {
     final roleOptions = RoleCode.values
         .where((role) => role.scope == widget.scope)
         .toList(growable: false);
-    final linkedAccess = widget.current?.access;
+    final theme = Theme.of(context);
+    final dialogWidth = math.min(560.0, MediaQuery.sizeOf(context).width - 48);
 
-    return AlertDialog(
-      title: Text(current == null ? 'Novo contato' : 'Editar contato'),
-      content: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560),
-        child: SingleChildScrollView(
-          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-          child: Form(
-            key: _form,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Base44SectionHeading(
-                  title: 'Dados do contato',
-                  subtitle:
-                      'Função na equipe e acesso ao app são campos separados.',
-                ),
-                if (widget.congregationName != null) ...[
-                  const SizedBox(height: UnifiedSpace.x2),
-                  Text('Congregação: ${widget.congregationName}'),
-                ],
-                const SizedBox(height: UnifiedSpace.x3),
-                TextFormField(
-                  key: const ValueKey('team-contact-name'),
-                  controller: _name,
-                  enabled: _canEditFields,
-                  maxLength: 200,
-                  decoration: const InputDecoration(labelText: 'Nome *'),
-                  validator: (value) {
-                    final name = value?.trim() ?? '';
-                    if (name.isEmpty) return 'Nome é obrigatório.';
-                    if (name.length > 200) return 'Use até 200 caracteres.';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: UnifiedSpace.x2),
-                DropdownButtonFormField<RoleCode?>(
-                  key: const ValueKey('team-contact-role'),
-                  initialValue: _roleCode,
-                  isExpanded: true,
-                  itemHeight: null,
-                  decoration: const InputDecoration(
-                    labelText: 'Função na equipe',
-                  ),
-                  items: [
-                    const DropdownMenuItem<RoleCode?>(
-                      value: null,
-                      child: Text('Sem função'),
-                    ),
-                    for (final role in roleOptions)
-                      DropdownMenuItem<RoleCode?>(
-                        value: role,
-                        child: Text(teamRoleLabel(role.wire)),
+    return Dialog(
+      // The keyboard inset must apply before EditableText scrolls the focused
+      // field into view. With the default 100 ms inset animation the caret is
+      // revealed against the old, taller viewport and the field ends up under
+      // the keyboard.
+      insetAnimationDuration: Duration.zero,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      child: SizedBox(
+        width: dialogWidth,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+              child: Text(
+                current == null ? 'Novo membro da equipe' : 'Editar membro',
+                style: theme.textTheme.headlineSmall,
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 8),
+                child: Form(
+                  key: _form,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Base44SectionHeading(
+                        title: 'Dados do membro',
+                        subtitle: 'Adicionar à equipe concede acesso ao app quando houver e-mail.',
                       ),
-                  ],
-                  onChanged: !_canEditFields
-                      ? null
-                      : (role) => setState(() {
-                          _roleCode = role;
-                          _replaceHolder = false;
-                          _previousContactId = null;
-                          _previousContact = null;
-                        }),
-                ),
-                if (_roleCode != null && _replacementCandidates.isNotEmpty) ...[
-                  const SizedBox(height: UnifiedSpace.x2),
-                  CheckboxListTile(
-                    key: const ValueKey('team-replace-holder-toggle'),
-                    contentPadding: EdgeInsets.zero,
-                    value: _replaceHolder,
-                    onChanged: !_canEditFields
-                        ? null
-                        : (value) => setState(() {
-                            _replaceHolder = value ?? false;
-                            _previousContactId = null;
-                            _previousContact = null;
-                          }),
-                    title: const Text('Substituir ocupante atual'),
-                    subtitle: const Text(
-                      'O contato anterior permanece no diretório e no histórico.',
-                    ),
-                    controlAffinity: ListTileControlAffinity.leading,
-                  ),
-                  if (_replaceHolder)
-                    DropdownButtonFormField<String>(
-                      key: const ValueKey('team-replace-holder'),
-                      initialValue: _previousContactId,
-                      isExpanded: true,
-                      itemHeight: null,
-                      decoration: const InputDecoration(
-                        labelText: 'Contato que ocupa a função atualmente',
-                      ),
-                      items: [
-                        for (final entry in _replacementCandidates)
-                          DropdownMenuItem(
-                            key: ValueKey('team-replace-option-${entry.id}'),
-                            value: entry.id,
-                            child: Text(entry.name, softWrap: true),
-                          ),
+                      if (widget.congregationName != null) ...[
+                        const SizedBox(height: UnifiedSpace.x2),
+                        Text('Congregação: ${widget.congregationName}'),
                       ],
-                      onChanged: _canEditFields ? _loadPreviousContact : null,
-                      validator: (value) =>
-                          value == null ? 'Selecione o contato atual.' : null,
-                    ),
-                ],
-                const SizedBox(height: UnifiedSpace.x2),
-                BrPhoneField(
-                  fieldKey: const ValueKey('team-contact-phone'),
-                  controller: _phone,
-                  label: 'Telefone',
-                  helperText: 'Opcional · 11 dígitos com DDD',
-                  enabled: _canEditFields,
-                ),
-                const SizedBox(height: UnifiedSpace.x2),
-                BrDateField(
-                  fieldKey: const ValueKey('team-contact-birth-date'),
-                  controller: _birthDate,
-                  label: 'Nascimento',
-                  helperText: 'Opcional · selecione no calendário',
-                  enabled: _canEditFields,
-                  allowClear: true,
-                  validator: brDateValidationError,
-                ),
-                if (widget.canManageAccess) ...[
-                  const SizedBox(height: UnifiedSpace.sectionGap),
-                  Base44SectionHeading(
-                    title: 'Acesso ao aplicativo',
-                    subtitle: current?.email == null
-                        ? 'Ao informar um email, o acesso será concedido automaticamente ao perfil desta equipe.'
-                        : linkedAccess?.boundUserId == null && _hasLinkedAccess
-                        ? 'Aguardando confirmação do email para ativar o acesso.'
-                        : _hasLinkedAccess
-                        ? 'Acesso ativo para ${linkedAccess!.userEmail}.'
-                        : 'Um email novo concede acesso automaticamente; vínculos revogados permanecem revogados.',
-                  ),
-                  if (!archived)
-                    CheckboxListTile(
-                      key: const ValueKey('team-manage-access-toggle'),
-                      contentPadding: EdgeInsets.zero,
-                      value: _manageAccess,
-                      onChanged: !_canEditFields
-                          ? null
-                          : (value) async {
-                              final manageAccess = value ?? false;
-                              setState(() {
-                                _manageAccess = manageAccess;
-                                _selectedAccessId = null;
-                                _createNewAccess = false;
-                                _accessCandidatePage = null;
-                                _accessCandidateError = null;
-                                _accessCandidateLoadGeneration++;
-                              });
-                              if (manageAccess && !_hasLinkedAccess) {
-                                await _loadAccessCandidates();
-                              }
-                            },
-                      title: Text(
-                        _hasLinkedAccess
-                            ? 'Atualizar vínculo de acesso'
-                            : 'Selecionar vínculo manualmente',
-                      ),
-                      subtitle: const Text(
-                        'O acesso só fica ativo quando o email corresponde a uma conta verificada.',
-                      ),
-                      controlAffinity: ListTileControlAffinity.leading,
-                    ),
-                  if (_manageAccess) ...[
-                    const SizedBox(height: UnifiedSpace.x2),
-                    DropdownButtonFormField<AccessRole>(
-                      key: const ValueKey('team-access-role'),
-                      initialValue: _accessRole,
-                      isExpanded: true,
-                      itemHeight: null,
-                      decoration: const InputDecoration(
-                        labelText: 'Perfil de acesso',
-                      ),
-                      items: [
-                        DropdownMenuItem(
-                          value: widget.scope == ContactScope.congregation
-                              ? AccessRole.direction
-                              : AccessRole.supervision,
-                          child: Text(
-                            widget.scope == ContactScope.congregation
-                                ? 'Direção da congregação'
-                                : 'Supervisão geral',
+                      if (archived) ...[
+                        const SizedBox(height: UnifiedSpace.x2),
+                        Text(
+                          'Membro inativo · sem acesso ao aplicativo',
+                          style: TextStyle(
+                            color: UnifiedColors.muted,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],
-                      onChanged: !_canEditFields
-                          ? null
-                          : (role) async {
-                              if (role != null && role != _accessRole) {
-                                setState(() {
-                                  _accessRole = role;
-                                  _selectedAccessId = null;
-                                  _createNewAccess = false;
-                                  _accessCandidatePage = null;
-                                });
-                                if (!_hasLinkedAccess) {
-                                  await _loadAccessCandidates();
-                                }
-                              }
-                            },
-                    ),
-                    if (_hasLinkedAccess) ...[
+                      const SizedBox(height: UnifiedSpace.x3),
+                      TextFormField(
+                        key: const ValueKey('team-contact-name'),
+                        controller: _name,
+                        enabled: _canEditFields,
+                        maxLength: 200,
+                        decoration: const InputDecoration(labelText: 'Nome *'),
+                        validator: (value) {
+                          final name = value?.trim() ?? '';
+                          if (name.isEmpty) return 'Nome é obrigatório.';
+                          if (name.length > 200) {
+                            return 'Use até 200 caracteres.';
+                          }
+                          return null;
+                        },
+                      ),
                       const SizedBox(height: UnifiedSpace.x2),
-                      DropdownButtonFormField<String>(
-                        key: const ValueKey('team-access-assignment'),
-                        initialValue: _selectedAccessId,
+                      DropdownButtonFormField<RoleCode?>(
+                        key: const ValueKey('team-contact-role'),
+                        initialValue: _roleCode,
                         isExpanded: true,
                         itemHeight: null,
                         decoration: const InputDecoration(
-                          labelText:
-                              'Vínculo existente (selecione explicitamente)',
+                          labelText: 'Função na equipe',
                         ),
                         items: [
-                          if (linkedAccess != null)
-                            DropdownMenuItem(
-                              value: linkedAccess.id,
-                              child: Text('ID ${linkedAccess.id}'),
+                          const DropdownMenuItem<RoleCode?>(
+                            value: null,
+                            child: Text('Sem função'),
+                          ),
+                          for (final role in roleOptions)
+                            DropdownMenuItem<RoleCode?>(
+                              value: role,
+                              child: Text(teamRoleLabel(role.wire)),
                             ),
                         ],
                         onChanged: !_canEditFields
                             ? null
-                            : (id) => setState(() {
-                                _selectedAccessId = id;
-                                _createNewAccess = false;
+                            : (role) => setState(() {
+                                _roleCode = role;
+                                _replaceHolder = false;
+                                _previousContactId = null;
+                                _previousContact = null;
                               }),
-                        validator: (value) => value == null
-                            ? 'Selecione o vínculo existente.'
-                            : null,
                       ),
-                    ],
-                    if (!_hasLinkedAccess) ...[
-                      const SizedBox(height: UnifiedSpace.x2),
-                      if (_loadingAccessCandidates)
-                        const LinearProgressIndicator(
-                          semanticsLabel: 'Carregando vínculos de acesso',
-                        )
-                      else if (_accessCandidateError != null)
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(_accessCandidateError!),
-                            TextButton.icon(
-                              onPressed: _canEditFields
-                                  ? _loadAccessCandidates
-                                  : null,
-                              icon: const Icon(Icons.refresh),
-                              label: const Text('Tentar carregar novamente'),
-                            ),
-                          ],
-                        )
-                      else ...[
-                        DropdownButtonFormField<String>(
-                          key: const ValueKey('team-access-candidate'),
-                          initialValue: _selectedAccessId,
-                          isExpanded: true,
-                          itemHeight: null,
-                          decoration: const InputDecoration(
-                            labelText: 'Vínculo existente (escolha pelo ID)',
-                          ),
-                          items: [
-                            for (final candidate
-                                in _accessCandidatePage?.items ??
-                                    const <TeamAccessCandidate>[])
-                              DropdownMenuItem(
-                                value: candidate.id,
-                                child: Text(
-                                  'ID ${candidate.id} · ${candidate.email} · ${teamAccessRoleLabel(candidate.role)} · ${candidate.scope.wire}',
-                                  softWrap: true,
-                                ),
-                              ),
-                          ],
-                          onChanged:
-                              !_canEditFields || _accessCandidatePage == null
-                              ? null
-                              : (id) => setState(() {
-                                  _selectedAccessId = id;
-                                  _createNewAccess = false;
-                                }),
-                          validator: (value) =>
-                              value != null || _createNewAccess
-                              ? null
-                              : 'Escolha um vínculo ou crie um novo.',
-                        ),
-                        if (_accessCandidatePage?.items.isEmpty == true)
-                          Padding(
-                            padding: const EdgeInsets.only(
-                              top: UnifiedSpace.x1,
-                            ),
-                            child: Text(
-                              'Nenhum vínculo existente neste perfil e escopo.',
-                              style: Theme.of(context).textTheme.bodySmall,
-                            ),
-                          ),
-                        if (_accessCandidatePage?.nextCursor != null)
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              onPressed: _canEditFields
-                                  ? () => _loadAccessCandidates(
-                                      cursor: _accessCandidatePage!.nextCursor,
-                                    )
-                                  : null,
-                              icon: const Icon(Icons.chevron_right),
-                              label: const Text('Mais vínculos'),
-                            ),
-                          ),
+                      if (_roleCode != null &&
+                          _replacementCandidates.isNotEmpty) ...[
+                        const SizedBox(height: UnifiedSpace.x2),
                         CheckboxListTile(
-                          key: const ValueKey('team-create-new-access'),
+                          key: const ValueKey('team-replace-holder-toggle'),
                           contentPadding: EdgeInsets.zero,
-                          value: _createNewAccess,
+                          value: _replaceHolder,
                           onChanged: !_canEditFields
                               ? null
                               : (value) => setState(() {
-                                  _createNewAccess = value ?? false;
-                                  if (_createNewAccess) {
-                                    _selectedAccessId = null;
-                                  }
+                                  _replaceHolder = value ?? false;
+                                  _previousContactId = null;
+                                  _previousContact = null;
                                 }),
-                          title: const Text('Criar novo vínculo pendente'),
+                          title: const Text('Substituir ocupante atual'),
                           subtitle: const Text(
-                            'Use quando nenhuma atribuição existente deve ser vinculada.',
+                            'O contato anterior permanece no diretório e no histórico.',
                           ),
                           controlAffinity: ListTileControlAffinity.leading,
                         ),
+                        if (_replaceHolder)
+                          DropdownButtonFormField<String>(
+                            key: const ValueKey('team-replace-holder'),
+                            initialValue: _previousContactId,
+                            isExpanded: true,
+                            itemHeight: null,
+                            decoration: const InputDecoration(
+                              labelText:
+                                  'Contato que ocupa a função atualmente',
+                            ),
+                            items: [
+                              for (final entry in _replacementCandidates)
+                                DropdownMenuItem(
+                                  key: ValueKey(
+                                    'team-replace-option-${entry.id}',
+                                  ),
+                                  value: entry.id,
+                                  child: Text(entry.name, softWrap: true),
+                                ),
+                            ],
+                            onChanged: _canEditFields
+                                ? _loadPreviousContact
+                                : null,
+                            validator: (value) => value == null
+                                ? 'Selecione o contato atual.'
+                                : null,
+                          ),
+                      ],
+                      const SizedBox(height: UnifiedSpace.x2),
+                      BrPhoneField(
+                        fieldKey: const ValueKey('team-contact-phone'),
+                        controller: _phone,
+                        label: 'Telefone',
+                        helperText: 'Opcional · 11 dígitos com DDD',
+                        enabled: _canEditFields,
+                      ),
+                      const SizedBox(height: UnifiedSpace.x2),
+                      BrDateField(
+                        fieldKey: const ValueKey('team-contact-birth-date'),
+                        controller: _birthDate,
+                        label: 'Nascimento',
+                        helperText: 'Opcional · selecione no calendário',
+                        enabled: _canEditFields,
+                        allowClear: true,
+                        validator: brDateValidationError,
+                      ),
+                      const SizedBox(height: UnifiedSpace.x2),
+                      TextFormField(
+                        key: const ValueKey('team-contact-email'),
+                        controller: _email,
+                        enabled: _canEditFields,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'E-mail (opcional)',
+                          helperText: 'Sem e-mail a pessoa fica na equipe, mas não entra no app.',
+                          helperMaxLines: 2,
+                        ),
+                        validator: (value) {
+                          final email = value?.trim() ?? '';
+                          if (email.isNotEmpty &&
+                              !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+                                  .hasMatch(email)) {
+                            return 'Informe um e-mail válido.';
+                          }
+                          return null;
+                        },
+                      ),
+                      if (current != null) ...[
+                        const SizedBox(height: UnifiedSpace.x2),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: _canChangeArchiveState
+                                ? _changeArchiveState
+                                : null,
+                            icon: Icon(
+                              archived
+                                  ? Icons.person_add_alt_1_outlined
+                                  : Icons.person_off_outlined,
+                            ),
+                            label: Text(
+                              archived
+                                  ? 'Reativar membro'
+                                  : 'Marcar como inativo',
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (_error != null) ...[
+                        const SizedBox(height: UnifiedSpace.x2),
+                        Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            style: const TextStyle(color: UnifiedColors.error),
+                          ),
+                        ),
                       ],
                     ],
-                  ],
-                  if (_hasLinkedAccess && linkedAccess != null) ...[
-                    const SizedBox(height: UnifiedSpace.x2),
-                    Text(
-                      linkedAccess.boundUserId == null
-                          ? 'Aguardando email verificado'
-                          : 'Acesso vinculado',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (!archived)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed: _canEditFields ? _revokeAccess : null,
-                          icon: const Icon(Icons.person_remove_outlined),
-                          label: const Text('Revogar acesso'),
-                        ),
-                      ),
-                  ],
-                ],
-                TextFormField(
-                  key: const ValueKey('team-contact-email'),
-                  controller: _email,
-                  enabled: _canEditEmail,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: InputDecoration(
-                    labelText: _manageAccess
-                        ? 'Email para acesso *'
-                        : 'Email (opcional)',
-                    helperText: _hasLinkedAccess
-                        ? 'O email muda somente com o vínculo selecionado.'
-                        : 'Email verificado concede acesso.',
                   ),
-                  validator: (value) {
-                    final email = value?.trim() ?? '';
-                    if (_manageAccess && email.isEmpty) {
-                      return 'Informe um email para conceder acesso.';
-                    }
-                    if (email.isNotEmpty &&
-                        !RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
-                            .hasMatch(email)) {
-                      return 'Informe um email válido.';
-                    }
-                    return null;
-                  },
                 ),
-                const SizedBox(height: UnifiedSpace.x2),
-                if (current != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _canChangeArchiveState
-                          ? _changeArchiveState
-                          : null,
-                      icon: Icon(
-                        archived
-                            ? Icons.unarchive_outlined
-                            : Icons.archive_outlined,
-                      ),
-                      label: Text(
-                        archived ? 'Restaurar contato' : 'Arquivar contato',
-                      ),
-                    ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              child: OverflowBar(
+                alignment: MainAxisAlignment.end,
+                spacing: 8,
+                overflowAlignment: OverflowBarAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                    child: const Text('Cancelar'),
                   ),
-                if (_error != null) ...[
-                  const SizedBox(height: UnifiedSpace.x2),
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: UnifiedColors.error),
+                  FilledButton.icon(
+                    key: const ValueKey('team-contact-save'),
+                    onPressed: _busy || archived ? null : _save,
+                    icon: Icon(
+                      _busy ? Icons.hourglass_top : Icons.save_outlined,
+                    ),
+                    label: Text(
+                      _busy
+                          ? 'Salvando…'
+                          : _mutationAttempted
+                          ? 'Tentar novamente'
+                          : 'Salvar contato',
                     ),
                   ),
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _busy ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancelar'),
-        ),
-        FilledButton.icon(
-          key: const ValueKey('team-contact-save'),
-          onPressed: _busy || archived ? null : _save,
-          icon: Icon(_busy ? Icons.hourglass_top : Icons.save_outlined),
-          label: Text(
-            _busy
-                ? 'Salvando…'
-                : _mutationAttempted
-                ? 'Tentar novamente'
-                : 'Salvar contato',
-          ),
-        ),
-      ],
     );
   }
 }

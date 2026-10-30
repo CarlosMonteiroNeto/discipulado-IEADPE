@@ -67,7 +67,7 @@ class ReleaseTest(unittest.TestCase):
         self.assertIn('only abuse and capacity limits are operator-configurable', runbook)
 
     def test_ministry_contract_marks_no_grant_creation_as_superseded(self):
-        contract = Path('docs/integration/ministry-contracts.md').read_text()
+        contract = Path('docs/integration/ministry-contracts.md').read_text(encoding='utf-8')
         self.assertIn('without a matching campaign grant, registration follows public pending intake', contract)
         self.assertIn('superseded by the public-intake authority migration', contract)
 
@@ -128,7 +128,7 @@ class ReleaseTest(unittest.TestCase):
             Thread(target=server.serve_forever, daemon=True).start()
             try:
                 for route in (
-                    '/login', '/register', '/home', '/converts', '/pending', '/admin',
+                    '/login', '/register', '/home', '/converts', '/pending', '/team', '/admin',
                     '/auth/callback?code=synthetic&next=%2Fregister',
                     '/ministry', '/ministry/team', '/ministry/students',
                     '/ministry/students/register', '/ministry/classes',

@@ -5,7 +5,6 @@ import '../../data/supabase_gateway.dart';
 import '../../domain/models.dart';
 import '../../ui/base44_widgets.dart';
 import '../../ui/unified_theme.dart';
-import 'access_panel.dart';
 import 'congregation_repository.dart';
 import 'congregations_panel.dart';
 
@@ -17,7 +16,6 @@ class AdminPage extends StatefulWidget {
     required this.scope,
     required this.gateway,
     required this.onScopeRefresh,
-    required this.onOpenTeam,
     this.reportBuilder,
     this.eventsBuilder,
     this.backupBuilder,
@@ -26,7 +24,6 @@ class AdminPage extends StatefulWidget {
   final AccessScope scope;
   final Gateway gateway;
   final Future<void> Function() onScopeRefresh;
-  final VoidCallback onOpenTeam;
   final WidgetBuilder? reportBuilder, eventsBuilder, backupBuilder;
   final VoidCallback? onFeedback;
   @override
@@ -343,7 +340,6 @@ class _AdminPageState extends State<AdminPage> {
                   children: [
                     for (final entry in const [
                       ('Congregações', Icons.church_outlined),
-                      ('Acessos', Icons.people_outline),
                       ('Relatório', Icons.bar_chart_outlined),
                       ('Eventos', Icons.event_note_outlined),
                       ('Backup', Icons.backup_outlined),
@@ -456,16 +452,8 @@ class _AdminPageState extends State<AdminPage> {
                       _mutate((op) => repository.archive(op, id)),
                 )
               else if (_selected == 1)
-                AccessPanel(
-                  gateway: widget.gateway,
-                  congregations: _catalog!,
-                  canOpenTeam: widget.scope.hasMinistryAccess,
-                  onOpenTeam: widget.onOpenTeam,
-                  onScopeRefresh: widget.onScopeRefresh,
-                )
-              else if (_selected == 2)
                 _later(widget.reportBuilder, 'O relatório')
-              else if (_selected == 3)
+              else if (_selected == 2)
                 _later(widget.eventsBuilder, 'O histórico de eventos')
               else
                 _later(widget.backupBuilder, 'O backup'),

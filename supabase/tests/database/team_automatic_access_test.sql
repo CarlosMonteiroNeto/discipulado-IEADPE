@@ -34,4 +34,31 @@ INSERT INTO private.admin_allowlist(user_id) VALUES ('f1000000-0000-4000-8000-00
 SELECT public.ieadpe_ministry_save_contact('f3000000-0000-4000-8000-000000000004',jsonb_build_object('id','f4000000-0000-4000-8000-000000000004','scope','supervision','congregation_id',NULL,'name','Supervisor','role_code','campaignSupervisor','phone_e164',NULL,'birth_date',NULL,'email','supervisor@example.test'));
 SELECT set_config('request.jwt.claim.sub','f1000000-0000-4000-8000-000000000003',true);
 SELECT pg_temp.assert_true((public.ieadpe_get_scope()->>'is_supervision')::boolean,'supervision contact grants verified supervisor global scope');
+
+-- Team membership owns the access lifecycle: the e-mail is the only input.
+SELECT set_config('request.jwt.claim.sub','f1000000-0000-4000-8000-000000000001',true);
+INSERT INTO auth.users(id,email,email_confirmed_at) VALUES ('f1000000-0000-4000-8000-000000000004','moved@example.test',now());
+SELECT public.ieadpe_ministry_save_contact('f3000000-0000-4000-8000-000000000005',jsonb_build_object('id','f4000000-0000-4000-8000-000000000001','scope','congregation','congregation_id','f2000000-0000-4000-8000-000000000001','name','New Member','role_code','teacher','phone_e164',NULL,'birth_date',NULL,'email','moved@example.test','expected_revision',1));
+SELECT pg_temp.assert_true(EXISTS(SELECT FROM public.ministry_contacts c JOIN public.user_access ua ON ua.id=c.user_access_id WHERE c.id='f4000000-0000-4000-8000-000000000001' AND ua.user_email='moved@example.test' AND ua.user_id='f1000000-0000-4000-8000-000000000004'),'changing the e-mail moves the linked access to the verified account');
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM public.user_access WHERE user_email='person@example.test' AND congregation_id='f2000000-0000-4000-8000-000000000001'),'the previous local grant is moved, not duplicated');
+
+SELECT public.ieadpe_ministry_save_contact('f3000000-0000-4000-8000-000000000006',jsonb_build_object('id','f4000000-0000-4000-8000-000000000001','scope','congregation','congregation_id','f2000000-0000-4000-8000-000000000001','name','New Member','role_code','teacher','phone_e164',NULL,'birth_date',NULL,'email',NULL,'expected_revision',2));
+SELECT pg_temp.assert_true((SELECT user_access_id IS NULL FROM public.ministry_contacts WHERE id='f4000000-0000-4000-8000-000000000001'),'clearing the e-mail unlinks the member');
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM public.user_access WHERE user_email='moved@example.test'),'clearing the e-mail deletes the grant');
+SELECT pg_temp.assert_true((SELECT archived_at IS NULL FROM public.ministry_contacts WHERE id='f4000000-0000-4000-8000-000000000001'),'clearing the e-mail keeps the member active');
+
+SELECT public.ieadpe_ministry_save_contact('f3000000-0000-4000-8000-000000000007',jsonb_build_object('id','f4000000-0000-4000-8000-000000000001','scope','congregation','congregation_id','f2000000-0000-4000-8000-000000000001','name','New Member','role_code','teacher','phone_e164',NULL,'birth_date',NULL,'email','person@example.test','expected_revision',3));
+INSERT INTO public.ministry_role_slots(scope,congregation_id,role_code,contact_id,updated_by) VALUES ('congregation','f2000000-0000-4000-8000-000000000001','teacher','f4000000-0000-4000-8000-000000000001','f1000000-0000-4000-8000-000000000001');
+SELECT public.ieadpe_ministry_set_contact_archived('f3000000-0000-4000-8000-000000000008',jsonb_build_object('id','f4000000-0000-4000-8000-000000000001','scope','congregation','congregation_id','f2000000-0000-4000-8000-000000000001','archived',true,'expected_revision',4));
+SELECT pg_temp.assert_true(EXISTS(SELECT FROM public.ministry_role_slots WHERE role_code='teacher' AND congregation_id='f2000000-0000-4000-8000-000000000001' AND contact_id IS NULL),'inactivation releases assigned role slot');
+SELECT pg_temp.assert_true((SELECT user_access_id IS NULL FROM public.ministry_contacts WHERE id='f4000000-0000-4000-8000-000000000001'),'inactive member loses the access link');
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM public.user_access WHERE user_email='person@example.test' AND congregation_id='f2000000-0000-4000-8000-000000000001'),'inactive member loses the grant');
+SELECT pg_temp.assert_true((SELECT archived_at IS NOT NULL FROM public.ministry_contacts WHERE id='f4000000-0000-4000-8000-000000000001'),'inactive member stays in the directory');
+
+SELECT public.ieadpe_ministry_set_contact_archived('f3000000-0000-4000-8000-000000000009',jsonb_build_object('id','f4000000-0000-4000-8000-000000000001','scope','congregation','congregation_id','f2000000-0000-4000-8000-000000000001','archived',false,'expected_revision',5));
+SELECT pg_temp.assert_true(EXISTS(SELECT FROM public.ministry_contacts c JOIN public.user_access ua ON ua.id=c.user_access_id WHERE c.id='f4000000-0000-4000-8000-000000000001' AND ua.user_email='person@example.test' AND ua.user_id='f1000000-0000-4000-8000-000000000002'),'reactivation restores the grant');
+INSERT INTO public.ministry_contacts(id,scope,congregation_id,name,normalized_name,email,archived_at,updated_by) VALUES ('f4000000-0000-4000-8000-000000000005','congregation','f2000000-0000-4000-8000-000000000001','Old','old','old@example.test',now(),'f1000000-0000-4000-8000-000000000001');
+INSERT INTO public.user_access(user_email,role,congregation_id) VALUES ('old@example.test','Membro da direção da campanha','f2000000-0000-4000-8000-000000000001');
+SELECT private.ministry_sync_contact_access('f4000000-0000-4000-8000-000000000005');
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT FROM public.user_access WHERE user_email='old@example.test'),'inactive legacy unlinked grant is removed');
 ROLLBACK;

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../data/supabase_gateway.dart';
-import '../../../data/access_repository.dart';
 import 'team_contact_form.dart';
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/br_input.dart';
@@ -152,13 +151,11 @@ class _ClassFormState extends State<ClassForm> {
       context: context,
       builder: (dialogContext) => TeamContactForm(
         repository: widget.repository,
-        accessRepository: AccessRepository(widget.repository.gateway),
         scope: ContactScope.congregation,
         congregationId: congregationId,
         congregationName: widget.congregationName,
         current: null,
         directory: _teachers,
-        canManageAccess: false,
         createId: _uuid.v4,
         isScopeCurrent: () =>
             mounted && widget.congregationId == congregationId,

@@ -4,8 +4,8 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../converts/convert_actions.dart';
 
-import '../../../data/access_repository.dart';
 import '../../../data/supabase_gateway.dart';
+import '../../../domain/models.dart' show Congregation;
 import '../../../ui/base44_widgets.dart';
 import '../../../ui/unified_theme.dart';
 import '../data/ministry_codec.dart';
@@ -14,23 +14,20 @@ import '../domain/ministry_models.dart';
 import 'team_contact_form.dart';
 import 'team_role_labels.dart';
 
-/// Scoped directory for local and supervision ministry contacts.
+/// Scoped directory for local and supervision ministry teams. Membership is
+/// the access grant: an active member with an e-mail can sign in.
 class TeamPage extends StatefulWidget {
   const TeamPage({
     super.key,
     required this.repository,
-    this.congregationId,
-    this.congregationName,
-    this.supervision = false,
-    this.canManageAccess = false,
+    this.congregations = const [],
+    this.canSelectSupervision = false,
     this.onScopeRefresh,
   });
 
   final MinistryRepository repository;
-  final String? congregationId;
-  final String? congregationName;
-  final bool supervision;
-  final bool canManageAccess;
+  final List<Congregation> congregations;
+  final bool canSelectSupervision;
   final Future<void> Function()? onScopeRefresh;
 
   @override
@@ -38,6 +35,8 @@ class TeamPage extends StatefulWidget {
 }
 
 class _TeamPageState extends State<TeamPage> {
+  static const _supervisionKey = 'supervision';
+
   final _uuid = const Uuid();
   final _search = TextEditingController();
   MinistryPage<MinistryDirectoryEntry>? _page;
@@ -47,19 +46,31 @@ class _TeamPageState extends State<TeamPage> {
   bool _detailLoading = false;
   BuildContext? _dialogContext;
   int _loadGeneration = 0;
+  String? _scopeKey;
 
-  ContactScope get _scope =>
-      widget.supervision ? ContactScope.supervision : ContactScope.congregation;
+  bool get _supervision =>
+      widget.canSelectSupervision && _scopeKey == _supervisionKey;
 
-  bool _isScopeCurrent(ContactScope scope, String? congregationId) =>
-      mounted &&
-      scope == _scope &&
-      congregationId == (widget.supervision ? null : widget.congregationId) &&
-      (scope == ContactScope.supervision || congregationId != null);
+  String? get _congregationId =>
+      _scopeKey == null || _scopeKey == _supervisionKey ? null : _scopeKey;
+
+  Congregation? get _selectedCongregation => widget.congregations
+      .where((item) => item.id == _congregationId)
+      .firstOrNull;
+
+  String get _initialScopeKey {
+    if (widget.canSelectSupervision) return _supervisionKey;
+    return widget.congregations.isEmpty
+        ? _supervisionKey
+        : widget.congregations.first.id;
+  }
+
+  bool _hasScope() => _supervision || _congregationId != null;
 
   @override
   void initState() {
     super.initState();
+    _scopeKey = _initialScopeKey;
     _load();
   }
 
@@ -72,25 +83,34 @@ class _TeamPageState extends State<TeamPage> {
   @override
   void didUpdateWidget(covariant TeamPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.congregationId != widget.congregationId ||
-        oldWidget.supervision != widget.supervision ||
-        oldWidget.canManageAccess != widget.canManageAccess) {
-      _search.clear();
-      _page = null;
-      _detailLoading = false;
-      _loadGeneration++;
-      final dialogContext = _dialogContext;
-      if (dialogContext != null) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (dialogContext.mounted) Navigator.of(dialogContext).pop();
-        });
-      }
+    final scopeChanged =
+        oldWidget.canSelectSupervision != widget.canSelectSupervision ||
+        oldWidget.congregations.length != widget.congregations.length ||
+        !oldWidget.congregations.every(
+          (item) => widget.congregations.any((next) => next.id == item.id),
+        );
+    if (scopeChanged) {
+      _scopeKey = _initialScopeKey;
+      _resetDirectory();
       _load();
     }
   }
 
+  void _resetDirectory() {
+    _search.clear();
+    _page = null;
+    _detailLoading = false;
+    _loadGeneration++;
+    final dialogContext = _dialogContext;
+    if (dialogContext != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (dialogContext.mounted) Navigator.of(dialogContext).pop();
+      });
+    }
+  }
+
   Future<void> _load({String? cursor}) async {
-    if (!widget.supervision && widget.congregationId == null) {
+    if (!_hasScope()) {
       setState(() {
         _page = null;
         _loading = false;
@@ -99,8 +119,9 @@ class _TeamPageState extends State<TeamPage> {
       return;
     }
     final generation = ++_loadGeneration;
-    final congregationId = widget.congregationId;
-    final supervision = widget.supervision;
+    final scopeKey = _scopeKey;
+    final supervision = _supervision;
+    final congregationId = _congregationId;
     setState(() {
       _loading = true;
       _error = null;
@@ -113,10 +134,7 @@ class _TeamPageState extends State<TeamPage> {
         limit: 50,
         cursor: cursor,
       );
-      if (mounted &&
-          generation == _loadGeneration &&
-          congregationId == widget.congregationId &&
-          supervision == widget.supervision) {
+      if (mounted && generation == _loadGeneration && scopeKey == _scopeKey) {
         setState(() {
           _page = page;
           _cursor = cursor;
@@ -128,7 +146,7 @@ class _TeamPageState extends State<TeamPage> {
         setState(() {
           _loading = false;
           _error = error is DataFailure && error.code == 'permission'
-              ? 'Você não tem acesso a este diretório.'
+              ? 'Você não tem acesso a esta equipe.'
               : 'Não foi possível carregar a equipe. Tente novamente.';
         });
       }
@@ -154,19 +172,24 @@ class _TeamPageState extends State<TeamPage> {
   }
 
   String _accessStatus(MinistryDirectoryEntry item) {
-    if (item.email == null) return 'Sem acesso ao aplicativo';
-    if (!widget.canManageAccess) return 'Email cadastrado';
-    if (item.userAccessId != null) return 'Acesso vinculado';
-    return 'Email cadastrado · sem vínculo';
+    if (item.archivedAt != null) return 'Membro inativo';
+    if (item.email == null) return 'Sem acesso ao app';
+    return 'Acesso ao app pelo e-mail';
   }
 
   Future<void> _openContact([MinistryDirectoryEntry? item]) async {
-    if (_detailLoading ||
-        (!widget.supervision && widget.congregationId == null)) {
-      return;
-    }
-    final scope = _scope;
-    final congregationId = widget.supervision ? null : widget.congregationId;
+    if (_detailLoading || !_hasScope()) return;
+    final scope = _supervision
+        ? ContactScope.supervision
+        : ContactScope.congregation;
+    final congregationId = _congregationId;
+    final scopeKey = _scopeKey;
+    final generation = _loadGeneration;
+    bool isScopeCurrent() =>
+        mounted &&
+        scopeKey == _scopeKey &&
+        generation == _loadGeneration &&
+        _hasScope();
     MinistryContactDetail? detail;
     if (item != null) {
       setState(() {
@@ -180,36 +203,33 @@ class _TeamPageState extends State<TeamPage> {
           contactId: item.id,
         );
       } catch (error) {
-        if (mounted) {
+        if (isScopeCurrent()) {
           setState(() {
             _detailLoading = false;
             _error = error is DataFailure && error.code == 'permission'
-                ? 'Você não tem acesso a este contato.'
-                : 'Não foi possível carregar os dados do contato.';
+                ? 'Você não tem acesso a este membro.'
+                : 'Não foi possível carregar os dados do membro.';
           });
         }
         return;
       }
-      if (!_isScopeCurrent(scope, congregationId)) return;
+      if (!isScopeCurrent()) return;
       setState(() => _detailLoading = false);
     }
-    if (!_isScopeCurrent(scope, congregationId)) return;
-    if (!mounted) return;
+    if (!isScopeCurrent() || !mounted) return;
     await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         _dialogContext = dialogContext;
         return TeamContactForm(
           repository: widget.repository,
-          accessRepository: AccessRepository(widget.repository.gateway),
           scope: scope,
           congregationId: congregationId,
-          congregationName: widget.congregationName,
+          congregationName: _selectedCongregation?.name,
           current: detail,
           directory: _page?.items ?? const <MinistryDirectoryEntry>[],
-          canManageAccess: widget.canManageAccess,
           createId: _uuid.v4,
-          isScopeCurrent: () => _isScopeCurrent(scope, congregationId),
+          isScopeCurrent: isScopeCurrent,
           onScopeRefresh: widget.onScopeRefresh,
           onSaved: () {
             Navigator.of(dialogContext).pop();
@@ -222,6 +242,43 @@ class _TeamPageState extends State<TeamPage> {
     _dialogContext = null;
   }
 
+  Widget _scopeSelector() {
+    final options = <(String, String)>[
+      if (widget.canSelectSupervision)
+        (_supervisionKey, 'Equipe da supervisão'),
+      for (final congregation in widget.congregations)
+        (congregation.id, 'Equipe local · ${congregation.name}'),
+    ];
+    if (options.length < 2) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: UnifiedSpace.x2),
+      child: Base44Panel(
+        child: DropdownButtonFormField<String>(
+          key: const ValueKey('team-scope-selector'),
+          initialValue: _scopeKey,
+          isExpanded: true,
+          itemHeight: null,
+          decoration: const InputDecoration(
+            labelText: 'Equipe',
+            prefixIcon: Icon(Icons.groups_outlined),
+          ),
+          items: [
+            for (final (value, label) in options)
+              DropdownMenuItem(value: value, child: Text(label)),
+          ],
+          onChanged: _loading || _detailLoading
+              ? null
+              : (value) {
+                  if (value == null || value == _scopeKey) return;
+                  setState(() => _scopeKey = value);
+                  _resetDirectory();
+                  _load();
+                },
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
     backgroundColor: Colors.transparent,
@@ -231,22 +288,21 @@ class _TeamPageState extends State<TeamPage> {
           padding: const EdgeInsets.symmetric(vertical: UnifiedSpace.x4),
           children: [
             Base44PageHeading(
-              title: 'Equipe de discipulado',
+              title: 'Equipe',
               icon: Icons.groups_outlined,
-              subtitle: widget.supervision
-                  ? 'Diretório da supervisão'
-                  : 'Diretório da congregação',
-              trailing: widget.supervision || widget.congregationId != null
+              subtitle: _supervision ? 'Equipe da supervisão' : 'Equipe local',
+              trailing: _hasScope()
                   ? FilledButton.icon(
                       onPressed: _loading || _detailLoading
                           ? null
                           : () => _openContact(),
                       icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Adicionar contato'),
+                      label: const Text('Adicionar membro'),
                     )
                   : null,
             ),
             const SizedBox(height: UnifiedSpace.x4),
+            _scopeSelector(),
             Base44Panel(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -281,7 +337,7 @@ class _TeamPageState extends State<TeamPage> {
               ),
             ),
             const SizedBox(height: UnifiedSpace.x2),
-            if (widget.supervision == false && widget.congregationId == null)
+            if (!_hasScope())
               const Base44Panel(
                 child: Text(
                   'Selecione uma congregação autorizada para abrir a equipe.',
@@ -297,7 +353,10 @@ class _TeamPageState extends State<TeamPage> {
                 ),
               ),
             if (_detailLoading)
-              Semantics(liveRegion: true, child: LinearProgressIndicator()),
+              Semantics(
+                liveRegion: true,
+                child: const LinearProgressIndicator(),
+              ),
             if (_error != null)
               Base44Panel(
                 child: Column(
@@ -314,7 +373,7 @@ class _TeamPageState extends State<TeamPage> {
                 ),
               ),
             if (!_loading && _error == null && _page?.items.isEmpty == true)
-              const Base44Panel(child: Text('Nenhuma pessoa encontrada.')),
+              const Base44Panel(child: Text('Nenhum membro nesta equipe.')),
             for (final item in _page?.items ?? const <MinistryDirectoryEntry>[])
               Card(
                 child: ListTile(
@@ -327,15 +386,21 @@ class _TeamPageState extends State<TeamPage> {
                       children: [
                         Text(teamRoleLabel(item.roleCode)),
                         Text(_accessStatus(item)),
-                        if (item.archivedAt != null)
-                          const Text('Contato arquivado'),
                       ],
                     ),
                   ),
-                  leading: const CircleAvatar(
-                    backgroundColor: UnifiedColors.pageTint,
-                    foregroundColor: UnifiedColors.brandNavy,
-                    child: Icon(Icons.person_outline),
+                  leading: CircleAvatar(
+                    backgroundColor: item.archivedAt == null
+                        ? UnifiedColors.pageTint
+                        : UnifiedColors.border,
+                    foregroundColor: item.archivedAt == null
+                        ? UnifiedColors.brandNavy
+                        : UnifiedColors.muted,
+                    child: Icon(
+                      item.archivedAt == null
+                          ? Icons.person_outline
+                          : Icons.person_off_outlined,
+                    ),
                   ),
                   trailing: Wrap(
                     children: [
@@ -350,7 +415,7 @@ class _TeamPageState extends State<TeamPage> {
                         color: UnifiedColors.whatsapp,
                       ),
                       IconButton(
-                        tooltip: 'Editar contato',
+                        tooltip: 'Editar membro',
                         onPressed: _detailLoading
                             ? null
                             : () => _openContact(item),

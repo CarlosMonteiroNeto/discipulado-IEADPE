@@ -15,7 +15,7 @@ const _knownRoutes = {
   '/pending',
   '/admin',
   '/ministry',
-  '/ministry/team',
+  '/team',
   '/ministry/students',
   '/ministry/students/register',
   '/ministry/classes',
@@ -27,6 +27,7 @@ bool isPublicRegistrationPath(String? value) =>
     value == '/' || value == '/register';
 String safeRoute(String? value) {
   if (value == '/ministry/students/register') return '/ministry/students';
+  if (value == '/ministry/team') return '/team';
   return isSafeRoute(value) ? value! : '/register';
 }
 
@@ -40,7 +41,7 @@ List<String> routesFor(AccessScope scope) => [
   if (scope.isGlobalManager) '/admin',
   if (scope.hasMinistryAccess) ...[
     '/ministry',
-    '/ministry/team',
+    '/team',
     if (scope.ministryCongregationIds.isNotEmpty ||
         scope.isMinistrySupervision) ...[
       '/ministry/students',

@@ -40,7 +40,7 @@ class AppShell extends StatelessWidget {
     '/pending': 'Pendentes',
     '/admin': 'Admin',
     '/ministry': 'Discipulado',
-    '/ministry/team': 'Equipe',
+    '/team': 'Equipe',
     '/ministry/students': 'Alunos',
     '/ministry/students/register': 'Cadastrar aluno',
     '/ministry/classes': 'Turmas',
@@ -55,7 +55,7 @@ class AppShell extends StatelessWidget {
     '/pending': Icons.inbox_outlined,
     '/admin': Icons.settings_outlined,
     '/ministry': Icons.menu_book_outlined,
-    '/ministry/team': Icons.groups_outlined,
+    '/team': Icons.groups_outlined,
     '/ministry/students': Icons.school_outlined,
     '/ministry/students/register': Icons.person_add_alt_1_outlined,
     '/ministry/classes': Icons.class_outlined,
@@ -77,9 +77,9 @@ class AppShell extends StatelessWidget {
   List<String> _topLevelRoutes(List<String> routes) => [
     for (final route in const [
       '/home',
-      '/register',
       '/converts',
-      '/admin',
+      '/register',
+      '/team',
       '/ministry',
     ])
       if (routes.contains(route)) route,
@@ -156,6 +156,23 @@ class AppShell extends StatelessWidget {
         onPressed: onSignOut,
         icon: const Icon(Icons.logout, size: 18),
         label: const Text('Sair'),
+      );
+    }
+
+    /// Administrative settings are occasional; they stay one tap away in the
+    /// header instead of taking a bottom-bar slot from the daily workflow.
+    Widget adminAction() {
+      if (publicMode ||
+          !scope.isGlobalManager ||
+          !routes.contains('/admin')) {
+        return const SizedBox.shrink();
+      }
+      return IconButton(
+        key: const ValueKey('app-shell-admin'),
+        tooltip: 'Administração',
+        onPressed: navigationLocked ? null : () => onNavigate('/admin'),
+        color: Colors.white,
+        icon: const Icon(Icons.settings_outlined),
       );
     }
 
@@ -244,6 +261,7 @@ class AppShell extends StatelessWidget {
                           Row(
                             children: [
                               const Expanded(child: BrandHeader()),
+                              adminAction(),
                               sessionAction(),
                             ],
                           ),
@@ -263,7 +281,9 @@ class AppShell extends StatelessWidget {
                   ),
                 ),
               ),
-              if (scope.hasMinistryAccess) ministrySelector(),
+              if (scope.hasMinistryAccess &&
+                  currentRoute.startsWith('/ministry'))
+                ministrySelector(),
               Expanded(
                 child: Center(
                   child: ConstrainedBox(
@@ -276,7 +296,7 @@ class AppShell extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: mobile && !publicMode
+      bottomNavigationBar: mobile && !publicMode && primaryRoutes.length > 1
           ? SafeArea(
               top: false,
               child: Material(

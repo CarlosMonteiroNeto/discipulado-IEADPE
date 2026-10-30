@@ -12,7 +12,6 @@ Widget app(
   Future<void> Function()? refresh,
   AccessScope? scope,
   double scale = 1,
-  VoidCallback? openTeam,
 }) => MaterialApp(
   home: Scaffold(
     body: MediaQuery(
@@ -24,7 +23,6 @@ Widget app(
         scope: scope ?? AccessScope(isSupervision: true),
         gateway: gateway,
         onScopeRefresh: refresh ?? () async {},
-        onOpenTeam: openTeam ?? () {},
         reportBuilder: (_) => const Text('Relatório real'),
         eventsBuilder: (_) => const Text('Eventos reais'),
         backupBuilder: (_) => const Text('Backup real'),
@@ -41,7 +39,7 @@ Future<void> press(WidgetTester t, String label) async {
 
 void main() {
   testWidgets(
-    'manager can navigate five injected panels and feedback at 200 percent on narrow screen',
+    'manager can navigate four injected panels and feedback at 200 percent on narrow screen',
     (t) async {
       t.view.physicalSize = const Size(320, 800);
       t.view.devicePixelRatio = 1;
@@ -61,7 +59,6 @@ void main() {
                 scope: AccessScope(isSupervision: true),
                 gateway: gateway,
                 onScopeRefresh: () async {},
-                onOpenTeam: () {},
                 reportBuilder: (_) => const Text('Relatório real'),
                 eventsBuilder: (_) => const Text('Eventos reais'),
                 backupBuilder: (_) => const Text('Backup real'),
@@ -131,52 +128,6 @@ void main() {
     await t.pumpAndSettle();
     expect(gateway.commands, ['archive_congregation']);
     expect(gateway.payloads.single, {'id': catalogId});
-  });
-  testWidgets(
-    'admin without Ministry scope stays in Admin and can refresh access',
-    (t) async {
-      final gateway = AdminGateway();
-      var refreshed = 0;
-      var opened = 0;
-      await t.pumpWidget(
-        app(
-          gateway,
-          scope: AccessScope(isAdmin: true),
-          refresh: () async => refreshed++,
-          openTeam: () => opened++,
-        ),
-      );
-      await t.pumpAndSettle();
-      await press(t, 'Acessos');
-      expect(
-        find.text(
-          'O servidor não confirmou acesso à equipe. Atualize seu acesso para tentar novamente.',
-        ),
-        findsOneWidget,
-      );
-      expect(find.text('Atualizar acesso'), findsOneWidget);
-      await press(t, 'Atualizar acesso');
-      expect(refreshed, 1);
-      expect(opened, 0);
-    },
-  );
-  testWidgets('Admin access tab opens the unified Team workflow', (t) async {
-    final gateway = AdminGateway();
-    var opened = 0;
-    await t.pumpWidget(
-      app(
-        gateway,
-        scope: AccessScope(isSupervision: true, isMinistrySupervision: true),
-        openTeam: () => opened++,
-      ),
-    );
-    await t.pumpAndSettle();
-    await press(t, 'Acessos');
-    expect(find.text('Abrir equipe'), findsOneWidget);
-    expect(find.text('Novo acesso'), findsNothing);
-    await press(t, 'Abrir equipe');
-    expect(opened, 1);
-    expect(gateway.commands, isEmpty);
   });
   testWidgets('stale protected read cannot publish former user catalog', (
     t,
